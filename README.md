@@ -1,33 +1,34 @@
-# 01_IfcLCA
+# IfcLCA IFC Pipeline 🌐
 
-A web platform designed for conducting Life Cycle Assessments (LCAs) on construction projects. It streamlines the LCA process by allowing users to upload Industry Foundation Classes (IFC) files for carbon footprint analysis of building elements, presented through a user-friendly dashboard showcasing project summaries.
+Welcome to IfcLCA, an innovative web platform designed specifically for conducting Life Cycle Assessments (LCAs) on Swiss construction projects. Utilizing Industry Foundation Classes (IFC) files, our platform simplifies the process of analyzing building elements' carbon footprints. With a user-friendly dashboard, IfcLCA presents a comprehensive overview of projects, making sustainability evaluations both accessible and impactful.
 
-## Overview
+## Project Overview 🏢
 
-The platform leverages a Node.js backend with Express for server-side logic, MongoDB for data storage, and EJS for templating. It emphasizes simplicity in user interaction and system design, with server-side rendering for dynamic content delivery. The application architecture simulates carbon footprint analysis through a mock Python script.
+IfcLCA is crafted with sustainability at its core, offering real-time LCA calculations based on the SIA 2032 methodology. This ensures users can make environmentally sound decisions in alignment with Swiss construction regulations and standards.
 
-## Features
+![Process Diagram](/public/process.png)
 
-- **Dashboard Overview:** An interactive array of project cards displaying essential details and the total carbon footprint.
-- **Project Management:** Easy project creation, updating, and visualization.
-- **IFC File Analysis:** Upload IFC files for a simulated carbon footprint analysis of construction elements.
+## Key Features 🔑
 
-## Getting Started
+- **Open Standards Support:** Leveraging IFC for interoperability and integration.
+- **Real-time LCA Calculations:** Assessing embodied carbon, PE-NR, and UBP promptly.
+- **User-Friendly Dashboard:** Streamlining project overviews and environmental impacts.
+- **Project Management:** Efficiently upload, manage, and visualize project data.
+- **Material Matching:** Automatically match sustainable materials within projects.
+- **Reporting:** Effortlessly export essential data and gain insights.
 
-### Requirements
+## Get Started 🚀
 
-- Node.js
-- MongoDB
-- Python (for the mock analysis script)
+Join the IfcLCA initiative! The platform's core functionality is open-source, encouraging collaboration and contributions. Whether you're a developer, architect, engineer, or a specialist in sustainability, your input is valuable in refining IfcLCA and reducing the carbon footprint in construction.
 
-### Quickstart
+### Quick Start
 
-1. Clone the repository.
-2. Install dependencies with `npm install`.
-3. Set up your `.env` file based on `.env.example`.
-4. Start the server with `npm start`.
-5. Access the web application at `http://localhost:<PORT>` (default is 3000).
+1. **Installation:** Clone the repository and install dependencies.
+2. **Configuration:** Set up your environment with `.env`.
+3. **Launch:** Fire up the server and dive into sustainable project analysis!
 
-### License
+## Open Source & Licensing 📄
 
-Copyright (c) 2024.
+IfcLCA is committed to the principles of open-source development, fostering collaboration and community contributions towards sustainable construction solutions. We're proudly licensed under the **GNU Affero General Public License v3.0 (AGPLv3)**, which ensures that all derivative work and modifications are freely available under the same license, contributing to a growing community dedicated to sustainable development practices.
+
+Build a greener future with IfcLCA! 🌿
