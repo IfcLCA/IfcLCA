@@ -1,0 +1,52 @@
+body {
+  font-family: 'Nunito', sans-serif;
+  background-color: #f8f9fa;
+}
+
+.navbar-dark .navbar-brand {
+  color: #ff5722 !important;
+}
+
+.card {
+  margin-bottom: 20px;
+  box-shadow: 0 4px 8px rgba(0,0,0,.05);
+}
+
+.card-img-top {
+  width: 250px; /* Adjusted fixed width */
+  height: auto; /* Ensure aspect ratio is maintained */
+  object-fit: cover;
+  display: block;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.btn-primary {
+  background-color: #ff5722;
+  border-color: #ff5722;
+}
+
+.btn-primary:hover {
+  background-color: #e64a19;
+  border-color: #e64a19;
+}
+
+.form-control {
+  border-radius: 0.25rem;
+}
+
+.container {
+  padding-top: 20px;
+  padding-bottom: 20px;
+}
+
+footer {
+  background-color: #f8f9fa;
+  padding: 3px 0; /* Reduced padding for smaller height */
+  margin-top: 20px;
+  border-top: 1px solid #e7e7e7;
+}
+
+footer span {
+  color: #777;
+}

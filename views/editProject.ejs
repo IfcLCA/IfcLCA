@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="en">
+<%- include('partials/_head.ejs') %>
+<body>
+<%- include('partials/_header.ejs') %>
+<main role="main" class="container mt-4">
+    <h2>Edit Project</h2>
+    <form id="editProjectForm" action="/projects/<%= project._id %>/edit" method="POST">
+        <div class="mb-3">
+          <label for="name" class="form-label">Project Name</label>
+          <input type="text" id="name" name="name" class="form-control" value="<%= project.name %>" required>
+        </div>
+        <div class="mb-3">
+          <label for="phase" class="form-label">Phase</label>
+          <input type="text" id="phase" name="phase" class="form-control" value="<%= project.phase %>">
+        </div>
+        <div class="mb-3">
+          <label for="description" class="form-label">Description</label>
+          <textarea id="description" name="description" class="form-control" rows="3"><%= project.description %></textarea>
+        </div>
+        <div class="mb-3">
+          <label for="customImage" class="form-label">Custom Image URL</label>
+          <input type="text" id="customImage" name="customImage" class="form-control" value="<%= project.customImage %>">
+        </div>
+        <button type="submit" class="btn btn-primary">Update Project</button>
+    </form>
+</main>
+<%- include('partials/_footer.ejs') %>
+<script src="/js/projectForm.js"></script>
+</body>
+</html>
