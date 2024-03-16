@@ -16,17 +16,14 @@ router.post('/api/projects', isAuthenticated, async (req, res) => {
     const { name, phase, description, customImage, totalCarbonFootprint, EBF } = req.body;
     const user = req.session.userId;
     const timestampedName = appendTimestampToProjectName(name);
-    if (!EBF || EBF <= 0) {
-      throw new Error("Invalid EBF value. EBF must be greater than 0.");
-    }
-    const project = await Project.create({
-      name: timestampedName,
-      phase,
-      description,
-      customImage,
-      totalCarbonFootprint,
+    const project = await Project.create({ 
+      name: timestampedName, 
+      phase, 
+      description, 
+      customImage, 
+      totalCarbonFootprint, 
       user,
-      EBF
+      EBF 
     });
     console.log(`Project created successfully: ${project.name}`);
     // Modified to send JSON response instead of redirecting
@@ -51,14 +48,9 @@ router.get('/newProject', isAuthenticated, (req, res) => {
 // GET endpoint for fetching all projects
 router.get('/dashboard', isAuthenticated, async (req, res) => {
   try {
-    const userId = req.session.userId;
-    const projects = await Project.find({ user: userId }).exec();
+    const userId = req.session.userId; 
+    const projects = await Project.find({ user: userId });
     console.log(`Fetched ${projects.length} projects for user ID ${userId} successfully.`);
-    projects.forEach(project => {
-      if (project.EBF && project.totalCarbonFootprint) {
-        project.co2PerSquareMeter = (project.totalCarbonFootprint / project.EBF).toFixed(2);
-      }
-    });
     res.render('dashboard', { projects, query: req.query, formatProjectNameForDisplay: formatProjectNameForDisplay });
   } catch (error) {
     console.error('Error fetching projects:', error);
@@ -70,12 +62,9 @@ router.get('/dashboard', isAuthenticated, async (req, res) => {
 router.get('/projects/:projectId', isAuthenticated, async (req, res) => {
   try {
     const projectId = req.params.projectId;
-    const project = await Project.findById(projectId).exec();
+    const project = await Project.findById(projectId);
     if (!project) {
       return res.status(404).send('Project not found');
-    }
-    if (project.EBF && project.totalCarbonFootprint) {
-      project.co2PerSquareMeter = (project.totalCarbonFootprint / project.EBF).toFixed(2);
     }
     res.render('projectHome', { project, formatProjectNameForDisplay });
     console.log(`Rendering detailed page for project: ${project.name}`);
@@ -90,7 +79,7 @@ router.post('/api/projects/:projectId/upload', isAuthenticated, upload.single('i
   if (!req.file) {
     return res.status(400).send('No file uploaded.');
   }
-
+  
   const projectId = req.params.projectId;
   const filePath = req.file.path;
 
@@ -118,7 +107,7 @@ router.post('/api/projects/:projectId/upload', isAuthenticated, upload.single('i
         console.error(`Project with ID ${projectId} not found.`);
         return res.status(404).send('Project not found');
       }
-
+      
       // Cleanup: Delete the temporary file
       fs.unlink(filePath, err => {
         if (err) {
@@ -126,7 +115,7 @@ router.post('/api/projects/:projectId/upload', isAuthenticated, upload.single('i
         }
         console.log(`Temporary file removed: ${filePath}`);
       });
-
+      
       console.log(`Project ${project.name} updated successfully with new totalCarbonFootprint: ${elementCount}`);
       res.redirect(`/projects/${projectId}`);
     } catch (dbError) {
@@ -170,9 +159,6 @@ router.post('/projects/:projectId/edit', isAuthenticated, async (req, res) => {
   const { projectId } = req.params;
   const { name, phase, description, customImage, totalCarbonFootprint, EBF } = req.body; // Include EBF in the data received from the request for update
   try {
-    if (!EBF || EBF <= 0) {
-      throw new Error("Invalid EBF value. EBF must be greater than 0.");
-    }
     const updatedProject = await Project.findByIdAndUpdate(projectId, {
       name,
       phase,
@@ -184,7 +170,7 @@ router.post('/projects/:projectId/edit', isAuthenticated, async (req, res) => {
     if (!updatedProject) {
       return res.status(404).send('Project not found');
     }
-    console.log(`Project ${updatedProject.name} updated successfully. EBF set to ${EBF}.`);
+    console.log(`Project ${updatedProject.name} updated successfully.`);
     res.redirect(`/projects/${projectId}`);
   } catch (error) {
     console.error('Error updating project:', error);
