@@ -16,7 +16,7 @@ router.post('/api/projects', isAuthenticated, async (req, res) => {
     const { name, phase, description, customImage, totalCarbonFootprint, EBF } = req.body;
     const user = req.session.userId;
     const timestampedName = appendTimestampToProjectName(name);
-    if (!EBF || EBF <= 0) {
+    if (EBF < 0) {
       throw new Error("Invalid EBF value. EBF must be greater than 0.");
     }
     const project = await Project.create({ 
@@ -170,7 +170,7 @@ router.post('/projects/:projectId/edit', isAuthenticated, async (req, res) => {
   const { projectId } = req.params;
   const { name, phase, description, customImage, totalCarbonFootprint, EBF } = req.body; // Include EBF in the data received from the request for update
   try {
-    if (!EBF || EBF <= 0) {
+    if (EBF < 0) {
       throw new Error("Invalid EBF value. EBF must be greater than 0.");
     }
     const updatedProject = await Project.findByIdAndUpdate(projectId, {

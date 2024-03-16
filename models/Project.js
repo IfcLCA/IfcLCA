@@ -6,8 +6,11 @@ const projectSchema = new mongoose.Schema({
   description: String,
   customImage: String, // Assuming this is a URL to an image
   totalCarbonFootprint: Number,
-  user: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true }, // Add reference to User model
-  EBF: { type: Number, required: true } // Energiebezugsfläche (EBF) in m²
+  user: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User'
+  },
+  EBF: Number // EBF is now optional
 });
 
 projectSchema.pre('save', function(next) {
