@@ -1,33 +1,36 @@
-# 01_IfcLCA
+# IfcLCA 🌐
 
-01_IfcLCA is a web platform designed to facilitate Life Cycle Assessments (LCAs) on construction projects by leveraging Industry Foundation Classes (IFC) files. It aims to simplify the LCA process by providing a user-friendly dashboard for project overview and detailed carbon footprint analysis of construction elements.
+![Logo](/public/logo.png)
 
-## Overview
+Welcome to IfcLCA, an innovative web platform designed specifically for conducting Life Cycle Assessments (LCAs) on Swiss construction projects. Utilizing Industry Foundation Classes (IFC) files, our platform simplifies the process of analyzing building elements' carbon footprints. With a user-friendly dashboard, IfcLCA presents a comprehensive overview of projects, making sustainability evaluations both accessible and impactful.
 
-The platform is built on a robust architecture utilizing MongoDB for data storage, Node.js with Express for server-side logic, and EJS for server-side rendering. The front end is styled with Bootstrap and uses vanilla JavaScript for dynamic content. Projects are managed through a dashboard displaying project cards, and users can upload IFC files for analysis, which is initially simulated by counting elements in the file.
+## Project Overview 🏢
 
-## Features
+IfcLCA is crafted with sustainability at its core, offering real-time LCA calculations based on the SIA 2032 methodology. This ensures users can make environmentally sound decisions in alignment with Swiss construction regulations and standards (adding more environmental databases is straightforward, but underlying methodoligies can differ quite a bit, depending on where you perform an LCA).
 
-- **Dashboard Overview:** View all projects at a glance with details including name, phase, and total carbon footprint.
-- **Project Management:** Add new projects easily through a user-friendly form.
-- **IFC File Analysis:** Upload IFC files for detailed carbon footprint analysis of building elements.
-- **Simplified User Interface:** Designed with simplicity in mind, providing a straightforward user experience.
+![Process Diagram](/public/process.png)
 
-## Getting started
+## Key Features 🔑
 
-### Requirements
+- **Open Standards Support:** Leveraging IFC for interoperability and integration.
+- **Real-time LCA Calculations:** Assessing embodied carbon, PE-NR, and UBP promptly.
+- **User-Friendly Dashboard:** Streamlining project overviews and environmental impacts.
+- **Material Matching:** Automatically match sustainable materials within projects.
+- **Reporting:** Effortlessly export essential data and gain insights.
 
-- MongoDB installed and running
-- Node.js and npm installed
+## Join the opensource LCA initiative 🚀
+IfcLCA is steadfast in its commitment to open-source development, fostering a culture of collaboration and contribution. We believe in maintaining an unwavering transparency, particularly when it comes to Life Cycle Assessments. 
+Our platform's core features are, and always will be, openly available—allowing users and developers alike to scrutinize, enhance, and innovate within our shared ecosystem. This dedication not only fuels progress but also ensures accountability and integrity in our collective pursuit of sustainable construction practices.
+ Whether you're a developer, architect, engineer, or a specialist in sustainability, your input is valuable in refining IfcLCA and reducing the carbon footprint in construction.
 
-### Quickstart
+### Quick Start
 
-1. Clone the repository and navigate into the project directory.
-2. Copy `.env.example` to `.env` and fill in your MongoDB URL and session secret.
-3. Run `npm install` to install dependencies.
-4. Start the server with `npm start`.
-5. Open your browser and navigate to `http://localhost:3001` to view the dashboard.
+tbd
 
-### License
+## Open Source & Licensing 📄
 
-Copyright (c) 2024.
+IfcLCA is committed to the principles of open-source development, fostering collaboration and community contributions towards sustainable construction solutions. We're proudly licensed under the **GNU Affero General Public License v3.0 (AGPLv3)**, which ensures that all derivative work and modifications are freely available under the same license, contributing to a growing community dedicated to sustainable development practices. 
+
+Free as in Freedom, not like free beer 😉
+
+Build a greener future with IfcLCA! 🌿
