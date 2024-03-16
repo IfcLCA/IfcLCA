@@ -5,6 +5,7 @@ const { isAuthenticated } = require('./middleware/authMiddleware');
 const multer = require('multer');
 const { exec } = require('child_process');
 const fs = require('fs');
+const { formatProjectNameForDisplay, appendTimestampToProjectName } = require('../utils/util');
 
 // Setup Multer for file upload
 const upload = multer({ dest: 'uploads/' });
@@ -12,14 +13,27 @@ const upload = multer({ dest: 'uploads/' });
 // POST endpoint for creating a new project
 router.post('/api/projects', isAuthenticated, async (req, res) => {
   try {
-    const { name, phase, description, customImage, totalCarbonFootprint } = req.body;
-    const project = await Project.create({ name, phase, description, customImage, totalCarbonFootprint });
+    const { name, phase, description, customImage, totalCarbonFootprint, EBF } = req.body;
+    const user = req.session.userId;
+    const timestampedName = appendTimestampToProjectName(name);
+    if (!EBF || EBF <= 0) {
+      throw new Error("Invalid EBF value. EBF must be greater than 0.");
+    }
+    const project = await Project.create({
+      name: timestampedName,
+      phase,
+      description,
+      customImage,
+      totalCarbonFootprint,
+      user,
+      EBF
+    });
     console.log(`Project created successfully: ${project.name}`);
-    res.status(201).json(project);
+    // Modified to send JSON response instead of redirecting
+    res.json({ status: 'success', url: `/projects/${project._id}` });
   } catch (error) {
-    console.error('Error creating project:', error.message);
-    console.error(error.stack);
-    res.status(400).json({ message: error.message, stack: error.stack });
+    console.error('Error creating project:', error);
+    res.status(400).json({ message: "Error creating project", error: error.toString() });
   }
 });
 
@@ -29,22 +43,26 @@ router.get('/newProject', isAuthenticated, (req, res) => {
     res.render('newProject');
     console.log('Rendering new project form.');
   } catch (error) {
-    console.error('Error rendering new project form:', error.message);
-    console.error(error.stack);
+    console.error('Error rendering new project form:', error);
     res.status(500).send('Error rendering new project form.');
   }
 });
 
 // GET endpoint for fetching all projects
-router.get('/api/projects', isAuthenticated, async (req, res) => {
+router.get('/dashboard', isAuthenticated, async (req, res) => {
   try {
-    const projects = await Project.find({});
-    console.log(`Fetched ${projects.length} projects successfully.`);
-    res.json(projects);
+    const userId = req.session.userId;
+    const projects = await Project.find({ user: userId }).exec();
+    console.log(`Fetched ${projects.length} projects for user ID ${userId} successfully.`);
+    projects.forEach(project => {
+      if (project.EBF && project.totalCarbonFootprint) {
+        project.co2PerSquareMeter = (project.totalCarbonFootprint / project.EBF).toFixed(2);
+      }
+    });
+    res.render('dashboard', { projects, query: req.query, formatProjectNameForDisplay: formatProjectNameForDisplay });
   } catch (error) {
-    console.error('Error fetching projects:', error.message);
-    console.error(error.stack);
-    res.status(500).json({ message: "Error fetching projects", error: error.message });
+    console.error('Error fetching projects:', error);
+    res.status(500).json({ message: "Error fetching projects", error: error.toString() });
   }
 });
 
@@ -52,15 +70,17 @@ router.get('/api/projects', isAuthenticated, async (req, res) => {
 router.get('/projects/:projectId', isAuthenticated, async (req, res) => {
   try {
     const projectId = req.params.projectId;
-    const project = await Project.findById(projectId);
+    const project = await Project.findById(projectId).exec();
     if (!project) {
       return res.status(404).send('Project not found');
     }
-    res.render('projectHome', { project });
+    if (project.EBF && project.totalCarbonFootprint) {
+      project.co2PerSquareMeter = (project.totalCarbonFootprint / project.EBF).toFixed(2);
+    }
+    res.render('projectHome', { project, formatProjectNameForDisplay });
     console.log(`Rendering detailed page for project: ${project.name}`);
   } catch (error) {
-    console.error('Error fetching project details:', error.message);
-    console.error(error.stack);
+    console.error('Error fetching project details:', error);
     res.status(500).send('Error fetching project details.');
   }
 });
@@ -70,12 +90,12 @@ router.post('/api/projects/:projectId/upload', isAuthenticated, upload.single('i
   if (!req.file) {
     return res.status(400).send('No file uploaded.');
   }
-  
+
   const projectId = req.params.projectId;
   const filePath = req.file.path;
 
   // Determine Python command based on environment
-  const pythonCommand = process.env.PYTHON_CMD || 'C:\\Users\\LouisTrümpler\\anaconda3\\python.exe';
+  const pythonCommand = process.env.PYTHON_CMD || 'python'; // Use 'python' assuming it's in PATH
 
   // Call the Python script to analyze the IFC file
   exec(`${pythonCommand} scripts/analyze_ifc.py "${filePath}"`, async (error, stdout, stderr) => {
@@ -98,23 +118,35 @@ router.post('/api/projects/:projectId/upload', isAuthenticated, upload.single('i
         console.error(`Project with ID ${projectId} not found.`);
         return res.status(404).send('Project not found');
       }
-      
+
       // Cleanup: Delete the temporary file
       fs.unlink(filePath, err => {
         if (err) {
           console.error(`Error removing temporary file: ${filePath}`, err);
-          // Not returning to allow the process to continue despite the error
         }
         console.log(`Temporary file removed: ${filePath}`);
       });
-      
+
       console.log(`Project ${project.name} updated successfully with new totalCarbonFootprint: ${elementCount}`);
-      res.json(project);
+      res.redirect(`/projects/${projectId}`);
     } catch (dbError) {
       console.error('Database error:', dbError);
       res.status(500).send('Error updating project with analysis results.');
     }
   });
+});
+
+// POST endpoint for deleting a project
+router.post('/api/projects/:projectId/delete', isAuthenticated, async (req, res) => {
+  try {
+    const projectId = req.params.projectId;
+    await Project.findByIdAndDelete(projectId); // Changed from findByIdAndRemove to findByIdAndDelete
+    console.log(`Project with ID ${projectId} has been deleted successfully.`);
+    res.redirect('/dashboard?deletionSuccess=true');
+  } catch (error) {
+    console.error('Error deleting project:', error);
+    res.status(500).send('Error deleting project.');
+  }
 });
 
 // GET endpoint for editing a project's details
@@ -128,8 +160,7 @@ router.get('/projects/:projectId/edit', isAuthenticated, async (req, res) => {
     res.render('editProject', { project });
     console.log(`Rendering edit form for project: ${project.name}`);
   } catch (error) {
-    console.error('Error rendering edit form:', error.message);
-    console.error(error.stack);
+    console.error('Error rendering edit form:', error);
     res.status(500).send('Error rendering edit form.');
   }
 });
@@ -137,23 +168,26 @@ router.get('/projects/:projectId/edit', isAuthenticated, async (req, res) => {
 // POST endpoint for updating a project's details
 router.post('/projects/:projectId/edit', isAuthenticated, async (req, res) => {
   const { projectId } = req.params;
-  const { name, phase, description, customImage, totalCarbonFootprint } = req.body;
+  const { name, phase, description, customImage, totalCarbonFootprint, EBF } = req.body; // Include EBF in the data received from the request for update
   try {
+    if (!EBF || EBF <= 0) {
+      throw new Error("Invalid EBF value. EBF must be greater than 0.");
+    }
     const updatedProject = await Project.findByIdAndUpdate(projectId, {
       name,
       phase,
       description,
       customImage,
-      totalCarbonFootprint
+      totalCarbonFootprint,
+      EBF // Update the project with the new EBF value
     }, { new: true });
     if (!updatedProject) {
       return res.status(404).send('Project not found');
     }
-    console.log(`Project ${updatedProject.name} updated successfully.`);
+    console.log(`Project ${updatedProject.name} updated successfully. EBF set to ${EBF}.`);
     res.redirect(`/projects/${projectId}`);
   } catch (error) {
-    console.error('Error updating project:', error.message);
-    console.error(error.stack);
+    console.error('Error updating project:', error);
     res.status(500).send('Error updating project');
   }
 });

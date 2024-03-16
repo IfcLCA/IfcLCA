@@ -1,11 +1,13 @@
 const mongoose = require('mongoose');
 
 const projectSchema = new mongoose.Schema({
-  name: { type: String, required: true, unique: true },
+  name: { type: String, required: true },
   phase: String,
   description: String,
   customImage: String, // Assuming this is a URL to an image
-  totalCarbonFootprint: Number
+  totalCarbonFootprint: Number,
+  user: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true }, // Add reference to User model
+  EBF: { type: Number, required: true } // Energiebezugsfläche (EBF) in m²
 });
 
 projectSchema.pre('save', function(next) {
@@ -19,12 +21,14 @@ projectSchema.post('save', function(doc, next) {
 });
 
 projectSchema.post('save', function(error, doc, next) {
-  if (error.name === 'MongoError' && error.code === 11000) {
-    console.error(`Error: A project with the name '${doc.name}' already exists.`);
-    next(new Error('Duplicate project name.'));
-  } else {
+  if (error.name === 'MongoError' && error.code !== 11000) {
+    console.error(`MongoDB error: ${error.message}`);
+    next(error); // Pass on MongoDB errors other than code 11000
+  } else if (error) {
     console.error(`Error saving project: ${error.message}`, error.stack);
     next(error); // Pass on any other errors to the handler
+  } else {
+    next();
   }
 });
 

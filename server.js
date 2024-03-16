@@ -52,6 +52,14 @@ app.on("error", (error) => {
   console.error(error.stack);
 });
 
+// Middleware to inject success message into response locals based on URL query
+app.use((req, res, next) => {
+  if (req.query.uploadSuccess) {
+    res.locals.uploadSuccess = true;
+  }
+  next();
+});
+
 // Logging session creation and destruction
 app.use((req, res, next) => {
   const sess = req.session;

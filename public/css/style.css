@@ -42,11 +42,41 @@ body {
 
 footer {
   background-color: #f8f9fa;
-  padding: 3px 0; /* Reduced padding for smaller height */
+  padding: 1px 0; /* Adjusted to make the footer less high */
   margin-top: 20px;
   border-top: 1px solid #e7e7e7;
 }
 
 footer span {
   color: #777;
+}
+
+/* Added styles for success message */
+.alert-success {
+  color: #3c763d;
+  background-color: #dff0d8;
+  border-color: #d6e9c6;
+  padding: 15px;
+  margin-bottom: 20px;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  text-align: center;
+}
+
+/* Additional styles to address user feedback */
+.navbar .btn-primary {
+  position: absolute;
+  right: 1rem;
+  top: 0.5rem; /* Ensure it aligns well with the navbar */
+}
+
+/* Style adjustments for specific buttons on the navbar */
+.navbar .btn-primary, .navbar .btn-primary:hover {
+  background-color: #ff5722; /* Orange color as per user request */
+  border-color: #ff5722;
+}
+
+.navbar .btn-primary:hover {
+  background-color: #e64a19;
+  border-color: #e64a19;
 }

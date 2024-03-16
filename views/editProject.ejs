@@ -22,7 +22,14 @@
           <label for="customImage" class="form-label">Custom Image URL</label>
           <input type="text" id="customImage" name="customImage" class="form-control" value="<%= project.customImage %>">
         </div>
+        <div class="mb-3">
+          <label for="EBF" class="form-label">Energiebezugsfläche (EBF) in m²</label>
+          <input type="number" id="EBF" name="EBF" class="form-control" value="<%= project.EBF %>" step="0.01" min="0" required>
+        </div>
         <button type="submit" class="btn btn-primary">Update Project</button>
+    </form>
+    <form action="/api/projects/<%= project._id %>/delete" method="POST" onsubmit="return confirm('Are you sure you want to delete this project? This action cannot be undone.');">
+        <button type="submit" class="btn btn-danger" style="margin-top: 20px;">Delete Project</button>
     </form>
 </main>
 <%- include('partials/_footer.ejs') %>

@@ -17,13 +17,22 @@ document.getElementById('newProjectForm').addEventListener('submit', function(e)
   })
   .then(response => {
     if (!response.ok) {
-      throw new Error('Network response was not ok');
+      return response.json().then(errorData => {
+        throw new Error(errorData.message || 'Failed to create project');
+      });
     }
     return response.json();
   })
   .then(data => {
-    console.log('Project created successfully:', data);
-    document.getElementById('message').innerHTML = `<div class="alert alert-success" role="alert">Project created successfully!</div>`;
+    if(data && data.url) {
+      // Display success message before redirecting
+      document.getElementById('message').innerHTML = `<div class="alert alert-success" role="alert">Project created successfully! Redirecting...</div>`;
+      setTimeout(() => {
+        window.location.href = data.url; // Redirect to the project's home page
+      }, 2000); // Delay redirection to allow the user to read the success message
+    } else {
+      throw new Error('Missing project URL for redirection');
+    }
   })
   .catch((error) => {
     console.error('Error creating project:', error);
