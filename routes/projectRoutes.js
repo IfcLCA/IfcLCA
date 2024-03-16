@@ -75,7 +75,7 @@ router.post('/api/projects/:projectId/upload', isAuthenticated, upload.single('i
   const filePath = req.file.path;
 
   // Determine Python command based on environment
-  const pythonCommand = process.env.PYTHON_CMD || 'C:\\Users\\LouisTrümpler\\AppData\\Local\\Programs\\Python\\Python310\\python.exe';
+  const pythonCommand = process.env.PYTHON_CMD || 'C:\\Users\\LouisTrümpler\\anaconda3\\python.exe';
 
   // Call the Python script to analyze the IFC file
   exec(`${pythonCommand} scripts/analyze_ifc.py "${filePath}"`, async (error, stdout, stderr) => {
