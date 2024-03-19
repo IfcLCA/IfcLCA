@@ -192,8 +192,7 @@ router.post('/projects/:projectId/edit', isAuthenticated, async (req, res) => {
   }
 });
 
-const Project = require('../models/Project');
-
+// GET endpoint for fetching all elements of a project
 router.get('/projects/:projectId/elements', isAuthenticated, async (req, res) => {
   try {
     const projectId = req.params.projectId;
