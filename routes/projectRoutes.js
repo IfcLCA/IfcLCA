@@ -193,8 +193,8 @@ router.post('/projects/:projectId/edit', isAuthenticated, async (req, res) => {
   }
 });
 
-// GET endpoint for fetching all elements of a project
-router.get('/projects/:projectId/elements', isAuthenticated, async (req, res) => {
+// GET endpoint for fetching all elements of a project as JSON
+router.get('/api/projects/:projectId/elements', isAuthenticated, async (req, res) => {
   try {
     const projectId = req.params.projectId;
     const project = await Project.findById(projectId).populate('building_elements');

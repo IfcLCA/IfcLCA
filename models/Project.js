@@ -13,7 +13,7 @@ const projectSchema = new mongoose.Schema({
   EBF: Number, // EBF is now optional,
   building_elements: [{
     type: mongoose.Schema.Types.ObjectId,
-    ref: 'building_elements'
+    ref: 'BuildingElement'
   }],
 });
 
