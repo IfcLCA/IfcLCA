@@ -6,6 +6,7 @@ const multer = require('multer');
 const { exec } = require('child_process');
 const fs = require('fs');
 const { formatProjectNameForDisplay, appendTimestampToProjectName } = require('../utils/util');
+const BuildingElement = require('../models/BuildingElement');
 
 // Setup Multer for file upload
 const upload = multer({ dest: 'uploads/' });
@@ -98,7 +99,7 @@ router.post('/api/projects/:projectId/upload', isAuthenticated, upload.single('i
   const pythonCommand = process.env.PYTHON_CMD || 'C:\\Users\\LouisTrümpler\\anaconda3\\python.exe'; 
 
   // Call the Python script to analyze the IFC file
-  exec(`${pythonCommand} scripts/analyze_ifc.py "${filePath}"`, async (error, stdout, stderr) => {
+  exec(`${pythonCommand} scripts/analyze_ifc.py "${filePath}" "${projectId}"`, async (error, stdout, stderr) => {
     if (error) {
       console.error(`exec error: ${error}`);
       console.error(`Analysis script stderr: ${stderr}`);
@@ -196,12 +197,15 @@ router.post('/projects/:projectId/edit', isAuthenticated, async (req, res) => {
 router.get('/projects/:projectId/elements', isAuthenticated, async (req, res) => {
   try {
     const projectId = req.params.projectId;
-    const project = await Project.findById(projectId); // Adjust query as needed
-    res.json(project.building_elements);
+    const project = await Project.findById(projectId).populate('building_elements');
+    if (!project) {
+      return res.status(404).send('Project not found');
+    }
+    console.log('Fetched project:', project);  // Log the fetched project data
+    res.json(project.building_elements);  // Send the building_elements as a JSON response
   } catch (error) {
-    console.error('Error fetching elements:', error);
-    res.status(500).json({ message: "Error fetching elements", error: error.toString() });
+    console.error('Error fetching project:', error);
+    res.status(500).send('Error fetching project');
   }
 });
-
 module.exports = router;

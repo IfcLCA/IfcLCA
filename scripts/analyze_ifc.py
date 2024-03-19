@@ -122,7 +122,7 @@ def calculate_volume(shape):
     brepgprop_VolumeProperties(shape.geometry, prop)
     return prop.Mass()
 
-def process_element(ifc_file, element, settings, ifc_file_path, user_id, session_id):
+def process_element(ifc_file, element, settings, ifc_file_path, user_id, session_id, projectId):
     """
     Processes a single building element to extract detailed data and metadata, 
     including handling of multilayer materials.
@@ -176,13 +176,14 @@ def process_element(ifc_file, element, settings, ifc_file_path, user_id, session
         "is_multilayer": is_multilayer,
         "ifc_file_origin": ifc_file_path,
         "user_id": user_id,
-        "session_id": session_id
+        "session_id": session_id,
+        "project_id": projectId
     }
-  
+   
     return element_data
 
 
-def main(file_path):
+def main(file_path, projectId):
     # Connect to the MongoDB instance with the specified database
     client = pymongo.MongoClient("mongodb://localhost:27017/IfcLCAdata_01")
     # Access or create the database and collection
@@ -202,7 +203,7 @@ def main(file_path):
     total_volume = 0  # Initialize total volume accumulator
 
     for element in elements:
-        element_data = process_element(ifc_file, element, settings, file_path, user_id, session_id)
+        element_data = process_element(ifc_file, element, settings, file_path, user_id, session_id, projectId)
         if element_data:
             # Add the volume of the current element to the total volume
             total_volume += element_data['total_volume']
@@ -213,9 +214,10 @@ def main(file_path):
     print(total_volume)
 
 if __name__ == "__main__":
-    if len(sys.argv) != 2:
+    if len(sys.argv) != 3:
         print("Usage: python script.py <path_to_ifc_file>", file=sys.stderr)
         sys.exit(1)
 
     file_path = sys.argv[1]
-    main(file_path)
+    projectId = sys.argv[2]
+    main(file_path, projectId)

@@ -47,7 +47,14 @@
             {title: "Volume", field: "volume"},
             {title: "Material", field: "materials_info", formatter: "textarea"} // Assuming materials_info contains a summary or array of materials
         ],
-    });
+        ajaxResponse: function(url, params, response){
+            console.log('Data from server:', response);  // Log the data from the server
+            return response;  // Return the data for Tabulator
+        },
+        ajaxError: function(xhr, textStatus, errorThrown){
+                console.error('Error loading data:', textStatus, errorThrown);  // Log any errors
+        },
+});
 </script>
 </body>
 </html>
