@@ -183,7 +183,6 @@ def process_element(ifc_file, element, settings, ifc_file_path, user_id, session
 
 
 def main(file_path):
-def main(file_path, project_id):
     # Connect to the MongoDB instance with the specified database
     client = pymongo.MongoClient("mongodb://localhost:27017/IfcLCAdata_01")
     # Access or create the database and collection
@@ -196,28 +195,27 @@ def main(file_path, project_id):
 
     # Example values for demonstration
     user_id = "example_user_id"
-    session_id = "example_session_id"  # This should be updated to fetch the latest session ID for the project
+    session_id = "example_session_id"
 
     elements = load_ifc_data(ifc_file)
 
     total_volume = 0  # Initialize total volume accumulator
 
     for element in elements:
-        element_data = process_element(ifc_file, element, settings, file_path, user_id, session_id, project_id)
+        element_data = process_element(ifc_file, element, settings, file_path, user_id, session_id)
         if element_data:
             # Add the volume of the current element to the total volume
             total_volume += element_data['total_volume']
             # Insert the processed element data into the collection
             collection.insert_one(element_data)
-
     
     # Print the total volume after processing all elements
     print(total_volume)
 
 if __name__ == "__main__":
-    if len(sys.argv) != 3:
-        print("Usage: python script.py <path_to_ifc_file> <project_id>", file=sys.stderr)
+    if len(sys.argv) != 2:
+        print("Usage: python script.py <path_to_ifc_file>", file=sys.stderr)
         sys.exit(1)
 
-    file_path, project_id = sys.argv[1], sys.argv[2]
-    main(file_path, project_id)
+    file_path = sys.argv[1]
+    main(file_path)

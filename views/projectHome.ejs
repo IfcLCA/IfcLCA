@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <%- include('partials/_head.ejs') %>
+<link href="https://cdn.jsdelivr.net/npm/tabulator-tables/dist/css/tabulator.min.css" rel="stylesheet">
 <body>
 <%- include('partials/_header.ejs') %>
 <main role="main" class="container mt-4">
@@ -23,9 +24,30 @@
             IFC file uploaded successfully!
         </div>
     <% } %>
+    <!-- Tabulator Table for Building Elements -->
+    <div id="elements-table" class="mt-4"></div>
     <a href="/projects/<%= project._id %>/edit" class="btn btn-primary" style="margin-top: 20px;">Edit Project</a>
 </main>
 <%- include('partials/_footer.ejs') %>
+<script src="https://cdn.jsdelivr.net/npm/tabulator-tables/dist/js/tabulator.min.js"></script>
 <script src="/js/uploadIfc.js"></script>
+<script>
+    // Initialize Tabulator on DOM element
+    var table = new Tabulator("#elements-table", {
+        height: "auto",
+        layout: "fitColumns",
+        ajaxURL: "/api/projects/<%= project._id %>/elements", // URL to fetch data
+        columns: [
+            {title: "IFC GUID", field: "guid"},
+            {title: "IFC Instance Name", field: "instance_name"},
+            {title: "IFC Class", field: "ifc_class"},
+            {title: "Building Storey", field: "building_storey"},
+            {title: "Is Loadbearing", field: "is_loadbearing"},
+            {title: "Is External", field: "is_external"},
+            {title: "Volume", field: "volume"},
+            {title: "Material", field: "materials_info", formatter: "textarea"} // Assuming materials_info contains a summary or array of materials
+        ],
+    });
+</script>
 </body>
 </html>

@@ -95,7 +95,7 @@ router.post('/api/projects/:projectId/upload', isAuthenticated, upload.single('i
   const filePath = req.file.path;
 
   // Determine Python command based on environment
-  const pythonCommand = process.env.PYTHON_CMD || 'python'; // Use 'python' assuming it's in PATH
+  const pythonCommand = process.env.PYTHON_CMD || 'C:\\Users\\LouisTrümpler\\anaconda3\\python.exe'; 
 
   // Call the Python script to analyze the IFC file
   exec(`${pythonCommand} scripts/analyze_ifc.py "${filePath}"`, async (error, stdout, stderr) => {
@@ -189,6 +189,19 @@ router.post('/projects/:projectId/edit', isAuthenticated, async (req, res) => {
   } catch (error) {
     console.error('Error updating project:', error);
     res.status(500).send('Error updating project');
+  }
+});
+
+const Project = require('../models/Project');
+
+router.get('/projects/:projectId/elements', isAuthenticated, async (req, res) => {
+  try {
+    const projectId = req.params.projectId;
+    const project = await Project.findById(projectId); // Adjust query as needed
+    res.json(project.building_elements);
+  } catch (error) {
+    console.error('Error fetching elements:', error);
+    res.status(500).json({ message: "Error fetching elements", error: error.toString() });
   }
 });
 

@@ -130,3 +130,6 @@ dist
 .pnp.*t
 
 uploads/
+
+venv/
+.aider*
