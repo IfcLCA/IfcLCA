@@ -215,7 +215,7 @@ def main(file_path, projectId):
 
 if __name__ == "__main__":
     if len(sys.argv) != 3:
-        print("Usage: python script.py <path_to_ifc_file>", file=sys.stderr)
+        print("Usage: python script.py <path_to_ifc_file> <projectId>", file=sys.stderr)
         sys.exit(1)
 
     file_path = sys.argv[1]
