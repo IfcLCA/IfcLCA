@@ -15,7 +15,9 @@
         <% projects.forEach(function(project) { %>
           <a href="/projects/<%= project._id %>" style="text-decoration: none; color: inherit;">
             <div class="card" style="width: 18rem; margin: 10px;">
-              <img src="<%= project.customImage || '/path/to/default/image.png' %>" class="card-img-top" alt="<%= project.name %>">
+              <% if (project.customImage) { %>
+               <img src="<%= project.customImage %>" class="card-img-top" alt="<%= project.name %>">
+             <% } %>
               <div class="card-body">
                 <h5 class="card-title"><%= project.displayName || project.name %> - <small><%= project.description %></small></h5>
                 <p class="card-text">Phase: <%= project.phase %></p>
