@@ -32,8 +32,10 @@
 <script src="https://cdn.jsdelivr.net/npm/tabulator-tables/dist/js/tabulator.min.js"></script>
 <script src="/js/uploadIfc.js"></script>
 <script>
-    // Tabulator table initialization script will be moved to a separate JS file for better maintainability
-    // The new file will be /js/projectTable.js
+    // Pass the project ID to the JavaScript file
+    <script>
+        var projectId = "<%= project._id %>";
+    </script>
 </script>
 <script src="/js/projectTable.js"></script>
 </body>

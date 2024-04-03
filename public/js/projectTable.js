@@ -2,7 +2,7 @@
 var table = new Tabulator("#elements-table", {
     height: "auto",
     layout: "fitColumns",
-    ajaxURL: "/api/projects/<%= project._id %>/elements", // URL to fetch data
+    ajaxURL: "/api/projects/" + projectId + "/elements", // URL to fetch data
     columns: [
         {title: "GUID", field: "guid"},
         {title: "Name", field: "name"},
@@ -20,6 +20,7 @@ var table = new Tabulator("#elements-table", {
         {title: "Indikator (kgCO2eq/kg)", field: "indikator", editor: "input"},
         {title: "Total CO2", field: "total_co2", formatter: "textarea"},
         {title: "Bewehrung", field: "bewehrung", editor: "input"},
+        // ... rest of the columns ...
     ],
     // Additional Tabulator options for sorting, filtering, and collapsing will be added here
     // ...
