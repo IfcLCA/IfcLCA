@@ -16,7 +16,7 @@
           <a href="/projects/<%= project._id %>" style="text-decoration: none; color: inherit;">
             <div class="card" style="width: 18rem; margin: 10px;">              
               <% if (project.customImage) { %>
-                <img src="<%= project.customImage %>" class="card-img-top" alt="<%= project.name %>">
+                <img src="<%= project.customImage %>" class="card-img-top" alt="<%= project.publicName %>">
               <% } %>
               <div class="card-body">
                 <h5 class="card-title"><%= project.publicName %> - <small><%= project.description %></small></h5>
