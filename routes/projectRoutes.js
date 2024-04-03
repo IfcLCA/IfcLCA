@@ -8,6 +8,18 @@ const fs = require('fs');
 const { formatProjectNameForDisplay, appendTimestampToProjectName } = require('../utils/util');
 const BuildingElement = require('../models/BuildingElement');
 
+// GET endpoint for fetching building elements of a project by ID as JSON
+router.get('/api/projects/:projectId/building-elements', isAuthenticated, async (req, res) => {
+  try {
+    const projectId = req.params.projectId;
+    const buildingElements = await BuildingElement.find({ project: projectId }).select('name type material quantity');
+    res.json(buildingElements);
+  } catch (error) {
+    console.error('Error fetching building elements:', error);
+    res.status(500).json({ message: "Error fetching building elements", error: error.toString() });
+  }
+});
+
 // Setup Multer for file upload
 const upload = multer({ dest: 'uploads/' });
 
