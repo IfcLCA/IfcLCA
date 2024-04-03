@@ -67,21 +67,37 @@
     }
 
     // Fetch and display building elements for the latest upload
-    fetch(`/api/projects/${projectId}/building-elements`)
-      .then(response => response.json())
-      .then(elements => {
-        const tableBody = document.getElementById('building-elements').querySelector('tbody');
-        elements.forEach(element => {
-          const row = tableBody.insertRow();
-          row.innerHTML = `
-            <td>${element.name}</td>
-            <td>${element.type}</td>
-            <td>${element.material}</td>
-            <td>${element.quantity}</td>
-          `;
+    function populateBuildingElementsTable() {
+      fetch(`/api/projects/${projectId}/building-elements`)
+        .then(response => {
+          if (!response.ok) {
+            throw new Error('Network response was not ok');
+          }
+          return response.json();
+        })
+        .then(elements => {
+          const tableBody = document.getElementById('building-elements').querySelector('tbody');
+          // Clear existing rows
+          tableBody.innerHTML = '';
+          // Populate table with new rows
+          elements.forEach(element => {
+            const row = tableBody.insertRow();
+            row.innerHTML = `
+              <td>${element.name}</td>
+              <td>${element.type}</td>
+              <td>${element.material}</td>
+              <td>${element.quantity}</td>
+            `;
+          });
+        })
+        .catch(error => {
+          console.error('Error fetching building elements:', error);
+          // Optionally update the UI to indicate that an error occurred
         });
-      })
-      .catch(error => console.error('Error fetching building elements:', error));
+    }
+
+    // Call the function to populate the table
+    populateBuildingElementsTable();
   });
 </script>
 </body>
