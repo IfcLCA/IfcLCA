@@ -6,7 +6,7 @@
 <%- include('partials/_header.ejs') %>
 <main role="main" class="container mt-4">
     <div class="project-details">
-        <h2><%= formatProjectNameForDisplay(project.name) %></h2>
+        <h2><%= project.name %></h2>
         <p><strong>Phase:</strong> <%= project.phase %></p>
         <p><strong>Description:</strong> <%= project.description %></p>
         <p><strong>Total Carbon Footprint:</strong> <span id="carbonFootprint"><%= project.totalCarbonFootprint %></span></p>
@@ -26,7 +26,6 @@
     <% } %>
     <!-- Tabulator Table for Building Elements -->
     <div id="elements-table" class="mt-4"></div>
-    <a href="/projects/<%= project._id %>/edit" class="btn btn-primary" style="margin-top: 20px;">Edit Project</a>
 </main>
 <%- include('partials/_footer.ejs') %>
 <script src="https://cdn.jsdelivr.net/npm/tabulator-tables/dist/js/tabulator.min.js"></script>

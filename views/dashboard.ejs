@@ -14,10 +14,12 @@
       <div id="projects-container" class="d-flex flex-wrap justify-content-around">
         <% projects.forEach(function(project) { %>
           <a href="/projects/<%= project._id %>" style="text-decoration: none; color: inherit;">
-            <div class="card" style="width: 18rem; margin: 10px;">
-              <img src="<%= project.customImage %>" class="card-img-top" alt="<%= project.name %>">
+            <div class="card" style="width: 18rem; margin: 10px;">              
+              <% if (project.customImage) { %>
+                <img src="<%= project.customImage %>" class="card-img-top" alt="<%= project.name %>">
+              <% } %>
               <div class="card-body">
-                <h5 class="card-title"><%= formatProjectNameForDisplay(project.name) %> - <small><%= project.description %></small></h5>
+                <h5 class="card-title"><%= project.name %> - <small><%= project.description %></small></h5>
                 <p class="card-text">Phase: <%= project.phase %></p>
                 <p class="card-text">Carbon Footprint: <%= project.totalCarbonFootprint %></p>
                 <p class="card-text">EBF (m²): <%= project.EBF %></p>
