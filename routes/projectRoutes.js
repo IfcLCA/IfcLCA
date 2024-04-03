@@ -229,15 +229,3 @@ router.get('/api/projects/latest/:projectName/elements', isAuthenticated, async 
     res.status(500).send('Error fetching project elements');
   }
 });
-    // Debug: Log the project ID when the route is hit
-    console.log(`[Debug] Fetching project with ID: ${req.params.projectId}`);
-
-        // Debug: Log the project name after it is successfully fetched
-        console.log(`[Debug] Project fetched: ${project.name}`);
-
-        // Debug: Log the project name when rendering the project home page
-        console.log(`[Debug] Rendering project home for: ${project.name}`);
-
-        // Debug: Log error if there is an issue fetching the project data
-        console.error(`[Debug] Error fetching project details for ID ${req.params.projectId}:`, error);
-
