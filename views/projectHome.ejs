@@ -36,5 +36,18 @@
     var projectName = "<%= project.name %>";
 </script>
 <script src="/js/projectTable.js"></script>
+<script>
+  // Debugging code to log project data on page load
+  document.addEventListener('DOMContentLoaded', function() {
+    console.log("Project data on page load:", {
+      projectId: "<%= project._id %>",
+      projectName: "<%= project.name %>",
+      totalCarbonFootprint: "<%= project.totalCarbonFootprint %>"
+    });
+    if (!projectId || !projectName) {
+      console.error("Project ID or name is undefined. Check the server response and EJS variable interpolation.");
+    }
+  });
+</script>
 </body>
 </html>
