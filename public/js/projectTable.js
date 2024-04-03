@@ -2,7 +2,10 @@
 var table = new Tabulator("#elements-table", {
     height: "auto",
     layout: "fitColumns",
-    ajaxURL: "/api/projects/" + projectId + "/elements", // URL to fetch data
+    // Function to set the AJAX URL dynamically to fetch the latest elements by project name
+    ajaxURL: function(url){
+        return "/api/projects/latest/" + projectName + "/elements";
+    },
     columns: [
         {title: "GUID", field: "guid"},
         {title: "Name", field: "name"},
