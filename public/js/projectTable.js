@@ -4,7 +4,12 @@ var table = new Tabulator("#elements-table", {
     layout: "fitColumns",
     // Function to set the AJAX URL dynamically to fetch the latest elements by project name
     ajaxURL: function(url){
+        console.log("Fetching building elements data from URL:", url);
         return "/api/projects/latest/" + projectName + "/elements";
+    },
+    ajaxResponse:function(url, params, response){
+        console.log("Received response for building elements data:", response);
+        return response; //return the tableData property of a response json object
     },
     columns: [
         {title: "GUID", field: "guid"},
@@ -17,6 +22,7 @@ var table = new Tabulator("#elements-table", {
         {title: "Volume", field: "volume"},
         {title: "Surface", field: "surface"},
         {title: "Material", field: "material"},
+        {title: "Matched Material", field: "matched_material", editor: "select", editorParams: {values: ["Material 1", "Material 2", "Material 3"]}},
         // Matched Material as a dropdown with KBOB Materials as selection
         {title: "Matched Material", field: "matched_material", editor: "select", editorParams: {values: ["Material 1", "Material 2", "Material 3"]}}, // Replace with actual KBOB Materials
         {title: "Rohdichte (kg/m3)", field: "rohdichte", editor: "input"},
