@@ -24,14 +24,11 @@ document.addEventListener('DOMContentLoaded', function() {
             }
             return response.json();
         })
-        .then(data => {
-            // Refresh the table data after successful upload and analysis
-            table.setData(`/api/projects/${projectId}/elements`);
-            messageContainer.textContent = 'IFC file uploaded and analyzed successfully!';
-        })
+        .then(data => window.location.href = `/projects/${projectId}`)
         .catch(error => {
             messageContainer.textContent = error.message;
         });
     });
+});
 
 });
