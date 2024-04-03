@@ -70,22 +70,19 @@ router.get('/dashboard', isAuthenticated, async (req, res) => {
 // GET endpoint for a project's detailed page
 router.get('/projects/:projectId', isAuthenticated, async (req, res) => {
   try {
-    const projectId = req.params.projectId;
-    const project = await Project.findById(projectId);
-    if (!project) {
-      return res.status(404).send('Project not found');
-    }
-    if (project.EBF && project.totalCarbonFootprint) {
-      project.co2PerSquareMeter = (project.totalCarbonFootprint / project.EBF).toFixed(2);
-    }
-    res.render('projectHome', { project, formatProjectNameForDisplay });
-    console.log(`Rendering detailed page for project: ${project.name}`);
+      const projectId = req.params.projectId;
+      const project = await Project.findById(projectId);
+      if (!project) {
+          return res.status(404).send('Project not found');
+      }
+      if (project.EBF && project.totalCarbonFootprint) {
+          project.co2PerSquareMeter = (project.totalCarbonFootprint / project.EBF).toFixed(2);
+      }
+      res.render('projectHome', { project, formatProjectNameForDisplay });
   } catch (error) {
-    console.error('Error fetching project details:', error);
-    res.status(500).send('Error fetching project details.');
+      res.status(500).send('Error fetching project details.');
   }
 });
-
 // POST endpoint for IFC file upload
 router.post('/api/projects/:projectId/upload', isAuthenticated, upload.single('ifcFile'), (req, res) => {
   if (!req.file) {
@@ -226,6 +223,40 @@ router.get('/api/projects/latest/:projectName/elements', isAuthenticated, async 
   } catch (error) {
     console.error('Error fetching project elements:', error);
     res.status(500).json({ message: "Error fetching project elements", error: error.toString() });
+    res.status(500).send('Error fetching project elements');
+  }
+});
+
+router.get('/api/projects/:projectId/elements', isAuthenticated, async (req, res) => {
+  try {
+    const projectId = req.params.projectId;
+    console.log(`Fetching building elements for project with ID: ${projectId}`);  // Log the project ID
+    const project = await Project.findById(projectId).populate('building_elements');
+    if (!project) {
+      console.error(`Project with ID '${projectId}' not found.`);  // Log an error message if the project is not found
+      return res.status(404).send('Project not found');
+    }
+    console.log('Fetched project:', project);  // Log the fetched project data
+    res.json(project.building_elements);  // Send the building_elements as a JSON response
+  } catch (error) {
+    console.error(`Error fetching project with ID '${projectId}':`, error);  // Log the error message and stack trace
+    res.status(500).send('Error fetching project');
+  }
+});
+
+router.get('/api/projects/latest/:projectName/elements', isAuthenticated, async (req, res) => {
+  try {
+    const projectName = req.params.projectName;
+    console.log(`Fetching latest building elements for project with name: ${projectName}`);  // Log the project name
+    const project = await Project.findOne({ name: projectName }).sort({ createdAt: -1 }).populate('building_elements');
+    if (!project) {
+      console.error(`Project with name '${projectName}' not found.`);  // Log an error message if the project is not found
+      return res.status(404).send('Project not found');
+    }
+    console.log('Fetched latest project elements:', project.building_elements);  // Log the fetched building elements
+    res.json(project.building_elements);  // Send the building_elements as a JSON response
+  } catch (error) {
+    console.error(`Error fetching latest project elements for project with name '${projectName}':`, error);  // Log the error message and stack trace
     res.status(500).send('Error fetching project elements');
   }
 });
