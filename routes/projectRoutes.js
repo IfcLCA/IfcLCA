@@ -136,7 +136,6 @@ router.post('/api/projects/:projectId/upload', isAuthenticated, upload.single('i
     }
   });
 });
-
 // POST endpoint for deleting a project
 router.post('/api/projects/:projectId/delete', isAuthenticated, async (req, res) => {
   try {

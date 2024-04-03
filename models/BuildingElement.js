@@ -13,7 +13,7 @@ const buildingElementSchema = new mongoose.Schema({
   ifc_file_origin: String,
   user_id: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
   session_id: String,
-  project_id: { type: mongoose.Schema.Types.ObjectId, ref: 'Project', required: true }
+  projectId: { type: mongoose.Schema.Types.ObjectId, ref: 'Project', required: true }
 }, { timestamps: true });
 
 const BuildingElement = mongoose.model('BuildingElement', buildingElementSchema);

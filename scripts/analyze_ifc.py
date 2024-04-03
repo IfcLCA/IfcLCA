@@ -112,7 +112,7 @@ def calculate_volume(shape):
     """
     Calculates the volume of a given shape using Open CASCADE technology.
 
-    Args:
+    Args:§
         shape: The geometric shape object.
 
     Returns:
@@ -177,7 +177,7 @@ def process_element(ifc_file, element, settings, ifc_file_path, user_id, session
         "ifc_file_origin": ifc_file_path,
         "user_id": user_id,
         "session_id": session_id,
-        "project_id": projectId
+        "projectId": projectId
     }
    
     return element_data
