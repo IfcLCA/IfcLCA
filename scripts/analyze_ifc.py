@@ -4,7 +4,7 @@ from ifcopenshell import geom
 from OCC.Core.BRepGProp import brepgprop_VolumeProperties
 from OCC.Core.GProp import GProp_GProps
 from collections import Counter
-import pymongo
+from pymongo import MongoClient
 
 def open_ifc_file(file_path):
     """
@@ -185,7 +185,7 @@ def process_element(ifc_file, element, settings, ifc_file_path, user_id, session
 
 def main(file_path, projectId):
     # Connect to the MongoDB instance with the specified database
-    client = pymongo.MongoClient("mongodb://localhost:27017/IfcLCAdata_01")
+    client =   MongoClient("mongodb://localhost:27017/")
     # Access or create the database and collection
     db = client["IfcLCAdata_01"]
     collection = db["building_elements"]

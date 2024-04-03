@@ -229,19 +229,3 @@ router.get('/api/projects/latest/:projectName/elements', isAuthenticated, async 
     res.status(500).send('Error fetching project elements');
   }
 });
-
-router.get('/projects/:projectId', isAuthenticated, async (req, res) => {
-  try {
-      const projectId = req.params.projectId;
-      const project = await Project.findById(projectId);
-      if (!project) {
-          return res.status(404).send('Project not found');
-      }
-      if (project.EBF && project.totalCarbonFootprint) {
-          project.co2PerSquareMeter = (project.totalCarbonFootprint / project.EBF).toFixed(2);
-      }
-      res.render('projectHome', { project, formatProjectNameForDisplay });
-  } catch (error) {
-      res.status(500).send('Error fetching project details.');
-  }
-});
