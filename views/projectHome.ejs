@@ -32,30 +32,9 @@
 <script src="https://cdn.jsdelivr.net/npm/tabulator-tables/dist/js/tabulator.min.js"></script>
 <script src="/js/uploadIfc.js"></script>
 <script>
-    // Initialize Tabulator on DOM element
-    var table = new Tabulator("#elements-table", {
-        height: "auto",
-        layout: "fitColumns",
-        ajaxURL: "/api/projects/<%= project._id %>/elements", // URL to fetch data
-        columns: [
-            {title: "IFC GUID", field: "guid"},
-            {title: "IFC Instance Name", field: "instance_name"},
-            {title: "IFC Class", field: "ifc_class"},
-            {title: "Building Storey", field: "building_storey"},
-            {title: "Is Loadbearing", field: "is_loadbearing"},
-            {title: "Is External", field: "is_external"},
-            {title: "Volume", field: "volume"},
-            {title: "Material", field: "materials_info", formatter: "textarea"} // Assuming materials_info contains a summary or array of materials
-        ],
-        ajaxResponse: function(url, params, response){
-            response.forEach(element => {
-                if (element.materials_info && Array.isArray(element.materials_info)) {
-                    element.materials_info = element.materials_info.map(info => `${info.name}: ${info.volume.toFixed(2)}`).join(", ");
-                }
-            });
-            return response;
-},
-});
+    // Tabulator table initialization script will be moved to a separate JS file for better maintainability
+    // The new file will be /js/projectTable.js
 </script>
+<script src="/js/projectTable.js"></script>
 </body>
 </html>
