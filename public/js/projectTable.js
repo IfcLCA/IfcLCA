@@ -5,12 +5,17 @@ var table = new Tabulator("#elements-table", {
     // Function to set the AJAX URL dynamically to fetch the latest elements by project name
     ajaxURL: function(url){
         console.log("Fetching building elements data from URL:", url);
+        console.error("If you see this message in the console, the AJAX URL function is being called.");
         return "/api/projects/latest/" + projectName + "/elements";
     },
     ajaxResponse:function(url, params, response){
         console.log("Received response for building elements data:", response);
+        if (!response) {
+            console.error("No response received for building elements data. Check the network tab for failed requests.");
+        }
         return response; //return the tableData property of a response json object
     },
+    // ... rest of the Tabulator initialization ...
     columns: [
         {title: "GUID", field: "guid"},
         {title: "Name", field: "name"},

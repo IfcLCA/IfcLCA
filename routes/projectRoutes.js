@@ -208,18 +208,24 @@ router.get('/api/projects/:projectId/elements', isAuthenticated, async (req, res
   }
 });
 module.exports = router;// GET endpoint for fetching the latest elements of a project by name as JSON
+// GET endpoint for fetching the latest elements of a project by name as JSON
 router.get('/api/projects/latest/:projectName/elements', isAuthenticated, async (req, res) => {
   try {
     const projectName = req.params.projectName;
     // Find the latest project with the given name
     const project = await Project.findOne({ name: projectName }).sort({ createdAt: -1 }).populate('building_elements');
     if (!project) {
+        console.error(`Project with name '${projectName}' not found.`);
       return res.status(404).send('Project not found');
     }
     console.log('Fetched latest project elements:', project.building_elements);  // Log the fetched building elements
+    if (!project.building_elements || project.building_elements.length === 0) {
+        console.error(`No building elements found for project '${projectName}'.`);
+    }
     res.json(project.building_elements);  // Send the building_elements as a JSON response
   } catch (error) {
     console.error('Error fetching project elements:', error);
+    res.status(500).json({ message: "Error fetching project elements", error: error.toString() });
     res.status(500).send('Error fetching project elements');
   }
 });
