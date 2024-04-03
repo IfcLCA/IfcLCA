@@ -26,6 +26,23 @@
     <% } %>
     <!-- Tabulator Table for Building Elements -->
     <div id="elements-table" class="mt-4"></div>
+    <!-- Placeholder for Building Elements Table -->
+    <div id="building-elements-table" class="mt-4">
+        <h3>Building Elements</h3>
+        <table id="building-elements">
+            <thead>
+                <tr>
+                    <th>Name</th>
+                    <th>Type</th>
+                    <th>Material</th>
+                    <th>Quantity</th>
+                </tr>
+            </thead>
+            <tbody>
+                <!-- Building elements will be populated here -->
+            </tbody>
+        </table>
+    </div>
     <a href="/projects/<%= project._id %>/edit" class="btn btn-primary" style="margin-top: 20px;">Edit Project</a>
 </main>
 <%- include('partials/_footer.ejs') %>
@@ -48,6 +65,23 @@
     if (!projectId || !projectName) {
       console.error("Project ID or name is undefined. Check the server response and EJS variable interpolation.");
     }
+
+    // Fetch and display building elements for the latest upload
+    fetch(`/api/projects/${projectId}/building-elements`)
+      .then(response => response.json())
+      .then(elements => {
+        const tableBody = document.getElementById('building-elements').querySelector('tbody');
+        elements.forEach(element => {
+          const row = tableBody.insertRow();
+          row.innerHTML = `
+            <td>${element.name}</td>
+            <td>${element.type}</td>
+            <td>${element.material}</td>
+            <td>${element.quantity}</td>
+          `;
+        });
+      })
+      .catch(error => console.error('Error fetching building elements:', error));
   });
 </script>
 </body>
