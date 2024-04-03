@@ -19,7 +19,7 @@
                 <img src="<%= project.customImage %>" class="card-img-top" alt="<%= project.name %>">
               <% } %>
               <div class="card-body">
-                <h5 class="card-title"><%= formatProjectNameForDisplay(project.name) %> - <small><%= project.description %></small></h5>
+                <h5 class="card-title"><%= project.publicName %> - <small><%= project.description %></small></h5>
                 <p class="card-text">Phase: <%= project.phase %></p>
                 <p class="card-text">Carbon Footprint: <%= project.totalCarbonFootprint %></p>
                 <p class="card-text">EBF (m²): <%= project.EBF %></p>
