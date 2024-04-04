@@ -21,27 +21,22 @@ router.get('/api/projects/:projectId/building_elements', isAuthenticated, async 
     const buildingElements = await BuildingElement.find({ projectId: projectId });
     console.log(`Found ${buildingElements.length} building elements for Project ID: ${projectId}`);
 
-    if (!buildingElements.length) {
-      console.log(`No building elements found for Project ID: ${projectId}`); // More specific log for no elements found
-      return res.status(404).json({ message: 'No building elements found for project ID' });
-    }
-
-    // Print first element to console for a quick check (if large data, logging all might not be efficient)
-    console.log("First building element found:", buildingElements[0]);
-
-    const responseData = buildingElements.map(element => {
-      return {
-        guid: element.guid,
+    const responseData = buildingElements.map(element => ({
+      ...element._doc, // Spread the element document
+      materials_info: element.materials_info.map(material => ({
+        name: material.name,
+        volume: material.volume,
         instance_name: element.instance_name,
         ifc_class: element.ifc_class,
-        materials_info: element.materials_info.map(material => ({
-          ...material,
-          instance_name: element.instance_name,
-          ifc_class: element.ifc_class,
-          guid: element.guid,
-        }))
-      };
-    });
+        guid: element.guid,
+        building_storey: element.building_storey,
+        is_loadbearing: element.is_loadbearing,
+        is_external: element.is_external,
+        
+      })),
+  
+    }));
+    
 
     console.log("Response data prepared, sending back to client."); // Log before sending the response
     res.json(responseData);

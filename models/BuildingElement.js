@@ -1,19 +1,28 @@
 const mongoose = require('mongoose');
 
 const buildingElementSchema = new mongoose.Schema({
-  guid: { type: String, required: true },
-  instance_name: { type: String, required: false },
-  ifc_class: { type: String, required: false },
+  guid: String,
+  instance_name: String,
+  ifc_class: String,
   materials_info: [{
     name: String,
     volume: Number
   }],
-  total_volume: { type: Number, required: false },
-  
-  
-  projectId: { type: String, required: false },
-  
-
+  total_volume: Number,
+  is_multilayer: Boolean,
+  ifc_file_origin: String,
+  user_id: String,
+  session_id: String,
+  projectId: String,
+  building_storey: String,
+  is_loadbearing: Boolean,
+  is_external: Boolean,
+  surface: Number,
+  matched_material: String,
+  rohdichte: Number,
+  indikator: Number,
+  total_co2: Number,
+  bewehrung: Number,
 }, { timestamps: false });
 
 const BuildingElement = mongoose.model('BuildingElement', buildingElementSchema, 'building_elements');

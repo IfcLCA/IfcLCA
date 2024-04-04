@@ -28,7 +28,10 @@ var table = new Tabulator("#elements-table", {
                     ...material,
                     guid: buildingElement.guid,
                     instance_name: buildingElement.instance_name,
-                    ifc_class: buildingElement.ifc_class
+                    ifc_class: buildingElement.ifc_class,
+                    building_storey: buildingElement.building_storey,
+                    is_loadbearing: buildingElement.is_loadbearing,
+                    is_external: buildingElement.is_external
                 });
             });
         });
@@ -43,15 +46,15 @@ var table = new Tabulator("#elements-table", {
     
     columns: [
         {title: "GUID", field: "guid"},
-        {title: "Name", field: "instance_name"},
-        {title: "Type", field: "type"},
         {title: "IfcClass", field: "ifc_class"},
+        {title: "Name", field: "instance_name"},
+        //{title: "Type", field: "type"},
         {title: "BuildingStorey", field: "building_storey"},
-        {title: "IsLoadbearing", field: "is_loadbearing"},
-        {title: "IsExternal", field: "is_external"},
+        {title: "IsLoadbearing", field: "is_loadbearing", typeof: "boolean"},
+        {title: "IsExternal", field: "is_external", typeof: "boolean"},
         {title: "Volume", field: "volume"},
         {title: "Surface", field: "surface"},
-        {title: "Material", field: "material"},
+        {title: "Material", field: "name"},
         // Matched Material as a dropdown with KBOB Materials as selection
         {title: "Matched Material", field: "matched_material", editor: "select", editorParams: {values: ["Material 1", "Material 2", "Material 3"]}}, // Replace with actual KBOB Materials
         {title: "Rohdichte (kg/m3)", field: "rohdichte", editor: "input"},

@@ -122,6 +122,31 @@ def calculate_volume(shape):
     brepgprop_VolumeProperties(shape.geometry, prop)
     return prop.Mass()
 
+def get_building_storey(element):
+    """
+    Attempts to find the building storey an element is contained in.
+    """
+    containing_storey = ifcopenshell.util.element.get_container(element)
+    if containing_storey and containing_storey.is_a("IfcBuildingStorey"):
+        return containing_storey.Name
+    return None
+
+def get_element_property(element, property_name):
+    """
+    Retrieves a specific property value for an IFC element by property name.
+    """
+    # Attempt to retrieve all Psets for the element
+    psets = ifcopenshell.util.element.get_psets(element)
+    
+    # Iterate through all Psets and their properties
+    for pset_name, properties in psets.items():
+        # Check if the property exists in this Pset and return its value
+        if property_name in properties:
+            return properties[property_name]
+    
+    # Return None if the property was not found in any Pset
+    return None
+
 def process_element(ifc_file, element, settings, ifc_file_path, user_id, session_id, projectId):
     """
     Processes a single building element to extract detailed data and metadata, 
@@ -167,6 +192,11 @@ def process_element(ifc_file, element, settings, ifc_file_path, user_id, session
 
     is_multilayer = len(materials_info) > 1
 
+    building_storey = get_building_storey(element)
+    is_loadbearing = get_element_property(element, "IsLoadbearing")
+    is_external = get_element_property(element, "IsExternal")
+
+
     element_data = {
         "guid": element.GlobalId,
         "instance_name": element.Name if element.Name else "Unnamed",
@@ -177,7 +207,10 @@ def process_element(ifc_file, element, settings, ifc_file_path, user_id, session
         "ifc_file_origin": ifc_file_path,
         "user_id": user_id,
         "session_id": session_id,
-        "projectId": projectId
+        "projectId": projectId,
+        "building_storey": building_storey,
+        "is_loadbearing": is_loadbearing,
+        "is_external": is_external
     }
    
     return element_data
