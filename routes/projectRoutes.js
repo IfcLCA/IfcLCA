@@ -13,16 +13,43 @@ const BuildingElement = require('../models/BuildingElement');
 router.get('/api/projects/:projectId/building-elements', isAuthenticated, async (req, res) => {
   try {
     const projectId = req.params.projectId;
+    // Directly fetching building elements associated with the projectId
     const buildingElements = await BuildingElement.find({ projectId: projectId });
-    if (buildingElements.length === 0) {
-      console.log('No building elements found for project ID:', projectId);
+
+    if (!buildingElements.length) {
+      // If no building elements are found, return a 404 with a message
+      return res.status(404).json({ message: 'No building elements found for project ID' });
     }
-    res.json(buildingElements);
+
+    // Print all elements to console
+    console.log(buildingElements);
+
+    // Preparing data for the response, if necessary
+    const responseData = buildingElements.map(element => {
+      // Mapping or processing data if needed before sending the response
+      return {
+        guid: element.guid,
+        instance_name: element.instance_name,
+        ifc_class: element.ifc_class,
+        materials_info: element.materials_info.map(material => ({
+          ...material,
+          instance_name: element.instance_name,
+          ifc_class: element.ifc_class,
+          guid: element.guid, // Adding the GUID to the materials info
+        }))
+      };
+    });
+
+    // Responding with the processed building elements
+    res.json(responseData);
   } catch (error) {
     console.error('Error fetching building elements:', error);
     res.status(500).json({ message: "Error fetching building elements", error: error.toString() });
   }
 });
+
+
+    
 
 // Setup Multer for file upload
 const upload = multer({ dest: 'uploads/' });
@@ -101,7 +128,6 @@ router.get('/projects/:projectId', isAuthenticated, async (req, res) => {
   try {
       const projectId = req.params.projectId;
       const project = await Project.findById(projectId).populate('building_elements');
-      const project = await Project.findById(projectId);
       if (!project) {
           return res.status(404).send('Project not found');
       }

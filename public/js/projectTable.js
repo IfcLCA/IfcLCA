@@ -12,24 +12,30 @@ if (typeof projectName === 'undefined') {
 var table = new Tabulator("#elements-table", {
     height: "auto",
     layout: "fitColumns",
-    // Function to set the AJAX URL dynamically to fetch the latest elements by project name
-    ajaxURL:  `/api/projects/${projectId}/building-elements`,
+    ajaxURL:  `/api/projects/${projectId}/building-elements`, // Ensure projectId is correctly defined
     
     ajaxRequesting:function(url, params){
+        // Log the AJAX request details
         console.log("Making AJAX request to:", url, "with params:", params);
     },
+    
     ajaxResponse:function(url, params, response){
+        // Log the response for debugging
         console.log("Received response for building elements data:", response);
+        
         if (!response || response.length === 0) {
-            console.error("No response or empty response received for building elements data. Check the network tab for failed requests.");
+            console.error("No response or empty response received for building elements data.");
+            return []; // Return an empty array to prevent errors in Tabulator
         }
-        return response; //return the tableData property of a response json object
+        
+        return response; // Directly return the response as it matches the expected format
     },
+    
     ajaxError:function(xhr, textStatus, errorThrown){
+        // Handle AJAX errors
         console.error("AJAX error:", textStatus, errorThrown);
     },
-
-    // ... rest of the Tabulator initialization ...
+    
     columns: [
         {title: "GUID", field: "guid"},
         {title: "Name", field: "name"},
