@@ -16,5 +16,5 @@ const buildingElementSchema = new mongoose.Schema({
 
 }, { timestamps: false });
 
-const BuildingElement = mongoose.model('BuildingElement', buildingElementSchema);
+const BuildingElement = mongoose.model('BuildingElement', buildingElementSchema, 'building_elements');
 module.exports = BuildingElement;

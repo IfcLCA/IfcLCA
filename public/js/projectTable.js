@@ -12,7 +12,7 @@ if (typeof projectName === 'undefined') {
 var table = new Tabulator("#elements-table", {
     height: "auto",
     layout: "fitColumns",
-    ajaxURL:  `/api/projects/${projectId}/building-elements`, // Ensure projectId is correctly defined
+    ajaxURL:  `/api/projects/${projectId}/building_elements`, // Ensure projectId is correctly defined
     
     ajaxRequesting:function(url, params){
         // Log the AJAX request details
@@ -20,15 +20,20 @@ var table = new Tabulator("#elements-table", {
     },
     
     ajaxResponse:function(url, params, response){
-        // Log the response for debugging
-        console.log("Received response for building elements data:", response);
-        
-        if (!response || response.length === 0) {
-            console.error("No response or empty response received for building elements data.");
-            return []; // Return an empty array to prevent errors in Tabulator
-        }
-        
-        return response; // Directly return the response as it matches the expected format
+        // Flatten building elements to materials_info with additional details
+        var flattenedData = [];
+        response.forEach(buildingElement => {
+            buildingElement.materials_info.forEach(material => {
+                flattenedData.push({
+                    ...material,
+                    guid: buildingElement.guid,
+                    instance_name: buildingElement.instance_name,
+                    ifc_class: buildingElement.ifc_class
+                });
+            });
+        });
+        console.log("Flattened data for table:", flattenedData);
+        return flattenedData;
     },
     
     ajaxError:function(xhr, textStatus, errorThrown){
@@ -38,7 +43,7 @@ var table = new Tabulator("#elements-table", {
     
     columns: [
         {title: "GUID", field: "guid"},
-        {title: "Name", field: "name"},
+        {title: "Name", field: "instance_name"},
         {title: "Type", field: "type"},
         {title: "IfcClass", field: "ifc_class"},
         {title: "BuildingStorey", field: "building_storey"},

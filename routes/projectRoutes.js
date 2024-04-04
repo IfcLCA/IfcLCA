@@ -10,23 +10,26 @@ const { formatProjectNameForDisplay, appendTimestampToProjectName } = require('.
 const BuildingElement = require('../models/BuildingElement');
 
 // GET endpoint for fetching building elements of a project by ID as JSON
-router.get('/api/projects/:projectId/building-elements', isAuthenticated, async (req, res) => {
+router.get('/api/projects/:projectId/building_elements', isAuthenticated, async (req, res) => {
+  console.log("Accessed the building_elements endpoint");
+
   try {
     const projectId = req.params.projectId;
+    console.log("Project ID received:", projectId); // Log the received project ID for verification
+
     // Directly fetching building elements associated with the projectId
     const buildingElements = await BuildingElement.find({ projectId: projectId });
+    console.log(`Found ${buildingElements.length} building elements for Project ID: ${projectId}`);
 
     if (!buildingElements.length) {
-      // If no building elements are found, return a 404 with a message
+      console.log(`No building elements found for Project ID: ${projectId}`); // More specific log for no elements found
       return res.status(404).json({ message: 'No building elements found for project ID' });
     }
 
-    // Print all elements to console
-    console.log(buildingElements);
+    // Print first element to console for a quick check (if large data, logging all might not be efficient)
+    console.log("First building element found:", buildingElements[0]);
 
-    // Preparing data for the response, if necessary
     const responseData = buildingElements.map(element => {
-      // Mapping or processing data if needed before sending the response
       return {
         guid: element.guid,
         instance_name: element.instance_name,
@@ -35,19 +38,18 @@ router.get('/api/projects/:projectId/building-elements', isAuthenticated, async 
           ...material,
           instance_name: element.instance_name,
           ifc_class: element.ifc_class,
-          guid: element.guid, // Adding the GUID to the materials info
+          guid: element.guid,
         }))
       };
     });
 
-    // Responding with the processed building elements
+    console.log("Response data prepared, sending back to client."); // Log before sending the response
     res.json(responseData);
   } catch (error) {
-    console.error('Error fetching building elements:', error);
+    console.error('Error fetching building elements:', error.message, error.stack);
     res.status(500).json({ message: "Error fetching building elements", error: error.toString() });
   }
 });
-
 
     
 
