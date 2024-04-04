@@ -99,14 +99,17 @@ router.get('/dashboard', isAuthenticated, async (req, res) => {
 router.get('/projects/:projectId', isAuthenticated, async (req, res) => {
   try {
       const projectId = req.params.projectId;
-      const project = await Project.findById(projectId).populate('building_elements');
+      const project = await Project.findById(projectId);
       if (!project) {
           return res.status(404).send('Project not found');
       }
       if (project.EBF && project.totalCarbonFootprint) {
           project.co2PerSquareMeter = (project.totalCarbonFootprint / project.EBF).toFixed(2);
       }
-      const buildingElements = await BuildingElement.find({ projectId: projectId });
+      const buildingElements = await BuildingElement.find({ projectId: project._id.toString() });
+      if (buildingElements.length === 0) {
+          console.log(`No building elements found for project ID: ${projectId}`);
+      }
       res.render('projectHome', { project, buildingElements, formatProjectNameForDisplay });
   } catch (error) {
       console.error('Error fetching project details:', error);
