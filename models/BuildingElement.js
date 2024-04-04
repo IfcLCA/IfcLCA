@@ -9,13 +9,13 @@ const buildingElementSchema = new mongoose.Schema({
     volume: Number
   }],
   total_volume: { type: Number, required: true },
-  is_multilayer: { type: Boolean, required: true },
-  ifc_file_origin: String,
-  user_id: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
-  session_id: String,
-  projectId: { type: mongoose.Schema.Types.ObjectId, ref: 'Project', required: true }
+  
+  
+  projectId: { type: String, required: true },
+  
+
 }, { timestamps: true });
 
-const BuildingElement = mongoose.model('BuildingElement', buildingElementSchema);
+const BuildingElement = mongoose.model('building-elements', buildingElementSchema);
 
 module.exports = BuildingElement;

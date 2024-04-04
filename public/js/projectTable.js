@@ -13,11 +13,8 @@ var table = new Tabulator("#elements-table", {
     height: "auto",
     layout: "fitColumns",
     // Function to set the AJAX URL dynamically to fetch the latest elements by project name
-    ajaxURL: function(){
-        var ajaxUrl = "/api/projects/latest/" + projectName + "/elements";
-        console.log(`Fetching building elements data from URL: ${ajaxUrl}`);
-        return ajaxUrl;
-    },
+    ajaxURL:  `/api/projects/${projectId}/building-elements`,
+    
     ajaxRequesting:function(url, params){
         console.log("Making AJAX request to:", url, "with params:", params);
     },

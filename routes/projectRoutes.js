@@ -12,7 +12,10 @@ const BuildingElement = require('../models/BuildingElement');
 router.get('/api/projects/:projectId/building-elements', isAuthenticated, async (req, res) => {
   try {
     const projectId = req.params.projectId;
-    const buildingElements = await BuildingElement.find({ project: projectId }).select('name type material quantity');
+    const buildingElements = await BuildingElement.find({ projectId: projectId });
+    if (buildingElements.length === 0) {
+      console.log('No building elements found for project ID:', projectId);
+    }
     res.json(buildingElements);
   } catch (error) {
     console.error('Error fetching building elements:', error);
@@ -42,11 +45,24 @@ router.post('/api/projects', isAuthenticated, async (req, res) => {
       EBF 
     });
     console.log(`Project created successfully: ${project.name}`);
-    // Modified to send JSON response instead of redirecting
     res.json({ status: 'success', url: `/projects/${project._id}` });
   } catch (error) {
     console.error('Error creating project:', error);
     res.status(400).json({ message: "Error creating project", error: error.toString() });
+  }
+});
+
+router.get('/api/projects/:projectId', isAuthenticated, async (req, res) => {
+  try {
+    const projectId = req.params.projectId;
+    const project = await Project.findById(projectId).populate('building_elements');
+    if (!project) {
+      return res.status(404).json({ message: 'Project not found' });
+    }
+    res.json(project);
+  } catch (error) {
+    console.error('Error fetching project:', error);
+    res.status(500).json({ message: "Error fetching project", error: error.toString() });
   }
 });
 
@@ -201,74 +217,4 @@ router.post('/projects/:projectId/edit', isAuthenticated, async (req, res) => {
   }
 });
 
-// GET endpoint for fetching all elements of a project as JSON
-router.get('/api/projects/:projectId/elements', isAuthenticated, async (req, res) => {
-  try {
-    const projectId = req.params.projectId;
-    const project = await Project.findById(projectId).populate('building_elements');
-    if (!project) {
-      return res.status(404).send('Project not found');
-    }
-    console.log('Fetched project:', project);  // Log the fetched project data
-    res.json(project.building_elements);  // Send the building_elements as a JSON response
-  } catch (error) {
-    console.error('Error fetching project:', error);
-    res.status(500).send('Error fetching project');
-  }
-});
-module.exports = router;// GET endpoint for fetching the latest elements of a project by name as JSON
-// GET endpoint for fetching the latest elements of a project by name as JSON
-router.get('/api/projects/latest/:projectName/elements', isAuthenticated, async (req, res) => {
-  try {
-    const projectName = req.params.projectName;
-    // Find the latest project with the given name
-    const project = await Project.findOne({ name: projectName }).sort({ createdAt: -1 }).populate('building_elements');
-    if (!project) {
-        console.error(`Project with name '${projectName}' not found.`);
-      return res.status(404).send('Project not found');
-    }
-    console.log('Fetched latest project elements:', project.building_elements);  // Log the fetched building elements
-    if (!project.building_elements || project.building_elements.length === 0) {
-        console.error(`No building elements found for project '${projectName}'.`);
-    }
-    res.json(project.building_elements);  // Send the building_elements as a JSON response
-  } catch (error) {
-    console.error('Error fetching project elements:', error);
-    res.status(500).json({ message: "Error fetching project elements", error: error.toString() });
-    res.status(500).send('Error fetching project elements');
-  }
-});
-
-router.get('/api/projects/:projectId/elements', isAuthenticated, async (req, res) => {
-  try {
-    const projectId = req.params.projectId;
-    console.log(`Fetching building elements for project with ID: ${projectId}`);  // Log the project ID
-    const project = await Project.findById(projectId).populate('building_elements');
-    if (!project) {
-      console.error(`Project with ID '${projectId}' not found.`);  // Log an error message if the project is not found
-      return res.status(404).send('Project not found');
-    }
-    console.log('Fetched project:', project);  // Log the fetched project data
-    res.json(project.building_elements);  // Send the building_elements as a JSON response
-  } catch (error) {
-    console.error(`Error fetching project with ID '${projectId}':`, error);  // Log the error message and stack trace
-    res.status(500).send('Error fetching project');
-  }
-});
-
-router.get('/api/projects/latest/:projectName/elements', isAuthenticated, async (req, res) => {
-  try {
-    const projectName = req.params.projectName;
-    console.log(`Fetching latest building elements for project with name: ${projectName}`);  // Log the project name
-    const project = await Project.findOne({ name: projectName }).sort({ createdAt: -1 }).populate('building_elements');
-    if (!project) {
-      console.error(`Project with name '${projectName}' not found.`);  // Log an error message if the project is not found
-      return res.status(404).send('Project not found');
-    }
-    console.log('Fetched latest project elements:', project.building_elements);  // Log the fetched building elements
-    res.json(project.building_elements);  // Send the building_elements as a JSON response
-  } catch (error) {
-    console.error(`Error fetching latest project elements for project with name '${projectName}':`, error);  // Log the error message and stack trace
-    res.status(500).send('Error fetching project elements');
-  }
-});
+module.exports = router;
