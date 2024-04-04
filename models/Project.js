@@ -11,9 +11,14 @@ const projectSchema = new mongoose.Schema({
     ref: 'User'
   },
   EBF: Number, // EBF is now optional,
-  
-
+  building_elements: [
+    {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'BuildingElement'
+    }
+  ]
 });
+
 
 projectSchema.pre('save', function(next) {
   console.log(`Saving project: ${this.name}`);

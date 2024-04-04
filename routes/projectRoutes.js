@@ -1,4 +1,5 @@
 const express = require('express');
+const mongoose = require('mongoose');
 const router = express.Router();
 const Project = require('../models/Project');
 const { isAuthenticated } = require('./middleware/authMiddleware');
@@ -99,17 +100,14 @@ router.get('/dashboard', isAuthenticated, async (req, res) => {
 router.get('/projects/:projectId', isAuthenticated, async (req, res) => {
   try {
       const projectId = req.params.projectId;
-      const project = await Project.findById(projectId);
+      const project = await Project.findById(projectId).populate('building_elements');
       if (!project) {
           return res.status(404).send('Project not found');
       }
       if (project.EBF && project.totalCarbonFootprint) {
           project.co2PerSquareMeter = (project.totalCarbonFootprint / project.EBF).toFixed(2);
       }
-      const buildingElements = await BuildingElement.find({ projectId: project._id.toString() });
-      if (buildingElements.length === 0) {
-          console.log(`No building elements found for project ID: ${projectId}`);
-      }
+      const buildingElements = await BuildingElement.find({ projectId: projectId });
       res.render('projectHome', { project, buildingElements, formatProjectNameForDisplay });
   } catch (error) {
       console.error('Error fetching project details:', error);
