@@ -109,6 +109,8 @@ router.get('/projects/:projectId', isAuthenticated, async (req, res) => {
       const buildingElements = await BuildingElement.find({ projectId: projectId });
       res.render('projectHome', { project, buildingElements, formatProjectNameForDisplay });
   } catch (error) {
+      console.error('Error fetching project details:', error);
+      console.error(`Project ID: ${req.params.projectId}`);
       res.status(500).send('Error fetching project details.');
   }
 });
