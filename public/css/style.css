@@ -12,13 +12,20 @@ body {
   box-shadow: 0 4px 8px rgba(0,0,0,.05);
 }
 
+
 .card-img-top {
+  padding-top: 15px; 
   width: 250px; /* Adjusted fixed width */
   height: auto; /* Ensure aspect ratio is maintained */
+  max-height: 250px; /* Limit the height to prevent cards from getting too big */
   object-fit: cover;
   display: block;
   margin-left: auto;
   margin-right: auto;
+}
+
+.card-body {
+  font-size: 0.8rem; /* Adjust the value as needed */
 }
 
 .btn-primary {
@@ -79,4 +86,12 @@ footer span {
 .navbar .btn-primary:hover {
   background-color: #e64a19;
   border-color: #e64a19;
+}
+
+#elements-table {
+  border-radius: 4px;
+}
+
+.bold-value {
+  font-weight: bold;
 }

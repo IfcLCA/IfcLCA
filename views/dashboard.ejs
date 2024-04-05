@@ -20,10 +20,10 @@
              <% } %>
               <div class="card-body">
                 <h5 class="card-title"><%= project.name %> - <small><%= project.description %></small></h5>
-                <p class="card-text">Phase: <%= project.phase %></p>
-                <p class="card-text">Carbon Footprint: <%= project.totalCarbonFootprint %></p>
-                <p class="card-text">EBF (m²): <%= project.EBF %></p>
-                <p class="card-text">CO₂ / m² EBF: <%= project.co2PerSquareMeter %></p>
+                <p class="card-text">Phase: <span class="bold-value"><%= project.phase %></span></p>
+                <p class="card-text">EBF (m²): <span class="bold-value"><%= project.EBF %></span></p>
+                <p class="card-text">CO₂ / m² EBF: <span class="bold-value"><%= project.co2PerSquareMeter %></span></p>
+                <p class="card-text">Carbon Footprint: <span class="bold-value"><%= project.totalCarbonFootprint %></span></p>
               </div>
             </div>
           </a>
