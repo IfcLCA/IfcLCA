@@ -1,19 +1,12 @@
-console.log('projectTable.js is loaded');
-console.log(`projectName: ${projectName}`);
-
-// Check if the projectName variable is defined
-if (typeof projectName === 'undefined') {
-    console.error('projectName variable is not defined. Please check your code to make sure the projectName variable is defined before initializing Tabulator.');
-} else {
-    console.log(`projectName: ${projectName}`);
-}
-
 // Initialize Tabulator on DOM element
 var table = new Tabulator("#elements-table", {
-    height: "auto",
+    height: "622px",
     layout: "fitColumns",
-    ajaxURL:  `/api/projects/${projectId}/building_elements`, // Ensure projectId is correctly defined
-    
+    ajaxURL:  `/api/projects/${projectId}/building_elements`, 
+    layoutColumnsOnNewData: true,
+    ajaxConfig: "GET",
+
+
     ajaxRequesting:function(url, params){
         // Log the AJAX request details
         console.log("Making AJAX request to:", url, "with params:", params);
@@ -45,52 +38,157 @@ var table = new Tabulator("#elements-table", {
     },
     
     columns: [
-        {title: "GUID", field: "guid"},
-        {title: "IfcClass", field: "ifc_class"},
-        {title: "Name", field: "instance_name"},
-        //{title: "Type", field: "type"},
-        {title: "BuildingStorey", field: "building_storey"},
-        {title: "IsLoadbearing", field: "is_loadbearing", typeof: "boolean"},
-        {title: "IsExternal", field: "is_external", typeof: "boolean"},
-        {title: "Volume", field: "volume"},
-        {title: "Surface", field: "surface"},
-        {title: "Material", field: "name"},
-        // Matched Material as a dropdown with KBOB Materials as selection
-        {title: "Matched Material", field: "matched_material", editor: "select", editorParams: {values: ["Material 1", "Material 2", "Material 3"]}}, // Replace with actual KBOB Materials
-        {title: "Rohdichte (kg/m3)", field: "rohdichte", editor: "input"},
-        {title: "Indikator (kgCO2eq/kg)", field: "indikator"},
-        {title: "Total CO2", field: "total_co2", formatter: "textarea"},
-        {title: "Bewehrung", field: "bewehrung", editor: "input"},
-    ],
-    // Additional Tabulator options for sorting, filtering, and collapsing will be added here
-    // ...  
-    // Add a button to save the table data
-    footerElement: "<button id='save-table-data'>Save Table Data</button>",
-    // Add a callback to handle the button click event
-    footerElementClick: function(e, element){
-        if(element._item.id === 'save-table-data'){
-            // Get the table data
-            var tableData = table.getData();
-            console.log("Table data:", tableData);
-            // Send the table data to the server
-            fetch("/api/projects/latest/" + projectName + "/elements", {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json",
-                },
-                body: JSON.stringify(tableData),
-            })
-            .then(function(response) {
-                if (response.ok) {
-                    console.log("Table data saved successfully");
-                } else {
-                    console.error("Failed to save table data:", response.statusText);
-                }
-            })
-            .catch(function(error) {
-                console.error("Error saving table data:", error);
-            });
+        // Apply the interactiveHeaderFormatter to all columns for consistency
+        {title: "GUID", field: "guid",  width: 68, widthGrow: 1},
+
+        {title: "IfcClass", field: "ifc_class",  formatter: "plaintext", width: 100},
+        {title: "Name", field: "instance_name",  formatter: "plaintext", width: 300},
+        {title: "BuildingStorey", field: "building_storey",  formatter: "plaintext", widthGrow: 1},
+        {title: "IsLoadbearing", field: "is_loadbearing",  formatter: "tickCross", widthGrow: 1},
+        {title: "IsExternal", field: "is_external",  formatter: "tickCross", widthGrow: 1},
+        {
+            title: "Volume", field: "volume",  
+            formatter: function(cell, formatterParams) {
+                // Round to three decimals
+                return parseFloat(cell.getValue()).toFixed(3);
+            },
+            widthGrow: 1
+        },
+        {
+            title: "Surface", field: "surface", 
+            formatter: function(cell, formatterParams){
+                // Round to three decimals for surface values
+                return parseFloat(cell.getValue()).toFixed(3);
+            },
+            widthGrow: 1 // Adjust based on content
+        },
+        {
+            title: "Material", field: "name", 
+            formatter: "plaintext", width: 200, 
+        },
+        {
+            title: "Matched Material", field: "matched_material", 
+            editor: "select",
+            editorParams: {
+                values: ["Material 1", "Material 2", "Material 3"] // Replace with actual KBOB Materials
+            },
+            formatter: "plaintext",
+            widthGrow: 1 // Adjust based on content
+        },
+        {
+            title: "Rohdichte (kg/m³)", field: "rohdichte", 
+            editor: "input",
+            formatter: function(cell, formatterParams){
+                // Round to three decimals for density values
+                return parseFloat(cell.getValue()).toFixed(3);
+            },
+            widthGrow: 1 // Adjust based on content
+        },
+        {
+            title: "Indikator (kg CO₂-eq/kg)", field: "indikator", 
+            formatter: function(cell, formatterParams){
+                // Round to three decimals for indicator values
+                return parseFloat(cell.getValue()).toFixed(3);
+            },
+            widthGrow: 1 // Adjust based on content
+        },
+        {
+            title: "CO₂-eq", field: "total_co2", 
+            formatter: function(cell, formatterParams){
+                // Ensure numerical values are rounded to three decimals
+                return parseFloat(cell.getValue()).toFixed(3);
+            },
+            widthGrow: 1 // Adjust based on content
+        },
+        {
+            title: "Bewehrung", field: "bewehrung", 
+            editor: "input",
+            formatter: function(cell, formatterParams){
+                // If reinforcement values need rounding
+                return parseFloat(cell.getValue()).toFixed(3);
+            },
+            widthGrow: 1 // Adjust based on content
         }
-    }
-    
+            ],
+       
 });
+
+// After Tabulator has been initialized and the table is rendered
+table.on("tableBuilt", function(){
+    // Extend column header setup with filtering, sorting, and collapse/expand logic
+    $(".tabulator-col-content").each(function(){
+        var headerContent = $(this);
+        var columnName = headerContent.text().trim(); // Get column name directly
+        var column = table.getColumn(columnName); // Retrieve the column component based on its field name
+
+        // Sorting Icon
+        var sortIcon = $("<i class='fas fa-sort' style='margin-left:5px; cursor:pointer;'></i>")
+            .on("click", function(){
+                // Toggle sort direction
+                var currentSort = column.getSort();
+                var sortDir = currentSort === "asc" ? "desc" : "asc";
+                table.setSort(column.getField(), sortDir);
+            });
+        headerContent.append(sortIcon);
+
+        // Filtering Input
+        var filterInput = $("<input type='text' placeholder='Filter...' style='margin-left:5px; width: 50%;'></input>")
+            .on("input", function(){
+                var filterVal = $(this).val();
+                table.setFilter(column.getField(), "like", filterVal);
+            });
+        headerContent.append(filterInput);
+
+        // Collapse/Expand Icon
+        var collapseIcon = $("<i class='fas fa-compress-arrows-alt' style='margin-left:5px; cursor:pointer;'></i>")
+            .on("click", function(){
+                var isVisible = column.isVisible();
+                column.toggle(); // Toggle visibility
+                isVisible ? $(this).removeClass('fa-compress-arrows-alt').addClass('fa-expand-arrows-alt') : $(this).removeClass('fa-expand-arrows-alt').addClass('fa-compress-arrows-alt');
+
+                // Recalculate and display volume totals if needed
+                recalculateVolumeTotals();
+            });
+        headerContent.append(collapseIcon);
+
+        // Tooltip
+        var tooltip = $("<span class='tooltip' style='display:none; position:absolute; background-color:#f9f9f9; border:1px solid #ccc; padding:5px; z-index:1000;'>"+columnName+"</span>");
+        headerContent.hover(function(){ $(this).find(".tooltip").show(); }, function(){ $(this).find(".tooltip").hide(); });
+        headerContent.append(tooltip);
+    });
+});
+
+// Function to aggregate volumes based on visible columns and unique entries
+function recalculateVolumeTotals() {
+    let visibleColumns = table.getColumns().filter(column => column.isVisible()).map(column => column.getField());
+    let data = table.getData();
+    let aggregatedData = {};
+
+    // Aggregate data based on visible columns
+    data.forEach(row => {
+        // Create a unique key based on values of visible columns
+        let key = visibleColumns.map(col => row[col]).join('|');
+
+        if (!aggregatedData[key]) {
+            aggregatedData[key] = { ...row, count: 1 }; // Initialize if not exist
+        } else {
+            aggregatedData[key].volume += row.volume; // Aggregate volume
+            aggregatedData[key].count += 1; // Count entries for this key
+        }
+    });
+
+    // Convert aggregated data back to array format for Tabulator
+    let aggregatedArray = Object.values(aggregatedData).map(item => {
+        delete item.count; // Remove count property if it's not needed for display
+        return item;
+    });
+
+    // Optionally, update the table with aggregated data
+    // Note: Be mindful of replacing data if you need to toggle between views
+    table.updateData(aggregatedArray);
+}
+
+// Event listener for column visibility changes
+table.on("column-visibility-changed", recalculateVolumeTotals);
+
+// Note: You might want to initially call recalculateVolumeTotals() to setup the view.

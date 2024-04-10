@@ -119,7 +119,6 @@ router.get('/dashboard', isAuthenticated, async (req, res) => {
     res.status(500).json({ message: "Error fetching projects", error: error.toString() });
   }
 });
-
 // GET endpoint for a project's detailed page
 router.get('/projects/:projectId', isAuthenticated, async (req, res) => {
   try {
@@ -140,13 +139,26 @@ router.get('/projects/:projectId', isAuthenticated, async (req, res) => {
               ifc_class: element.ifc_class
           })));
       });
-      res.render('projectHome', { project, materialsInfo, formatProjectNameForDisplay });
+
+      // Define the function to format the project name
+      function formatProjectNameForDisplay(name) {
+          return name.replace(/_/g, ' ');
+      }
+
+      // Note: You had a mistake in the res.render parameters, they should be merged into a single object
+      res.render('projectHome', {
+          page: 'projectHome',
+          project,
+          materialsInfo,
+          formatProjectNameForDisplay // Pass the function as part of the object
+      });
   } catch (error) {
       console.error('Error fetching project details:', error);
       console.error(`Project ID: ${req.params.projectId}`);
       res.status(500).send('Error fetching project details.');
   }
 });
+
 // POST endpoint for IFC file upload
 router.post('/api/projects/:projectId/upload', isAuthenticated, upload.single('ifcFile'), (req, res) => {
   if (!req.file) {

@@ -90,7 +90,7 @@ app.get("/", (req, res) => {
 
 // Dashboard route
 app.get("/dashboard", (req, res) => {
-  res.render("dashboard");
+  res.render('dashboard', { page: 'dashboard'});
 });
 
 // If no routes handled the request, it's a 404

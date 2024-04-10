@@ -10,14 +10,16 @@ body {
 .card {
   margin-bottom: 20px;
   box-shadow: 0 4px 8px rgba(0,0,0,.05);
+  border: 1px solid rgba(0,0,0,.125);
+  border-radius: 0.8rem;
 }
 
 
 .card-img-top {
-  padding-top: 15px; 
-  width: 250px; /* Adjusted fixed width */
+  padding-top: 20px; 
+  width: 300px; /* Adjusted fixed width */
   height: auto; /* Ensure aspect ratio is maintained */
-  max-height: 250px; /* Limit the height to prevent cards from getting too big */
+  max-height: 300px; /* Limit the height to prevent cards from getting too big */
   object-fit: cover;
   display: block;
   margin-left: auto;
@@ -25,7 +27,17 @@ body {
 }
 
 .card-body {
-  font-size: 0.8rem; /* Adjust the value as needed */
+  text-align: left;
+}
+
+.card-title, .card-title small {
+  text-align: center;
+  display: block;
+  margin-bottom: 20px;
+}
+
+.card-text {
+  text-indent: 20px;
 }
 
 .btn-primary {
@@ -50,7 +62,6 @@ body {
 footer {
   background-color: #f8f9fa;
   padding: 1px 0; /* Adjusted to make the footer less high */
-  margin-top: 20px;
   border-top: 1px solid #e7e7e7;
 }
 
@@ -94,4 +105,34 @@ footer span {
 
 .bold-value {
   font-weight: bold;
+}
+
+.tabulator .tabulator-header .tabulator-col {
+  border-radius: 2px;
+ font-size: small;
+}
+
+
+.container, .container-fluid {
+  max-width: 90%; /* Adjust as needed */
+}
+
+
+.tooltip {
+  display: none;
+  position: absolute;
+  background-color: #f9f9f9;
+  border: 1px solid #ccc;
+  padding: 5px;
+  z-index: 1000;
+}
+.custom-header:hover .tooltip {
+  display: block;
+}
+
+.tabulator .tabulator-header .tabulator-col {
+  min-height: 55px; /* Adjust based on your content */
+  align-items: center; /* Centers content vertically */
+  display: flex; /* Enables flexbox layout */
+  flex-direction: column; /* Stacks content vertically */
 }
