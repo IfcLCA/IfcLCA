@@ -12,11 +12,17 @@ var table = new Tabulator("#elements-table", {
         console.log("Making AJAX request to:", url, "with params:", params);
     },
     
-    ajaxResponse:function(url, params, response){
+    ajaxResponse: function(url, params, response){
         // Flatten building elements to materials_info with additional details
         var flattenedData = [];
         response.forEach(buildingElement => {
             buildingElement.materials_info.forEach(material => {
+                // Calculate CO₂-eq based on volume, density, and CO₂ indicator
+                const volume = parseFloat(material.volume || 0);
+                const density = parseFloat(material.density || 0);
+                const co2Indicator = parseFloat(material.indikator || 0);
+                const totalCO2eq = volume * density * co2Indicator; // ensure all values are numbers, default to 0 if not
+    
                 flattenedData.push({
                     ...material,
                     guid: buildingElement.guid,
@@ -24,7 +30,10 @@ var table = new Tabulator("#elements-table", {
                     ifc_class: buildingElement.ifc_class,
                     building_storey: buildingElement.building_storey,
                     is_loadbearing: buildingElement.is_loadbearing,
-                    is_external: buildingElement.is_external
+                    is_external: buildingElement.is_external,
+                    rohdichte: material.density,
+                    indikator: material.indikator,
+                    total_co2: totalCO2eq.toFixed(3) // adding calculated CO₂-eq here
                 });
             });
         });
@@ -55,40 +64,30 @@ var table = new Tabulator("#elements-table", {
             widthGrow: 1
         },
         {
-            title: "Surface", field: "surface", 
-            formatter: function(cell, formatterParams){
-                // Round to three decimals for surface values
-                return parseFloat(cell.getValue()).toFixed(3);
-            },
-            widthGrow: 1 // Adjust based on content
-        },
-        {
             title: "Material", field: "name", 
             formatter: "plaintext", width: 200, 
         },
         {
             title: "Matched Material", field: "matched_material", 
             editor: "select",
-            editorParams: {
-                values: ["Material 1", "Material 2", "Material 3"] // Replace with actual KBOB Materials
-            },
             formatter: "plaintext",
             widthGrow: 1 // Adjust based on content
         },
         {
-            title: "Rohdichte (kg/m³)", field: "rohdichte", 
-            editor: "input",
+            title: "Rohdichte (kg/m³)", 
+            field: "rohdichte", 
             formatter: function(cell, formatterParams){
-                // Round to three decimals for density values
-                return parseFloat(cell.getValue()).toFixed(3);
+                // Simply return the cell value without parsing and rounding
+                return cell.getValue() || '0'; // Return '0' or a similar placeholder if undefined
             },
             widthGrow: 1 // Adjust based on content
         },
+        
         {
             title: "Indikator (kg CO₂-eq/kg)", field: "indikator", 
             formatter: function(cell, formatterParams){
-                // Round to three decimals for indicator values
-                return parseFloat(cell.getValue()).toFixed(3);
+                // Simply return the cell value without parsing and rounding
+                return cell.getValue() || '0'; // Return '0' or a similar placeholder if undefined
             },
             widthGrow: 1 // Adjust based on content
         },
@@ -100,15 +99,6 @@ var table = new Tabulator("#elements-table", {
             },
             widthGrow: 1 // Adjust based on content
         },
-        {
-            title: "Bewehrung", field: "bewehrung", 
-            editor: "input",
-            formatter: function(cell, formatterParams){
-                // If reinforcement values need rounding
-                return parseFloat(cell.getValue()).toFixed(3);
-            },
-            widthGrow: 1 // Adjust based on content
-        }
             ],
        
 });

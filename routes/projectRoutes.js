@@ -6,47 +6,154 @@ const { isAuthenticated } = require('./middleware/authMiddleware');
 const multer = require('multer');
 const { exec } = require('child_process');
 const fs = require('fs');
+const Fuse = require('fuse.js');
 const { formatProjectNameForDisplay, appendTimestampToProjectName } = require('../utils/util');
 const BuildingElement = require('../models/BuildingElement');
+const CarbonMaterial = require('../models/CarbonMaterial');
 
-// GET endpoint for fetching building elements of a project by ID as JSON
+// Utility function to parse "Rohdichte/Flächenmasse" and handle non-numeric values
+function parseDensity(density, materialName) {
+  if (density.includes("-")) {
+    return 0;
+  }
+
+  const parsed = parseFloat(density);
+  if (isNaN(parsed)) {
+    console.log(`Unable to parse density '${density}' for material '${materialName}', setting to 0`);
+    return 0;
+  }
+
+  return parsed;
+}
+
+// Utility function to parse "Treibhausgasemissionen, Total, (in kg CO2-eq)" and handle non-numeric values
+function parseTreibhausgasemissionen(value, materialName) {
+  if (value === undefined) {
+    console.log(`Treibhausgasemissionen is undefined for material '${materialName}', setting to 0`);
+    return 0;
+  }
+
+  const parsed = parseFloat(value);
+  if (isNaN(parsed)) {
+    console.log(`Unable to parse Treibhausgasemissionen '${value}' for material '${materialName}', setting to 0`);
+    return 0;
+  }
+
+  return parsed;
+}
+
+// Priority materials map where keys are keywords to search in material names
+const priorityMaterials = {
+  "beton": "Hochbaubeton (ohne Bewehrung)",
+  "Holzwerkstoffplatte": "3- und 5-Schicht Massivholzplatte",
+  "Holz": "Brettschichtholz",
+  "CLT": "Brettsperrholz",
+  "Stahl": "Stahlprofil, blank",
+  "S235": "Stahlprofil, blank",
+  "S355": "Stahlprofil, blank",
+  "S335": "Stahlprofil, blank",
+  "Beton_vorfabriziert": "Betonfertigteil, hochfester Beton, ab Werk",
+};
+
+// Adjusted Fuse.js settings for matching
+const fuseOptions = {
+  keys: ['BAUMATERIALIEN'],
+  threshold: 0.7, // Adjust for precision in matching priority materials
+  includeScore: true,
+  shouldSort: true,
+};
+
+// Convert priority materials to an array for Fuse.js search
+const priorityMaterialsList = Object.values(priorityMaterials).map(material => ({ BAUMATERIALIEN: material }));
+
+// Initialize Fuse with priority materials for searching the best match
+const priorityFuse = new Fuse(priorityMaterialsList, fuseOptions);
+
+// Initialize Fuse with all carbon materials for general search
+let allMaterialsFuse; // This will be initialized after fetching carbonMaterials
+
+// Function to find the best matching priority material using Fuse.js
+function findBestPriorityMaterial(materialName) {
+  const matches = priorityFuse.search(materialName);
+  return matches.length > 0 ? matches[0].item.BAUMATERIALIEN : null;
+}
+
+
+// GET endpoint
 router.get('/api/projects/:projectId/building_elements', isAuthenticated, async (req, res) => {
-  console.log("Accessed the building_elements endpoint");
-
   try {
     const projectId = req.params.projectId;
-    console.log("Project ID received:", projectId); // Log the received project ID for verification
+    const project = await Project.findById(projectId);
+    if (!project) {
+      return res.status(404).send('Project not found');
+    }
 
-    // Directly fetching building elements associated with the projectId
-    const buildingElements = await BuildingElement.find({ projectId: projectId });
-    console.log(`Found ${buildingElements.length} building elements for Project ID: ${projectId}`);
+    const buildingElements = await BuildingElement.find({ projectId: projectId }).lean();
+    const carbonMaterials = await CarbonMaterial.find({}).lean();
+    allMaterialsFuse = new Fuse(carbonMaterials, fuseOptions); // Initialize with all materials
 
-    const responseData = buildingElements.map(element => ({
-      ...element._doc, // Spread the element document
-      materials_info: element.materials_info.map(material => ({
-        name: material.name,
-        volume: material.volume,
-        instance_name: element.instance_name,
-        ifc_class: element.ifc_class,
-        guid: element.guid,
-        building_storey: element.building_storey,
-        is_loadbearing: element.is_loadbearing,
-        is_external: element.is_external,
-        
-      })),
-  
-    }));
-    
+    // Collect unique material names
+    const uniqueMaterialNames = new Set(buildingElements.flatMap(element => element.materials_info.map(material => material.name.toLowerCase())));
 
-    console.log("Response data prepared, sending back to client."); // Log before sending the response
+    // Pre-process and match each unique material name
+    const matchedMaterials = {};
+    uniqueMaterialNames.forEach(name => {
+      const priorityMatchName = findBestPriorityMaterial(name);
+      if (priorityMatchName) {
+        const bestMatch = carbonMaterials.find(mat => mat.BAUMATERIALIEN === priorityMatchName);
+        matchedMaterials[name] = bestMatch; // Directly assign if it's a priority material
+      } else {
+        const matches = allMaterialsFuse.search(name);
+        matchedMaterials[name] = matches.length && matches[0].score < 0.7 ? matches[0].item : null; // Perform general search otherwise
+      }
+    });
+
+    let totalFootprint = 0;
+
+    // Map the processed materials back to building elements and calculate the carbon footprint
+    const responseData = buildingElements.map(element => {
+      const materialsInfo = element.materials_info.map(material => {
+        const materialNameLower = material.name.toLowerCase();
+        const bestMatch = matchedMaterials[materialNameLower];
+
+        const density = bestMatch ? parseDensity(bestMatch['Rohdichte/Flächenmasse'], bestMatch.BAUMATERIALIEN) : 0;
+        const indikator = bestMatch ? parseTreibhausgasemissionen(bestMatch['Treibhausgasemissionen, Total,  (in kg CO2-eq)'], bestMatch.BAUMATERIALIEN) : 0;
+
+        // Calculate and add to the total footprint
+        const volume = parseFloat(material.volume || 0);
+        const totalCO2eq = Math.round(volume * density * indikator);
+        totalFootprint += totalCO2eq;
+
+        return {
+          ...material,
+          matched_material: bestMatch ? bestMatch.BAUMATERIALIEN : "No Match",
+          density: density,
+          indikator: indikator,
+          total_co2: totalCO2eq.toFixed(3)
+        };
+      });
+
+      return { ...element, materials_info: materialsInfo };
+    });
+
+    // Update the project with the new total carbon footprint asynchronously without awaiting the result
+    project.totalCarbonFootprint = totalFootprint;
+    project.save().then(() => {
+      console.log(`Updated total carbon footprint for project ${project.name}: ${totalFootprint}`);
+    }).catch(err => {
+      console.error('Failed to update project total carbon footprint:', err);
+    });
+
+    // Continue to respond with the current request without waiting for the footprint update
     res.json(responseData);
   } catch (error) {
-    console.error('Error fetching building elements:', error.message, error.stack);
+    console.error('Error fetching building elements:', error);
     res.status(500).json({ message: "Error fetching building elements", error: error.toString() });
   }
 });
 
-    
+
+
 
 // Setup Multer for file upload
 const upload = multer({ dest: 'uploads/' });

@@ -42,6 +42,38 @@ projectSchema.post('save', function(error, doc, next) {
   }
 });
 
+projectSchema.methods.calculateTotalCarbonFootprint = async function() {
+  try {
+    // Load the building elements related to this project, including their materials
+    const buildingElements = await BuildingElement.find({ projectId: this._id }).populate({
+      path: 'materials_info.material', // Assuming materials_info is an array and has a material reference
+      model: 'CarbonMaterial'
+    });
+
+    let totalFootprint = 0;
+    buildingElements.forEach(element => {
+      element.materials_info.forEach(materialInfo => {
+        const density = parseFloat(materialInfo.material['Rohdichte/Flächenmasse']);
+        const volume = parseFloat(materialInfo.volume);
+        const co2Indicator = parseFloat(materialInfo.material['Treibhausgasemissionen, Total, (in kg CO2-eq)']);
+
+        if (!isNaN(density) && !isNaN(volume) && !isNaN(co2Indicator)) {
+          totalFootprint += volume * density * co2Indicator;
+        }
+      });
+    });
+
+    // Save the calculated footprint to the project
+    this.totalCarbonFootprint = totalFootprint;
+    await this.save();
+
+    console.log(`Updated total carbon footprint for project ${this.name}: ${totalFootprint}`);
+  } catch (error) {
+    console.error('Failed to calculate total carbon footprint:', error);
+  }
+};
+
+
 const Project = mongoose.model('Project', projectSchema);
 
 module.exports = Project;
