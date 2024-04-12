@@ -337,8 +337,7 @@ router.post('/api/projects/:projectId/upload', isAuthenticated, upload.single('i
               return res.status(500).send(`Error during file analysis: ${stderr}`);
           }
 
-          // Update the project's totalCarbonFootprint in the database
-          const totalCO2 = parseFloat(stdout); // Ensure your Python script outputs the total CO2 footprint
+
           await Project.findByIdAndUpdate(projectId, { $set: { totalCarbonFootprint: totalCO2 } });
 
           // Cleanup: Delete the temporary file
@@ -371,21 +370,7 @@ router.post('/api/projects/:projectId/delete', isAuthenticated, async (req, res)
   }
 });
 
-// GET endpoint for editing a project's details
-router.get('/projects/:projectId/edit', isAuthenticated, async (req, res) => {
-  try {
-    const projectId = req.params.projectId;
-    const project = await Project.findById(projectId);
-    if (!project) {
-      return res.status(404).send('Project not found');
-    }
-    res.render('editProject', { project });
-    console.log(`Rendering edit form for project: ${project.name}`);
-  } catch (error) {
-    console.error('Error rendering edit form:', error);
-    res.status(500).send('Error rendering edit form.');
-  }
-});
+
 
 // POST endpoint for updating a project's details
 router.post('/projects/:projectId/edit', isAuthenticated, async (req, res) => {
