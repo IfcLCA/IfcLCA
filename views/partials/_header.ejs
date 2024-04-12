@@ -6,27 +6,24 @@
   <div class="collapse navbar-collapse" id="navbarNav">
     <ul class="navbar-nav mr-auto">
       <% if (session && session.userId) { %>
-      <li class="nav-item">
-        <a class="nav-link" href="/dashboard">Dashboard</a>
-      </li>
+        <li class="nav-item">
+          <a class="nav-link" href="/dashboard">Dashboard</a>
+        </li>
       <% } %>
     </ul>
     <ul class="navbar-nav ml-auto">
       <% if (typeof page !== 'undefined') { %>
         <% if (page === 'dashboard') { %>
           <li class="nav-item">
-            <a href="/projects/new" class="btn btn-primary">Create New Project</a>
+            <a href="/newProject" class="btn btn-primary">Create New Project</a>
           </li>
         <% } else if (page === 'projectHome') { %>
           <li class="nav-item">
-            <a href="/projects/upload" class="btn btn-primary">Upload IFC File</a>
+            <a href="/projects/<%= project._id %>/upload" class="btn btn-primary">Upload IFC File</a>
           </li>
         <% } %>
       <% } %>
       <% if (session && session.userId) { %>
-        <li class="nav-item">
-          <a class="btn btn-primary" href="/newProject">Create New Project</a>
-        </li>
         <li class="nav-item">
           <a class="nav-link" href="/auth/logout">Logout</a>
         </li>

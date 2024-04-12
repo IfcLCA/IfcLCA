@@ -250,7 +250,7 @@ router.get('/api/projects/:projectId', isAuthenticated, async (req, res) => {
 // GET endpoint for the new project creation form
 router.get('/newProject', isAuthenticated, (req, res) => {
   try {
-    res.render('newProject');
+    res.render('projectHome', { project, currentPage: 'projectHome' });
     console.log('Rendering new project form.');
   } catch (error) {
     console.error('Error rendering new project form:', error);
@@ -269,12 +269,14 @@ router.get('/dashboard', isAuthenticated, async (req, res) => {
         project.co2PerSquareMeter = (project.totalCarbonFootprint / project.EBF).toFixed(2);
       }
     });
-    res.render('dashboard', { projects, query: req.query, formatProjectNameForDisplay: formatProjectNameForDisplay });
+    res.render('dashboard', { projects, query: req.query, page: 'dashboard', formatProjectNameForDisplay: formatProjectNameForDisplay });
   } catch (error) {
     console.error('Error fetching projects:', error);
     res.status(500).json({ message: "Error fetching projects", error: error.toString() });
   }
 });
+
+
 // GET endpoint for a project's detailed page
 router.get('/projects/:projectId', isAuthenticated, async (req, res) => {
   try {
