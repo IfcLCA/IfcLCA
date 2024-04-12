@@ -83,6 +83,17 @@ function findBestPriorityMaterial(materialName) {
   return matches.length > 0 ? matches[0].item.BAUMATERIALIEN : null;
 }
 
+// Function to find the best match for a material using Fuse.js
+function findBestMatchForMaterial(materialName, carbonMaterials) {
+  const materialNameLower = materialName.toLowerCase();
+  const priorityMaterialName = findBestPriorityMaterial(materialNameLower);
+  if (priorityMaterialName) {
+    return carbonMaterials.find(mat => mat.BAUMATERIALIEN === priorityMaterialName);
+  }
+  const matches = allMaterialsFuse.search(materialNameLower);
+  return matches.length > 0 && matches[0].score < 0.7 ? matches[0].item : null;
+}
+
 // GET endpoint
 router.get('/api/projects/:projectId/building_elements', isAuthenticated, async (req, res) => {
   try {
@@ -92,69 +103,61 @@ router.get('/api/projects/:projectId/building_elements', isAuthenticated, async 
       return res.status(404).send('Project not found');
     }
 
-    // Determine the latest upload timestamp
-    const latestElement = await BuildingElement.findOne({ projectId: projectId }).sort({ createdAt: -1 });
-    if (!latestElement) {
-      return res.status(404).json({ message: "No elements found for this project" });
-    }
+    const latestTimestamp = await BuildingElement.findOne({ projectId }).sort({ createdAt: -1 }).select('createdAt');
+    if (!latestTimestamp) return res.status(404).json({ message: "No elements found for this project" });
 
-    const latestTime = latestElement.createdAt;
-    const minTime = new Date(latestTime.getTime() - 60000); // Subtract one minute
 
-    // Fetch elements within the last minute of the latest upload
-    const buildingElements = await BuildingElement
-      .find({ projectId: projectId, createdAt: { $gte: minTime, $lte: latestTime } })
-      .lean();
-
-    // Initialize Fuse with all carbon materials
+    const buildingElements = await BuildingElement.find({ projectId, createdAt: latestTimestamp.createdAt }).lean();
     const carbonMaterials = await CarbonMaterial.find({}).lean();
-    allMaterialsFuse = new Fuse(carbonMaterials, { keys: ['BAUMATERIALIEN'], threshold: 0.7, includeScore: true, shouldSort: true });
+    allMaterialsFuse = new Fuse(carbonMaterials, fuseOptions); // Initialize Fuse with all materials
 
-    // Process building elements and calculate carbon footprint
-    let totalFootprint = 0;
-    const responseData = buildingElements.map(element => {
+// Process building elements and calculate carbon footprint
+let totalFootprint = 0;
+const responseData = buildingElements.map(element => {
+  return {
+    ...element,
+    materials_info: element.materials_info.map(material => {
+      const bestMatch = findBestMatchForMaterial(material.name, carbonMaterials);
+      if (!bestMatch) { // Check if no match was found and handle gracefully
+        console.log(`No match found for material '${material.name}'. Using default values.`);
+        return {
+          ...material,
+          matched_material: "No Match",
+          density: 0,
+          indikator: 0,
+          total_co2: 0
+        };
+      }
+
+      // Parse density and emission indicator safely, using zero as default if parsing fails
+      const density = parseDensity(bestMatch['Rohdichte/Flächenmasse'], bestMatch.BAUMATERIALIEN);
+      const indikator = parseTreibhausgasemissionen(bestMatch['Treibhausgasemissionen, Total,  (in kg CO2-eq)'], bestMatch.BAUMATERIALIEN);
+      const totalCO2eq = material.volume * density * indikator;
+      totalFootprint += totalCO2eq;
+
       return {
-        ...element,
-        materials_info: element.materials_info.map(material => {
-          const bestMatch = findBestMatchForMaterial(material.name, carbonMaterials);
-          const density = parseDensity(bestMatch['Rohdichte/Flächenmasse'], bestMatch.BAUMATERIALIEN);
-          const emissionFactor = parseTreibhausgasemissionen(bestMatch['Treibhausgasemissionen, Total, (in kg CO2-eq)'], bestMatch.BAUMATERIALIEN);
-          const totalCO2eq = material.volume * density * emissionFactor;
-          totalFootprint += totalCO2eq;
-          return {
-            ...material,
-            matched_material: bestMatch.BAUMATERIALIEN,
-            density,
-            emissionFactor,
-            total_co2: totalCO2eq
-          };
-        })
+        ...material,
+        matched_material: bestMatch.BAUMATERIALIEN,
+        density,
+        indikator, // Ensure indikator is included in the response
+        total_co2: totalCO2eq.toFixed(3) // Format the CO2 value for better readability
       };
-    });
+    })
+  };
+});
 
-        // Asynchronously update the project's total carbon footprint
-        Project.findByIdAndUpdate(projectId, { $set: { totalCarbonFootprint: totalFootprint } }, { new: true })
-        .then(updatedProject => console.log(`Updated total carbon footprint for project ${updatedProject.name}: ${totalFootprint}`))
-        .catch(err => console.error('Failed to update project total carbon footprint:', err));
-  
-      res.json(responseData);
-    } catch (error) {
-      console.error('Error fetching building elements:', error);
-      res.status(500).json({ message: "Error fetching building elements", error: error.toString() });
-    }
-  });
-  
-  function findBestMatchForMaterial(materialName, carbonMaterials) {
-    const materialNameLower = materialName.toLowerCase();
-    const priorityMaterialName = findBestPriorityMaterial(materialNameLower);
-    if (priorityMaterialName) {
-      return carbonMaterials.find(mat => mat.BAUMATERIALIEN === priorityMaterialName);
-    }
-    const matches = allMaterialsFuse.search(materialNameLower);
-    return matches.length > 0 && matches[0].score < 0.7 ? matches[0].item : null;
+// Update the project's total carbon footprint asynchronously
+Project.findByIdAndUpdate(projectId, { $set: { totalCarbonFootprint: totalFootprint } }, { new: true })
+  .then(updatedProject => console.log(`Updated total carbon footprint for project ${updatedProject.name}: ${totalFootprint}`))
+  .catch(err => console.error('Failed to update project total carbon footprint:', err));
+
+res.json(responseData);
+
+  } catch (error) {
+    console.error('Error fetching building elements:', error);
+    res.status(500).json({ message: "Error fetching building elements", error: error.toString() });
   }
-  
-  module.exports = router;
+});
 
 
 
