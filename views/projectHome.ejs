@@ -20,13 +20,6 @@
         <img src="<%= project.customImage %>" alt="Project Image" style="width: 250px; height: auto;">
     </div>
     <a href="/projects/<%= project._id %>/edit" class="btn btn-primary" style="margin-top: 20px;">Edit Project</a>
-    <div class="text-center mt-4">
-        <h3>Upload IFC File</h3>
-        <form id="ifcUploadForm" action="/api/projects/<%= project._id %>/upload" method="POST" enctype="multipart/form-data">
-            <input class="form-control" type="file" id="ifcFile" name="ifcFile" onchange="this.form.submit();" required>
-        </form>
-        <div id="uploadMessage"></div>
-    </div>
     <% if (typeof uploadSuccess !== 'undefined' && uploadSuccess) { %>
         <div class="alert alert-success" role="alert">
             IFC file uploaded successfully!
@@ -43,6 +36,5 @@
     console.log(`projectName: ${projectName}`);
 </script>
 <script src="/js/projectTable.js"></script>
-
 </body>
 </html>
