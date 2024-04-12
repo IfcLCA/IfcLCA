@@ -303,12 +303,11 @@ router.get('/projects/:projectId', isAuthenticated, async (req, res) => {
           return name.replace(/_/g, ' ');
       }
 
-      // Note: You had a mistake in the res.render parameters, they should be merged into a single object
       res.render('projectHome', {
           page: 'projectHome',
           project,
           materialsInfo,
-          formatProjectNameForDisplay // Pass the function as part of the object
+          formatProjectNameForDisplay 
       });
   } catch (error) {
       console.error('Error fetching project details:', error);
