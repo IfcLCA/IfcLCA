@@ -316,49 +316,48 @@ router.get('/projects/:projectId', isAuthenticated, async (req, res) => {
 });
 
 // POST endpoint for IFC file upload
-router.post('/api/projects/:projectId/upload', isAuthenticated, upload.single('ifcFile'), (req, res) => {
+router.post('/api/projects/:projectId/upload', isAuthenticated, upload.single('ifcFile'), async (req, res) => {
   if (!req.file) {
-    return res.status(400).send('No file uploaded.');
+      return res.status(400).send('No file uploaded.');
   }
-  
+
   const projectId = req.params.projectId;
   const filePath = req.file.path;
 
-  // Determine Python command based on environment
-  const pythonCommand = process.env.PYTHON_CMD || 'C:\\Users\\LouisTrümpler\\anaconda3\\python.exe'; 
+  try {
+      // Delete existing building elements for the project
+      await BuildingElement.deleteMany({ projectId: projectId });
 
-  // Call the Python script to analyze the IFC file
-  exec(`${pythonCommand} scripts/analyze_ifc.py "${filePath}" "${projectId}"`, async (error, stdout, stderr) => {
-    if (error) {
-      console.error(`exec error: ${error}`);
-      console.error(`Analysis script stderr: ${stderr}`);
-      return res.status(500).send(`Error during file analysis: ${stderr}`);
-    }
+      // Process the new IFC file
+      const pythonCommand = process.env.PYTHON_CMD || 'python'; // Adjust according to your server configuration
+      exec(`${pythonCommand} scripts/analyze_ifc.py "${filePath}" "${projectId}"`, async (error, stdout, stderr) => {
+          if (error) {
+              console.error(`exec error: ${error}`);
+              console.error(`Analysis script stderr: ${stderr}`);
+              return res.status(500).send(`Error during file analysis: ${stderr}`);
+          }
 
-    try {
-      // Update the project's totalCarbonFootprint in the database
-      const project = await Project.findByIdAndUpdate(projectId, { $set: { totalCarbonFootprint: 0 } }, { new: true });
-      if (!project) {
-        console.error(`Project with ID ${projectId} not found.`);
-        return res.status(404).send('Project not found');
-      }
-      
-      // Cleanup: Delete the temporary file
-      fs.unlink(filePath, err => {
-        if (err) {
-          console.error(`Error removing temporary file: ${filePath}`, err);
-        }
-        console.log(`Temporary file removed: ${filePath}`);
+          // Update the project's totalCarbonFootprint in the database
+          const totalCO2 = parseFloat(stdout); // Ensure your Python script outputs the total CO2 footprint
+          await Project.findByIdAndUpdate(projectId, { $set: { totalCarbonFootprint: totalCO2 } });
+
+          // Cleanup: Delete the temporary file
+          fs.unlink(filePath, err => {
+              if (err) {
+                  console.error(`Error removing temporary file: ${filePath}`, err);
+              }
+              console.log(`Temporary file removed: ${filePath}`);
+          });
+
+          console.log(`IFC file processed and project updated successfully: ${projectId}`);
+          res.redirect(`/projects/${projectId}`); // Redirect or respond according to your frontend setup
       });
-      
-      console.log(`Project ${project.name} updated successfully with new totalCarbonFootprint: ${0}`);
-      res.redirect(`/projects/${projectId}`);
-    } catch (dbError) {
-      console.error('Database error:', dbError);
-      res.status(500).send('Error updating project with analysis results.');
-    }
-  });
+  } catch (error) {
+      console.error('Error handling IFC upload:', error);
+      res.status(500).send('Internal Server Error during IFC upload.');
+  }
 });
+
 // POST endpoint for deleting a project
 router.post('/api/projects/:projectId/delete', isAuthenticated, async (req, res) => {
   try {
