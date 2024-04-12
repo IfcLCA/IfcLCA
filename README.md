@@ -9,6 +9,8 @@ IfcLCA is crafted with sustainability at its core, offering real-time LCA calcul
 
 ![Process Diagram](/public/process.png)
 
+![Data Flow](public\WebAppDataFlow.png)
+
 ## Key Features 🔑
 
 - **Open Standards Support:** Leveraging IFC for interoperability and integration.
