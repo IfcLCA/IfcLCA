@@ -2,10 +2,32 @@
 <html lang="en">
 <%- include('partials/_head.ejs') %>
   <body>
-<%- include('partials/_header.ejs') %>
+    <%- include('partials/_header.ejs') %>
     <main role="main" class="container mt-4">
       <div class="text-center">
-        <h1>IfcLCA</h1>
+        <h1>Welcome to IfcLCA</h1>
+        <p>Your trusted partner in sustainable construction analytics</p>
+      </div>
+      <div class="row mt-5">
+        <div class="col-md-4">
+          <h3>Dashboard</h3>
+          <p>Quickly access all your projects, see latest results, and manage your data efficiently.</p>
+          <img src="/images/dashboard-preview.png" alt="Dashboard Preview" class="img-fluid">
+        </div>
+        <div class="col-md-4">
+          <h3>Real-Time Calculations</h3>
+          <p>Perform LCA calculations in real time to make informed decisions with the latest data.</p>
+          <img src="/images/calculations-preview.png" alt="Calculations Preview" class="img-fluid">
+        </div>
+        <div class="col-md-4">
+          <h3>Interactive Reports</h3>
+          <p>Explore interactive graphs and detailed reports to understand the impact of your projects.</p>
+          <img src="/images/reports-preview.png" alt="Reports Preview" class="img-fluid">
+        </div>
+      </div>
+      <!-- Button in the middle of the page with description -->
+      <div class="text-center" style="margin-top: 50px;">
+        <a href="/newProject" class="btn btn-primary">Create New Project</a>
       </div>
     </main>
   </body>

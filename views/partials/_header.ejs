@@ -26,7 +26,13 @@
             <!-- Hidden file input and form -->
             <form id="ifcUploadForm" action="/api/projects/<%= project._id %>/upload" method="POST" enctype="multipart/form-data" style="display: none;">
               <input type="file" id="hiddenFileInput" name="ifcFile" onchange="this.form.submit();" required>
+              <% if (typeof uploadSuccess !== 'undefined' && uploadSuccess) { %>
+                <div class="alert alert-success" role="alert">
+                  IFC file uploaded successfully!
+                </div>
+              <% } %>
             </form>
+            
           </li>
         <% } %>
       <% } %>
@@ -42,3 +48,4 @@
     </ul>
   </div>
 </nav>
+

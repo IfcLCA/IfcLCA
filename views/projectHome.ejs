@@ -7,7 +7,8 @@
 <script src="https://cdn.jsdelivr.net/npm/tabulator-tables/dist/js/tabulator.min.js"></script>
 <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css" rel="stylesheet">
 <body>
-<%- include('partials/_header.ejs', { hasProjects: false }) %><main role="main" class="container mt-4">
+<%- include('partials/_header.ejs', { hasProjects: false }) %>
+<main role="main" class="container mt-4">
     <div class="project-details d-flex flex-wrap justify-content-between align-items-start">
         <div>
             <h2><%= formatProjectNameForDisplay(project.name) %></h2>
@@ -17,16 +18,13 @@
             <p><strong>EBF per m²:</strong> <span id="ebfPerM2"><%= project.EBF %> m²</span></p>
             <p><strong>CO₂ per m²:</strong> <span id="co2PerM2"><%= project.co2PerSquareMeter %> kg</span></p>
         </div>
-        <img src="<%= project.customImage %>" alt="Project Image" style="width: 250px; height: auto;">
-    </div>
-    <a href="/projects/<%= project._id %>/edit" class="btn btn-primary" style="margin-top: 20px;">Edit Project</a>
-    <% if (typeof uploadSuccess !== 'undefined' && uploadSuccess) { %>
-        <div class="alert alert-success" role="alert">
-            IFC file uploaded successfully!
+        <div class="image-container d-flex flex-column align-items-start">
+            <img src="<%= project.customImage %>" alt="Project Image" style="width: 250px; height: auto;">
+            <a href="/projects/<%= project._id %>/edit" class="btn btn-primary" style="margin-top: 20px;">Edit Project</a>
         </div>
-    <% } %>
+    </div>
     <div id="elements-table" class="mt-4"></div>
-    </main>
+</main>
 <%- include('partials/_footer.ejs') %>
 <script src="https://cdn.jsdelivr.net/npm/tabulator-tables/dist/js/tabulator.min.js"></script>
 <script src="/js/uploadIfc.js"></script>
