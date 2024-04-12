@@ -50,9 +50,9 @@ fetchMaterialNames().then(materialNames => {
             { title: "GUID", field: "guid", width: 68, widthGrow: 0 },
             { title: "IfcClass", field: "ifc_class", formatter: "plaintext", widthGrow: 0},
             { title: "Name", field: "instance_name", formatter: "plaintext", widthGrow: 3},
-            { title: "BuildingStorey", field: "building_storey", formatter: "plaintext", widthGrow: 0 },
-            { title: "IsLoadbearing", field: "is_loadbearing", formatter: "tickCross", widthGrow: 0 },
-            { title: "IsExternal", field: "is_external", formatter: "tickCross", widthGrow: 0 },
+            { title: "Building-Storey", field: "building_storey", formatter: "plaintext", widthGrow: 0 },
+            { title: "Load-bearing", field: "is_loadbearing", formatter: "tickCross", widthGrow: 0 },
+            { title: "External", field: "is_external", formatter: "tickCross", widthGrow: 0 },
             { title: "Volume", field: "volume", formatter: function(cell) { return parseFloat(cell.getValue()).toFixed(3); }, widthGrow: 1 },
             { title: "Material", field: "name", formatter: "plaintext", widthGrow: 2},
             {
@@ -78,8 +78,8 @@ fetchMaterialNames().then(materialNames => {
                     updateMaterialDetails(cell);
                 }, widthGrow: 2,
             },
-            { title: "Rohdichte (kg/m³)", field: "rohdichte", formatter: "plaintext" },
-            { title: "Indikator (kg CO₂-eq/kg)", field: "indikator", formatter: "plaintext" },
+            { title: "Density (kg/m³)", field: "rohdichte", formatter: "plaintext" },
+            { title: "Indicator (kg CO₂-eq/kg)", field: "indikator", formatter: "plaintext" },
             { title: "CO₂-eq (kg)", field: "total_co2", formatter: "plaintext" }
             
         ],
