@@ -30,7 +30,7 @@ Getting started with IfcLCA on your web browser is straightforward. Follow these
 
 1. **Access the Platform**
    - Open your preferred web browser.
-   - Navigate to the IfcLCA website at [https://ifclca.com](https://ifclca.com).
+   - Navigate to the IfcLCA website at [http://ifclca.com](http://ifclca.com).
 
 2. **Create an Account**
    - Click on the ‘Sign Up’ button on the top right corner of the homepage.
