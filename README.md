@@ -59,6 +59,7 @@ It's that simple...
 
 IfcLCA is proudly licensed under the **GNU Affero General Public License v3.0 (AGPLv3)**. This licensing ensures that all modifications and derivative works are freely available under the same terms, encouraging a vibrant community dedicated to advancing sustainable construction technologies. Our license allows users and developers to legally share and adapt the software, provided the same freedoms are preserved in derivative works.
 
-"Free as in Freedom, not just free beer." 🍻 [https://www.gnu.org/philosophy/free-sw.html](https://www.gnu.org/philosophy/free-sw.html)
+"Free as in Freedom, not just free beer." 🍻 
+[https://www.gnu.org/philosophy/free-sw.html](https://www.gnu.org/philosophy/free-sw.html)
 
 Together, let's build a greener future with IfcLCA! 🌿
