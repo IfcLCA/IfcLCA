@@ -17,10 +17,19 @@
           <li class="nav-item">
             <a href="/newProject" class="btn btn-primary">Create New Project</a>
           </li>
-        <% } else if (page === 'projectHome') { %>
+        <% } else if (page === 'projectHome' && project) { %>
+          <!-- Hidden file input -->
+          <input type="file" id="hiddenFileInput" style="display: none;" onchange="document.getElementById('ifcUploadForm').submit();">
+          <!-- Visible button that triggers file input -->
           <li class="nav-item">
-            <a href="/projects/<%= project._id %>/upload" class="btn btn-primary">Upload IFC File</a>
+            <button type="button" class="btn btn-primary" onclick="document.getElementById('hiddenFileInput').click();">
+              Upload IFC File
+            </button>
           </li>
+          <!-- Hidden form to submit -->
+          <form id="ifcUploadForm" action="/api/projects/<%= project._id %>/upload" method="POST" enctype="multipart/form-data" style="display: none;">
+            <input type="hidden" name="file" id="hiddenFileField" />
+          </form>
         <% } %>
       <% } %>
       <% if (session && session.userId) { %>
