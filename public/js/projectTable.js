@@ -16,9 +16,10 @@ function fetchMaterialNames() {
 fetchMaterialNames().then(materialNames => {
     var table = new Tabulator("#elements-table", {
         height: "622px",
-        layout: "fitColumns",
+        layout:"fitColumns",
         ajaxURL: `/api/projects/${projectId}/building_elements`,
         layoutColumnsOnNewData: true,
+        resizableColumnFit:true,
         ajaxConfig: "GET",
         ajaxRequesting: function(url, params){
             console.log("Making AJAX request to:", url, "with params:", params);
@@ -46,14 +47,14 @@ fetchMaterialNames().then(materialNames => {
             })).flat();
         },
         columns: [
-            { title: "GUID", field: "guid", width: 68, widthGrow: 1 },
-            { title: "IfcClass", field: "ifc_class", formatter: "plaintext", width: 100 },
-            { title: "Name", field: "instance_name", formatter: "plaintext", width: 300 },
-            { title: "BuildingStorey", field: "building_storey", formatter: "plaintext", widthGrow: 1 },
-            { title: "IsLoadbearing", field: "is_loadbearing", formatter: "tickCross", widthGrow: 1 },
-            { title: "IsExternal", field: "is_external", formatter: "tickCross", widthGrow: 1 },
+            { title: "GUID", field: "guid", width: 68, widthGrow: 0 },
+            { title: "IfcClass", field: "ifc_class", formatter: "plaintext", widthGrow: 0},
+            { title: "Name", field: "instance_name", formatter: "plaintext", widthGrow: 3},
+            { title: "BuildingStorey", field: "building_storey", formatter: "plaintext", widthGrow: 0 },
+            { title: "IsLoadbearing", field: "is_loadbearing", formatter: "tickCross", widthGrow: 0 },
+            { title: "IsExternal", field: "is_external", formatter: "tickCross", widthGrow: 0 },
             { title: "Volume", field: "volume", formatter: function(cell) { return parseFloat(cell.getValue()).toFixed(3); }, widthGrow: 1 },
-            { title: "Material", field: "name", formatter: "plaintext", width: 200 },
+            { title: "Material", field: "name", formatter: "plaintext", widthGrow: 2},
             {
                 title: "Matched Material",
                 field: "matched_material",
@@ -75,7 +76,7 @@ fetchMaterialNames().then(materialNames => {
                 cellEdited: (cell) => {
                     const newValue = cell.getValue();
                     updateMaterialDetails(cell);
-                }
+                }, widthGrow: 2,
             },
             { title: "Rohdichte (kg/m³)", field: "rohdichte", formatter: "plaintext" },
             { title: "Indikator (kg CO₂-eq/kg)", field: "indikator", formatter: "plaintext" },

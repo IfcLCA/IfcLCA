@@ -11,9 +11,12 @@ const { formatProjectNameForDisplay, appendTimestampToProjectName } = require('.
 const BuildingElement = require('../models/BuildingElement');
 const CarbonMaterial = require('../models/CarbonMaterial');
 
+
 // Utility function to parse "Rohdichte/Flächenmasse" and handle non-numeric values
 function parseDensity(density, materialName) {
-  if (density.includes("-")) {
+  // Ensure density is defined before checking its content
+  if (!density || density.includes("-")) {
+    console.log(`Density value is invalid or undefined for material '${materialName}'. Returning 0.`);
     return 0;
   }
 
@@ -25,6 +28,7 @@ function parseDensity(density, materialName) {
 
   return parsed;
 }
+
 
 // Utility function to parse "Treibhausgasemissionen, Total, (in kg CO2-eq)" and handle non-numeric values
 function parseTreibhausgasemissionen(value, materialName) {
@@ -79,7 +83,6 @@ function findBestPriorityMaterial(materialName) {
   return matches.length > 0 ? matches[0].item.BAUMATERIALIEN : null;
 }
 
-
 // GET endpoint
 router.get('/api/projects/:projectId/building_elements', isAuthenticated, async (req, res) => {
   try {
@@ -89,69 +92,71 @@ router.get('/api/projects/:projectId/building_elements', isAuthenticated, async 
       return res.status(404).send('Project not found');
     }
 
-    const buildingElements = await BuildingElement.find({ projectId: projectId }).lean();
+    // Determine the latest upload timestamp
+    const latestElement = await BuildingElement.findOne({ projectId: projectId }).sort({ createdAt: -1 });
+    if (!latestElement) {
+      return res.status(404).json({ message: "No elements found for this project" });
+    }
+
+    const latestTime = latestElement.createdAt;
+    const minTime = new Date(latestTime.getTime() - 60000); // Subtract one minute
+
+    // Fetch elements within the last minute of the latest upload
+    const buildingElements = await BuildingElement
+      .find({ projectId: projectId, createdAt: { $gte: minTime, $lte: latestTime } })
+      .lean();
+
+    // Initialize Fuse with all carbon materials
     const carbonMaterials = await CarbonMaterial.find({}).lean();
-    allMaterialsFuse = new Fuse(carbonMaterials, fuseOptions); // Initialize with all materials
+    allMaterialsFuse = new Fuse(carbonMaterials, { keys: ['BAUMATERIALIEN'], threshold: 0.7, includeScore: true, shouldSort: true });
 
-    // Collect unique material names
-    const uniqueMaterialNames = new Set(buildingElements.flatMap(element => element.materials_info.map(material => material.name.toLowerCase())));
-
-    // Pre-process and match each unique material name
-    const matchedMaterials = {};
-    uniqueMaterialNames.forEach(name => {
-      const priorityMatchName = findBestPriorityMaterial(name);
-      if (priorityMatchName) {
-        const bestMatch = carbonMaterials.find(mat => mat.BAUMATERIALIEN === priorityMatchName);
-        matchedMaterials[name] = bestMatch; // Directly assign if it's a priority material
-      } else {
-        const matches = allMaterialsFuse.search(name);
-        matchedMaterials[name] = matches.length && matches[0].score < 0.7 ? matches[0].item : null; // Perform general search otherwise
-      }
-    });
-
+    // Process building elements and calculate carbon footprint
     let totalFootprint = 0;
-
-    // Map the processed materials back to building elements and calculate the carbon footprint
     const responseData = buildingElements.map(element => {
-      const materialsInfo = element.materials_info.map(material => {
-        const materialNameLower = material.name.toLowerCase();
-        const bestMatch = matchedMaterials[materialNameLower];
-
-        const density = bestMatch ? parseDensity(bestMatch['Rohdichte/Flächenmasse'], bestMatch.BAUMATERIALIEN) : 0;
-        const indikator = bestMatch ? parseTreibhausgasemissionen(bestMatch['Treibhausgasemissionen, Total,  (in kg CO2-eq)'], bestMatch.BAUMATERIALIEN) : 0;
-
-        // Calculate and add to the total footprint
-        const volume = parseFloat(material.volume || 0);
-        const totalCO2eq = Math.round(volume * density * indikator);
-        totalFootprint += totalCO2eq;
-
-        return {
-          ...material,
-          matched_material: bestMatch ? bestMatch.BAUMATERIALIEN : "No Match",
-          density: density,
-          indikator: indikator,
-          total_co2: totalCO2eq.toFixed(3)
-        };
-      });
-
-      return { ...element, materials_info: materialsInfo };
+      return {
+        ...element,
+        materials_info: element.materials_info.map(material => {
+          const bestMatch = findBestMatchForMaterial(material.name, carbonMaterials);
+          const density = parseDensity(bestMatch['Rohdichte/Flächenmasse'], bestMatch.BAUMATERIALIEN);
+          const emissionFactor = parseTreibhausgasemissionen(bestMatch['Treibhausgasemissionen, Total, (in kg CO2-eq)'], bestMatch.BAUMATERIALIEN);
+          const totalCO2eq = material.volume * density * emissionFactor;
+          totalFootprint += totalCO2eq;
+          return {
+            ...material,
+            matched_material: bestMatch.BAUMATERIALIEN,
+            density,
+            emissionFactor,
+            total_co2: totalCO2eq
+          };
+        })
+      };
     });
 
-    // Update the project with the new total carbon footprint asynchronously without awaiting the result
-    project.totalCarbonFootprint = totalFootprint;
-    project.save().then(() => {
-      console.log(`Updated total carbon footprint for project ${project.name}: ${totalFootprint}`);
-    }).catch(err => {
-      console.error('Failed to update project total carbon footprint:', err);
-    });
-
-    // Continue to respond with the current request without waiting for the footprint update
-    res.json(responseData);
-  } catch (error) {
-    console.error('Error fetching building elements:', error);
-    res.status(500).json({ message: "Error fetching building elements", error: error.toString() });
+        // Asynchronously update the project's total carbon footprint
+        Project.findByIdAndUpdate(projectId, { $set: { totalCarbonFootprint: totalFootprint } }, { new: true })
+        .then(updatedProject => console.log(`Updated total carbon footprint for project ${updatedProject.name}: ${totalFootprint}`))
+        .catch(err => console.error('Failed to update project total carbon footprint:', err));
+  
+      res.json(responseData);
+    } catch (error) {
+      console.error('Error fetching building elements:', error);
+      res.status(500).json({ message: "Error fetching building elements", error: error.toString() });
+    }
+  });
+  
+  function findBestMatchForMaterial(materialName, carbonMaterials) {
+    const materialNameLower = materialName.toLowerCase();
+    const priorityMaterialName = findBestPriorityMaterial(materialNameLower);
+    if (priorityMaterialName) {
+      return carbonMaterials.find(mat => mat.BAUMATERIALIEN === priorityMaterialName);
+    }
+    const matches = allMaterialsFuse.search(materialNameLower);
+    return matches.length > 0 && matches[0].score < 0.7 ? matches[0].item : null;
   }
-});
+  
+  module.exports = router;
+
+
 
 // Endpoint to get material names for the dropdown
 router.get('/api/materials/names', async (req, res) => {
@@ -327,15 +332,9 @@ router.post('/api/projects/:projectId/upload', isAuthenticated, upload.single('i
       return res.status(500).send(`Error during file analysis: ${stderr}`);
     }
 
-    const elementCount = parseInt(stdout, 10);
-    if(isNaN(elementCount)) {
-      console.error(`Error parsing element count from Python script: stdout=${stdout}`);
-      return res.status(500).send('Error analyzing file: Invalid output from analysis script.');
-    }
-
     try {
       // Update the project's totalCarbonFootprint in the database
-      const project = await Project.findByIdAndUpdate(projectId, { $set: { totalCarbonFootprint: elementCount } }, { new: true });
+      const project = await Project.findByIdAndUpdate(projectId, { $set: { totalCarbonFootprint: 0 } }, { new: true });
       if (!project) {
         console.error(`Project with ID ${projectId} not found.`);
         return res.status(404).send('Project not found');
@@ -349,7 +348,7 @@ router.post('/api/projects/:projectId/upload', isAuthenticated, upload.single('i
         console.log(`Temporary file removed: ${filePath}`);
       });
       
-      console.log(`Project ${project.name} updated successfully with new totalCarbonFootprint: ${elementCount}`);
+      console.log(`Project ${project.name} updated successfully with new totalCarbonFootprint: ${0}`);
       res.redirect(`/projects/${projectId}`);
     } catch (dbError) {
       console.error('Database error:', dbError);

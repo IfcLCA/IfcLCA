@@ -142,3 +142,7 @@ footer span {
   color: black;
   font-weight: bold;
 }
+
+.tabulator .tabulator-header .tabulator-col .tabulator-col-content .tabulator-col-title {
+  white-space: normal;
+}
