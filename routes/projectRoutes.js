@@ -52,6 +52,7 @@ const priorityMaterials = {
   "S235": "Stahlprofil, blank",
   "S355": "Stahlprofil, blank",
   "S335": "Stahlprofil, blank",
+  "S335J0": "Stahlprofil, blank",
   "Beton_vorfabriziert": "Betonfertigteil, hochfester Beton, ab Werk",
 };
 
@@ -152,7 +153,47 @@ router.get('/api/projects/:projectId/building_elements', isAuthenticated, async 
   }
 });
 
+// Endpoint to get material names for the dropdown
+router.get('/api/materials/names', async (req, res) => {
+  try {
+      const carbonMaterials = await CarbonMaterial.find({}).lean(); // Fetch all materials
+      allMaterialsFuse = new Fuse(carbonMaterials, { keys: ['BAUMATERIALIEN'], threshold: 0.7 }); // Initialize Fuse
 
+      let results = carbonMaterials.map(material => material.BAUMATERIALIEN);
+      if (req.query.search) {
+          results = allMaterialsFuse.search(req.query.search).map(result => result.item.BAUMATERIALIEN);
+      }
+      
+      res.json(results);
+  } catch (error) {
+      console.error('Failed to fetch material names:', error);
+      res.status(500).send('Error fetching material names');
+  }
+});
+
+// Endpoint to get detailed properties of a material by name
+router.get('/api/materials/details/:name', isAuthenticated, async (req, res) => {
+  try {
+      const materialName = req.params.name;
+      const material = await CarbonMaterial.findOne({ BAUMATERIALIEN: materialName }).lean();
+
+      if (!material) {
+          return res.status(404).json({ message: "Material not found" });
+      }
+
+      // Assuming the database schema has these fields, adjust as necessary.
+      const density = parseDensity(material['Rohdichte/Flächenmasse'], materialName);
+      const indicator = parseTreibhausgasemissionen(material['Treibhausgasemissionen, Total,  (in kg CO2-eq)'], materialName);
+
+      res.json({
+          density: density,
+          indicator: indicator
+      });
+  } catch (error) {
+      console.error('Failed to fetch material details:', error);
+      res.status(500).send('Internal Server Error');
+  }
+});
 
 
 // Setup Multer for file upload

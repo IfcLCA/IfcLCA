@@ -136,3 +136,9 @@ footer span {
   display: flex; /* Enables flexbox layout */
   flex-direction: column; /* Stacks content vertically */
 }
+
+.range-highlight {
+  background-color: yellow;
+  color: black;
+  font-weight: bold;
+}
