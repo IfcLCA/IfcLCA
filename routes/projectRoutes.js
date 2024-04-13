@@ -250,11 +250,32 @@ router.get('/api/projects/:projectId', isAuthenticated, async (req, res) => {
 // GET endpoint for the new project creation form
 router.get('/newProject', isAuthenticated, (req, res) => {
   try {
-    res.render('projectHome', { project, currentPage: 'projectHome' });
-    console.log('Rendering new project form.');
+    // Render the 'newProject.ejs' view instead of 'projectHome'
+    res.render('newProject', { currentPage: 'newProject' });
+    console.log('Rendering create new project form.');
   } catch (error) {
-    console.error('Error rendering new project form:', error);
-    res.status(500).send('Error rendering new project form.');
+    console.error('Error rendering create new project form:', error);
+    res.status(500).send('Error rendering create new project form.');
+  }
+});
+
+// Route for the Open Source page
+router.get('/opensource', (req, res) => {
+  try {
+    res.render('opensource', { title: 'Open Source Community' });
+  } catch (error) {
+    console.error('Error rendering Open Source page:', error);
+    res.status(500).send('An error occurred while rendering the Open Source page.');
+  }
+});
+
+// Route for the Open Source page
+router.get('/contributing', (req, res) => {
+  try {
+    res.render('contributing', { title: 'Help is welcome' });
+  } catch (error) {
+    console.error('Error rendering Open Source page:', error);
+    res.status(500).send('An error occurred while rendering the Open Source page.');
   }
 });
 

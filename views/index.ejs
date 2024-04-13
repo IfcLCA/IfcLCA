@@ -1,36 +1,46 @@
 <!DOCTYPE html>
 <html lang="en">
 <%- include('partials/_head.ejs') %>
-  <body>
-    <%- include('partials/_header.ejs') %>
-    <main role="main" class="container mt-4">
-      <div class="text-center">
-        <h1>Welcome to IfcLCA</h1>
-        <p>Your trusted partner in sustainable construction analytics</p>
-      </div>
+<body>
+  <%- include('partials/_header.ejs') %>
+  <main role="main" class="container mt-4">
+    <div class="text-center">
+      <h1>Welcome to IfcLCA</h1>
+      <p class="tagline">Your trusted partner in sustainable construction analytics</p>
+    </div>
+
+    <section class="features">
       <div class="row mt-5">
-        <div class="col-md-4">
-          <h3>Dashboard</h3>
-          <p>Quickly access all your projects, see latest results, and manage your data efficiently.</p>
+        <div class="feature col-md-4">
+          <h3>Intuitive Dashboard</h3>
+          <p>Effortlessly manage your projects with an intuitive dashboard that provides comprehensive insights into your sustainability metrics.</p>
           <img src="/images/dashboard-preview.png" alt="Dashboard Preview" class="img-fluid">
         </div>
-        <div class="col-md-4">
-          <h3>Real-Time Calculations</h3>
-          <p>Perform LCA calculations in real time to make informed decisions with the latest data.</p>
+        <div class="feature col-md-4">
+          <h3>Real-Time Analytics</h3>
+          <p>Make data-driven decisions with real-time LCA calculations, enabling your team to assess and optimize the sustainability of your projects.</p>
           <img src="/images/calculations-preview.png" alt="Calculations Preview" class="img-fluid">
         </div>
-        <div class="col-md-4">
-          <h3>Interactive Reports</h3>
-          <p>Explore interactive graphs and detailed reports to understand the impact of your projects.</p>
+        <div class="feature col-md-4">
+          <h3>User-Centric Design</h3>
+          <p>Our solution is crafted to meet today's sustainability challenges, offering a user-friendly interface and customizable options for seamless LCA integration.</p>
           <img src="/images/reports-preview.png" alt="Reports Preview" class="img-fluid">
         </div>
       </div>
-      <!-- Button in the middle of the page with description -->
-      <div class="text-center" style="margin-top: 50px;">
-        <a href="/newProject" class="btn btn-primary">Create New Project</a>
-      </div>
-    </main>
-  </body>
-<%- include('partials/_footer.ejs') %>
+    </section>
+
+    <section class="open-source-invitation text-center mt-5">
+      <h3>Join Our Open-Source Community</h3>
+      <p>Contribute to a greener future by collaborating on IfcLCA. Together, we can innovate for sustainability in construction.</p>
+      <a href="/opensource" class="btn btn-success">Get Involved</a>
+    </section>
+
+    <div class="text-center action-call" style="margin-top: 50px;">
+      <a href="/newProject" class="btn btn-primary">Start Your Sustainable Project</a>
+    </div>
+  </main>
+
+  <%- include('partials/_footer.ejs') %>
   <script src="/js/main.js"></script>
+</body>
 </html>
