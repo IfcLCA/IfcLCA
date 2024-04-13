@@ -15,13 +15,13 @@
       <% if (typeof page !== 'undefined') { %>
         <% if (page === 'dashboard') { %>
           <li class="nav-item">
-            <a href="/newProject" class="btn btn-primary">Create New Project</a>
+            <a href="/newProject" class="btn btn-primary">New Project</a>
           </li>
         <% } else if (page === 'projectHome' && project) { %>
           <li class="nav-item">
             <!-- Button to trigger file input -->
             <button type="button" class="btn btn-primary" onclick="document.getElementById('hiddenFileInput').click();">
-              Upload IFC File
+              Upload IFC
             </button>
             <!-- Hidden file input and form -->
             <form id="ifcUploadForm" action="/api/projects/<%= project._id %>/upload" method="POST" enctype="multipart/form-data" style="display: none;">
@@ -32,7 +32,6 @@
                 </div>
               <% } %>
             </form>
-            
           </li>
         <% } %>
       <% } %>
