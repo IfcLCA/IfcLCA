@@ -3,13 +3,6 @@ document.addEventListener('DOMContentLoaded', function() {
     const messageContainer = document.getElementById('uploadMessage');
     const navBar = document.querySelector('.navbar');
 
-
-    // Ensure the upload button is aligned to the right
-    let dynamicUploadButton = document.getElementById('dynamicUploadButton');
-    if (!dynamicUploadButton) {
-        createUploadButton();
-    }
-
     // Handle the form submission event to perform the upload and analysis
     uploadForm.addEventListener('submit', function(event) {
         event.preventDefault();

@@ -5,6 +5,8 @@ from OCC.Core.BRepGProp import brepgprop_VolumeProperties
 from OCC.Core.GProp import GProp_GProps
 from collections import Counter
 from pymongo import MongoClient
+from bson import ObjectId
+
 
 def open_ifc_file(file_path):
     """
@@ -173,29 +175,33 @@ def process_element(ifc_file, element, settings, ifc_file_path, user_id, session
 
     material_layers_volumes, material_layers_names = get_layer_volumes_and_materials(ifc_file, element, volume)
 
-    # Initialize materials_info
+    # Initialize materials_info with materialId
     materials_info = []
-    
+
     if material_layers_names:
         materials_info = [{
+            "materialId": ObjectId(),  # Generate a new ObjectId for each material
             "name": name,
             "volume": volume
         } for name, volume in zip(material_layers_names, material_layers_volumes)]
     elif volume > 0:
-        # Here, you try to get the material name directly for elements with a single material
-        material_name, is_multilayer = "Unnamed Material", False  # Default values
+        # For elements with a single material
+        material_name, is_multilayer = "Unnamed Material", False
         materials = ifcopenshell.util.element.get_materials(element, should_inherit=True)
         if materials:
             material_name = materials[0].Name if materials[0].Name else "Unnamed Material"
             is_multilayer = len(materials) > 1
-        materials_info.append({"name": material_name, "volume": volume})
+        materials_info.append({
+            "materialId": ObjectId(),
+            "name": material_name,
+            "volume": volume
+        })
 
     is_multilayer = len(materials_info) > 1
 
     building_storey = get_building_storey(element)
     is_loadbearing = get_element_property(element, "IsLoadbearing")
     is_external = get_element_property(element, "IsExternal")
-
 
     element_data = {
         "guid": element.GlobalId,
@@ -214,6 +220,7 @@ def process_element(ifc_file, element, settings, ifc_file_path, user_id, session
     }
    
     return element_data
+
 
 
 def main(file_path, projectId):
