@@ -1,12 +1,13 @@
 document.addEventListener('DOMContentLoaded', function() {
     const uploadForm = document.getElementById('ifcUploadForm');
     const messageContainer = document.getElementById('uploadMessage');
-    const navBar = document.querySelector('.navbar');
+    const projectId = window.location.pathname.split('/').pop();
 
     // Handle the form submission event to perform the upload and analysis
     uploadForm.addEventListener('submit', function(event) {
         event.preventDefault();
         const formData = new FormData(uploadForm);
+
         fetch(`/api/projects/${projectId}/upload`, {
             method: 'POST',
             body: formData
@@ -17,9 +18,15 @@ document.addEventListener('DOMContentLoaded', function() {
             }
             return response.json();
         })
-        .then(data => window.location.href = `/projects/${projectId}`)
+        .then(data => {
+            messageContainer.textContent = 'File uploaded and processed successfully.';
+            setTimeout(() => {
+                // Redirect or reload the page to see the new data
+                window.location.reload();
+            }, 2000);
+        })
         .catch(error => {
-            messageContainer.textContent = error.message;
+            messageContainer.textContent = `Error: ${error.message}`;
         });
     });
 });
