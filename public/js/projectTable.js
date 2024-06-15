@@ -40,7 +40,7 @@ function initializeTable(projectId, materialNames) {
                 { title: "Building-Storey", field: "building_storey", width: 150 },
                 { title: "Load-bearing", field: "is_loadbearing", formatter: "tickCross", width: 100 },
                 { title: "External", field: "is_external", formatter: "tickCross", width: 100 },
-                { title: "Volume", field: "volume", formatter: "money", formatterParams: {precision: 3}, width: 120 },
+                { title: "Volume", field: "volume", formatter: "money", formatterParams: { precision: 3 }, width: 120 },
                 { title: "Material", field: "name", widthGrow: 2 },
                 {
                     title: "Matched Material",
@@ -57,11 +57,53 @@ function initializeTable(projectId, materialNames) {
                         acc[name] = name;
                         return acc;
                     }, {}),
-                    widthGrow: 2
+                    widthGrow: 2,
+                    cellEdited: function (cell) {
+                        // Get updated material name
+                        const updatedMaterialName = cell.getValue();
+                        const row = cell.getRow();
+                        const data = row.getData();
+
+                        // Fetch material details and update density and CO2
+                        fetch(`/api/materials/details/${updatedMaterialName}`)
+                            .then(response => response.json())
+                            .then(materialDetails => {
+                                const newDensity = materialDetails.density;
+                                const newIndicator = materialDetails.indicator;
+                                const newTotalCO2 = data.volume * newDensity * newIndicator;
+
+                                // Update the table row
+                                row.update({
+                                    density: newDensity,
+                                    indikator: newIndicator,
+                                    total_co2: newTotalCO2.toFixed(3)
+                                });
+
+                                // Update the database
+                                $.ajax({
+                                    url: `/api/projects/${projectId}/building_elements/update`,
+                                    method: 'POST',
+                                    contentType: 'application/json',
+                                    data: JSON.stringify({
+                                        materialId: data.materialId,
+                                        matched_material_name: updatedMaterialName,
+                                        density: newDensity,
+                                        indikator: newIndicator,
+                                        total_co2: newTotalCO2.toFixed(3)
+                                    }),
+                                    success: function () {
+                                        console.log('Material updated successfully');
+                                    },
+                                    error: function (xhr, status, error) {
+                                        console.error('Error updating material:', error);
+                                    }
+                                });
+                            });
+                    }
                 },
-                { title: "Density (kg/m³)", field: "density", formatter: "money", formatterParams: {precision: 2}, width: 150 },
-                { title: "Indicator (kg CO₂-eq/kg)", field: "indikator", formatter: "money", formatterParams: {precision: 3}, width: 150 },
-                { title: "CO₂-eq (kg)", field: "total_co2", formatter: "money", formatterParams: {precision: 3}, width: 150 }
+                { title: "Density (kg/m³)", field: "density", formatter: "money", formatterParams: { precision: 2 }, width: 150 },
+                { title: "Indicator (kg CO₂-eq/kg)", field: "indikator", formatter: "money", formatterParams: { precision: 3 }, width: 150 },
+                { title: "CO₂-eq (kg)", field: "total_co2", formatter: "money", formatterParams: { precision: 3 }, width: 150 }
             ],
         });
     });
@@ -72,6 +114,7 @@ function flattenElements(buildingElements) {
     return buildingElements.flatMap(element => {
         return element.materials_info.map(material => ({
             guid: element.guid,
+            materialId: material.materialId, // Ensure materialId is present
             ifc_class: element.ifc_class,
             instance_name: element.instance_name,
             building_storey: element.building_storey,
@@ -88,7 +131,7 @@ function flattenElements(buildingElements) {
 }
 
 // Preload material names and initialize Tabulator
-document.addEventListener('DOMContentLoaded', function() {
+document.addEventListener('DOMContentLoaded', function () {
     const projectId = window.location.pathname.split('/').pop();
     fetchMaterialNames().then(materialNames => {
         initializeTable(projectId, materialNames);

@@ -114,148 +114,165 @@ async function findBestMatchForMaterial(material, carbonMaterials, allMaterialsF
 // Setup Multer for file upload
 const upload = multer({ dest: 'uploads/' });
 
-// POST endpoint for IFC file upload
+// POST endpoint for IFC file upload and initial material matching
 router.post('/api/projects/:projectId/upload', isAuthenticated, upload.single('ifcFile'), async (req, res) => {
   if (!req.file) {
-    return res.status(400).send('No file uploaded.');
+      return res.status(400).send('No file uploaded.');
   }
 
   const projectId = req.params.projectId;
   const filePath = req.file.path;
 
   try {
-    // Ensure no old elements for the project
-    await BuildingElement.deleteMany({ projectId });
+      // Ensure no old elements for the project
+      await BuildingElement.deleteMany({ projectId });
 
-    // Execute the Python script and wait for it to complete
-    await new Promise((resolve, reject) => {
-      exec(`${process.env.PYTHON_CMD || 'python'} scripts/analyze_ifc.py "${filePath}" "${projectId}"`, (error, stdout, stderr) => {
-        if (error) {
-          console.error(`exec error: ${error}`);
-          console.error(`Analysis script stderr: ${stderr}`);
-          reject(error);
-        } else {
-          resolve(stdout);
-        }
+      // Execute the Python script and wait for it to complete
+      await new Promise((resolve, reject) => {
+          exec(`${process.env.PYTHON_CMD || 'python'} scripts/analyze_ifc.py "${filePath}" "${projectId}"`, (error, stdout, stderr) => {
+              if (error) {
+                  console.error(`exec error: ${error}`);
+                  console.error(`Analysis script stderr: ${stderr}`);
+                  reject(error);
+              } else {
+                  resolve(stdout);
+              }
+          });
       });
-    });
 
-    // Remove the uploaded file after processing
-    await fs.unlink(filePath);
+      // Remove the uploaded file after processing
+      await fs.unlink(filePath);
 
-    // Now perform material matching and carbon calculation
-    const buildingElements = await BuildingElement.find({ projectId }).lean();
-    const carbonMaterials = await CarbonMaterial.find({}).lean();
-    allMaterialsFuse = new Fuse(carbonMaterials, fuseOptions);
+      // Fetch and process building elements
+      const buildingElements = await BuildingElement.find({ projectId }).lean();
+      const carbonMaterials = await CarbonMaterial.find({}).lean();
+      allMaterialsFuse = new Fuse(carbonMaterials, fuseOptions);
 
-    // Check and initialize `materials_info` if not defined
-    const updatedElements = await Promise.all(buildingElements.map(async element => {
-      if (!element.materials_info) {
-        console.warn(`Building element ${element._id} has no materials_info. Initializing as empty array.`);
-        element.materials_info = [];
+      const bulkOps = []; // to collect bulk update operations
+
+      for (const element of buildingElements) {
+          if (!element.materials_info) {
+              console.warn(`Building element ${element._id} has no materials_info. Initializing as empty array.`);
+              element.materials_info = [];
+          }
+
+          for (const material of element.materials_info) {
+              material.buildingElementId = element._id;
+              const bestMatch = await findBestMatchForMaterial(material, carbonMaterials, allMaterialsFuse);
+              if (bestMatch) {
+                  const density = parseDensity(bestMatch['Rohdichte/Flächenmasse'], bestMatch.BAUMATERIALIEN);
+                  const indikator = parseTreibhausgasemissionen(bestMatch['Treibhausgasemissionen, Total,  (in kg CO2-eq)'], bestMatch.BAUMATERIALIEN);
+                  const totalCO2eq = material.volume * density * indikator;
+
+                  bulkOps.push({
+                      updateOne: {
+                          filter: { "_id": element._id, "materials_info.materialId": material.materialId },
+                          update: {
+                              "$set": {
+                                  "materials_info.$.matched_material_id": bestMatch._id,
+                                  "materials_info.$.matched_material_name": bestMatch.BAUMATERIALIEN,
+                                  "materials_info.$.density": density,
+                                  "materials_info.$.indikator": indikator,
+                                  "materials_info.$.total_co2": totalCO2eq.toFixed(3)
+                              }
+                          }
+                      }
+                  });
+              } else {
+                  bulkOps.push({
+                      updateOne: {
+                          filter: { "_id": element._id, "materials_info.materialId": material.materialId },
+                          update: {
+                              "$set": {
+                                  "materials_info.$.matched_material_name": "No Match"
+                              }
+                          }
+                      }
+                  });
+              }
+          }
       }
 
-      const updatedMaterials = await Promise.all(element.materials_info.map(async material => {
-        material.buildingElementId = element._id;
-        const bestMatch = await findBestMatchForMaterial(material, carbonMaterials, allMaterialsFuse);
-        if (bestMatch) {
-          const density = parseDensity(bestMatch['Rohdichte/Flächenmasse'], bestMatch.BAUMATERIALIEN);
-          const indikator = parseTreibhausgasemissionen(bestMatch['Treibhausgasemissionen, Total,  (in kg CO2-eq)'], bestMatch.BAUMATERIALIEN);
-          const totalCO2eq = material.volume * density * indikator;
+      // Perform bulk update
+      if (bulkOps.length > 0) {
+          await BuildingElement.bulkWrite(bulkOps);
+      }
 
-          await BuildingElement.updateOne(
-            { "_id": element._id, "materials_info.materialId": material.materialId },
-            {
-              "$set": {
-                "materials_info.$.matched_material_id": bestMatch._id,
-                "materials_info.$.matched_material_name": bestMatch.BAUMATERIALIEN,
-                "materials_info.$.density": density,
-                "materials_info.$.indikator": indikator,
-                "materials_info.$.total_co2": totalCO2eq.toFixed(3)
-              }
-            }
-          );
-        } else {
-          await BuildingElement.updateOne(
-            { "_id": element._id, "materials_info.materialId": material.materialId },
-            {
-              "$set": {
-                "materials_info.$.matched_material_name": "No Match"
-              }
-            }
-          );
-        }
-        return material; // return updated material
-      }));
-      return { ...element, materials_info: updatedMaterials }; // return updated element
-    }));
-
-    // Calculate total footprint for the project
-    const totalFootprint = updatedElements.reduce((total, element) => {
-      if (!element.materials_info) return total; // Skip if no materials_info
-      return total + element.materials_info.reduce((elementTotal, material) => {
-        return elementTotal + parseFloat(material.total_co2 || 0);
+      // Calculate total footprint for the project
+      const updatedElements = await BuildingElement.find({ projectId }).lean();
+      const totalFootprint = updatedElements.reduce((total, element) => {
+          if (!element.materials_info) return total; // Skip if no materials_info
+          return total + element.materials_info.reduce((elementTotal, material) => {
+              return elementTotal + parseFloat(material.total_co2 || 0);
+          }, 0);
       }, 0);
-    }, 0);
 
-    await Project.findByIdAndUpdate(projectId, { totalCarbonFootprint: totalFootprint });
+      await Project.findByIdAndUpdate(projectId, { totalCarbonFootprint: totalFootprint });
 
-    // Redirect to the project page or send a response to the client
-    res.redirect(`/projects/${projectId}`);
+      // Redirect to the project page or send a response to the client
+      res.redirect(`/projects/${projectId}`);
   } catch (error) {
-    // Remove the uploaded file if there's an error
-    await fs.unlink(filePath).catch(() => { });
-    console.error('Error handling IFC upload:', error);
-    res.status(500).send('Internal Server Error during IFC upload.');
+      // Remove the uploaded file if there's an error
+      await fs.unlink(filePath).catch(() => { });
+      console.error('Error handling IFC upload:', error);
+      res.status(500).send('Internal Server Error during IFC upload.');
   }
 });
 
-// GET endpoint for building elements and calculate carbon footprint
+// GET endpoint for building elements (no matching, just fetching from DB)
 router.get('/api/projects/:projectId/building_elements', isAuthenticated, async (req, res) => {
   try {
-    const projectId = req.params.projectId;
-    const buildingElements = await BuildingElement.find({ projectId }).lean();
-    const carbonMaterials = await CarbonMaterial.find({}).lean();
-    allMaterialsFuse = new Fuse(carbonMaterials, fuseOptions);
-
-    const updatedElements = await Promise.all(buildingElements.map(async element => {
-      const updatedMaterials = await Promise.all(element.materials_info.map(async material => {
-        material.buildingElementId = element._id;
-        const bestMatch = await findBestMatchForMaterial(material, carbonMaterials, allMaterialsFuse);
-        if (bestMatch) {
-          const density = parseDensity(bestMatch['Rohdichte/Flächenmasse'], bestMatch.BAUMATERIALIEN);
-          const indikator = parseTreibhausgasemissionen(bestMatch['Treibhausgasemissionen, Total,  (in kg CO2-eq)'], bestMatch.BAUMATERIALIEN);
-          const totalCO2eq = material.volume * density * indikator;
-          await BuildingElement.updateOne(
-            { "_id": element._id, "materials_info.materialId": material.materialId },
-            {
-              "$set": {
-                "materials_info.$.density": density,
-                "materials_info.$.indikator": indikator,
-                "materials_info.$.total_co2": totalCO2eq.toFixed(3)
-              }
-            }
-          );
-        }
-        return { ...material, matched_material: bestMatch ? bestMatch.BAUMATERIALIEN : 'No Match' };
-      }));
-      return { ...element, materials_info: updatedMaterials };
-    }));
-
-    const totalFootprint = updatedElements.reduce((total, element) => {
-      return total + element.materials_info.reduce((elementTotal, material) => {
-        return elementTotal + (parseFloat(material.total_co2) || 0);
-      }, 0);
-    }, 0);
-
-    await Project.findByIdAndUpdate(projectId, { totalCarbonFootprint: totalFootprint });
-
-    res.json(updatedElements);
+      const projectId = req.params.projectId;
+      const buildingElements = await BuildingElement.find({ projectId }).lean();
+      res.json(buildingElements);
   } catch (error) {
-    console.error('Error fetching building elements:', error);
-    res.status(500).json({ message: "Error fetching building elements", error: error.toString() });
+      console.error('Error fetching building elements:', error);
+      res.status(500).json({ message: "Error fetching building elements", error: error.toString() });
   }
 });
+
+// POST endpoint to update building elements' materials based on user edits
+router.post('/api/projects/:projectId/building_elements/update', isAuthenticated, async (req, res) => {
+  try {
+      const { projectId } = req.params;
+      const { materialId, matched_material_name, density, indikator, total_co2 } = req.body;
+
+      // Find and update the specific material within the building element
+      const buildingElement = await BuildingElement.findOneAndUpdate(
+          { projectId, "materials_info.materialId": materialId },
+          {
+              "$set": {
+                  "materials_info.$.matched_material_name": matched_material_name,
+                  "materials_info.$.density": density,
+                  "materials_info.$.indikator": indikator,
+                  "materials_info.$.total_co2": total_co2,
+                  "materials_info.$.matched_material_id": null // Indicate manual change
+              }
+          },
+          { new: true }
+      );
+
+      if (buildingElement) {
+          // Update the total carbon footprint for the project
+          const buildingElements = await BuildingElement.find({ projectId }).lean();
+          const totalFootprint = buildingElements.reduce((total, element) => {
+              return total + element.materials_info.reduce((elementTotal, material) => {
+                  return elementTotal + parseFloat(material.total_co2 || 0);
+              }, 0);
+          }, 0);
+
+          await Project.findByIdAndUpdate(projectId, { totalCarbonFootprint: totalFootprint });
+
+          res.json({ message: 'Material updated successfully' });
+      } else {
+          res.status(404).json({ message: 'Building element not found' });
+      }
+  } catch (error) {
+      console.error('Error updating building element:', error);
+      res.status(500).json({ message: "Error updating building element", error: error.toString() });
+  }
+});
+
 
 // Endpoint to get material names for the dropdown
 router.get('/api/materials/names', async (req, res) => {
