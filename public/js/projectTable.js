@@ -1,7 +1,7 @@
 // Fetch materials names from the backend
 function fetchMaterialNames() {
     return $.ajax({
-        url: '/api/materials/names',  // Adjust this URL to your actual API endpoint
+        url: '/api/materials/names',
         type: 'GET',
         dataType: 'json'
     }).then(function(data) {
@@ -12,186 +12,128 @@ function fetchMaterialNames() {
     });
 }
 
-// Preload material names and initialize Tabulator when ready
-fetchMaterialNames().then(materialNames => {
-    var table = new Tabulator("#elements-table", {
-        height: "622px",
-        layout:"fitColumns",
-        ajaxURL: `/api/projects/${projectId}/building_elements`,
-        layoutColumnsOnNewData: true,
-        resizableColumnFit:true,
-        ajaxConfig: "GET",
-        ajaxRequesting: function(url, params){
-            console.log("Making AJAX request to:", url, "with params:", params);
-        },
-        ajaxResponse: function(url, params, response){
-            // Flatten building elements to materials_info with additional details
-            return response.map(buildingElement => buildingElement.materials_info.map(material => {
-                const volume = parseFloat(material.volume || 0);
-                const density = parseFloat(material.density || 0);
-                const co2Indicator = parseFloat(material.indikator || 0);
-                const totalCO2eq = volume * density * co2Indicator;
-                return {
-                    ...material,
-                    guid: buildingElement.guid,
-                    instance_name: buildingElement.instance_name,
-                    ifc_class: buildingElement.ifc_class,
-                    building_storey: buildingElement.building_storey,
-                    is_loadbearing: buildingElement.is_loadbearing,
-                    is_external: buildingElement.is_external,
-                    rohdichte: density,
-                    indikator: co2Indicator,
-                    total_co2: Math.round(totalCO2eq),
-                    matched_material: material.matched_material || "",  // ensure proper formatting
-                };
-            })).flat();
-        },
-        columns: [
-            { title: "GUID", field: "guid", width: 68, widthGrow: 0 },
-            { title: "IfcClass", field: "ifc_class", formatter: "plaintext", widthGrow: 0},
-            { title: "Name", field: "instance_name", formatter: "plaintext", widthGrow: 3},
-            { title: "Building-Storey", field: "building_storey", formatter: "plaintext", widthGrow: 0 },
-            { title: "Load-bearing", field: "is_loadbearing", formatter: "tickCross", widthGrow: 0 },
-            { title: "External", field: "is_external", formatter: "tickCross", widthGrow: 0 },
-            { title: "Volume", field: "volume", formatter: function(cell) { return parseFloat(cell.getValue()).toFixed(3); }, widthGrow: 1 },
-            { title: "Material", field: "name", formatter: "plaintext", widthGrow: 2},
-            {
-                title: "Matched Material",
-                field: "matched_material",
-                editor: "list",
-                editorParams: {
-                    values: materialNames,
-                    autocomplete: true,
-                    clearable: true,
-                    sort: "asc",
-                    itemFormatter: function(label, value, item, element) {
-                        return "<strong>" + label + "</strong><br/><div>" + (item.subtitle || '') + "</div>";
+// Fetch building elements from the backend
+function fetchBuildingElements(projectId) {
+    return $.ajax({
+        url: `/api/projects/${projectId}/building_elements`,
+        type: 'GET',
+        dataType: 'json'
+    }).then(function(data) {
+        return data;  // Assuming the data is an array of building elements
+    }).catch(function(error) {
+        console.error("Error fetching building elements:", error);
+        return [];
+    });
+}
+
+// Initialize Tabulator after preloading material names
+function initializeTable(projectId, materialNames) {
+    fetchBuildingElements(projectId).then(buildingElements => {
+        var table = new Tabulator("#elements-table", {
+            height: "622px",
+            layout: "fitColumns",
+            data: flattenElements(buildingElements),
+            columns: [
+                { title: "GUID", field: "guid", width: 100 },
+                { title: "IfcClass", field: "ifc_class", width: 100 },
+                { title: "Name", field: "instance_name", widthGrow: 3 },
+                { title: "Building-Storey", field: "building_storey", width: 150 },
+                { title: "Load-bearing", field: "is_loadbearing", formatter: "tickCross", width: 100 },
+                { title: "External", field: "is_external", formatter: "tickCross", width: 100 },
+                { title: "Volume", field: "volume", formatter: "money", formatterParams: { precision: 3 }, width: 120 },
+                { title: "Material", field: "name", widthGrow: 2 },
+                {
+                    title: "Matched Material",
+                    field: "matched_material",
+                    editor: "list",
+                    editorParams: {
+                        values: materialNames,
+                        autocomplete: true,
+                        clearable: true,
+                        sort: "asc",
+                    },
+                    formatter: "lookup",
+                    formatterParams: materialNames.reduce((acc, name) => {
+                        acc[name] = name;
+                        return acc;
+                    }, {}),
+                    widthGrow: 2,
+                    cellEdited: function (cell) {
+                        // Get updated material name
+                        const updatedMaterialName = cell.getValue();
+                        const row = cell.getRow();
+                        const data = row.getData();
+
+                        // Fetch material details and update density and CO2
+                        fetch(`/api/materials/details/${updatedMaterialName}`)
+                            .then(response => response.json())
+                            .then(materialDetails => {
+                                const newDensity = materialDetails.density;
+                                const newIndicator = materialDetails.indicator;
+                                const newTotalCO2 = data.volume * newDensity * newIndicator;
+
+                                // Update the table row
+                                row.update({
+                                    density: newDensity,
+                                    indikator: newIndicator,
+                                    total_co2: newTotalCO2.toFixed(3)
+                                });
+
+                                // Update the database
+                                $.ajax({
+                                    url: `/api/projects/${projectId}/building_elements/update`,
+                                    method: 'POST',
+                                    contentType: 'application/json',
+                                    data: JSON.stringify({
+                                        materialId: data.materialId,
+                                        matched_material_name: updatedMaterialName,
+                                        density: newDensity,
+                                        indikator: newIndicator,
+                                        total_co2: newTotalCO2.toFixed(3)
+                                    }),
+                                    success: function () {
+                                        console.log('Material updated successfully');
+                                    },
+                                    error: function (xhr, status, error) {
+                                        console.error('Error updating material:', error);
+                                    }
+                                });
+                            });
                     }
                 },
-                formatter: "lookup",
-                formatterParams: materialNames.reduce((acc, name) => {
-                    acc[name] = name;  // Map each name to itself for lookup formatting
-                    return acc;
-                }, {}),
-                cellEdited: (cell) => {
-                    const newValue = cell.getValue();
-                    updateMaterialDetails(cell);
-                }, widthGrow: 2,
-            },
-            { title: "Density (kg/m³)", field: "rohdichte", formatter: "plaintext" },
-            { title: "Indicator (kg CO₂-eq/kg)", field: "indikator", formatter: "plaintext" },
-            { title: "CO₂-eq (kg)", field: "total_co2", formatter: "plaintext" }
-            
-        ],
-    });
-});
-
-function updateMaterialDetails(cell) {
-    // Fetch the new material details from the server
-    const materialName = cell.getValue();
-    $.ajax({
-        url: `/api/materials/details/${materialName}`,  // Ensure this endpoint is correct and returning the expected fields
-        type: 'GET',
-        success: function(data) {
-            console.log(data);  // Log the data received from the server
-            if (data) {
-                const row = cell.getRow();
-                const volume = parseFloat(row.getCell('volume').getValue()) || 0;
-                const density = parseFloat(data.density) || 0;
-                const indicator = parseFloat(data.indicator) || 0;
-                const totalCO2eq = volume * density * indicator;
-        
-                // Update the row with new values
-                row.update({
-                    rohdichte: density.toFixed(3),
-                    indikator: indicator.toFixed(3),
-                    total_co2: totalCO2eq.toFixed(3)
-                });
-            }
-        }
-        ,
-        error: function(xhr, status, error) {
-            console.error('Failed to fetch material details:', error);
-        }
+                { title: "Density (kg/m³)", field: "density", formatter: "money", formatterParams: { precision: 2 }, width: 150 },
+                { title: "Indicator (kg CO₂-eq/kg)", field: "indikator", formatter: "money", formatterParams: { precision: 3 }, width: 150 },
+                { title: "CO₂-eq (kg)", field: "total_co2", formatter: "money", formatterParams: { precision: 3 }, width: 150 }
+            ],
+        });
     });
 }
 
-
-
-// After Tabulator has been initialized and the table is rendered
-table.on("tableBuilt", function(){
-    // Extend column header setup with filtering, sorting, and collapse/expand logic
-    $(".tabulator-col-content").each(function(){
-        var headerContent = $(this);
-        var columnName = headerContent.text().trim(); // Get column name directly
-        var column = table.getColumn(columnName); // Retrieve the column component based on its field name
-
-        // Sorting Icon
-        var sortIcon = $("<i class='fas fa-sort' style='margin-left:5px; cursor:pointer;'></i>")
-            .on("click", function(){
-                // Toggle sort direction
-                var currentSort = column.getSort();
-                var sortDir = currentSort === "asc" ? "desc" : "asc";
-                table.setSort(column.getField(), sortDir);
-            });
-        headerContent.append(sortIcon);
-
-        // Filtering Input
-        var filterInput = $("<input type='text' placeholder='Filter...' style='margin-left:5px; width: 50%;'></input>")
-            .on("input", function(){
-                var filterVal = $(this).val();
-                table.setFilter(column.getField(), "like", filterVal);
-            });
-        headerContent.append(filterInput);
-
-        // Collapse/Expand Icon
-        var collapseIcon = $("<i class='fas fa-compress-arrows-alt' style='margin-left:5px; cursor:pointer;'></i>")
-            .on("click", function(){
-                var isVisible = column.isVisible();
-                column.toggle(); // Toggle visibility
-                isVisible ? $(this).removeClass('fa-compress-arrows-alt').addClass('fa-expand-arrows-alt') : $(this).removeClass('fa-expand-arrows-alt').addClass('fa-compress-arrows-alt');
-
-                // Recalculate and display volume totals if needed
-                recalculateVolumeTotals();
-            });
-        headerContent.append(collapseIcon);
-
-        // Tooltip
-        var tooltip = $("<span class='tooltip' style='display:none; position:absolute; background-color:#f9f9f9; border:1px solid #ccc; padding:5px; z-index:1000;'>"+columnName+"</span>");
-        headerContent.hover(function(){ $(this).find(".tooltip").show(); }, function(){ $(this).find(".tooltip").hide(); });
-        headerContent.append(tooltip);
+// Flatten building elements data
+function flattenElements(buildingElements) {
+    return buildingElements.flatMap(element => {
+        return element.materials_info.map(material => ({
+            guid: element.guid,
+            materialId: material.materialId, // Ensure materialId is present
+            ifc_class: element.ifc_class,
+            instance_name: element.instance_name,
+            building_storey: element.building_storey,
+            is_loadbearing: element.is_loadbearing,
+            is_external: element.is_external,
+            volume: material.volume,
+            name: material.name,
+            matched_material: material.matched_material_name || "No Match",
+            density: material.density || 0,
+            indikator: material.indikator || 0,
+            total_co2: material.total_co2 || 0
+        }));
     });
-});
-
-// Function to aggregate volumes based on visible columns and unique entries
-function recalculateVolumeTotals() {
-    let visibleColumns = table.getColumns().filter(column => column.isVisible()).map(column => column.getField());
-    let data = table.getData();
-    let aggregatedData = {};
-
-    // Aggregate data based on visible columns
-    data.forEach(row => {
-        // Create a unique key based on values of visible columns
-        let key = visibleColumns.map(col => row[col]).join('|');
-
-        if (!aggregatedData[key]) {
-            aggregatedData[key] = { ...row, count: 1 }; // Initialize if not exist
-        } else {
-            aggregatedData[key].volume += row.volume; // Aggregate volume
-            aggregatedData[key].count += 1; // Count entries for this key
-        }
-    });
-
-    // Convert aggregated data back to array format for Tabulator
-    let aggregatedArray = Object.values(aggregatedData).map(item => {
-        delete item.count; // Remove count property if it's not needed for display
-        return item;
-    });
-
-    // Optionally, update the table with aggregated data
-    // Note: Be mindful of replacing data if you need to toggle between views
-    table.updateData(aggregatedArray);
 }
 
-// Event listener for column visibility changes
-table.on("column-visibility-changed", recalculateVolumeTotals);
+// Preload material names and initialize Tabulator
+document.addEventListener('DOMContentLoaded', function () {
+    const projectId = window.location.pathname.split('/').pop();
+    fetchMaterialNames().then(materialNames => {
+        initializeTable(projectId, materialNames);
+    });
+});

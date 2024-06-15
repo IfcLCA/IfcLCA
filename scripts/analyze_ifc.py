@@ -225,8 +225,7 @@ def process_element(ifc_file, element, settings, ifc_file_path, user_id, session
 
 def main(file_path, projectId):
     # Connect to the MongoDB instance with the specified database
-    client =   MongoClient("mongodb://localhost:27017/")
-    # Access or create the database and collection
+    client = MongoClient("mongodb://localhost:27017/")
     db = client["IfcLCAdata_01"]
     collection = db["building_elements"]
 
@@ -235,8 +234,8 @@ def main(file_path, projectId):
     settings.set(settings.USE_PYTHON_OPENCASCADE, True)
 
     # Example values for demonstration
-    user_id = "example_user_id"
-    session_id = "example_session_id"
+    user_id = "example_user_id"  # Replace with actual user ID from Node.js or another source
+    session_id = "example_session_id"  # Replace with actual session ID from Node.js or another source
 
     elements = load_ifc_data(ifc_file)
 
@@ -247,12 +246,9 @@ def main(file_path, projectId):
         if element_data:
             # Add the volume of the current element to the total volume
             total_volume += element_data['total_volume']
-            # Insert the processed element data into the collection
+            # Insert the processed element data into the MongoDB collection
             collection.insert_one(element_data)
     
-    # Print the total volume after processing all elements
-    print(total_volume)
-
 if __name__ == "__main__":
     if len(sys.argv) != 3:
         print("Usage: python script.py <path_to_ifc_file> <projectId>", file=sys.stderr)
