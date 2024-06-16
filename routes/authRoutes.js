@@ -1,10 +1,11 @@
 const express = require('express');
-const path = require('path');  // Ensure this is imported
-const fs = require('fs');  // Ensure this is imported
+const path = require('path');
+const fs = require('fs');
 const User = require('../models/User');
-const bcrypt = require('bcryptjs');  // Use bcryptjs
+const bcrypt = require('bcryptjs');
 const crypto = require('crypto');
 const nodemailer = require('nodemailer');
+const rateLimit = require('express-rate-limit');
 const router = express.Router();
 
 // Configure nodemailer
@@ -18,16 +19,24 @@ const transporter = nodemailer.createTransport({
 
 // Extract first name from email
 function extractFirstName(email) {
-  const firstName = email.split('@')[0].split('.')[0];
+  const parts = email.split('@')[0].split('.');
+  const firstName = parts[0];
   return firstName.charAt(0).toUpperCase() + firstName.slice(1);
 }
+
+// Rate limiter middleware for registration and login
+const authRateLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 5, // Limit each IP to 5 requests per windowMs
+  message: 'Too many requests from this IP, please try again after 15 minutes.'
+});
 
 // Register Route
 router.get('/auth/register', (req, res) => {
   res.render('register', { query: req.query });
 });
 
-router.post('/auth/register', async (req, res) => {
+router.post('/auth/register', authRateLimiter, async (req, res) => {
   try {
     const { username, password } = req.body;
     const token = crypto.randomBytes(32).toString('hex');
@@ -49,7 +58,7 @@ router.post('/auth/register', async (req, res) => {
 
     const emailContent = emailTemplate
       .replace(/<%= firstName %>/g, firstName)
-      .replace(/<%= confirmUrl %>/g, `http://${req.headers.host}/auth/confirm/${token}`)
+      .replace(/<%= confirmUrl %>/g, `http://${req.headers.host}/auth/confirm/${token}`);
 
     // Send the confirmation email
     await transporter.sendMail({
@@ -89,7 +98,7 @@ router.get('/auth/login', (req, res) => {
   res.render('login', { query: req.query });
 });
 
-router.post('/auth/login', async (req, res) => {
+router.post('/auth/login', authRateLimiter, async (req, res) => {
   try {
     const { username, password } = req.body;
     const user = await User.findOne({ username });
