@@ -13,10 +13,22 @@ const CarbonMaterial = require('../models/CarbonMaterial');
 const { appendTimestampToProjectName, formatProjectNameForDisplay } = require('../utils/util');
 const { isNaN } = require('lodash'); // Import lodash's isNaN for robust NaN checks
 
-function validateAndParseNumber(value) {
-  const parsed = parseFloat(value);
-  return isNaN(parsed) ? 0 : parsed;
+// Helper function to safely remove the file
+async function safeUnlink(filePath) {
+  try {
+    await fs.unlink(filePath);
+  } catch (error) {
+    console.warn(`Failed to remove file at ${filePath}: ${error.message}`);
+  }
 }
+
+
+// Route for the /opensource page
+router.get('/opensource', (req, res) => {
+  res.render('opensource');
+});
+
+module.exports = router;
 
 function parseDensity(density, materialName) {
   if (!density || density.includes("-")) {
@@ -117,107 +129,108 @@ const upload = multer({ dest: 'uploads/' });
 // POST endpoint for IFC file upload and initial material matching
 router.post('/api/projects/:projectId/upload', isAuthenticated, upload.single('ifcFile'), async (req, res) => {
   if (!req.file) {
-      return res.status(400).send('No file uploaded.');
+    return res.status(400).send('No file uploaded.');
   }
 
   const projectId = req.params.projectId;
   const filePath = req.file.path;
 
   try {
-      // Ensure no old elements for the project
-      await BuildingElement.deleteMany({ projectId });
+    // Ensure no old elements for the project
+    await BuildingElement.deleteMany({ projectId });
 
-      // Execute the Python script and wait for it to complete
-      await new Promise((resolve, reject) => {
-          exec(`${process.env.PYTHON_CMD || 'python'} scripts/analyze_ifc.py "${filePath}" "${projectId}"`, (error, stdout, stderr) => {
-              if (error) {
-                  console.error(`exec error: ${error}`);
-                  console.error(`Analysis script stderr: ${stderr}`);
-                  reject(error);
-              } else {
-                  resolve(stdout);
-              }
-          });
+    // Execute the Python script and wait for it to complete
+    await new Promise((resolve, reject) => {
+      exec(`${process.env.PYTHON_CMD || 'python'} scripts/analyze_ifc.py "${filePath}" "${projectId}"`, (error, stdout, stderr) => {
+        if (error) {
+          console.error(`exec error: ${error}`);
+          console.error(`Analysis script stderr: ${stderr}`);
+          return reject(new Error(`Python script execution failed: ${stderr}`));
+        }
+        resolve(stdout);
       });
+    });
 
-      // Remove the uploaded file after processing
-      await fs.unlink(filePath);
+    // Remove the uploaded file after processing
+    await safeUnlink(filePath);
 
-      // Fetch and process building elements
-      const buildingElements = await BuildingElement.find({ projectId }).lean();
-      const carbonMaterials = await CarbonMaterial.find({}).lean();
-      allMaterialsFuse = new Fuse(carbonMaterials, fuseOptions);
+    // Fetch and process building elements
+    const buildingElements = await BuildingElement.find({ projectId }).lean();
+    const carbonMaterials = await CarbonMaterial.find({}).lean();
+    allMaterialsFuse = new Fuse(carbonMaterials, fuseOptions);
 
-      const bulkOps = []; // to collect bulk update operations
+    const bulkOps = []; // to collect bulk update operations
 
-      for (const element of buildingElements) {
-          if (!element.materials_info) {
-              console.warn(`Building element ${element._id} has no materials_info. Initializing as empty array.`);
-              element.materials_info = [];
-          }
+    for (const element of buildingElements) {
+      if (!element.materials_info) {
+        console.warn(`Building element ${element._id} has no materials_info. Initializing as empty array.`);
+        element.materials_info = [];
+      }
 
-          for (const material of element.materials_info) {
-              material.buildingElementId = element._id;
-              const bestMatch = await findBestMatchForMaterial(material, carbonMaterials, allMaterialsFuse);
-              if (bestMatch) {
-                  const density = parseDensity(bestMatch['Rohdichte/Flächenmasse'], bestMatch.BAUMATERIALIEN);
-                  const indikator = parseTreibhausgasemissionen(bestMatch['Treibhausgasemissionen, Total,  (in kg CO2-eq)'], bestMatch.BAUMATERIALIEN);
-                  const totalCO2eq = material.volume * density * indikator;
+      for (const material of element.materials_info) {
+        material.buildingElementId = element._id;
+        const bestMatch = await findBestMatchForMaterial(material, carbonMaterials, allMaterialsFuse);
+        if (bestMatch) {
+          const density = parseDensity(bestMatch['Rohdichte/Flächenmasse'], bestMatch.BAUMATERIALIEN);
+          const indikator = parseTreibhausgasemissionen(bestMatch['Treibhausgasemissionen, Total,  (in kg CO2-eq)'], bestMatch.BAUMATERIALIEN);
+          const totalCO2eq = material.volume * density * indikator;
 
-                  bulkOps.push({
-                      updateOne: {
-                          filter: { "_id": element._id, "materials_info.materialId": material.materialId },
-                          update: {
-                              "$set": {
-                                  "materials_info.$.matched_material_id": bestMatch._id,
-                                  "materials_info.$.matched_material_name": bestMatch.BAUMATERIALIEN,
-                                  "materials_info.$.density": density,
-                                  "materials_info.$.indikator": indikator,
-                                  "materials_info.$.total_co2": totalCO2eq.toFixed(3)
-                              }
-                          }
-                      }
-                  });
-              } else {
-                  bulkOps.push({
-                      updateOne: {
-                          filter: { "_id": element._id, "materials_info.materialId": material.materialId },
-                          update: {
-                              "$set": {
-                                  "materials_info.$.matched_material_name": "No Match"
-                              }
-                          }
-                      }
-                  });
+          bulkOps.push({
+            updateOne: {
+              filter: { "_id": element._id, "materials_info.materialId": material.materialId },
+              update: {
+                "$set": {
+                  "materials_info.$.matched_material_id": bestMatch._id,
+                  "materials_info.$.matched_material_name": bestMatch.BAUMATERIALIEN,
+                  "materials_info.$.density": density,
+                  "materials_info.$.indikator": indikator,
+                  "materials_info.$.total_co2": totalCO2eq.toFixed(3)
+                }
               }
-          }
+            }
+          });
+        } else {
+          bulkOps.push({
+            updateOne: {
+              filter: { "_id": element._id, "materials_info.materialId": material.materialId },
+              update: {
+                "$set": {
+                  "materials_info.$.matched_material_name": "No Match"
+                }
+              }
+            }
+          });
+        }
       }
+    }
 
-      // Perform bulk update
-      if (bulkOps.length > 0) {
-          await BuildingElement.bulkWrite(bulkOps);
-      }
+    // Perform bulk update
+    if (bulkOps.length > 0) {
+      await BuildingElement.bulkWrite(bulkOps);
+    }
 
-      // Calculate total footprint for the project
-      const updatedElements = await BuildingElement.find({ projectId }).lean();
-      const totalFootprint = updatedElements.reduce((total, element) => {
-          if (!element.materials_info) return total; // Skip if no materials_info
-          return total + element.materials_info.reduce((elementTotal, material) => {
-              return elementTotal + parseFloat(material.total_co2 || 0);
-          }, 0);
+    // Calculate total footprint for the project
+    const updatedElements = await BuildingElement.find({ projectId }).lean();
+    const totalFootprint = updatedElements.reduce((total, element) => {
+      if (!element.materials_info) return total; // Skip if no materials_info
+      return total + element.materials_info.reduce((elementTotal, material) => {
+        return elementTotal + parseFloat(material.total_co2 || 0);
       }, 0);
+    }, 0);
 
-      await Project.findByIdAndUpdate(projectId, { totalCarbonFootprint: totalFootprint });
+    await Project.findByIdAndUpdate(projectId, { totalCarbonFootprint: totalFootprint });
 
-      // Redirect to the project page or send a response to the client
-      res.redirect(`/projects/${projectId}`);
+    // Redirect to the project page or send a response to the client
+    res.redirect(`/projects/${projectId}`);
   } catch (error) {
-      // Remove the uploaded file if there's an error
-      await fs.unlink(filePath).catch(() => { });
-      console.error('Error handling IFC upload:', error);
-      res.status(500).send('Internal Server Error during IFC upload.');
+    // Remove the uploaded file if there's an error
+    await safeUnlink(filePath);
+    console.error('Error handling IFC upload:', error);
+    res.status(500).json({ error: error.message });
   }
 });
+
+
 
 // GET endpoint for building elements (no matching, just fetching from DB)
 router.get('/api/projects/:projectId/building_elements', isAuthenticated, async (req, res) => {
