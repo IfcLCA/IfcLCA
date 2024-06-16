@@ -1,28 +1,36 @@
 <!DOCTYPE html>
 <html lang="en">
 <%- include('partials/_head.ejs') %>
-  <body>
+<body>
 <%- include('partials/_header.ejs') %>
-    <main role="main">
-      <div class="container mt-5">
+<main role="main">
+  <div class="container mt-5">
+    <div class="card shadow">
+      <div class="card-body">
+        <h2 class="card-title text-center mb-4">Login to IfcLCA</h2>
         <% if (typeof query !== 'undefined' && query.message) { %>
-          <div class="alert alert-info"><%= query.message %></div>
+          <div class="alert alert-info text-center"><%= query.message %></div>
         <% } %>
-        <h2>Login</h2>
         <form action="/auth/login" method="POST">
           <div class="mb-3">
-            <input type="text" name="username" placeholder="Email" required class="form-control">
+            <label for="username" class="form-label">Email Address</label>
+            <input type="email" name="username" placeholder="Email" required class="form-control">
           </div>
           <div class="mb-3">
+            <label for="password" class="form-label">Password</label>
             <input type="password" name="password" placeholder="Password" required class="form-control">
           </div>
-          <div class="mb-3">
+          <div class="d-grid gap-2">
             <button type="submit" class="btn btn-primary">Login</button>
-            Don't have an account? <a href="/auth/register">Register</a>
+          </div>
+          <div class="text-center mt-3">
+            <span>Don't have an account? <a href="/auth/register">Register</a></span>
           </div>
         </form>
       </div>
-    </main>
-  </body>
+    </div>
+  </div>
+</main>
 <%- include('partials/_footer.ejs') %>
+</body>
 </html>
