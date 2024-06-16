@@ -33,80 +33,146 @@ function initializeTable(projectId, materialNames) {
             height: "622px",
             layout: "fitColumns",
             data: flattenElements(buildingElements),
-            columns: [
-                { title: "GUID", field: "guid", width: 100 },
-                { title: "IfcClass", field: "ifc_class", width: 100 },
-                { title: "Name", field: "instance_name", widthGrow: 3 },
-                { title: "Building-Storey", field: "building_storey", width: 150 },
-                { title: "Load-bearing", field: "is_loadbearing", formatter: "tickCross", width: 100 },
-                { title: "External", field: "is_external", formatter: "tickCross", width: 100 },
-                { title: "Volume", field: "volume", formatter: "money", formatterParams: { precision: 3 }, width: 120 },
-                { title: "Material", field: "name", widthGrow: 2 },
-                {
-                    title: "Matched Material",
-                    field: "matched_material",
-                    editor: "list",
-                    editorParams: {
-                        values: materialNames,
-                        autocomplete: true,
-                        clearable: true,
-                        sort: "asc",
-                    },
-                    formatter: "lookup",
-                    formatterParams: materialNames.reduce((acc, name) => {
-                        acc[name] = name;
-                        return acc;
-                    }, {}),
-                    widthGrow: 2,
-                    cellEdited: function (cell) {
-                        // Get updated material name
-                        const updatedMaterialName = cell.getValue();
-                        const row = cell.getRow();
-                        const data = row.getData();
-
-                        // Fetch material details and update density and CO2
-                        fetch(`/api/materials/details/${updatedMaterialName}`)
-                            .then(response => response.json())
-                            .then(materialDetails => {
-                                const newDensity = materialDetails.density;
-                                const newIndicator = materialDetails.indicator;
-                                const newTotalCO2 = data.volume * newDensity * newIndicator;
-
-                                // Update the table row
-                                row.update({
-                                    density: newDensity,
-                                    indikator: newIndicator,
-                                    total_co2: newTotalCO2.toFixed(3)
-                                });
-
-                                // Update the database
-                                $.ajax({
-                                    url: `/api/projects/${projectId}/building_elements/update`,
-                                    method: 'POST',
-                                    contentType: 'application/json',
-                                    data: JSON.stringify({
-                                        materialId: data.materialId,
-                                        matched_material_name: updatedMaterialName,
-                                        density: newDensity,
-                                        indikator: newIndicator,
-                                        total_co2: newTotalCO2.toFixed(3)
-                                    }),
-                                    success: function () {
-                                        console.log('Material updated successfully');
-                                    },
-                                    error: function (xhr, status, error) {
-                                        console.error('Error updating material:', error);
-                                    }
-                                });
-                            });
-                    }
-                },
-                { title: "Density (kg/m³)", field: "density", formatter: "money", formatterParams: { precision: 2 }, width: 150 },
-                { title: "Indicator (kg CO₂-eq/kg)", field: "indikator", formatter: "money", formatterParams: { precision: 3 }, width: 150 },
-                { title: "CO₂-eq (kg)", field: "total_co2", formatter: "money", formatterParams: { precision: 3 }, width: 150 }
-            ],
+            columns: getColumns(materialNames, projectId),
         });
     });
+}
+
+// Generate columns with combine rows icon
+function getColumns(materialNames, projectId) {
+    const columns = [
+        { title: "GUID", field: "guid", width: 100, headerContextMenu: combineRowsIcon("guid") },
+        { title: "IfcClass", field: "ifc_class", width: 100, headerContextMenu: combineRowsIcon("ifc_class") },
+        { title: "Name", field: "instance_name", widthGrow: 3, headerContextMenu: combineRowsIcon("instance_name") },
+        { title: "Building-Storey", field: "building_storey", width: 150, headerContextMenu: combineRowsIcon("building_storey") },
+        { title: "Load-bearing", field: "is_loadbearing", formatter: "tickCross", width: 100, headerContextMenu: combineRowsIcon("is_loadbearing") },
+        { title: "External", field: "is_external", formatter: "tickCross", width: 100, headerContextMenu: combineRowsIcon("is_external") },
+        { title: "Volume", field: "volume", formatter: "money", formatterParams: { precision: 3 }, width: 120, headerContextMenu: combineRowsIcon("volume") },
+        { title: "Material", field: "name", widthGrow: 2, headerContextMenu: combineRowsIcon("name") },
+        {
+            title: "Matched Material",
+            field: "matched_material",
+            editor: "list",
+            editorParams: {
+                values: materialNames,
+                autocomplete: true,
+                clearable: true,
+                sort: "asc",
+            },
+            formatter: "lookup",
+            formatterParams: materialNames.reduce((acc, name) => {
+                acc[name] = name;
+                return acc;
+            }, {}),
+            widthGrow: 2,
+            headerContextMenu: combineRowsIcon("matched_material"),
+            cellEdited: function (cell) {
+                // Get updated material name
+                const updatedMaterialName = cell.getValue();
+                const row = cell.getRow();
+                const data = row.getData();
+
+                // Fetch material details and update density and CO2
+                fetch(`/api/materials/details/${updatedMaterialName}`)
+                    .then(response => response.json())
+                    .then(materialDetails => {
+                        const newDensity = materialDetails.density;
+                        const newIndicator = materialDetails.indicator;
+                        const newTotalCO2 = data.volume * newDensity * newIndicator;
+
+                        // Update the table row
+                        row.update({
+                            density: newDensity,
+                            indikator: newIndicator,
+                            total_co2: newTotalCO2.toFixed(3)
+                        });
+
+                        // Update the database
+                        $.ajax({
+                            url: `/api/projects/${projectId}/building_elements/update`,
+                            method: 'POST',
+                            contentType: 'application/json',
+                            data: JSON.stringify({
+                                materialId: data.materialId,
+                                matched_material_name: updatedMaterialName,
+                                density: newDensity,
+                                indikator: newIndicator,
+                                total_co2: newTotalCO2.toFixed(3)
+                            }),
+                            success: function () {
+                                console.log('Material updated successfully');
+                            },
+                            error: function (xhr, status, error) {
+                                console.error('Error updating material:', error);
+                            }
+                        });
+                    });
+            }
+        },
+        { title: "Density (kg/m³)", field: "density", formatter: "money", formatterParams: { precision: 2 }, width: 150, headerContextMenu: combineRowsIcon("density") },
+        { title: "Indicator (kg CO₂-eq/kg)", field: "indikator", formatter: "money", formatterParams: { precision: 3 }, width: 150, headerContextMenu: combineRowsIcon("indikator") },
+        { title: "CO₂-eq (kg)", field: "total_co2", formatter: "money", formatterParams: { precision: 3 }, width: 150, headerContextMenu: combineRowsIcon("total_co2") }
+    ];
+    return columns;
+}
+
+// Create combine rows icon for column headers
+function combineRowsIcon(field) {
+    return function(e, column) {
+        e.preventDefault();  // Prevent default context menu from appearing
+        combineRowsByField(column.getTable(), field);
+    };
+}
+
+// Create combine rows icon for column headers
+function combineRowsIcon(field) {
+    return [
+        {
+            label: "Combine Rows",
+            action: function(e, column) {
+                combineRowsByField(column.getTable(), field);
+            },
+            icon: "<i class='fa fa-compress'></i>"
+        }
+    ];
+}
+
+// Combine rows by specified field
+function combineRowsByField(table, field) {
+    var rows = table.getRows();
+    var groupedData = {};
+    rows.forEach(row => {
+        var data = row.getData();
+        var key = data[field];
+        if (!groupedData[key]) {
+            groupedData[key] = [];
+        }
+        groupedData[key].push(data);
+    });
+
+    var combinedRows = [];
+    for (var key in groupedData) {
+        var group = groupedData[key];
+        var combined = combineGroup(group, field);
+        combinedRows.push(combined);
+    }
+
+    table.replaceData(combinedRows);
+}
+
+// Combine group data
+function combineGroup(group, field) {
+    var combined = Object.assign({}, group[0]);
+    combined.volume = group.reduce((sum, item) => sum + parseFloat(item.volume), 0).toFixed(3);
+    combined.total_co2 = group.reduce((sum, item) => sum + parseFloat(item.total_co2), 0).toFixed(3);
+
+    for (var key in combined) {
+        if (group.some(item => item[key] !== combined[key])) {
+            combined[key] = "<varies>";
+        }
+    }
+    combined[field] = group[0][field];  // Preserve the combined value
+    return combined;
 }
 
 // Flatten building elements data

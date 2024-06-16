@@ -99,50 +99,83 @@ footer span {
   border-color: #e64a19;
 }
 
-#elements-table {
+/* Material UI Table Styling */
+.tabulator {
+  font-family: 'Roboto', sans-serif;
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12), 0 1px 2px rgba(0, 0, 0, 0.24);
+}
+
+.tabulator-header {
+  background-color: #f5f5f5;
+  color: #616161;
+}
+
+.tabulator-header .tabulator-col {
+  border-right: 1px solid #e0e0e0;
+  padding: 12px 6px;
+  text-align: center;
+}
+
+.tabulator-header .tabulator-col:last-child {
+  border-right: none;
+}
+
+.tabulator-tableholder {
+  overflow-x: auto;
+}
+
+.tabulator-row {
+  border-bottom: 1px solid #e0e0e0;
+}
+
+.tabulator-row:nth-of-type(odd) {
+  background-color: #fafafa;
+}
+
+.tabulator-row:nth-of-type(even) {
+  background-color: #ffffff;
+}
+
+.tabulator-row:hover {
+  background-color: #f1f1f1;
+}
+
+.tabulator-cell {
+  padding: 10px 6px;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.tabulator-cell a {
+  color: #1e88e5;
+  text-decoration: none;
+}
+
+.tabulator-cell a:hover {
+  text-decoration: underline;
+}
+
+.tabulator-pagination {
+  margin-top: 10px;
+  text-align: center;
+  display: flex;
+  justify-content: center;
+  gap: 5px;
+}
+
+.tabulator-pagination button {
+  background-color: #1e88e5;
+  color: #ffffff;
+  border: none;
   border-radius: 4px;
+  padding: 8px 12px;
+  cursor: pointer;
+  transition: background-color 0.3s ease;
 }
 
-.bold-value {
-  font-weight: bold;
-}
-
-.tabulator .tabulator-header .tabulator-col {
-  border-radius: 2px;
- font-size: small;
-}
-
-
-.container, .container-fluid {
-  max-width: 90%; /* Adjust as needed */
-}
-
-
-.tooltip {
-  display: none;
-  position: absolute;
-  background-color: #f9f9f9;
-  border: 1px solid #ccc;
-  padding: 5px;
-  z-index: 1000;
-}
-.custom-header:hover .tooltip {
-  display: block;
-}
-
-.tabulator .tabulator-header .tabulator-col {
-  min-height: 55px; /* Adjust based on your content */
-  align-items: center; /* Centers content vertically */
-  display: flex; /* Enables flexbox layout */
-  flex-direction: column; /* Stacks content vertically */
-}
-
-.range-highlight {
-  background-color: yellow;
-  color: black;
-  font-weight: bold;
-}
-
-.tabulator .tabulator-header .tabulator-col .tabulator-col-content .tabulator-col-title {
-  white-space: normal !important;
+.tabulator-pagination button:hover {
+  background-color: #1565c0;
 }
