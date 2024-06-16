@@ -5,16 +5,19 @@
 <%- include('partials/_header.ejs') %>
     <main role="main">
       <div class="container mt-5">
+        <% if (typeof query !== 'undefined' && query.message) { %>
+          <div class="alert alert-info"><%= query.message %></div>
+        <% } %>
         <h2>Register</h2>
         <form action="/auth/register" method="POST">
           <div class="mb-3">
-            <input type="text" name="username" placeholder="Username" required class="form-control">
+            <input type="email" name="username" placeholder="Email" required class="form-control">
           </div>
           <div class="mb-3">
             <input type="password" name="password" placeholder="Password" required class="form-control">
           </div>
           <div class="mb-3">
-            <button type="submit" class="btn btn-primary mr-2">Register</button>
+            <button type="submit" class="btn btn-primary">Register</button>
             Already have an account? <a href="/auth/login">Login</a>
           </div>
         </form>
