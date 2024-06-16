@@ -1,4 +1,6 @@
 const express = require('express');
+const path = require('path');  // Ensure this is imported
+const fs = require('fs');  // Ensure this is imported
 const User = require('../models/User');
 const bcrypt = require('bcryptjs');  // Use bcryptjs
 const crypto = require('crypto');
@@ -14,6 +16,12 @@ const transporter = nodemailer.createTransport({
   }
 });
 
+// Extract first name from email
+function extractFirstName(email) {
+  const firstName = email.split('@')[0].split('.')[0];
+  return firstName.charAt(0).toUpperCase() + firstName.slice(1);
+}
+
 // Register Route
 router.get('/auth/register', (req, res) => {
   res.render('register', { query: req.query });
@@ -23,6 +31,7 @@ router.post('/auth/register', async (req, res) => {
   try {
     const { username, password } = req.body;
     const token = crypto.randomBytes(32).toString('hex');
+    const firstName = extractFirstName(username);
 
     // Create the user with a confirmation token but don't activate yet
     const newUser = new User({
@@ -34,13 +43,19 @@ router.post('/auth/register', async (req, res) => {
 
     await newUser.save();
 
+    // Read the email template
+    const emailTemplatePath = path.join(__dirname, '../views/emailTemplates/emailTemplate.html');
+    const emailTemplate = await fs.promises.readFile(emailTemplatePath, 'utf-8');
+
+    const emailContent = emailTemplate
+      .replace(/<%= firstName %>/g, firstName)
+      .replace(/<%= confirmUrl %>/g, `http://${req.headers.host}/auth/confirm/${token}`)
+
     // Send the confirmation email
-    const confirmUrl = `http://${req.headers.host}/auth/confirm/${token}`;
     await transporter.sendMail({
       to: username,
-      subject: 'Email Confirmation',
-      text: `Please confirm your email by clicking the following link: ${confirmUrl}`,
-      html: `<p>Please confirm your email by clicking the following link: <a href="${confirmUrl}">${confirmUrl}</a></p>`
+      subject: 'Email Confirmation - IfcLCA',
+      html: emailContent
     });
 
     res.redirect('/auth/login?message=Confirmation email sent. Please check your inbox.');
@@ -58,13 +73,9 @@ router.get('/auth/confirm/:token', async (req, res) => {
       return res.status(400).send('Invalid or expired token');
     }
 
-    console.log(`User before confirmation: ${JSON.stringify(user)}`);
-
     user.confirmationToken = null;
     user.isActive = true;
     await user.save();
-
-    console.log(`User after confirmation: ${JSON.stringify(user)}`);
 
     res.redirect('/auth/login?message=Email confirmed successfully. You can now log in.');
   } catch (error) {
@@ -89,15 +100,11 @@ router.post('/auth/login', async (req, res) => {
       return res.status(400).send('Email not confirmed. Please check your email.');
     }
 
-    console.log(`Hashed password from DB: ${user.password}`);
-    console.log(`Provided password: ${password}`);
-
     const isMatch = await bcrypt.compare(password, user.password);
 
-    console.log(`Password match result: ${isMatch}`);
-
     if (isMatch) {
-      req.session.userId = user._id;
+      req.session.userId = user._id;  // Store user ID in session
+      req.session.username = user.username;  // Optionally store username
       return res.redirect('/');
     } else {
       return res.status(400).send('Password is incorrect');
