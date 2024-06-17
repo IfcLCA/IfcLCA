@@ -21,13 +21,17 @@
             flex: 1;
             min-width: 250px; /* Ensure minimum width */
         }
-        .details-container, .image-container {
+        .details-container {
             display: flex;
             flex-direction: column;
             align-items: flex-start;
         }
         .image-container {
-            align-items: flex-end; /* Align image and button to the right */
+            display: flex;
+            flex-direction: column;
+            align-items: center; /* Center button below image */
+            justify-content: flex-end; /* Align image to the right */
+            width: 100%; /* Take full width */
         }
         .image-container img {
             width: 250px;
@@ -37,13 +41,13 @@
             display: flex;
             justify-content: center;
             align-items: center;
-            min-width: 800px;
+            min-width: 700px;
             padding: 10px;
             flex: 0 1 auto;
         }
         .chart-card {
             width: 100%;
-            max-width: 800px; /* Max width for chart */
+            max-width: 700px; /* Max width for chart */
         }
         .chart-container {
             padding: 5px;
@@ -77,7 +81,7 @@
         <div class="image-column">
             <div class="image-container">
                 <img src="<%= project.customImage %>" alt="Project Image">
-                <a href="/projects/<%= project._id %>/edit" class="btn btn-primary" style="margin-top: 20px;">Edit Project</a>
+                <a href="/projects/<%= project._id %>/edit" class="btn btn-primary mt-3">Edit Project</a>
             </div>
         </div>
     </div>
