@@ -57,6 +57,9 @@ body {
 .container {
   padding-top: 20px;
   padding-bottom: 20px;
+  width: 90%; /* Set the width to 100% of the viewport */
+  max-width: 1700px; /* Set a maximum width if you want to limit how wide it can get */
+  margin: 0 auto; /* Center the container if its width is less than the viewport's width */
 }
 
 footer {
