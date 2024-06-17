@@ -21,7 +21,6 @@ function fetchMaterialNames() {
         type: 'GET',
         dataType: 'json'
     }).then(data => {
-        console.log("Fetched material names:", data);  // Debug print
         return data;
     }).catch(error => {
         console.error("Error fetching material names:", error);
@@ -36,7 +35,6 @@ function fetchBuildingElements(projectId) {
         type: 'GET',
         dataType: 'json'
     }).then(data => {
-        console.log("Fetched building elements:", data);  // Debug print
         return data;
     }).catch(error => {
         console.error("Error fetching building elements:", error);
@@ -47,7 +45,6 @@ function fetchBuildingElements(projectId) {
 // Initialize Tabulator after preloading material names
 function initializeTable(projectId, materialNames) {
     fetchBuildingElements(projectId).then(buildingElements => {
-        console.log("Initializing table with elements:", buildingElements);  // Debug print
         var table = new Tabulator("#elements-table", {
             height: "622px",
             layout: "fitColumns",
@@ -91,9 +88,6 @@ function getColumns(materialNames, projectId) {
                 const row = cell.getRow();
                 const data = row.getData();
 
-                console.log("Editing matched material:", updatedMaterialName);  // Debug print
-                console.log("Original row data:", data);  // Debug print
-
                 // Fetch material details and update density and CO2
                 fetch(`/api/materials/details/${updatedMaterialName}`)
                     .then(response => response.json())
@@ -101,8 +95,6 @@ function getColumns(materialNames, projectId) {
                         const newDensity = materialDetails.density;
                         const newIndicator = materialDetails.indicator;
                         const newTotalCO2 = data.volume * newDensity * newIndicator;
-
-                        console.log("Material details fetched:", materialDetails);  // Debug print
 
                         // Update the combined row
                         row.update({
@@ -114,7 +106,6 @@ function getColumns(materialNames, projectId) {
                         // Update the database for all original rows
                         const materialIds = data._ids ? data._ids.split(',') : [data._id];
                         const validMaterialIds = materialIds.filter(id => id && id !== "<varies>");
-                        console.log("Updating original rows with IDs:", validMaterialIds);  // Debug print
                         
                         const updatePromises = validMaterialIds.map(materialId => {
                             return $.ajax({
@@ -133,7 +124,6 @@ function getColumns(materialNames, projectId) {
 
                         Promise.all(updatePromises)
                             .then(() => {
-                                console.log('All materials updated successfully');
                                 updateProjectDetails(projectId);
                                 // Refresh the data in the table
                                 fetchBuildingElements(window.projectId).then(buildingElements => {
@@ -181,7 +171,6 @@ function updateTableGrouping() {
         });
     } else {
         const groupedData = groupDataByFields(data, currentGrouping);
-        console.log("Grouped data:", groupedData);  // Debug print
         table.replaceData(groupedData);
     }
 }
@@ -199,7 +188,6 @@ function groupDataByFields(data, fields) {
     });
 
     const combinedGroups = Object.values(groupedData).map(group => combineGroup(group));
-    console.log("Combined groups:", combinedGroups);  // Debug print
     return combinedGroups;
 }
 
