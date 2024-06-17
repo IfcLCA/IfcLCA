@@ -59,7 +59,11 @@ function initializeTable(projectId, materialNames) {
             layout: "fitColumns",
             data: flattenElements(buildingElements),
             columns: getColumns(materialNames, projectId),
-            headerSortClickElement: "icon" // Sorting only on icon click
+            headerSortClickElement: "icon", // Sorting only on icon click
+            initialSort: [{ column: "guid", dir: "desc" }], // Sort by GUID by default
+            rowAdded: function(row) {
+                row.moveToTop(); // Move newly added row to the top
+            }
         });
 
         window.mainTable = table;
@@ -258,7 +262,15 @@ function getColumns(materialNames, projectId) {
                     });
             }            
         },
-        { title: `<div>Density (kg/m³)</div>`, field: "density", formatter: "money", formatterParams: { precision: 2 }, width: 100, headerWordWrap: true },
+        { 
+            title: `<div>Density (kg/m³)</div>`, 
+            field: "density", 
+            formatter: "money", 
+            formatterParams: { precision: 2 }, 
+            width: 100, 
+            headerWordWrap: true,
+            editor: "input", 
+        },
         { title: `<div>Indicator (kg CO₂-eq/kg)</div>`, field: "indikator", formatter: "money", formatterParams: { precision: 3, thousand:"'" }, width: 100, headerWordWrap: true },
         { title: `<div>CO₂-eq (kg)</div>`, field: "total_co2", formatter: "money", formatterParams: { precision: 2, thousand:"'" }, width: 125, headerWordWrap: true, hozAlign: "left" }
     ];
