@@ -499,5 +499,76 @@ router.get('/api/projects/:projectId/co2_per_storey', isAuthenticated, async (re
   }
 });
 
+// Add new building element row page
+router.get('/projects/:projectId/add-row', isAuthenticated, (req, res) => {
+  try {
+      const projectId = req.params.projectId;
+      res.render('addRow', { projectId });
+  } catch (error) {
+      console.error('Error rendering add row page:', error);
+      res.status(500).send('Error rendering add row page.');
+  }
+});
+
+// POST endpoint to add a new building element row
+router.post('/api/projects/:projectId/building_elements/add', isAuthenticated, async (req, res) => {
+  try {
+      const projectId = req.params.projectId;
+      const { name, volume, material, totalCO2, density, indicator } = req.body; // Extract density and indicator
+
+      const newElement = new BuildingElement({
+          projectId: new mongoose.Types.ObjectId(projectId),
+          guid: new mongoose.Types.ObjectId().toHexString(), // Generate a unique GUID
+          ifc_class: "CustomElement",
+          instance_name: name,
+          building_storey: "Unknown",
+          is_loadbearing: false,
+          is_external: false,
+          materials_info: [{
+              materialId: new mongoose.Types.ObjectId().toHexString(),
+              volume: volume,
+              name: material,
+              matched_material_name: material,
+              density: density, // Use extracted density
+              indicator: indicator, // Use extracted indicator
+              total_co2: totalCO2
+          }]
+      });
+
+      await newElement.save();
+
+      // Update project total CO₂ footprint
+      const project = await Project.findById(projectId);
+      project.totalCarbonFootprint += parseFloat(totalCO2);
+      await project.save();
+
+      res.redirect(`/projects/${projectId}`);
+  } catch (error) {
+      console.error('Error adding building element:', error);
+      res.status(500).json({ message: "Error adding building element", error: error.toString() });
+  }
+});
+
+router.post('/api/projects/:projectId/updateDensity', async (req, res) => {
+    try {
+        const projectId = req.params.projectId;
+        const newDensity = req.body.density;
+
+        // Update density
+        const project = await Project.findById(projectId);
+        project.density = newDensity;
+        await project.save();
+
+        // Recalculate CO2 value
+        const totalCO2 = project.volume * newDensity * project.co2Indicator;
+        project.totalCarbonFootprint = totalCO2;
+        await project.save();
+
+        res.json({ success: true });
+    } catch (error) {
+        console.error('Error updating density:', error);
+        res.status(500).json({ message: "Error updating density", error: error.toString() });
+    }
+});
 
 module.exports = router;

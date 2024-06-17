@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="en">
+<%- include('partials/_head.ejs') %>
+<head>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/select2/dist/js/select2.min.js"></script>
+    <link href="https://cdn.jsdelivr.net/npm/select2/dist/css/select2.min.css" rel="stylesheet" />
+    <style>
+        .card {
+            margin: 20px auto;
+            padding: 20px;
+            max-width: 700px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+        }
+        .card-body {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+        .form-group {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+        .form-group label {
+            flex: 1;
+        }
+        .form-group input, .form-group select {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+        }
+        .tooltip {
+            position: relative;
+            display: inline-block;
+            cursor: pointer;
+            margin-left: 5px;
+            color: #007bff;
+            text-decoration: underline;
+        }
+        .tooltip .tooltiptext {
+            visibility: hidden;
+            width: 200px;
+            background-color: #555;
+            color: #fff;
+            text-align: center;
+            border-radius: 5px;
+            padding: 5px;
+            position: absolute;
+            z-index: 1;
+            bottom: 125%; 
+            left: 50%;
+            margin-left: -100px;
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+        .tooltip:hover .tooltiptext {
+            visibility: visible;
+            opacity: 1;
+        }
+        .button-group {
+            display: flex;
+            gap: 10px;
+            justify-content: flex-end;
+        }
+    </style>
+</head>
+<body>
+<%- include('partials/_header.ejs', { hasProjects: false }) %>
+<main role="main" class="container mt-4">
+    <div class="card">
+        <div class="card-body">
+            <h3>Add New Row</h3>
+            <form id="addRowForm">
+                <div class="form-group">
+                    <label for="name">Name <span class="tooltip">?
+                        <span class="tooltiptext">Enter the name of the building element.</span>
+                    </span></label>
+                    <input type="text" id="name" name="name" required>
+                </div>
+                <div class="form-group">
+                    <label for="volume">Volume (m³) <span class="tooltip">?
+                        <span class="tooltiptext">Enter the volume in cubic meters.</span>
+                    </span></label>
+                    <input type="number" step="0.01" id="volume" name="volume" required>
+                </div>
+                <div class="form-group">
+                    <label for="material">Material <span class="tooltip">?
+                        <span class="tooltiptext">Select the material from the list or type to search.</span>
+                    </span></label>
+                    <select id="material" name="material" required style="width: 100%;"></select>
+                </div>
+                <div class="form-group">
+                    <label for="totalCO2">Total CO₂ (kg) <span class="tooltip">?
+                        <span class="tooltiptext">This is the calculated CO₂ equivalent.</span>
+                    </span></label>
+                    <input type="number" step="0.01" id="totalCO2" name="totalCO2" readonly>
+                </div>
+                <div class="button-group">
+                    <button type="button" id="cancelButton" class="btn btn-secondary">Cancel</button>
+                    <button type="submit" class="btn btn-success">Add new Row to table</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</main>
+<%- include('partials/_footer.ejs') %>
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    var materialDropdown = $('#material');
+    var volumeInput = document.getElementById('volume');
+    var totalCO2Input = document.getElementById('totalCO2');
+
+    function updatePreview() {
+        var volume = parseFloat(volumeInput.value);
+        var material = materialDropdown.val();
+
+        if (!isNaN(volume) && material) {
+            axios.get(`/api/materials/details/${material}`).then(response => {
+                var density = response.data.density;
+                var indicator = response.data.indicator;
+                var totalCO2 = volume * density * indicator;
+                totalCO2Input.value = totalCO2.toFixed(3);
+            }).catch(error => console.error('Error fetching material details:', error));
+        }
+    }
+
+    axios.get('/api/materials/names').then(response => {
+        materialDropdown.select2({
+            data: response.data.map(material => ({ id: material, text: material })),
+            placeholder: 'Select a material',
+            allowClear: true,
+            width: 'resolve'
+        });
+    }).catch(error => console.error('Error fetching materials:', error));
+
+    volumeInput.addEventListener('input', updatePreview);
+    materialDropdown.on('change', updatePreview);
+
+    document.getElementById('addRowForm').addEventListener('submit', function(event) {
+        event.preventDefault();
+        var name = document.getElementById('name').value;
+        var volume = parseFloat(volumeInput.value);
+        var material = materialDropdown.val();
+        var totalCO2 = parseFloat(totalCO2Input.value);
+
+        if (!name || isNaN(volume) || !material || isNaN(totalCO2)) {
+            alert('Please enter valid values.');
+            return;
+        }
+
+        axios.post(`/api/projects/${window.location.pathname.split('/')[2]}/building_elements/add`, {
+            name: name,
+            volume: volume,
+            material: material,
+            totalCO2: totalCO2
+        }).then(() => {
+            window.location.href = `/projects/${window.location.pathname.split('/')[2]}`;
+        }).catch(error => console.error('Error adding row:', error));
+    });
+
+    document.getElementById('cancelButton').addEventListener('click', function() {
+        window.location.href = `/projects/${window.location.pathname.split('/')[2]}`;
+    });
+});
+</script>
+</body>
+</html>

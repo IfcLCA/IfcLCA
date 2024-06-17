@@ -19,7 +19,7 @@
         }
         .details-column, .image-column {
             flex: 1;
-            min-width: 250px; /* Ensure minimum width */
+            min-width: 250px;
         }
         .details-container {
             display: flex;
@@ -29,9 +29,9 @@
         .image-container {
             display: flex;
             flex-direction: column;
-            align-items: center; /* Center button below image */
-            justify-content: flex-end; /* Align image to the right */
-            width: 100%; /* Take full width */
+            align-items: center;
+            justify-content: flex-end;
+            width: 100%;
         }
         .image-container img {
             width: 250px;
@@ -47,10 +47,17 @@
         }
         .chart-card {
             width: 100%;
-            max-width: 700px; /* Max width for chart */
+            max-width: 700px;
         }
         .chart-container {
             padding: 5px;
+        }
+        .btn-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 10px;
         }
     </style>
 </head>
@@ -79,9 +86,12 @@
             </div>
         </div>
         <div class="image-column">
+            <div class="btn-container">
+                <a href="/projects/<%= project._id %>/edit" class="btn btn-primary">Edit Project</a>
+            </div>
             <div class="image-container">
                 <img src="<%= project.customImage %>" alt="Project Image">
-                <a href="/projects/<%= project._id %>/edit" class="btn btn-primary mt-3">Edit Project</a>
+                <a href="/projects/<%= project._id %>/add-row" class="btn btn-primary mt-3">Add Material</a>
             </div>
         </div>
     </div>
