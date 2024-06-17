@@ -11,9 +11,9 @@
 <main role="main" class="container mt-4">
     <div class="project-details d-flex flex-wrap justify-content-between align-items-start">
         <div>
-            <h2><%= formatProjectNameForDisplay(project.name) %></h2>
-            <p><strong>Phase:</strong> <%= project.phase %></p>
-            <p><strong>Description:</strong> <%= project.description %></p>
+            <h2 id="project-name"><%= formatProjectNameForDisplay(project.name) %></h2>
+            <p><strong>Phase:</strong> <span id="project-phase"><%= project.phase %></span></p>
+            <p><strong>Description:</strong> <span id="project-description"><%= project.description %></span></p>
             <p><strong>Carbon Footprint:</strong> <span id="carbonFootprint"><%= (Math.round(project.totalCarbonFootprint) / 1000).toFixed(3) %> tons</span></p>
             <p><strong>EBF per m²:</strong> <span id="ebfPerM2"><%= project.EBF %> m²</span></p>
             <p><strong>CO₂ per m²:</strong> <span id="co2PerM2"><%= project.co2PerSquareMeter %> kg</span></p>
@@ -32,6 +32,9 @@
     var projectId = "<%= project._id %>";
     var projectName = "<%= project.name %>";
     console.log(`projectName: ${projectName}`);
+
+    // Update project details on load
+    updateProjectDetails(projectId);
 </script>
 <script src="/js/projectTable.js"></script>
 </body>

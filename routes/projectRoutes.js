@@ -287,6 +287,7 @@ router.post('/api/projects/:projectId/building_elements/update', isAuthenticated
 });
 
 
+
 // Endpoint to get material names for the dropdown
 router.get('/api/materials/names', async (req, res) => {
   try {
