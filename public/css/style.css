@@ -72,7 +72,6 @@ footer span {
   color: #777;
 }
 
-/* Added styles for success message */
 .alert-success {
   color: #3c763d;
   background-color: #dff0d8;
@@ -84,14 +83,12 @@ footer span {
   text-align: center;
 }
 
-/* Additional styles to address user feedback */
 .navbar .btn-primary {
   position: absolute;
   right: 1rem;
   top: 0.5rem; /* Ensure it aligns well with the navbar */
 }
 
-/* Style adjustments for specific buttons on the navbar */
 .navbar .btn-primary, .navbar .btn-primary:hover {
   background-color: #ff5722; /* Orange color as per user request */
   border-color: #ff5722;
@@ -102,7 +99,7 @@ footer span {
   border-color: #e64a19;
 }
 
-/* Material UI Table Styling */
+/* Table Styling */
 .tabulator {
   font-family: 'Roboto', sans-serif;
   border: 1px solid #e0e0e0;
@@ -116,10 +113,15 @@ footer span {
   color: #616161;
 }
 
-.tabulator-header .tabulator-col {
-  border-right: 1px solid #e0e0e0;
-  padding: 12px 6px;
-  text-align: center;
+.tabulator-header .tabulator-col-sorter {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-left: 4px; /* Ensure spacing between title and sort icon */
+}
+
+.tabulator-header {
+  height: auto; /* Allow the header height to adjust based on content */
 }
 
 .tabulator-header .tabulator-col:last-child {
@@ -182,3 +184,4 @@ footer span {
 .tabulator-pagination button:hover {
   background-color: #1565c0;
 }
+

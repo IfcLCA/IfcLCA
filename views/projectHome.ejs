@@ -1,26 +1,84 @@
 <!DOCTYPE html>
 <html lang="en">
 <%- include('partials/_head.ejs') %>
-<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
-<link href="https://cdn.jsdelivr.net/npm/tabulator-tables/dist/css/tabulator.min.css" rel="stylesheet">
-<script src="https://cdn.jsdelivr.net/npm/tabulator-tables/dist/js/tabulator.min.js"></script>
-<link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css" rel="stylesheet">
+<head>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+    <link href="https://cdn.jsdelivr.net/npm/tabulator-tables/dist/css/tabulator.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/tabulator-tables/dist/js/tabulator.min.js"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css" rel="stylesheet">
+    <!-- Load Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Custom CSS -->
+    <style>
+        .project-details {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            width: 100%;
+        }
+        .details-column, .image-column {
+            flex: 1;
+            min-width: 250px; /* Ensure minimum width */
+        }
+        .details-container, .image-container {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-start;
+        }
+        .image-container {
+            align-items: flex-end; /* Align image and button to the right */
+        }
+        .image-container img {
+            width: 250px;
+            height: auto;
+        }
+        .chart-column {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-width: 800px;
+            padding: 10px;
+            flex: 0 1 auto;
+        }
+        .chart-card {
+            width: 100%;
+            max-width: 800px; /* Max width for chart */
+        }
+        .chart-container {
+            padding: 5px;
+        }
+    </style>
+</head>
 <body>
 <%- include('partials/_header.ejs', { hasProjects: false }) %>
 <main role="main" class="container mt-4">
-    <div class="project-details d-flex flex-wrap justify-content-between align-items-start">
-        <div>
-            <h2 id="project-name"><%= formatProjectNameForDisplay(project.name) %></h2>
-            <p><strong>Phase:</strong> <span id="project-phase"><%= project.phase %></span></p>
-            <p><strong>Description:</strong> <span id="project-description"><%= project.description %></span></p>
-            <p><strong>Carbon Footprint:</strong> <span id="carbonFootprint"><%= (Math.round(project.totalCarbonFootprint) / 1000).toFixed(3) %> tons</span></p>
-            <p><strong>EBF per m²:</strong> <span id="ebfPerM2"><%= project.EBF %> m²</span></p>
-            <p><strong>CO₂ per m²:</strong> <span id="co2PerM2"><%= project.co2PerSquareMeter %> kg</span></p>
+    <div class="project-details">
+        <div class="details-column">
+            <div class="details-container">
+                <h2 id="project-name"><%= formatProjectNameForDisplay(project.name) %></h2>
+                <p><strong>Phase:</strong> <%= project.phase %></p>
+                <p><strong>Description:</strong> <%= project.description %></p>
+                <p><strong>Carbon Footprint:</strong> <span id="carbonFootprint"><%= (Math.round(project.totalCarbonFootprint) / 1000).toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 1 }) %> tons</span></p>
+                <p><strong>m²:</strong> <span id="ebfPerM2"><%= project.EBF.toLocaleString() %> m²</span></p>
+                <p><strong>CO₂-eq / m²:</strong> <span id="co2PerM2"><%= (Math.round(project.co2PerSquareMeter)).toLocaleString() %> kg</span></p>
+            </div>
         </div>
-        <div class="image-container d-flex flex-column align-items-start">
-            <img src="<%= project.customImage %>" alt="Project Image" style="width: 250px; height: auto;">
-            <a href="/projects/<%= project._id %>/edit" class="btn btn-primary" style="margin-top: 20px;">Edit Project</a>
+        <div class="chart-column">
+            <div class="card chart-card">
+                <div class="card-body">
+                    <h3 class="text-center">CO₂-eq per Building Storey</h3>
+                    <div class="chart-container">
+                        <canvas id="co2Chart" width="300" height="100"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="image-column">
+            <div class="image-container">
+                <img src="<%= project.customImage %>" alt="Project Image">
+                <a href="/projects/<%= project._id %>/edit" class="btn btn-primary" style="margin-top: 20px;">Edit Project</a>
+            </div>
         </div>
     </div>
     <div id="elements-table" class="mt-4"></div>
@@ -31,10 +89,11 @@
 <script>
     var projectId = "<%= project._id %>";
     var projectName = "<%= project.name %>";
-    console.log(`projectName: ${projectName}`);
 
     // Update project details on load
     updateProjectDetails(projectId);
+    // Initialize table and chart on load
+    initializeTableAndChart(projectId);
 </script>
 <script src="/js/projectTable.js"></script>
 </body>

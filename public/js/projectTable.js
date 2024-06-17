@@ -42,34 +42,146 @@ function fetchBuildingElements(projectId) {
     });
 }
 
+function updateProjectSummary(data) {
+    const totalCarbonFootprint = data.reduce((sum, element) => sum + parseFloat(element.total_co2 || 0), 0);
+    const EBF = parseFloat($('#ebfPerM2').text().split(' ')[0]); // Assume EBF is stored in span with id ebfPerM2
+    const co2PerSquareMeter = EBF > 0 ? totalCarbonFootprint / EBF : 0;
+
+    $('#carbonFootprint').text(`${(Math.round(totalCarbonFootprint) / 1000).toFixed(3)} tons`);
+    $('#co2PerM2').text(`${co2PerSquareMeter.toFixed(3)} kg`);
+}
+
 // Initialize Tabulator after preloading material names
 function initializeTable(projectId, materialNames) {
     fetchBuildingElements(projectId).then(buildingElements => {
         var table = new Tabulator("#elements-table", {
-            height: "622px",
+            height: "800px",
             layout: "fitColumns",
             data: flattenElements(buildingElements),
             columns: getColumns(materialNames, projectId),
+            headerSortClickElement: "icon" // Sorting only on icon click
         });
 
         window.mainTable = table;
     });
 }
 
+// Function to determine color based on CO₂ intensity
+function getCo2Color(value, min, max) {
+    const thresholds = {
+        low: min + (max - min) * 0.25,
+        medium: min + (max - min) * 0.5,
+        high: min + (max - min) * 0.75
+    };
+
+    if (value < thresholds.low) return 'rgba(75, 192, 192, 0.8)'; // Light blue
+    if (value < thresholds.medium) return 'rgba(255, 205, 86, 0.8)'; // Yellow
+    if (value < thresholds.high) return 'rgba(255, 159, 64, 0.8)'; // Orange
+    return 'rgba(255, 99, 132, 0.8)'; // Red
+}
+
+function loadCo2Chart(projectId) {
+    fetch(`/api/projects/${projectId}/co2_per_storey`)
+        .then(response => response.json())
+        .then(data => {
+            renderCo2Chart(data);
+        })
+        .catch(error => console.error('Error fetching CO₂-eq data per storey:', error));
+}
+
+function renderCo2Chart(data) {
+    const ctx = document.getElementById('co2Chart').getContext('2d');
+    const labels = data.map(item => item.storey);
+    const co2Values = data.map(item => item.co2_eq);
+
+    // Calculate min and max CO₂ values
+    const minCo2 = Math.min(...co2Values);
+    const maxCo2 = Math.max(...co2Values);
+
+    const barColors = co2Values.map(value => getCo2Color(value, minCo2, maxCo2));
+
+    new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: labels,
+            datasets: [{
+                label: 'CO₂-eq (kg)',
+                data: co2Values,
+                backgroundColor: barColors,
+                borderColor: barColors.map(color => color.replace('0.8', '1.0')),
+                borderWidth: 1
+            }]
+        },
+        options: {
+            responsive: true,
+            plugins: {
+                legend: {
+                    display: false
+                },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            return context.raw.toLocaleString() + ' kg CO₂-eq';
+                        }
+                    }
+                }
+            },
+            scales: {
+                x: {
+                    title: {
+                        display: true,
+                        text: 'Building Storey'
+                    }
+                },
+                y: {
+                    beginAtZero: true,
+                    title: {
+                        display: true,
+                        text: 'CO₂-eq (kg)'
+                    }
+                }
+            }
+        }
+    });
+}
+
+
+// Initialize the chart
+document.addEventListener('DOMContentLoaded', function () {
+    const projectId = window.location.pathname.split('/').pop();
+    window.projectId = projectId; // Store projectId globally for reuse
+    fetchMaterialNames().then(materialNames => {
+        initializeTable(projectId, materialNames);
+    });
+
+    // Load the CO2 chart data
+    loadCo2Chart(projectId);
+});
+
+
 // Generate columns with combine rows icon
 function getColumns(materialNames, projectId) {
+    // Add a display value for "No Match"
+    const materialLookup = materialNames.reduce((acc, name) => {
+        acc[name] = name;
+        return acc;
+    }, {});
+    materialLookup["No Match"] = "No Match"; // Ensure "No Match" has a display value
+
     return [
-        { title: "GUID", field: "guid", width: 85 },
-        { title: `<div>IfcClass<i class='fa fa-compress' style='cursor: pointer; margin-left: 5px;' onclick='toggleColumnGrouping("ifc_class")'></i></div>`, field: "ifc_class", width: 100 },
-        { title: `<div>Name<i class='fa fa-compress' style='cursor: pointer; margin-left: 5px;' onclick='toggleColumnGrouping("instance_name")'></i></div>`, field: "instance_name", width: 200 },
-        { title: `<div>Building-Storey<i class='fa fa-compress' style='cursor: pointer; margin-left: 5px;' onclick='toggleColumnGrouping("building_storey")'></i></div>`, field: "building_storey", width: 150 },
-        { title: `<div>Load-bearing<i class='fa fa-compress' style='cursor: pointer; margin-left: 5px;' onclick='toggleColumnGrouping("is_loadbearing")'></i></div>`, field: "is_loadbearing", formatter: "tickCross", width: 100 },
-        { title: `<div>External<i class='fa fa-compress' style='cursor: pointer; margin-left: 5px;' onclick='toggleColumnGrouping("is_external")'></i></div>`, field: "is_external", formatter: "tickCross", width: 100 },
-        { title: "Volume", field: "volume", formatter: "money", formatterParams: { precision: 3 }, width: 100 },
-        { title: `<div>Material<i class='fa fa-compress' style='cursor: pointer; margin-left: 5px;' onclick='toggleColumnGrouping("name")'></i></div>`, field: "name", width: 200 },
+        { title: `<div>GUID</div>`, field: "guid", width: 85, headerWordWrap: true, hozAlign: "left" },
+        { title: `<div>IfcClass<br><i class='fa fa-compress' style='cursor: pointer; margin-left: 5px;' onclick='toggleColumnGrouping("ifc_class")'></i></div>`, field: "ifc_class", width: 100, headerWordWrap: true, hozAlign: "left" },
+        { title: `<div>Name<br><i class='fa fa-compress' style='cursor: pointer; margin-left: 5px;' onclick='toggleColumnGrouping("instance_name")'></i></div>`, field: "instance_name", width: 300, headerWordWrap: true, hozAlign: "left" },
+        { title: `<div>Building-Storey<br><i class='fa fa-compress' style='cursor: pointer; margin-left: 5px;' onclick='toggleColumnGrouping("building_storey")'></i></div>`, field: "building_storey", width: 100, headerWordWrap: true, hozAlign: "left" },
+        { title: `<div>Load-bearing<br><i class='fa fa-compress' style='cursor: pointer; margin-left: 5px;' onclick='toggleColumnGrouping("is_loadbearing")'></i></div>`, field: "is_loadbearing", formatter: "tickCross", width: 85, headerWordWrap: true },
+        { title: `<div>External<br><i class='fa fa-compress' style='cursor: pointer; margin-left: 5px;' onclick='toggleColumnGrouping("is_external")'></i></div>`, field: "is_external", formatter: "tickCross", width: 85, headerWordWrap: true },
+        { title: `<div>Volume</div>`, field: "volume", formatter: "money", formatterParams: { precision: 3, thousand:"'" }, width: 100, headerWordWrap: true, hozAlign: "left" },
+        { title: `<div>Material<br><i class='fa fa-compress' style='cursor: pointer; margin-left: 5px;' onclick='toggleColumnGrouping("name")'></i></div>`, field: "name", width: 200, headerWordWrap: true, hozAlign: "left" },
         {
-            title: `<div>Matched Material<i class='fa fa-compress' style='cursor: pointer; margin-left: 5px;' onclick='toggleColumnGrouping("matched_material")'></i></div>`,
+            title: `<div>Matched Material<br><i class='fa fa-compress' style='cursor: pointer; margin-left: 5px;' onclick='toggleColumnGrouping("matched_material")'></i></div>`,
             field: "matched_material",
+            headerWordWrap: true,
+            hozAlign: "left",
             editor: "list",
             editorParams: {
                 values: materialNames,
@@ -78,11 +190,8 @@ function getColumns(materialNames, projectId) {
                 sort: "asc",
             },
             formatter: "lookup",
-            formatterParams: materialNames.reduce((acc, name) => {
-                acc[name] = name;
-                return acc;
-            }, {}),
-            width: 200,
+            formatterParams: materialLookup, // Use materialLookup object
+            width: 300,
             cellEdited: function (cell) {
                 const updatedMaterialName = cell.getValue();
                 const row = cell.getRow();
@@ -124,39 +233,59 @@ function getColumns(materialNames, projectId) {
             
                         Promise.all(updatePromises)
                             .then(() => {
-                                updateProjectDetails(projectId);
+                                return fetchBuildingElements(window.projectId);
+                            })
+                            .then(buildingElements => {
+                                const flattenedData = flattenElements(buildingElements);
+                                const table = window.mainTable; // Ensure table is referenced correctly
+                                table.replaceData(flattenedData);
             
-                                // Refresh the data in the table
-                                fetchBuildingElements(window.projectId).then(buildingElements => {
-                                    const flattenedData = flattenElements(buildingElements);
-                                    const table = window.mainTable; // Ensure table is referenced correctly
-                                    table.replaceData(flattenedData);
-                                    if (currentGrouping.length > 0) {
-                                        updateTableGrouping();
-                                    }
-                                });
+                                // Update the project totals immediately
+                                const totalCarbonFootprint = flattenedData.reduce((sum, element) => sum + parseFloat(element.total_co2 || 0), 0);
+                                const EBF = parseFloat($('#ebfPerM2').text().split(' ')[0]); // Assume EBF is stored in span with id ebfPerM2
+                                const co2PerSquareMeter = EBF > 0 ? totalCarbonFootprint / EBF : 0;
+            
+                                $('#carbonFootprint').text(`${(Math.round(totalCarbonFootprint) / 1000).toFixed(3)} tons`);
+                                $('#co2PerM2').text(`${co2PerSquareMeter.toFixed(3)} kg`);
+            
+                                if (currentGrouping.length > 0) {
+                                    updateTableGrouping();
+                                }
                             })
                             .catch(error => {
                                 console.error('Error updating materials:', error);
                             });
                     });
-            }
-            
+            }            
         },
-        { title: "Density (kg/m³)", field: "density", formatter: "money", formatterParams: { precision: 2 }, width: 100 },
-        { title: "Indicator (kg CO₂-eq/kg)", field: "indikator", formatter: "money", formatterParams: { precision: 3 }, width: 100 },
-        { title: "CO₂-eq (kg)", field: "total_co2", formatter: "money", formatterParams: { precision: 3 }, width: 100 }
+        { title: `<div>Density (kg/m³)</div>`, field: "density", formatter: "money", formatterParams: { precision: 2 }, width: 100, headerWordWrap: true },
+        { title: `<div>Indicator (kg CO₂-eq/kg)</div>`, field: "indikator", formatter: "money", formatterParams: { precision: 3, thousand:"'" }, width: 100, headerWordWrap: true },
+        { title: `<div>CO₂-eq (kg)</div>`, field: "total_co2", formatter: "money", formatterParams: { precision: 2, thousand:"'" }, width: 125, headerWordWrap: true, hozAlign: "left" }
     ];
 }
 
+
 // Toggle column grouping
 function toggleColumnGrouping(field) {
+    const headerElement = document.querySelector(`.tabulator-col[data-field="${field}"] .tabulator-col-title`);
+    const iconElement = headerElement ? headerElement.querySelector('i.fa-compress') : null;
+
     if (currentGrouping.includes(field)) {
-        // Remove grouping
+        // Remove grouping for the specified field
         currentGrouping = currentGrouping.filter(f => f !== field);
+        if (headerElement) {
+            headerElement.style.backgroundColor = "";
+            headerElement.style.color = "";  // Reset text color
+        }
+        if (iconElement) iconElement.style.color = "";  // Reset icon color
     } else {
-        // Add grouping
+        // Add grouping for the specified field
         currentGrouping.push(field);
+        if (headerElement) {
+            headerElement.style.backgroundColor = "lightorange";
+            headerElement.style.color = "orange";  // Change text color
+        }
+        if (iconElement) iconElement.style.color = "orange";  // Change icon color
     }
     updateTableGrouping();
 }
@@ -170,12 +299,33 @@ function updateTableGrouping() {
         // Reset table to original data
         fetchBuildingElements(window.projectId).then(buildingElements => {
             const flattenedData = flattenElements(buildingElements);
-            table.replaceData(flattenedData);
+            table.replaceData(flattenedData).then(() => updateProjectSummary(flattenedData)); // Update summary
         });
     } else {
         const groupedData = groupDataByFields(data, currentGrouping);
-        table.replaceData(groupedData);
+        table.replaceData(groupedData).then(() => updateProjectSummary(groupedData)); // Update summary
     }
+
+    // Reset all headers
+    document.querySelectorAll('.tabulator-col-title').forEach(header => {
+        header.style.backgroundColor = "";  // Reset background color
+        header.style.color = "";  // Reset text color
+    });
+    document.querySelectorAll('.fa-compress').forEach(icon => {
+        icon.style.color = "";  // Reset icon color
+    });
+
+    // Mark grouped headers
+    currentGrouping.forEach(field => {
+        const headerElement = document.querySelector(`.tabulator-col[data-field="${field}"] .tabulator-col-title`);
+        const iconElement = headerElement ? headerElement.querySelector('i.fa-compress') : null;
+
+        if (headerElement) {
+            headerElement.style.backgroundColor = "lightorange";
+            headerElement.style.color = "orange";  // Change text color
+        }
+        if (iconElement) iconElement.style.color = "orange";  // Change icon color
+    });
 }
 
 // Group data by current grouping fields
@@ -190,25 +340,42 @@ function groupDataByFields(data, fields) {
         groupedData[key].push(item);
     });
 
-    const combinedGroups = Object.values(groupedData).map(group => combineGroup(group));
+    const combinedGroups = Object.values(groupedData).map(group => combineGroup(group, fields));
     return combinedGroups;
 }
 
 // Combine group data
-function combineGroup(group) {
-    const combined = { ...group[0] };
+function combineGroup(group, fields) {
+    const combined = {};
+
+    // Initialize combined object with keys
+    Object.keys(group[0]).forEach(key => {
+        if (key === "_id" || key === "_ids") return; // Skip internal IDs
+
+        const allValues = group.map(item => item[key]);
+
+        // Determine if all values for the key are the same
+        if (fields.includes(key) || allValues.every(value => value === allValues[0])) {
+            combined[key] = allValues[0];
+        } else {
+            combined[key] = "<varies>";
+        }
+    });
+
     combined.volume = group.reduce((sum, item) => sum + parseFloat(item.volume), 0).toFixed(3);
     combined.total_co2 = group.reduce((sum, item) => sum + parseFloat(item.total_co2), 0).toFixed(3);
 
     // Include MongoDB Object IDs for all original rows
-    combined._ids = group.map(item => item._id.$oid || item._id).join(',');
-
-    // Mark fields that vary with <varies> for display purposes only
-    for (const key in combined) {
-        if (key !== "volume" && key !== "total_co2" && group.some(item => item[key] !== combined[key])) {
-            combined[key + '_display'] = "<varies>";  // Use a separate field for display
+    combined._ids = group.map(item => {
+        // Handle different formats of _id
+        if (item._id && item._id.$oid) {
+            return item._id.$oid;
+        } else if (typeof item._id === 'string') {
+            return item._id;
         }
-    }
+        return null;
+    }).filter(id => id !== null).join(',');
+
     return combined;
 }
 
