@@ -87,7 +87,7 @@ function getColumns(materialNames, projectId) {
                 const updatedMaterialName = cell.getValue();
                 const row = cell.getRow();
                 const data = row.getData();
-
+            
                 // Fetch material details and update density and CO2
                 fetch(`/api/materials/details/${updatedMaterialName}`)
                     .then(response => response.json())
@@ -95,18 +95,18 @@ function getColumns(materialNames, projectId) {
                         const newDensity = materialDetails.density;
                         const newIndicator = materialDetails.indicator;
                         const newTotalCO2 = data.volume * newDensity * newIndicator;
-
-                        // Update the combined row
+            
+                        // Update the combined row in the UI
                         row.update({
                             density: newDensity,
                             indikator: newIndicator,
                             total_co2: newTotalCO2.toFixed(3)
                         });
-
+            
                         // Update the database for all original rows
                         const materialIds = data._ids ? data._ids.split(',') : [data._id];
                         const validMaterialIds = materialIds.filter(id => id && id !== "<varies>");
-                        
+            
                         const updatePromises = validMaterialIds.map(materialId => {
                             return $.ajax({
                                 url: `/api/projects/${projectId}/building_elements/update`,
@@ -121,13 +121,15 @@ function getColumns(materialNames, projectId) {
                                 })
                             });
                         });
-
+            
                         Promise.all(updatePromises)
                             .then(() => {
                                 updateProjectDetails(projectId);
+            
                                 // Refresh the data in the table
                                 fetchBuildingElements(window.projectId).then(buildingElements => {
                                     const flattenedData = flattenElements(buildingElements);
+                                    const table = window.mainTable; // Ensure table is referenced correctly
                                     table.replaceData(flattenedData);
                                     if (currentGrouping.length > 0) {
                                         updateTableGrouping();
@@ -139,6 +141,7 @@ function getColumns(materialNames, projectId) {
                             });
                     });
             }
+            
         },
         { title: "Density (kg/m³)", field: "density", formatter: "money", formatterParams: { precision: 2 }, width: 100 },
         { title: "Indicator (kg CO₂-eq/kg)", field: "indikator", formatter: "money", formatterParams: { precision: 3 }, width: 100 },
