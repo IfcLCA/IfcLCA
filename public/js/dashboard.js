@@ -30,7 +30,6 @@ document.addEventListener('DOMContentLoaded', function() {
         allProjectsHtml += cardHtml;
       });
       projectsContainer.innerHTML = allProjectsHtml;
-      console.log('Projects loaded successfully.');
     })
     .catch(error => {
       console.error('Error fetching projects:', error.message, error.stack);

@@ -42,6 +42,15 @@ function fetchBuildingElements(projectId) {
     });
 }
 
+function updateProjectSummary(data) {
+    const totalCarbonFootprint = data.reduce((sum, element) => sum + parseFloat(element.total_co2 || 0), 0);
+    const EBF = parseFloat($('#ebfPerM2').text().split(' ')[0]); // Assume EBF is stored in span with id ebfPerM2
+    const co2PerSquareMeter = EBF > 0 ? totalCarbonFootprint / EBF : 0;
+
+    $('#carbonFootprint').text(`${(Math.round(totalCarbonFootprint) / 1000).toFixed(3)} tons`);
+    $('#co2PerM2').text(`${co2PerSquareMeter.toFixed(3)} kg`);
+}
+
 // Initialize Tabulator after preloading material names
 function initializeTable(projectId, materialNames) {
     fetchBuildingElements(projectId).then(buildingElements => {
@@ -56,6 +65,99 @@ function initializeTable(projectId, materialNames) {
         window.mainTable = table;
     });
 }
+
+// Function to determine color based on CO₂ intensity
+function getCo2Color(value, min, max) {
+    const thresholds = {
+        low: min + (max - min) * 0.25,
+        medium: min + (max - min) * 0.5,
+        high: min + (max - min) * 0.75
+    };
+
+    if (value < thresholds.low) return 'rgba(75, 192, 192, 0.8)'; // Light blue
+    if (value < thresholds.medium) return 'rgba(255, 205, 86, 0.8)'; // Yellow
+    if (value < thresholds.high) return 'rgba(255, 159, 64, 0.8)'; // Orange
+    return 'rgba(255, 99, 132, 0.8)'; // Red
+}
+
+function loadCo2Chart(projectId) {
+    fetch(`/api/projects/${projectId}/co2_per_storey`)
+        .then(response => response.json())
+        .then(data => {
+            renderCo2Chart(data);
+        })
+        .catch(error => console.error('Error fetching CO₂-eq data per storey:', error));
+}
+
+function renderCo2Chart(data) {
+    const ctx = document.getElementById('co2Chart').getContext('2d');
+    const labels = data.map(item => item.storey);
+    const co2Values = data.map(item => item.co2_eq);
+
+    // Calculate min and max CO₂ values
+    const minCo2 = Math.min(...co2Values);
+    const maxCo2 = Math.max(...co2Values);
+
+    const barColors = co2Values.map(value => getCo2Color(value, minCo2, maxCo2));
+
+    new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: labels,
+            datasets: [{
+                label: 'CO₂-eq (kg)',
+                data: co2Values,
+                backgroundColor: barColors,
+                borderColor: barColors.map(color => color.replace('0.8', '1.0')),
+                borderWidth: 1
+            }]
+        },
+        options: {
+            responsive: true,
+            plugins: {
+                legend: {
+                    display: false
+                },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            return context.raw.toLocaleString() + ' kg CO₂-eq';
+                        }
+                    }
+                }
+            },
+            scales: {
+                x: {
+                    title: {
+                        display: true,
+                        text: 'Building Storey'
+                    }
+                },
+                y: {
+                    beginAtZero: true,
+                    title: {
+                        display: true,
+                        text: 'CO₂-eq (kg)'
+                    }
+                }
+            }
+        }
+    });
+}
+
+
+// Initialize the chart
+document.addEventListener('DOMContentLoaded', function () {
+    const projectId = window.location.pathname.split('/').pop();
+    window.projectId = projectId; // Store projectId globally for reuse
+    fetchMaterialNames().then(materialNames => {
+        initializeTable(projectId, materialNames);
+    });
+
+    // Load the CO2 chart data
+    loadCo2Chart(projectId);
+});
+
 
 // Generate columns with combine rows icon
 function getColumns(materialNames, projectId) {
@@ -94,7 +196,7 @@ function getColumns(materialNames, projectId) {
                 const updatedMaterialName = cell.getValue();
                 const row = cell.getRow();
                 const data = row.getData();
-
+            
                 // Fetch material details and update density and CO2
                 fetch(`/api/materials/details/${updatedMaterialName}`)
                     .then(response => response.json())
@@ -102,18 +204,18 @@ function getColumns(materialNames, projectId) {
                         const newDensity = materialDetails.density;
                         const newIndicator = materialDetails.indicator;
                         const newTotalCO2 = data.volume * newDensity * newIndicator;
-
+            
                         // Update the combined row in the UI
                         row.update({
                             density: newDensity,
                             indikator: newIndicator,
                             total_co2: newTotalCO2.toFixed(3)
                         });
-
+            
                         // Update the database for all original rows
                         const materialIds = data._ids ? data._ids.split(',') : [data._id];
                         const validMaterialIds = materialIds.filter(id => id && id !== "<varies>");
-
+            
                         const updatePromises = validMaterialIds.map(materialId => {
                             return $.ajax({
                                 url: `/api/projects/${projectId}/building_elements/update`,
@@ -128,26 +230,33 @@ function getColumns(materialNames, projectId) {
                                 })
                             });
                         });
-
+            
                         Promise.all(updatePromises)
                             .then(() => {
-                                updateProjectDetails(projectId);
-
-                                // Refresh the data in the table
-                                fetchBuildingElements(window.projectId).then(buildingElements => {
-                                    const flattenedData = flattenElements(buildingElements);
-                                    const table = window.mainTable; // Ensure table is referenced correctly
-                                    table.replaceData(flattenedData);
-                                    if (currentGrouping.length > 0) {
-                                        updateTableGrouping();
-                                    }
-                                });
+                                return fetchBuildingElements(window.projectId);
+                            })
+                            .then(buildingElements => {
+                                const flattenedData = flattenElements(buildingElements);
+                                const table = window.mainTable; // Ensure table is referenced correctly
+                                table.replaceData(flattenedData);
+            
+                                // Update the project totals immediately
+                                const totalCarbonFootprint = flattenedData.reduce((sum, element) => sum + parseFloat(element.total_co2 || 0), 0);
+                                const EBF = parseFloat($('#ebfPerM2').text().split(' ')[0]); // Assume EBF is stored in span with id ebfPerM2
+                                const co2PerSquareMeter = EBF > 0 ? totalCarbonFootprint / EBF : 0;
+            
+                                $('#carbonFootprint').text(`${(Math.round(totalCarbonFootprint) / 1000).toFixed(3)} tons`);
+                                $('#co2PerM2').text(`${co2PerSquareMeter.toFixed(3)} kg`);
+            
+                                if (currentGrouping.length > 0) {
+                                    updateTableGrouping();
+                                }
                             })
                             .catch(error => {
                                 console.error('Error updating materials:', error);
                             });
                     });
-            }
+            }            
         },
         { title: `<div>Density (kg/m³)</div>`, field: "density", formatter: "money", formatterParams: { precision: 2 }, width: 100, headerWordWrap: true },
         { title: `<div>Indicator (kg CO₂-eq/kg)</div>`, field: "indikator", formatter: "money", formatterParams: { precision: 3, thousand:"'" }, width: 100, headerWordWrap: true },
@@ -181,7 +290,6 @@ function toggleColumnGrouping(field) {
     updateTableGrouping();
 }
 
-
 // Update table grouping
 function updateTableGrouping() {
     const table = window.mainTable;
@@ -191,11 +299,11 @@ function updateTableGrouping() {
         // Reset table to original data
         fetchBuildingElements(window.projectId).then(buildingElements => {
             const flattenedData = flattenElements(buildingElements);
-            table.replaceData(flattenedData);
+            table.replaceData(flattenedData).then(() => updateProjectSummary(flattenedData)); // Update summary
         });
     } else {
         const groupedData = groupDataByFields(data, currentGrouping);
-        table.replaceData(groupedData);
+        table.replaceData(groupedData).then(() => updateProjectSummary(groupedData)); // Update summary
     }
 
     // Reset all headers

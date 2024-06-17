@@ -347,7 +347,6 @@ router.post('/api/projects', isAuthenticated, async (req, res) => {
       user,
       EBF
     });
-    console.log(`Project created successfully: ${project.name}`);
     res.json({ status: 'success', url: `/projects/${project._id}` });
   } catch (error) {
     console.error('Error creating project:', error);
@@ -360,7 +359,6 @@ router.get('/dashboard', isAuthenticated, async (req, res) => {
   try {
     const userId = req.session.userId;
     const projects = await Project.find({ user: userId });
-    console.log(`Fetched ${projects.length} projects for user ID ${userId} successfully.`);
     projects.forEach(project => {
       if (project.EBF && project.totalCarbonFootprint) {
         project.co2PerSquareMeter = (project.totalCarbonFootprint / project.EBF).toFixed(2);
@@ -377,7 +375,6 @@ router.get('/dashboard', isAuthenticated, async (req, res) => {
 router.get('/newProject', isAuthenticated, (req, res) => {
   try {
     res.render('newProject', { currentPage: 'newProject' });
-    console.log('Rendering create new project form.');
   } catch (error) {
     console.error('Error rendering create new project form:', error);
     res.status(500).send('Error rendering create new project form.');
@@ -422,7 +419,6 @@ router.post('/api/projects/:projectId/delete', isAuthenticated, async (req, res)
   try {
     const projectId = req.params.projectId;
     await Project.findByIdAndDelete(projectId);
-    console.log(`Project with ID ${projectId} has been deleted successfully.`);
     res.redirect('/dashboard?deletionSuccess=true');
   } catch (error) {
     console.error('Error deleting project:', error);
@@ -439,7 +435,6 @@ router.get('/projects/:projectId/edit', isAuthenticated, async (req, res) => {
       return res.status(404).send('Project not found');
     }
     res.render('editProject', { project });
-    console.log(`Rendering edit form for project: ${project.name}`);
   } catch (error) {
     console.error('Error rendering edit form:', error);
     res.status(500).send('Error rendering edit form.');
@@ -465,12 +460,44 @@ router.post('/projects/:projectId/edit', isAuthenticated, async (req, res) => {
     if (!updatedProject) {
       return res.status(404).send('Project not found');
     }
-    console.log(`Project ${updatedProject.name} updated successfully.`);
     res.redirect(`/projects/${projectId}`);
   } catch (error) {
     console.error('Error updating project:', error);
     res.status(500).send('Error updating project');
   }
 });
+
+// Route to get CO₂-eq data per building storey
+router.get('/api/projects/:projectId/co2_per_storey', isAuthenticated, async (req, res) => {
+  try {
+      const projectId = req.params.projectId;
+      const buildingElements = await BuildingElement.find({ projectId }).lean();
+
+      // Aggregate CO₂-eq by building storey
+      const storeyCo2Data = buildingElements.reduce((acc, element) => {
+          const storey = element.building_storey || 'Unknown';
+          const totalCo2 = element.materials_info.reduce((sum, material) => sum + (parseFloat(material.total_co2) || 0), 0);
+          
+          if (!acc[storey]) {
+              acc[storey] = 0;
+          }
+          acc[storey] += totalCo2;
+
+          return acc;
+      }, {});
+
+      // Convert aggregated data into array format
+      const result = Object.keys(storeyCo2Data).map(storey => ({
+          storey: storey,
+          co2_eq: storeyCo2Data[storey]
+      }));
+
+      res.json(result);
+  } catch (error) {
+      console.error('Error fetching CO₂-eq data per building storey:', error);
+      res.status(500).json({ message: "Error fetching CO₂-eq data per building storey", error: error.toString() });
+  }
+});
+
 
 module.exports = router;

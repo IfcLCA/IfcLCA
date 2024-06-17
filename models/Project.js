@@ -21,12 +21,10 @@ const projectSchema = new mongoose.Schema({
 
 
 projectSchema.pre('save', function(next) {
-  console.log(`Saving project: ${this.name}`);
   next();
 });
 
 projectSchema.post('save', function(doc, next) {
-  console.log(`Project ${doc.name} saved successfully`);
   next();
 });
 
@@ -67,7 +65,6 @@ projectSchema.methods.calculateTotalCarbonFootprint = async function() {
     this.totalCarbonFootprint = totalFootprint;
     await this.save();
 
-    console.log(`Updated total carbon footprint for project ${this.name}: ${totalFootprint}`);
   } catch (error) {
     console.error('Failed to calculate total carbon footprint:', error);
   }
