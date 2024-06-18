@@ -1,41 +1,38 @@
-document.getElementById('newProjectForm').addEventListener('submit', function(e) {
-  e.preventDefault();
+document.getElementById('newProjectForm').addEventListener('submit', async function (event) {
+  event.preventDefault();
+  const form = event.target;
+  const formData = new FormData(form);
 
-  const formData = {
-    name: document.getElementById('name').value,
-    phase: document.getElementById('phase').value,
-    description: document.getElementById('description').value,
-    customImage: document.getElementById('customImage').value
+  const projectData = {
+    name: formData.get('name'),
+    phase: formData.get('phase'),
+    description: formData.get('description'),
+    customImage: formData.get('customImage'),
+    EBF: formData.get('EBF') // Ensure EBF is sent as a string
   };
 
-  fetch('/api/projects', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify(formData),
-  })
-  .then(response => {
+  try {
+    const response = await fetch('/api/projects', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(projectData)
+    });
+
     if (!response.ok) {
-      return response.json().then(errorData => {
-        throw new Error(errorData.message || 'Failed to create project');
-      });
+      throw new Error(await response.text());
     }
-    return response.json();
-  })
-  .then(data => {
-    if(data && data.url) {
-      // Display success message before redirecting
-      document.getElementById('message').innerHTML = `<div class="alert alert-success" role="alert">Project created successfully! Redirecting...</div>`;
-      setTimeout(() => {
-        window.location.href = data.url; // Redirect to the project's home page
-      }, 2000); // Delay redirection to allow the user to read the success message
+
+    const result = await response.json();
+    if (result.status === 'success') {
+      window.location.href = result.url;
     } else {
-      throw new Error('Missing project URL for redirection');
+      throw new Error(result.message);
     }
-  })
-  .catch((error) => {
+  } catch (error) {
     console.error('Error creating project:', error);
-    document.getElementById('message').innerHTML = `<div class="alert alert-danger" role="alert">Error creating project: ${error.message}</div>`;
-  });
+    document.getElementById('message').textContent = error.message;
+    document.getElementById('message').classList.add('alert', 'alert-danger');
+  }
 });

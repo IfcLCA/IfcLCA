@@ -5,7 +5,8 @@
 <%- include('partials/_header.ejs') %>
 <main role="main">
   <div class="container mt-5">
-    <div class="card shadow">
+    <!-- Login Card -->
+    <div class="card shadow mx-auto" style="max-width: 850px;">
       <div class="card-body">
         <h2 class="card-title text-center mb-4">Login to IfcLCA</h2>
         <% if (typeof query !== 'undefined' && query.message) { %>
@@ -30,6 +31,50 @@
       </div>
     </div>
   </div>
+
+  <!-- Features Section -->
+  <section class="features mt-5">
+    <div class="container d-flex justify-content-center" style="max-width: 100%;">
+      <div class="row" style="max-width: 100%;">
+        <div class="col-12 col-md-4 mb-4">
+          <div class="card shadow" style="max-width: 500px; margin: 0 auto;">
+            <img src="/images/dashboard-preview.png" class="card-img-top" alt="Dashboard Preview">
+            <div class="card-body">
+              <h5 class="card-title">Intuitive Dashboard</h5>
+              <p class="card-text">Effortlessly manage your projects with an intuitive dashboard that provides comprehensive insights into your sustainability metrics.</p>
+            </div>
+          </div>
+        </div>
+        <div class="col-12 col-md-4 mb-4">
+          <div class="card shadow" style="max-width: 500px; margin: 0 auto;">
+            <img src="/images/calculations-preview.png" class="card-img-top" alt="Calculations Preview">
+            <div class="card-body">
+              <h5 class="card-title">Real-Time Analytics</h5>
+              <p class="card-text">Make data-driven decisions with real-time LCA calculations, enabling your team to assess and optimize the sustainability of your projects.</p>
+            </div>
+          </div>
+        </div>
+        <div class="col-12 col-md-4 mb-4">
+          <div class="card shadow" style="max-width: 500px; margin: 0 auto;">
+            <img src="/images/reports-preview.png" class="card-img-top" alt="Reports Preview">
+            <div class="card-body">
+              <h5 class="card-title">User-Centric Design</h5>
+              <p class="card-text">Our solution is crafted to meet today's sustainability challenges, offering a user-friendly interface and customizable options for seamless LCA integration.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="open-source-invitation text-center mt-5">
+    <div class="container">
+      <h3>Join Our Open-Source Community</h3>
+      <p>Contribute to a greener future by collaborating on IfcLCA. Together, we can innovate for sustainability in construction.</p>
+      <a href="/opensource" class="btn btn-success">Get Involved</a>
+    </div>
+  </section>
+
 </main>
 <%- include('partials/_footer.ejs') %>
 </body>

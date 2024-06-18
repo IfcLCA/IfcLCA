@@ -22,6 +22,13 @@ async function safeUnlink(filePath) {
   }
 }
 
+router.get('/contributing', (req, res) => {
+  res.render('contributing');
+});
+
+router.get('/disclaimer', (req, res) => {
+  res.render('disclaimer');
+});
 
 // Route for the /opensource page
 router.get('/opensource', (req, res) => {

@@ -4,43 +4,59 @@
 <body>
   <%- include('partials/_header.ejs') %>
   <main role="main" class="container mt-4">
+    <!-- Welcome Section -->
     <div class="text-center">
       <h1>Welcome to IfcLCA</h1>
       <p class="tagline">Your trusted partner in sustainable construction analytics</p>
     </div>
 
-    <section class="features">
-      <div class="row mt-5">
-        <div class="feature col-md-4">
-          <h3>Intuitive Dashboard</h3>
-          <p>Effortlessly manage your projects with an intuitive dashboard that provides comprehensive insights into your sustainability metrics.</p>
-          <img src="/images/dashboard-preview.png" alt="Dashboard Preview" class="img-fluid">
-        </div>
-        <div class="feature col-md-4">
-          <h3>Real-Time Analytics</h3>
-          <p>Make data-driven decisions with real-time LCA calculations, enabling your team to assess and optimize the sustainability of your projects.</p>
-          <img src="/images/calculations-preview.png" alt="Calculations Preview" class="img-fluid">
-        </div>
-        <div class="feature col-md-4">
-          <h3>User-Centric Design</h3>
-          <p>Our solution is crafted to meet today's sustainability challenges, offering a user-friendly interface and customizable options for seamless LCA integration.</p>
-          <img src="/images/reports-preview.png" alt="Reports Preview" class="img-fluid">
-        </div>
-      </div>
+    <!-- Beta Warning Section -->
+    <section class="beta-warning text-center mt-4">
+      <h4>Beta Version</h4>
+      <p style="color: #e64a19; font-weight: bold;">
+        Please note that IfcLCA is currently in beta. Features and functionality are still under development, and things may change or break. We highly value your feedback to help us improve.<br>
+        If you encounter any issues or have suggestions, please open a 
+        <a href="https://github.com/your-repo/issues" target="_blank" style="color: #ff5722; text-decoration: underline;">GitHub issue</a>. 
+        Thank you for your understanding and contributions!
+      </p>
     </section>
 
+    <!-- Open Source Invitation Section -->
     <section class="open-source-invitation text-center mt-5">
       <h3>Join Our Open-Source Community</h3>
       <p>Contribute to a greener future by collaborating on IfcLCA. Together, we can innovate for sustainability in construction.</p>
       <a href="/opensource" class="btn btn-success">Get Involved</a>
     </section>
 
+    <!-- Action Call Section -->
     <div class="text-center action-call" style="margin-top: 50px;">
       <a href="/newProject" class="btn btn-primary">Start Your Sustainable Project</a>
     </div>
-  </main>
 
-  <%- include('partials/_footer.ejs') %>
+    <!-- Disclaimer Section -->
+    <section class="disclaimer-content mt-5">
+      <div class="text-left">
+        <h1>Disclaimer</h1>
+        <p class="tagline">Important Legal Information</p>
+      </div>
+      <h4>Website Disclaimer</h4>
+      <p>
+        The information provided by IfcLCA (“we,” “us,” or “our”) on this website (the “Site”) is for general informational purposes only. All information on the Site is provided in good faith, however, we make no representation or warranty of any kind, express or implied, regarding the accuracy, adequacy, validity, reliability, availability, or completeness of any information on the Site. We reserve the right to update or change information at any time without notice.
+      </p>
+      <h3>Professional Advice Disclaimer</h3>
+      <p>
+        The Site cannot and does not contain professional advice. The information is provided for general informational and educational purposes only and is not a substitute for professional advice. Accordingly, before taking any actions based upon such information, we encourage you to consult with appropriate professionals. We do not provide any kind of professional advice and recommend seeking professional guidance tailored to your specific needs.
+      </p>
+      <h4>Liability Disclaimer</h4>
+      <p>
+        To the maximum extent permitted by applicable law, we exclude all representations, warranties, and conditions relating to our website and the use of this website.
+      </p>
+      <h4>External Links Disclaimer</h4>
+      <p>
+        The Site may contain (or you may be sent through the Site) links to other websites or content belonging to or originating from third parties or links to websites and features in banners or other advertising. Such external links are not investigated, monitored, or checked for accuracy, adequacy, validity, reliability, availability, or completeness by us. We do not warrant, endorse, guarantee, or assume responsibility for the accuracy or reliability of any information offered by third-party websites linked through the Site or any website or feature linked in any banner or other advertising. We will not be a party to or in any way be responsible for monitoring any transaction between you and third-party providers of products or services.
+      </p>
+      </main>
+      <%- include('partials/_footer.ejs') %>
   <script src="/js/main.js"></script>
 </body>
 </html>
