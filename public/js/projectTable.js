@@ -8,10 +8,30 @@ function updateProjectDetails(projectId) {
         .then(response => response.json())
         .then(project => {
             console.log("Updated project details:", project);  // Debug print
-            $('#carbonFootprint').text(`${(Math.round(project.totalCarbonFootprint) / 1000).toFixed(3)} tons`);
-            $('#co2PerM2').text(`${project.co2PerSquareMeter} kg`);
+            $('#carbonFootprint').text(`${formatNumber(Math.round(project.totalCarbonFootprint) / 1000, 1)} tons`);
+            $('#co2PerM2').text(`${formatNumber(project.co2PerSquareMeter, 1)} kg`);
+            $('#ebfPerM2').text(`${formatNumber(project.EBF, 0)} m²`);
         })
         .catch(error => console.error('Error updating project details:', error));
+}
+
+function updateProjectSummary(data) {
+    const totalCarbonFootprint = data.reduce((sum, element) => sum + parseFloat(element.total_co2 || 0), 0);
+    const EBF = parseFloat($('#ebfPerM2').text().split(' ')[0].replace(/,/g, '')) || 0; // Ensure EBF is fetched and parsed correctly
+
+    $('#carbonFootprint').text(`${formatNumber(Math.round(totalCarbonFootprint) / 1000, 1)} tons`);
+
+    // Calculate and update CO₂-eq / m²
+    const co2PerSquareMeter = EBF > 0 ? totalCarbonFootprint / EBF : 0;
+    $('#co2PerM2').text(`${formatNumber(co2PerSquareMeter, 1)} kg`);
+
+    loadCo2Chart(window.projectId); // Ensure chart is up-to-date
+}
+
+// Format numbers for display
+function formatNumber(value, decimals) {
+    if (value == null || isNaN(value)) return '0';
+    return value.toLocaleString(undefined, { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
 }
 
 // Fetch material names from the backend
@@ -26,6 +46,31 @@ function fetchMaterialNames() {
         console.error("Error fetching material names:", error);
         return [];
     });
+}
+
+// Helper function to update material details
+function updateMaterial(url, data) {
+    $.ajax({
+        url: url,
+        method: 'POST',
+        contentType: 'application/json',
+        data: JSON.stringify(data)
+    }).then((response) => {
+        fetchBuildingElements(window.projectId)
+            .then(buildingElements => {
+                const flattenedData = flattenElements(buildingElements);
+                const table = window.mainTable;
+                table.replaceData(flattenedData);
+
+                updateProjectSummary(flattenedData);
+                loadCo2Chart(window.projectId); // Refresh the chart
+
+                // Update CO₂-eq / m² based on new data
+                const { totalCarbonFootprint, EBF } = response;
+                const co2PerSquareMeter = EBF > 0 ? totalCarbonFootprint / EBF : 0;
+                $('#co2PerM2').text(`${formatNumber(co2PerSquareMeter, 1)} kg`);
+            });
+    }).catch(error => console.error('Error updating materials:', error));
 }
 
 // Fetch building elements from the backend
@@ -269,28 +314,6 @@ function getColumns(materialNames, projectId) {
         { title: `<div>CO₂-eq (kg)</div>`, field: "total_co2", formatter: "money", formatterParams: { precision: 2, thousand:"'" }, width: 125, headerWordWrap: true, hozAlign: "left" }
     ];
 }
-
-// Helper function to update material details
-function updateMaterial(url, data) {
-    $.ajax({
-        url: url,
-        method: 'POST',
-        contentType: 'application/json',
-        data: JSON.stringify(data)
-    }).then(() => {
-        fetchBuildingElements(window.projectId)
-            .then(buildingElements => {
-                const flattenedData = flattenElements(buildingElements);
-                const table = window.mainTable;
-                table.replaceData(flattenedData);
-
-                updateProjectSummary(flattenedData);
-                loadCo2Chart(window.projectId); // Refresh the chart
-            });
-    }).catch(error => console.error('Error updating materials:', error));
-}
-
-
 
 // Toggle column grouping
 function toggleColumnGrouping(field) {

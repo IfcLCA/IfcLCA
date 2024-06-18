@@ -250,7 +250,6 @@ router.post('/api/projects/:projectId/building_elements/update', isAuthenticated
       const { projectId } = req.params;
       const { materialId, matched_material_name, density, indikator, total_co2 } = req.body;
 
-      // Find and update the specific material within the building element
       const buildingElement = await BuildingElement.findOneAndUpdate(
           { projectId, "materials_info.materialId": materialId },
           {
@@ -259,14 +258,13 @@ router.post('/api/projects/:projectId/building_elements/update', isAuthenticated
                   "materials_info.$.density": density,
                   "materials_info.$.indikator": indikator,
                   "materials_info.$.total_co2": total_co2,
-                  "materials_info.$.matched_material_id": null // Indicate manual change
+                  "materials_info.$.matched_material_id": null
               }
           },
           { new: true }
       );
 
       if (buildingElement) {
-          // Update the total carbon footprint for the project
           const buildingElements = await BuildingElement.find({ projectId }).lean();
           const totalFootprint = buildingElements.reduce((total, element) => {
               return total + element.materials_info.reduce((elementTotal, material) => {
@@ -274,9 +272,14 @@ router.post('/api/projects/:projectId/building_elements/update', isAuthenticated
               }, 0);
           }, 0);
 
-          await Project.findByIdAndUpdate(projectId, { totalCarbonFootprint: totalFootprint });
+          const project = await Project.findByIdAndUpdate(projectId, { totalCarbonFootprint: totalFootprint });
+          const EBF = project.EBF || 0;
 
-          res.json({ message: 'Material updated successfully' });
+          res.json({
+              message: 'Material updated successfully',
+              totalCarbonFootprint: totalFootprint,
+              EBF: EBF
+          });
       } else {
           res.status(404).json({ message: 'Building element not found' });
       }
@@ -285,7 +288,6 @@ router.post('/api/projects/:projectId/building_elements/update', isAuthenticated
       res.status(500).json({ message: "Error updating building element", error: error.toString() });
   }
 });
-
 
 
 // Endpoint to get material names for the dropdown
@@ -332,12 +334,10 @@ router.get('/api/materials/details/:name', isAuthenticated, async (req, res) => 
 // POST endpoint for creating a new project
 router.post('/api/projects', isAuthenticated, async (req, res) => {
   try {
-    const { name, phase, description, customImage, totalCarbonFootprint, EBF } = req.body;
+    const { name, phase, description, customImage, totalCarbonFootprint = 0, EBF = 0 } = req.body;
     const user = req.session.userId;
     const timestampedName = appendTimestampToProjectName(name);
-    if (EBF < 0) {
-      throw new Error("Invalid EBF value. EBF must be greater than 0.");
-    }
+
     const project = await Project.create({
       name: timestampedName,
       phase,
@@ -353,6 +353,7 @@ router.post('/api/projects', isAuthenticated, async (req, res) => {
     res.status(400).json({ message: "Error creating project", error: error.toString() });
   }
 });
+
 
 // GET endpoint for fetching all projects
 router.get('/dashboard', isAuthenticated, async (req, res) => {
@@ -384,35 +385,38 @@ router.get('/newProject', isAuthenticated, (req, res) => {
 // GET endpoint for a project's detailed page
 router.get('/projects/:projectId', isAuthenticated, async (req, res) => {
   try {
-    const projectId = req.params.projectId;
-    const project = await Project.findById(projectId).populate('building_elements');
-    if (!project) {
-      return res.status(404).send('Project not found');
-    }
-    if (project.EBF && project.totalCarbonFootprint) {
-      project.co2PerSquareMeter = (project.totalCarbonFootprint / project.EBF).toFixed(2);
-    }
-    const buildingElements = await BuildingElement.find({ projectId: project._id });
-    let materialsInfo = [];
-    buildingElements.forEach(element => {
-      materialsInfo = materialsInfo.concat(element.materials_info.map(material => ({
-        ...material,
-        instance_name: element.instance_name,
-        ifc_class: element.ifc_class
-      })));
-    });
-    res.render('projectHome', {
-      page: 'projectHome',
-      project,
-      materialsInfo,
-      formatProjectNameForDisplay
-    });
+      const projectId = req.params.projectId;
+      const project = await Project.findById(projectId).populate('building_elements');
+      if (!project) {
+          return res.status(404).send('Project not found');
+      }
+
+      const EBF = project.EBF || 0;
+      const totalCarbonFootprint = project.totalCarbonFootprint || 0;
+      const co2PerSquareMeter = EBF > 0 ? (totalCarbonFootprint / EBF).toFixed(3) : 0;
+
+      const buildingElements = await BuildingElement.find({ projectId: project._id });
+      let materialsInfo = [];
+      buildingElements.forEach(element => {
+          materialsInfo = materialsInfo.concat(element.materials_info.map(material => ({
+              ...material,
+              instance_name: element.instance_name,
+              ifc_class: element.ifc_class
+          })));
+      });
+
+      res.render('projectHome', {
+          page: 'projectHome',
+          project: { ...project.toObject(), co2PerSquareMeter },
+          materialsInfo,
+          formatProjectNameForDisplay
+      });
   } catch (error) {
-    console.error('Error fetching project details:', error);
-    console.error(`Project ID: ${req.params.projectId}`);
-    res.status(500).send('Error fetching project details.');
+      console.error('Error fetching project details:', error);
+      res.status(500).send('Error fetching project details.');
   }
 });
+
 
 // POST endpoint for deleting a project
 router.post('/api/projects/:projectId/delete', isAuthenticated, async (req, res) => {
