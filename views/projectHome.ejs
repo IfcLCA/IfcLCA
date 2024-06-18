@@ -73,13 +73,12 @@
                 <p><strong>Carbon Footprint:</strong> <span id="carbonFootprint"><%= formatNumber(Math.round(project.totalCarbonFootprint) / 1000, 1) %> tons</span></p>
                 <p><strong>m²:</strong> <span id="ebfPerM2"><%= formatNumber(project.EBF, 0) %> m²</span></p>
                 <p><strong>CO₂-eq / m²:</strong> <span id="co2PerM2"><%= formatNumber(project.co2PerSquareMeter, 1) %> kg</span></p>
-                
             </div>
         </div>
         <div class="chart-column">
             <div class="card chart-card">
                 <div class="card-body">
-                    <h3 class="text-center">CO₂-eq per Building Storey</h3>
+                    <h3 class="text-center">CO₂-eq /m² and Storey</h3>
                     <div class="chart-container">
                         <canvas id="co2Chart" width="300" height="100"></canvas>
                     </div>
@@ -101,20 +100,10 @@
 <%- include('partials/_footer.ejs') %>
 <script src="https://cdn.jsdelivr.net/npm/tabulator-tables/dist/js/tabulator.min.js"></script>
 <script src="/js/uploadIfc.js"></script>
-<script>
-    var projectId = "<%= project._id %>";
-    var projectName = "<%= project.name %>";
-
-    // Update project details on load
-    updateProjectDetails(projectId);
-    // Initialize table and chart on load
-    initializeTableAndChart(projectId);
-</script>
 <script src="/js/projectTable.js"></script>
 <% function formatNumber(value, decimals) { %>
     <%  if (value == null || isNaN(value)) return '0'; %>
     <%  return value.toLocaleString(undefined, { minimumFractionDigits: decimals, maximumFractionDigits: decimals }); %>
     <% } %>
-    
 </body>
 </html>

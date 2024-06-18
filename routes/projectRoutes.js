@@ -230,8 +230,6 @@ router.post('/api/projects/:projectId/upload', isAuthenticated, upload.single('i
   }
 });
 
-
-
 // GET endpoint for building elements (no matching, just fetching from DB)
 router.get('/api/projects/:projectId/building_elements', isAuthenticated, async (req, res) => {
   try {
@@ -288,7 +286,6 @@ router.post('/api/projects/:projectId/building_elements/update', isAuthenticated
       res.status(500).json({ message: "Error updating building element", error: error.toString() });
   }
 });
-
 
 // Endpoint to get material names for the dropdown
 router.get('/api/materials/names', async (req, res) => {
@@ -473,35 +470,38 @@ router.post('/projects/:projectId/edit', isAuthenticated, async (req, res) => {
 
 // Route to get CO₂-eq data per building storey
 router.get('/api/projects/:projectId/co2_per_storey', isAuthenticated, async (req, res) => {
-  try {
-      const projectId = req.params.projectId;
-      const buildingElements = await BuildingElement.find({ projectId }).lean();
+    try {
+        const projectId = req.params.projectId;
+        const project = await Project.findById(projectId).lean(); // Fetch project to get EBF
+        const buildingElements = await BuildingElement.find({ projectId }).lean();
+        const EBF = project.EBF || 1; // Ensure EBF is not zero
 
-      // Aggregate CO₂-eq by building storey
-      const storeyCo2Data = buildingElements.reduce((acc, element) => {
-          const storey = element.building_storey || 'Unknown';
-          const totalCo2 = element.materials_info.reduce((sum, material) => sum + (parseFloat(material.total_co2) || 0), 0);
-          
-          if (!acc[storey]) {
-              acc[storey] = 0;
-          }
-          acc[storey] += totalCo2;
+        // Aggregate CO₂-eq by building storey
+        const storeyCo2Data = buildingElements.reduce((acc, element) => {
+            const storey = element.building_storey || 'Unknown';
+            const totalCo2 = element.materials_info.reduce((sum, material) => sum + (parseFloat(material.total_co2) || 0), 0);
 
-          return acc;
-      }, {});
+            if (!acc[storey]) {
+                acc[storey] = 0;
+            }
+            acc[storey] += totalCo2;
 
-      // Convert aggregated data into array format
-      const result = Object.keys(storeyCo2Data).map(storey => ({
-          storey: storey,
-          co2_eq: storeyCo2Data[storey]
-      }));
+            return acc;
+        }, {});
 
-      res.json(result);
-  } catch (error) {
-      console.error('Error fetching CO₂-eq data per building storey:', error);
-      res.status(500).json({ message: "Error fetching CO₂-eq data per building storey", error: error.toString() });
-  }
+        // Convert aggregated data into array format
+        const result = Object.keys(storeyCo2Data).map(storey => ({
+            storey: storey,
+            co2_eq: storeyCo2Data[storey] / EBF // Divide by EBF to get CO₂-eq per m²
+        }));
+
+        res.json(result);
+    } catch (error) {
+        console.error('Error fetching CO₂-eq data per building storey:', error);
+        res.status(500).json({ message: "Error fetching CO₂-eq data per building storey", error: error.toString() });
+    }
 });
+
 
 // Add new building element row page
 router.get('/projects/:projectId/add-row', isAuthenticated, (req, res) => {

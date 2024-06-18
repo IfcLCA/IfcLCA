@@ -2,6 +2,18 @@
 let currentGrouping = [];
 let combinedRowsMap = {};
 
+// Initialize the table and chart on page load
+function initializeTableAndChart(projectId) {
+    // Fetch material names and initialize table
+    fetchMaterialNames().then(materialNames => {
+        initializeTable(projectId, materialNames);
+    });
+
+    // Load the CO₂-eq chart data
+    loadCo2Chart(projectId);
+}
+
+
 // Fetch and update project details
 function updateProjectDetails(projectId) {
     fetch(`/projects/${projectId}`)
@@ -15,6 +27,7 @@ function updateProjectDetails(projectId) {
         .catch(error => console.error('Error updating project details:', error));
 }
 
+
 function updateProjectSummary(data) {
     const totalCarbonFootprint = data.reduce((sum, element) => sum + parseFloat(element.total_co2 || 0), 0);
     const EBF = parseFloat($('#ebfPerM2').text().split(' ')[0].replace(/,/g, '')) || 0; // Ensure EBF is fetched and parsed correctly
@@ -25,8 +38,10 @@ function updateProjectSummary(data) {
     const co2PerSquareMeter = EBF > 0 ? totalCarbonFootprint / EBF : 0;
     $('#co2PerM2').text(`${formatNumber(co2PerSquareMeter, 1)} kg`);
 
-    loadCo2Chart(window.projectId); // Ensure chart is up-to-date
+    // Load and update the CO₂-eq per storey chart
+    loadCo2Chart(window.projectId);
 }
+
 
 // Format numbers for display
 function formatNumber(value, decimals) {
@@ -63,12 +78,14 @@ function updateMaterial(url, data) {
                 table.replaceData(flattenedData);
 
                 updateProjectSummary(flattenedData);
-                loadCo2Chart(window.projectId); // Refresh the chart
 
                 // Update CO₂-eq / m² based on new data
                 const { totalCarbonFootprint, EBF } = response;
                 const co2PerSquareMeter = EBF > 0 ? totalCarbonFootprint / EBF : 0;
                 $('#co2PerM2').text(`${formatNumber(co2PerSquareMeter, 1)} kg`);
+
+                // Load and update the CO₂-eq per storey chart
+                loadCo2Chart(window.projectId);
             });
     }).catch(error => console.error('Error updating materials:', error));
 }
@@ -140,10 +157,15 @@ function loadCo2Chart(projectId) {
         .catch(error => console.error('Error fetching CO₂-eq data per storey:', error));
 }
 
+let co2ChartInstance = null; // Reference to the existing chart instance
+
 function renderCo2Chart(data) {
     const ctx = document.getElementById('co2Chart').getContext('2d');
     const labels = data.map(item => item.storey);
-    const co2Values = data.map(item => item.co2_eq);
+    const EBF = parseFloat($('#ebfPerM2').text().split(' ')[0].replace(/,/g, '')) || 1; // Ensure EBF is not zero
+    
+    // Divide each CO₂-eq value by EBF to get values per m²
+    const co2Values = data.map(item => item.co2_eq / EBF); 
 
     // Calculate min and max CO₂ values
     const minCo2 = Math.min(...co2Values);
@@ -151,12 +173,18 @@ function renderCo2Chart(data) {
 
     const barColors = co2Values.map(value => getCo2Color(value, minCo2, maxCo2));
 
-    new Chart(ctx, {
+    // Destroy the previous chart instance if it exists
+    if (co2ChartInstance) {
+        co2ChartInstance.destroy();
+    }
+
+    // Create a new chart instance and assign it to co2ChartInstance
+    co2ChartInstance = new Chart(ctx, {
         type: 'bar',
         data: {
             labels: labels,
             datasets: [{
-                label: 'CO₂-eq (kg)',
+                label: 'CO₂-eq per m² (kg/m²)', // Update chart title
                 data: co2Values,
                 backgroundColor: barColors,
                 borderColor: barColors.map(color => color.replace('0.8', '1.0')),
@@ -172,7 +200,7 @@ function renderCo2Chart(data) {
                 tooltip: {
                     callbacks: {
                         label: function(context) {
-                            return context.raw.toLocaleString() + ' kg CO₂-eq';
+                            return context.raw.toLocaleString() + ' kg CO₂-eq/m²';
                         }
                     }
                 }
@@ -188,7 +216,7 @@ function renderCo2Chart(data) {
                     beginAtZero: true,
                     title: {
                         display: true,
-                        text: 'CO₂-eq (kg)'
+                        text: 'CO₂-eq per m² (kg/m²)'
                     }
                 }
             }
@@ -196,18 +224,6 @@ function renderCo2Chart(data) {
     });
 }
 
-
-// Initialize the chart
-document.addEventListener('DOMContentLoaded', function () {
-    const projectId = window.location.pathname.split('/').pop();
-    window.projectId = projectId; // Store projectId globally for reuse
-    fetchMaterialNames().then(materialNames => {
-        initializeTable(projectId, materialNames);
-    });
-
-    // Load the CO2 chart data
-    loadCo2Chart(projectId);
-});
 
 
 // Generate columns with combine rows icon
@@ -457,4 +473,7 @@ document.addEventListener('DOMContentLoaded', function () {
     fetchMaterialNames().then(materialNames => {
         initializeTable(projectId, materialNames);
     });
+
+    // Load the CO₂ chart data
+    loadCo2Chart(projectId);
 });
