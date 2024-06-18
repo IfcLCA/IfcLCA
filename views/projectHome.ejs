@@ -60,6 +60,22 @@
             flex-direction: column;
             gap: 10px; /* Add space between buttons */
         }
+        .overlay {
+            display: none; /* Hidden by default */
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            padding: 10px;
+            background-color: rgba(255, 255, 255, 0.8);
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            z-index: 10; /* Ensure it sits on top of the table */
+            text-align: center;
+            font-size: 18px;
+            color: #333;
+            white-space: nowrap; /* Prevent text wrapping */
+        }
     </style>
 </head>
 <body>
@@ -98,7 +114,10 @@
             </div>
         </div>
     </div>
-    <div id="elements-table" class="mt-4"></div>
+    <div id="elements-table-container" style="position: relative;">
+        <div id="elements-table" class="mt-4"></div>
+        <div id="table-overlay" class="overlay">Upload an IFC file to see data</div>
+    </div>
 </main>
 <%- include('partials/_footer.ejs') %>
 <script src="https://cdn.jsdelivr.net/npm/tabulator-tables/dist/js/tabulator.min.js"></script>

@@ -139,25 +139,45 @@ function fetchBuildingElements(projectId) {
     });
 }
 
+// Toggle overlay visibility based on whether the table is empty
+function toggleOverlay(isEmpty) {
+    const overlay = document.getElementById('table-overlay');
+    if (isEmpty) {
+        overlay.style.display = 'block';
+    } else {
+        overlay.style.display = 'none';
+    }
+}
+
 // Initialize Tabulator after preloading material names
 function initializeTable(projectId, materialNames) {
     fetchBuildingElements(projectId).then(buildingElements => {
+        const flattenedData = flattenElements(buildingElements);
         var table = new Tabulator("#elements-table", {
             height: "800px",
             layout: "fitColumns",
-            data: flattenElements(buildingElements),
+            data: flattenedData,
             columns: getColumns(materialNames, projectId),
             headerSortClickElement: "icon", // Sorting only on icon click
             initialSort: [{ column: "guid", dir: "desc" }], // Sort by GUID by default
             rowAdded: function(row) {
                 row.moveToTop(); // Move newly added row to the top
+                toggleOverlay(table.getData().length === 0);
+            },
+            dataLoaded: function(data) {
+                toggleOverlay(data.length === 0);
+            },
+            dataChanged: function(data) {
+                toggleOverlay(data.length === 0);
             }
         });
 
         window.mainTable = table;
+
+        // Initial overlay check
+        toggleOverlay(flattenedData.length === 0);
     });
 }
-
 // Function to determine color based on CO₂ intensity
 function getCo2Color(value, min, max) {
     const thresholds = {
