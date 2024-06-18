@@ -14,10 +14,10 @@
         .project-details {
             display: flex;
             justify-content: space-between;
-            align-items: center;
+            align-items: flex-start; /* Adjust to align image and buttons to top */
             width: 100%;
         }
-        .details-column, .image-column {
+        .details-column {
             flex: 1;
             min-width: 250px;
         }
@@ -26,24 +26,13 @@
             flex-direction: column;
             align-items: flex-start;
         }
-        .image-container {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: flex-end;
-            width: 100%;
-        }
-        .image-container img {
-            width: 250px;
-            height: auto;
-        }
         .chart-column {
+            flex: 2;
             display: flex;
             justify-content: center;
             align-items: center;
             min-width: 700px;
             padding: 10px;
-            flex: 0 1 auto;
         }
         .chart-card {
             width: 100%;
@@ -52,12 +41,40 @@
         .chart-container {
             padding: 5px;
         }
+        .image-column {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-end; /* Align image and buttons to the right */
+            justify-content: flex-start; /* Adjust to align image and buttons to top */
+            flex: 1;
+            min-width: 200px;
+            gap: 10px; /* Add space between image and buttons */
+        }
+        .image-container img {
+            width: 350px;
+            height: auto;
+            margin-bottom: 10px; /* Add space below the image */
+        }
         .btn-container {
             display: flex;
             flex-direction: column;
-            align-items: center;
-            gap: 10px;
-            margin-bottom: 10px;
+            gap: 10px; /* Add space between buttons */
+        }
+        .overlay {
+            display: none; /* Hidden by default */
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            padding: 10px;
+            background-color: rgba(255, 255, 255, 0.8);
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            z-index: 10; /* Ensure it sits on top of the table */
+            text-align: center;
+            font-size: 18px;
+            color: #333;
+            white-space: nowrap; /* Prevent text wrapping */
         }
     </style>
 </head>
@@ -70,9 +87,9 @@
                 <h2 id="project-name"><%= formatProjectNameForDisplay(project.name) %></h2>
                 <p><strong>Phase:</strong> <%= project.phase %></p>
                 <p><strong>Description:</strong> <%= project.description %></p>
-                <p><strong>Carbon Footprint:</strong> <span id="carbonFootprint"><%= (Math.round(project.totalCarbonFootprint) / 1000).toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 1 }) %> tons</span></p>
-                <p><strong>m²:</strong> <span id="ebfPerM2"><%= project.EBF.toLocaleString() %> m²</span></p>
-                <p><strong>CO₂-eq / m²:</strong> <span id="co2PerM2"><%= (Math.round(project.co2PerSquareMeter)).toLocaleString() %> kg</span></p>
+                <p><strong>Carbon Footprint:</strong> <span id="carbonFootprint"><%= formatNumber(Math.round(project.totalCarbonFootprint) / 1000, 1) %> tons</span></p>
+                <p><strong>m²:</strong> <span id="ebfPerM2"><%= formatNumber(project.EBF, 0) %> m²</span></p>
+                <p><strong>CO₂-eq / m²:</strong> <span id="co2PerM2"><%= formatNumber(project.co2PerSquareMeter, 1) %> kg</span></p>
             </div>
         </div>
         <div class="chart-column">
@@ -87,28 +104,28 @@
         </div>
         <div class="image-column">
             <div class="btn-container">
-                <a href="/projects/<%= project._id %>/edit" class="btn btn-primary">Edit Project</a>
+                <a href="/projects/<%= project._id %>/edit" class="btn btn-primary btn-edit">Edit Project</a>
             </div>
             <div class="image-container">
                 <img src="<%= project.customImage %>" alt="Project Image">
-                <a href="/projects/<%= project._id %>/add-row" class="btn btn-primary mt-3">Add Material</a>
+            </div>
+            <div class="btn-container">
+                <a href="/projects/<%= project._id %>/add-row" class="btn btn-success btn-add-material">Add Material</a>
             </div>
         </div>
     </div>
-    <div id="elements-table" class="mt-4"></div>
+    <div id="elements-table-container" style="position: relative;">
+        <div id="elements-table" class="mt-4"></div>
+        <div id="table-overlay" class="overlay">Upload an IFC file to see data</div>
+    </div>
 </main>
 <%- include('partials/_footer.ejs') %>
 <script src="https://cdn.jsdelivr.net/npm/tabulator-tables/dist/js/tabulator.min.js"></script>
 <script src="/js/uploadIfc.js"></script>
-<script>
-    var projectId = "<%= project._id %>";
-    var projectName = "<%= project.name %>";
-
-    // Update project details on load
-    updateProjectDetails(projectId);
-    // Initialize table and chart on load
-    initializeTableAndChart(projectId);
-</script>
 <script src="/js/projectTable.js"></script>
+<% function formatNumber(value, decimals) { %>
+    <%  if (value == null || isNaN(value)) return '0'; %>
+    <%  return value.toLocaleString(undefined, { minimumFractionDigits: decimals, maximumFractionDigits: decimals }); %>
+    <% } %>
 </body>
 </html>

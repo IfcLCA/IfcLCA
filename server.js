@@ -6,7 +6,7 @@ const session = require("express-session");
 const MongoStore = require('connect-mongo');
 const authRoutes = require("./routes/authRoutes");
 const projectRoutes = require('./routes/projectRoutes');
-const Fuse = require('fuse.js');
+
 
 if (!process.env.DATABASE_URL || !process.env.SESSION_SECRET) {
   console.error("Error: config environment variables not set. Please create/edit .env configuration file.");
@@ -29,9 +29,7 @@ app.use(express.static("public"));
 // Database connection
 mongoose
   .connect(process.env.DATABASE_URL)
-  .then(() => {
-    console.log("Database connected successfully");
-  })
+  .then(() => { })
   .catch((err) => {
     console.error(`Database connection error: ${err.message}`);
     console.error(err.stack);
@@ -68,12 +66,8 @@ app.use((req, res, next) => {
   res.locals.session = sess;
   if (!sess.views) {
     sess.views = 1;
-    console.log("Session created at: ", new Date().toISOString());
   } else {
     sess.views++;
-    console.log(
-      `Session accessed again at: ${new Date().toISOString()}, Views: ${sess.views}, User ID: ${sess.userId || '(unauthenticated)'}`,
-    );
   }
   next();
 });

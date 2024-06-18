@@ -16,10 +16,11 @@
           <a href="/projects/<%= project._id %>" style="text-decoration: none; color: inherit;">
             <div class="card" style="width: 21.5rem; margin: 10px;">
               <% if (project.customImage) { %>
-               <img src="<%= project.customImage %>" class="card-img-top" alt="<%= project.name %>">
+               <img src="<%= project.customImage %>" class="card-img-top" alt="<%= formatProjectNameForDisplay(project.name) %>">
              <% } %>
               <div class="card-body">
-                <h5 class="card-title"><%= project.name %> - <small><%= project.description %></small></h5>
+                <h5 class="card-title"><%= formatProjectNameForDisplay(project.name) %></h5>
+                <p class="card-text"><small><%= project.description %></small></p>
                 <p class="card-text">Carbon Footprint: <span class="bold-value"><%= (Math.round(project.totalCarbonFootprint) / 1000).toFixed(3) %> tons</span></p>
                 <p class="card-text">Phase: <span class="bold-value"><%= project.phase %></span></p>
                 <p class="card-text">EBF: <span class="bold-value"><%= project.EBF %> m²</span></p>
