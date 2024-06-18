@@ -292,31 +292,54 @@ router.post('/api/projects/:projectId/building_elements/update', isAuthenticated
   }
 });
 
-// POST endpoint to delete building element rows
-router.post('/api/projects/:projectId/building_elements/delete', isAuthenticated, async (req, res) => {
+// POST endpoint to delete specific materials from building elements
+router.post('/api/projects/:projectId/building_elements/materials/delete', isAuthenticated, async (req, res) => {
   try {
       const { projectId } = req.params;
-      const { ids } = req.body;
+      const { materialIds } = req.body; // Get the material IDs to delete
 
-      // Delete elements from database
-      await BuildingElement.deleteMany({ _id: { $in: ids } });
+      // Find building elements containing the specified materials
+      const buildingElements = await BuildingElement.find({
+          "materials_info.materialId": { $in: materialIds },
+          projectId
+      });
 
-      // Recalculate and update project total footprint
-      const buildingElements = await BuildingElement.find({ projectId });
-      const totalFootprint = buildingElements.reduce((total, element) => {
-          return total + element.materials_info.reduce((elementTotal, material) => {
-              return elementTotal + parseFloat(material.total_co2 || 0);
-          }, 0);
-      }, 0);
+      // Track total CO2 removed
+      let totalCo2Removed = 0;
 
-      await Project.findByIdAndUpdate(projectId, { totalCarbonFootprint: totalFootprint });
+      // Update or delete building elements
+      for (const element of buildingElements) {
+          const remainingMaterials = element.materials_info.filter(material => !materialIds.includes(material.materialId.toString()));
 
-      res.json({ message: 'Building elements deleted successfully' });
+          if (remainingMaterials.length === 0) {
+              // If no materials remain, delete the entire building element
+              totalCo2Removed += element.materials_info.reduce((sum, material) => sum + parseFloat(material.total_co2 || 0), 0);
+              await BuildingElement.deleteOne({ _id: element._id });
+          } else {
+              // Otherwise, update the element with remaining materials
+              totalCo2Removed += element.materials_info.reduce((sum, material) => {
+                  if (materialIds.includes(material.materialId.toString())) {
+                      return sum + parseFloat(material.total_co2);
+                  }
+                  return sum;
+              }, 0);
+              element.materials_info = remainingMaterials;
+              await element.save();
+          }
+      }
+
+      // Update project's total carbon footprint
+      const project = await Project.findById(projectId);
+      project.totalCarbonFootprint -= totalCo2Removed;
+      await project.save();
+
+      res.json({ message: 'Materials deleted successfully' });
   } catch (error) {
-      console.error('Error deleting building elements:', error);
-      res.status(500).json({ message: "Error deleting building elements", error: error.toString() });
+      console.error('Error deleting materials:', error);
+      res.status(500).json({ message: "Error deleting materials", error: error.toString() });
   }
 });
+
 
 
 // Endpoint to get material names for the dropdown

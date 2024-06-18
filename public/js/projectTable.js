@@ -24,6 +24,16 @@ function initializeTable(projectId, materialNames) {
             initialSort: [{ column: "guid", dir: "desc" }],
             selectable: true, // Enable row selection
             rowSelectionChanged: function(data, rows) {
+                if (isDeleteMode) {
+                    const selectedGuids = new Set(rows.map(row => row.getData().guid));
+                    table.getRows().forEach(row => {
+                        if (selectedGuids.has(row.getData().guid)) {
+                            row.select();
+                        } else {
+                            row.deselect();
+                        }
+                    });
+                }
                 // Update select-all checkbox based on row selections
                 const selectAllCheckbox = document.getElementById('select-all');
                 const allRows = table.getRows();
@@ -31,6 +41,23 @@ function initializeTable(projectId, materialNames) {
 
                 if (selectAllCheckbox) {
                     selectAllCheckbox.checked = selectedRows.length === allRows.length;
+                }
+            },
+            rowClick: function(e, row) {
+                if (isDeleteMode) {
+                    const selectedGuid = row.getData().guid;
+                    const isChecked = row.isSelected();
+
+                    // Toggle selection for all rows with the same guid
+                    table.getRows().forEach(r => {
+                        if (r.getData().guid === selectedGuid) {
+                            if (isChecked) {
+                                r.deselect();
+                            } else {
+                                r.select();
+                            }
+                        }
+                    });
                 }
             },
             rowAdded: function(row) {
@@ -67,12 +94,17 @@ function setupDeleteButton() {
 
     applyDeleteButton.addEventListener('click', function() {
         const selectedRows = window.mainTable.getSelectedRows();
-        const selectedIds = selectedRows.map(row => row.getData()._id);
-
-        if (selectedIds.length > 0) {
-            axios.post(`/api/projects/${window.projectId}/building_elements/delete`, { ids: selectedIds })
+        const selectedMaterialIds = selectedRows.map(row => row.getData().materialId); // Collect unique material IDs
+    
+        if (selectedMaterialIds.length > 0) {
+            axios.post(`/api/projects/${window.projectId}/building_elements/materials/delete`, { materialIds: selectedMaterialIds })
                 .then(() => {
+                    // Remove rows from the table
                     selectedRows.forEach(row => row.delete());
+                    // Hide the delete checkbox column
+                    window.mainTable.updateColumnDefinition("delete_checkbox", { visible: false });
+                    window.mainTable.deselectRow();
+                    window.mainTable.options.selectable = false; // Disable row selection
                     toggleDeleteUI(false);
                     loadCo2Chart(window.projectId);
                 })
@@ -81,6 +113,8 @@ function setupDeleteButton() {
                 });
         }
     });
+    
+    
 
     cancelButton.addEventListener('click', function() {
         isDeleteMode = false;
@@ -91,11 +125,19 @@ function setupDeleteButton() {
     });
 }
 
+
 function toggleDeleteUI(showDelete) {
     document.getElementById('btn-delete-material').style.display = showDelete ? 'none' : 'block';
     document.getElementById('btn-add-material').style.display = showDelete ? 'none' : 'block';
     document.getElementById('btn-edit-project').style.display = showDelete ? 'none' : 'block';
     document.getElementById('confirm-buttons').style.display = showDelete ? 'flex' : 'none';
+
+    if (!showDelete) {
+        // Hide delete checkbox column and disable row selection
+        window.mainTable.updateColumnDefinition("delete_checkbox", { visible: false });
+        window.mainTable.deselectRow();
+        window.mainTable.options.selectable = false;
+    }
 }
 
 
@@ -549,11 +591,11 @@ function combineGroup(group, fields) {
     return combined;
 }
 
-// Flatten building elements data
 function flattenElements(buildingElements) {
     return buildingElements.flatMap(element => {
         return element.materials_info.map(material => ({
-            _id: material.materialId.$oid || material.materialId,  // Ensure ObjectID format
+            materialId: material.materialId.$oid || material.materialId,  // Ensure ObjectID format
+            buildingElementId: element._id.$oid || element._id, // Include building element ID
             guid: element.guid,
             ifc_class: element.ifc_class,
             instance_name: element.instance_name,
@@ -569,6 +611,7 @@ function flattenElements(buildingElements) {
         }));
     });
 }
+
 
 // Add event listener for the "select-all" checkbox to handle bulk selection
 document.addEventListener('DOMContentLoaded', function () {
