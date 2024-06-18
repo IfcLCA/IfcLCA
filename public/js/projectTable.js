@@ -15,6 +15,19 @@ function initializeTableAndChart(projectId) {
     loadCo2Chart(projectId);
 }
 
+// Check if any density fields are invalid
+function checkForInvalidDensities(data) {
+    return data.some(row => !row.density || row.density <= 0);
+}
+
+// Show or hide notification for invalid densities
+function toggleInvalidDensityNotification(hasInvalidDensities) {
+    const notification = document.getElementById('invalid-density-notification');
+    if (notification) {
+        notification.style.display = hasInvalidDensities ? 'block' : 'none';
+    }
+}
+
 function initializeTable(projectId, materialNames) {
     fetchBuildingElements(projectId).then(buildingElements => {
         const flattenedData = flattenElements(buildingElements);
@@ -31,7 +44,7 @@ function initializeTable(projectId, materialNames) {
             data: flattenedData,
             columns: getColumns(materialNames, projectId),
             headerSortClickElement: "icon",
-            initialSort: [{ column: "guid", dir: "desc" }],
+            initialSort: [{ column: "density", dir: "asc" }], // Sort by density by default
             selectable: true, // Enable row selection
             rowSelectionChanged: function(data, rows) {
                 if (isDeleteMode) {
@@ -53,35 +66,21 @@ function initializeTable(projectId, materialNames) {
                     selectAllCheckbox.checked = selectedRows.length === allRows.length;
                 }
             },
-            rowClick: function(e, row) {
-                if (isDeleteMode) {
-                    const selectedGuid = row.getData().guid;
-                    const isChecked = row.isSelected();
-
-                    // Toggle selection for all rows with the same guid
-                    table.getRows().forEach(r => {
-                        if (r.getData().guid === selectedGuid) {
-                            if (isChecked) {
-                                r.deselect();
-                            } else {
-                                r.select();
-                            }
-                        }
-                    });
-                }
-            },
             rowAdded: function(row) {
                 row.moveToTop();
                 toggleOverlay(table.getData().length === 0);
-                // No need to adjust height again after initial load
+                toggleInvalidDensityNotification(checkForInvalidDensities(table.getData())); // Check for invalid densities
             },
             dataLoaded: function(data) {
                 toggleOverlay(data.length === 0);
-                // No need to adjust height again after initial load
+                toggleInvalidDensityNotification(checkForInvalidDensities(data)); // Check for invalid densities
             },
             dataChanged: function(data) {
                 toggleOverlay(data.length === 0);
-                // No need to adjust height again after initial load
+                toggleInvalidDensityNotification(checkForInvalidDensities(data)); // Check for invalid densities
+            },
+            cellEdited: function(cell) {
+                toggleInvalidDensityNotification(checkForInvalidDensities(cell.getTable().getData())); // Check after edit
             }
         });
 
@@ -90,6 +89,7 @@ function initializeTable(projectId, materialNames) {
         setupSelectAllCheckbox();
         // Initial overlay check
         toggleOverlay(flattenedData.length === 0);
+        toggleInvalidDensityNotification(checkForInvalidDensities(flattenedData)); // Check for invalid densities initially
     });
 }
 
