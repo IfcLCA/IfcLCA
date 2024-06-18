@@ -2,6 +2,9 @@
 let currentGrouping = [];
 let combinedRowsMap = {};
 let isDeleteMode = false;
+const rowHeight = 40; // Approximate height per row in pixels
+const maxTableHeight = 800; // Maximum table height in pixels
+const minTableHeight = 200; // Minimum table height in pixels
 
 // Initialize the table and chart on page load
 function initializeTableAndChart(projectId) {
@@ -15,8 +18,15 @@ function initializeTableAndChart(projectId) {
 function initializeTable(projectId, materialNames) {
     fetchBuildingElements(projectId).then(buildingElements => {
         const flattenedData = flattenElements(buildingElements);
+        const numRows = flattenedData.length;
+
+        // Determine initial height
+        const initialHeight = numRows < 30 
+            ? Math.max(Math.min(numRows * rowHeight, maxTableHeight), minTableHeight) + "px" 
+            : maxTableHeight + "px";
+
         var table = new Tabulator("#elements-table", {
-            height: "800px",
+            height: initialHeight, // Set initial height
             layout: "fitColumns",
             data: flattenedData,
             columns: getColumns(materialNames, projectId),
@@ -63,12 +73,15 @@ function initializeTable(projectId, materialNames) {
             rowAdded: function(row) {
                 row.moveToTop();
                 toggleOverlay(table.getData().length === 0);
+                // No need to adjust height again after initial load
             },
             dataLoaded: function(data) {
                 toggleOverlay(data.length === 0);
+                // No need to adjust height again after initial load
             },
             dataChanged: function(data) {
                 toggleOverlay(data.length === 0);
+                // No need to adjust height again after initial load
             }
         });
 
