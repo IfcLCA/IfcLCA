@@ -1,17 +1,103 @@
 // Track current grouping state and combined rows map
 let currentGrouping = [];
 let combinedRowsMap = {};
+let isDeleteMode = false;
 
 // Initialize the table and chart on page load
 function initializeTableAndChart(projectId) {
-    // Fetch material names and initialize table
     fetchMaterialNames().then(materialNames => {
         initializeTable(projectId, materialNames);
     });
 
-    // Load the CO₂-eq chart data
     loadCo2Chart(projectId);
 }
+
+function initializeTable(projectId, materialNames) {
+    fetchBuildingElements(projectId).then(buildingElements => {
+        const flattenedData = flattenElements(buildingElements);
+        var table = new Tabulator("#elements-table", {
+            height: "800px",
+            layout: "fitColumns",
+            data: flattenedData,
+            columns: getColumns(materialNames, projectId),
+            headerSortClickElement: "icon",
+            initialSort: [{ column: "guid", dir: "desc" }],
+            selectable: true, // Enable row selection
+            rowSelectionChanged: function(data, rows) {
+                // Update select-all checkbox based on row selections
+                const selectAllCheckbox = document.getElementById('select-all');
+                const allRows = table.getRows();
+                const selectedRows = table.getSelectedRows();
+
+                if (selectAllCheckbox) {
+                    selectAllCheckbox.checked = selectedRows.length === allRows.length;
+                }
+            },
+            rowAdded: function(row) {
+                row.moveToTop();
+                toggleOverlay(table.getData().length === 0);
+            },
+            dataLoaded: function(data) {
+                toggleOverlay(data.length === 0);
+            },
+            dataChanged: function(data) {
+                toggleOverlay(data.length === 0);
+            }
+        });
+
+        window.mainTable = table;
+        setupDeleteButton();
+        setupSelectAllCheckbox();
+        // Initial overlay check
+        toggleOverlay(flattenedData.length === 0);
+    });
+}
+
+function setupDeleteButton() {
+    const deleteButton = document.getElementById('btn-delete-material');
+    const applyDeleteButton = document.getElementById('btn-apply-delete');
+    const cancelButton = document.getElementById('btn-cancel');
+
+    deleteButton.addEventListener('click', function() {
+        isDeleteMode = true;
+        window.mainTable.updateColumnDefinition("delete_checkbox", { visible: true });
+        window.mainTable.options.selectable = true; // Correctly enable row selection
+        toggleDeleteUI(true);
+    });
+
+    applyDeleteButton.addEventListener('click', function() {
+        const selectedRows = window.mainTable.getSelectedRows();
+        const selectedIds = selectedRows.map(row => row.getData()._id);
+
+        if (selectedIds.length > 0) {
+            axios.post(`/api/projects/${window.projectId}/building_elements/delete`, { ids: selectedIds })
+                .then(() => {
+                    selectedRows.forEach(row => row.delete());
+                    toggleDeleteUI(false);
+                    loadCo2Chart(window.projectId);
+                })
+                .catch(error => {
+                    console.error('Error deleting materials:', error);
+                });
+        }
+    });
+
+    cancelButton.addEventListener('click', function() {
+        isDeleteMode = false;
+        window.mainTable.updateColumnDefinition("delete_checkbox", { visible: false });
+        window.mainTable.deselectRow();
+        window.mainTable.options.selectable = false; // Correctly disable row selection
+        toggleDeleteUI(false);
+    });
+}
+
+function toggleDeleteUI(showDelete) {
+    document.getElementById('btn-delete-material').style.display = showDelete ? 'none' : 'block';
+    document.getElementById('btn-add-material').style.display = showDelete ? 'none' : 'block';
+    document.getElementById('btn-edit-project').style.display = showDelete ? 'none' : 'block';
+    document.getElementById('confirm-buttons').style.display = showDelete ? 'flex' : 'none';
+}
+
 
 // Fetch and update project details
 function updateProjectDetails(projectId) {
@@ -149,35 +235,6 @@ function toggleOverlay(isEmpty) {
     }
 }
 
-// Initialize Tabulator after preloading material names
-function initializeTable(projectId, materialNames) {
-    fetchBuildingElements(projectId).then(buildingElements => {
-        const flattenedData = flattenElements(buildingElements);
-        var table = new Tabulator("#elements-table", {
-            height: "800px",
-            layout: "fitColumns",
-            data: flattenedData,
-            columns: getColumns(materialNames, projectId),
-            headerSortClickElement: "icon", // Sorting only on icon click
-            initialSort: [{ column: "guid", dir: "desc" }], // Sort by GUID by default
-            rowAdded: function(row) {
-                row.moveToTop(); // Move newly added row to the top
-                toggleOverlay(table.getData().length === 0);
-            },
-            dataLoaded: function(data) {
-                toggleOverlay(data.length === 0);
-            },
-            dataChanged: function(data) {
-                toggleOverlay(data.length === 0);
-            }
-        });
-
-        window.mainTable = table;
-
-        // Initial overlay check
-        toggleOverlay(flattenedData.length === 0);
-    });
-}
 // Function to determine color based on CO₂ intensity
 function getCo2Color(value, min, max) {
     const thresholds = {
@@ -268,7 +325,7 @@ function renderCo2Chart(data) {
     });
 }
 
-// Generate columns with combine rows icon
+// Define columns including the delete checkbox
 function getColumns(materialNames, projectId) {
     const materialLookup = materialNames.reduce((acc, name) => {
         acc[name] = name;
@@ -277,6 +334,15 @@ function getColumns(materialNames, projectId) {
     materialLookup["No Match"] = "No Match";
 
     return [
+        {
+            title: `<input type='checkbox' id='select-all' style='margin: 0;'>`,
+            formatter: "rowSelection", 
+            titleFormatter: "rowSelection",
+            field: "delete_checkbox",
+            hozAlign: "center",
+            headerSort: false,
+            visible: false // Initially hidden
+        },
         { title: `<div>GUID</div>`, field: "guid", width: 85, headerWordWrap: true, hozAlign: "left" },
         { title: `<div>IfcClass<br><i class='fa fa-compress' style='cursor: pointer; margin-left: 5px;' onclick='toggleColumnGrouping("ifc_class")'></i></div>`, field: "ifc_class", width: 100, headerWordWrap: true, hozAlign: "left" },
         { title: `<div>Name<br><i class='fa fa-compress' style='cursor: pointer; margin-left: 5px;' onclick='toggleColumnGrouping("instance_name")'></i></div>`, field: "instance_name", width: 300, headerWordWrap: true, hozAlign: "left" },
@@ -353,6 +419,20 @@ function getColumns(materialNames, projectId) {
         { title: `<div>Indicator (kg CO₂-eq/kg)</div>`, field: "indikator", formatter: "money", formatterParams: { precision: 3, thousand:"'" }, width: 100, headerWordWrap: true },
         { title: `<div>CO₂-eq (kg)</div>`, field: "total_co2", formatter: "money", formatterParams: { precision: 2, thousand:"'" }, width: 125, headerWordWrap: true, hozAlign: "left" }
     ];
+}
+
+function setupSelectAllCheckbox() {
+    const selectAllCheckbox = document.getElementById('select-all');
+    if (selectAllCheckbox) {
+        selectAllCheckbox.addEventListener('click', function() {
+            const isChecked = selectAllCheckbox.checked;
+            if (isChecked) {
+                window.mainTable.selectRow();
+            } else {
+                window.mainTable.deselectRow();
+            }
+        });
+    }
 }
 
 // Toggle column grouping
@@ -490,7 +570,7 @@ function flattenElements(buildingElements) {
     });
 }
 
-// Preload material names and initialize Tabulator
+// Add event listener for the "select-all" checkbox to handle bulk selection
 document.addEventListener('DOMContentLoaded', function () {
     const projectId = window.location.pathname.split('/').pop();
     window.projectId = projectId; // Store projectId globally for reuse
@@ -498,6 +578,29 @@ document.addEventListener('DOMContentLoaded', function () {
         initializeTable(projectId, materialNames);
     });
 
-    // Load the CO₂ chart data
+    loadCo2Chart(projectId);
+
+    const selectAllCheckbox = document.getElementById('select-all');
+    if (selectAllCheckbox) {
+        selectAllCheckbox.addEventListener('click', function() {
+            const isChecked = selectAllCheckbox.checked;
+            window.mainTable.getRows().forEach(row => {
+                if (isChecked) {
+                    row.select();
+                } else {
+                    row.deselect();
+                }
+            });
+        });
+    }
+});
+
+document.addEventListener('DOMContentLoaded', function () {
+    const projectId = window.location.pathname.split('/').pop();
+    window.projectId = projectId; // Store projectId globally for reuse
+    fetchMaterialNames().then(materialNames => {
+        initializeTable(projectId, materialNames);
+    });
+
     loadCo2Chart(projectId);
 });

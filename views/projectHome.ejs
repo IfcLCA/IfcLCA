@@ -14,7 +14,7 @@
         .project-details {
             display: flex;
             justify-content: space-between;
-            align-items: flex-start; /* Adjust to align image and buttons to top */
+            align-items: flex-start;
             width: 100%;
         }
         .details-column {
@@ -44,24 +44,29 @@
         .image-column {
             display: flex;
             flex-direction: column;
-            align-items: flex-end; /* Align image and buttons to the right */
-            justify-content: flex-start; /* Adjust to align image and buttons to top */
+            align-items: flex-end;
+            justify-content: flex-start;
             flex: 1;
             min-width: 200px;
-            gap: 10px; /* Add space between image and buttons */
+            gap: 10px;
         }
         .image-container img {
             width: 350px;
             height: auto;
-            margin-bottom: 10px; /* Add space below the image */
+            margin-bottom: 10px;
         }
         .btn-container {
             display: flex;
             flex-direction: column;
-            gap: 10px; /* Add space between buttons */
+            gap: 10px;
+            align-items: flex-end;
+        }
+        .btn-row {
+            display: flex;
+            gap: 10px;
         }
         .overlay {
-            display: none; /* Hidden by default */
+            display: none;
             position: absolute;
             top: 50%;
             left: 50%;
@@ -70,11 +75,11 @@
             background-color: rgba(255, 255, 255, 0.8);
             border: 1px solid #ccc;
             border-radius: 5px;
-            z-index: 10; /* Ensure it sits on top of the table */
+            z-index: 10;
             text-align: center;
             font-size: 18px;
             color: #333;
-            white-space: nowrap; /* Prevent text wrapping */
+            white-space: nowrap;
         }
     </style>
 </head>
@@ -104,19 +109,27 @@
         </div>
         <div class="image-column">
             <div class="btn-container">
-                <a href="/projects/<%= project._id %>/edit" class="btn btn-primary btn-edit">Edit Project</a>
+                <a href="/projects/<%= project._id %>/edit" id="btn-edit-project" class="btn btn-primary">Edit Project</a>
+                <div class="image-container">
+                    <img src="<%= project.customImage %>" alt="Project Image">
+                </div>
+                <div id="action-buttons" class="btn-row">
+                    <button id="btn-delete-material" class="btn btn-secondary">Delete</button>
+                    <a href="/projects/<%= project._id %>/add-row" id="btn-add-material" class="btn btn-success">Add Material</a>
+                </div>
+                <div id="confirm-buttons" class="btn-row" style="display: none;">
+                    <button id="btn-apply-delete" class="btn btn-danger">Apply Changes</button>
+                    <button id="btn-cancel" class="btn btn-secondary">Cancel</button>
+                </div>
             </div>
-            <div class="image-container">
-                <img src="<%= project.customImage %>" alt="Project Image">
-            </div>
-            <div class="btn-container">
-                <a href="/projects/<%= project._id %>/add-row" class="btn btn-success btn-add-material">Add Material</a>
-            </div>
+           
         </div>
     </div>
     <div id="elements-table-container" style="position: relative;">
         <div id="elements-table" class="mt-4"></div>
         <div id="table-overlay" class="overlay">Upload an IFC file to see data</div>
+        <!-- Ensure the select-all checkbox works -->
+        <input type='checkbox' id='select-all' style='margin: 0;' />
     </div>
 </main>
 <%- include('partials/_footer.ejs') %>

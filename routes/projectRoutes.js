@@ -292,6 +292,33 @@ router.post('/api/projects/:projectId/building_elements/update', isAuthenticated
   }
 });
 
+// POST endpoint to delete building element rows
+router.post('/api/projects/:projectId/building_elements/delete', isAuthenticated, async (req, res) => {
+  try {
+      const { projectId } = req.params;
+      const { ids } = req.body;
+
+      // Delete elements from database
+      await BuildingElement.deleteMany({ _id: { $in: ids } });
+
+      // Recalculate and update project total footprint
+      const buildingElements = await BuildingElement.find({ projectId });
+      const totalFootprint = buildingElements.reduce((total, element) => {
+          return total + element.materials_info.reduce((elementTotal, material) => {
+              return elementTotal + parseFloat(material.total_co2 || 0);
+          }, 0);
+      }, 0);
+
+      await Project.findByIdAndUpdate(projectId, { totalCarbonFootprint: totalFootprint });
+
+      res.json({ message: 'Building elements deleted successfully' });
+  } catch (error) {
+      console.error('Error deleting building elements:', error);
+      res.status(500).json({ message: "Error deleting building elements", error: error.toString() });
+  }
+});
+
+
 // Endpoint to get material names for the dropdown
 router.get('/api/materials/names', async (req, res) => {
   try {
