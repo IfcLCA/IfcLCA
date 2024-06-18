@@ -53,6 +53,7 @@
         .image-container img {
             width: 350px;
             height: auto;
+            max-height: 350px;
             margin-bottom: 10px;
         }
         .btn-container {
@@ -131,6 +132,14 @@
         <!-- Ensure the select-all checkbox works -->
         <input type='checkbox' id='select-all' style='margin: 0;' />
     </div>
+
+<!-- Notification for Invalid Densities -->
+<div id="invalid-density-notification" style="display:none; position:fixed; top:50%; left:50%; transform:translate(-50%, -50%); background:#ffc; border:1px solid #ffa; padding:10px; border-radius:5px; z-index:1000; box-shadow: 0 2px 5px rgba(0,0,0,0.2); font-size:14px; color:#a00;">
+    <p>Some density fields are invalid. Please check and enter valid values.</p>
+  </div>
+  
+  
+  
 </main>
 <%- include('partials/_footer.ejs') %>
 <script src="https://cdn.jsdelivr.net/npm/tabulator-tables/dist/js/tabulator.min.js"></script>

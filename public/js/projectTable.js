@@ -2,6 +2,9 @@
 let currentGrouping = [];
 let combinedRowsMap = {};
 let isDeleteMode = false;
+const rowHeight = 40; // Approximate height per row in pixels
+const maxTableHeight = 800; // Maximum table height in pixels
+const minTableHeight = 200; // Minimum table height in pixels
 
 // Initialize the table and chart on page load
 function initializeTableAndChart(projectId) {
@@ -12,16 +15,36 @@ function initializeTableAndChart(projectId) {
     loadCo2Chart(projectId);
 }
 
+// Check if any density fields are invalid
+function checkForInvalidDensities(data) {
+    return data.some(row => !row.density || row.density <= 0);
+}
+
+// Show or hide notification for invalid densities
+function toggleInvalidDensityNotification(hasInvalidDensities) {
+    const notification = document.getElementById('invalid-density-notification');
+    if (notification) {
+        notification.style.display = hasInvalidDensities ? 'block' : 'none';
+    }
+}
+
 function initializeTable(projectId, materialNames) {
     fetchBuildingElements(projectId).then(buildingElements => {
         const flattenedData = flattenElements(buildingElements);
+        const numRows = flattenedData.length;
+
+        // Determine initial height
+        const initialHeight = numRows < 30 
+            ? Math.max(Math.min(numRows * rowHeight, maxTableHeight), minTableHeight) + "px" 
+            : maxTableHeight + "px";
+
         var table = new Tabulator("#elements-table", {
-            height: "800px",
+            height: initialHeight, // Set initial height
             layout: "fitColumns",
             data: flattenedData,
             columns: getColumns(materialNames, projectId),
             headerSortClickElement: "icon",
-            initialSort: [{ column: "guid", dir: "desc" }],
+            initialSort: [{ column: "density", dir: "asc" }], // Sort by density by default
             selectable: true, // Enable row selection
             rowSelectionChanged: function(data, rows) {
                 if (isDeleteMode) {
@@ -43,32 +66,21 @@ function initializeTable(projectId, materialNames) {
                     selectAllCheckbox.checked = selectedRows.length === allRows.length;
                 }
             },
-            rowClick: function(e, row) {
-                if (isDeleteMode) {
-                    const selectedGuid = row.getData().guid;
-                    const isChecked = row.isSelected();
-
-                    // Toggle selection for all rows with the same guid
-                    table.getRows().forEach(r => {
-                        if (r.getData().guid === selectedGuid) {
-                            if (isChecked) {
-                                r.deselect();
-                            } else {
-                                r.select();
-                            }
-                        }
-                    });
-                }
-            },
             rowAdded: function(row) {
                 row.moveToTop();
                 toggleOverlay(table.getData().length === 0);
+                toggleInvalidDensityNotification(checkForInvalidDensities(table.getData())); // Check for invalid densities
             },
             dataLoaded: function(data) {
                 toggleOverlay(data.length === 0);
+                toggleInvalidDensityNotification(checkForInvalidDensities(data)); // Check for invalid densities
             },
             dataChanged: function(data) {
                 toggleOverlay(data.length === 0);
+                toggleInvalidDensityNotification(checkForInvalidDensities(data)); // Check for invalid densities
+            },
+            cellEdited: function(cell) {
+                toggleInvalidDensityNotification(checkForInvalidDensities(cell.getTable().getData())); // Check after edit
             }
         });
 
@@ -77,6 +89,7 @@ function initializeTable(projectId, materialNames) {
         setupSelectAllCheckbox();
         // Initial overlay check
         toggleOverlay(flattenedData.length === 0);
+        toggleInvalidDensityNotification(checkForInvalidDensities(flattenedData)); // Check for invalid densities initially
     });
 }
 
