@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="e</div>n">
+<html lang="en">
 <%- include('partials/_head.ejs') %>
 <body>
 <%- include('partials/_header.ejs') %>
@@ -13,7 +13,7 @@
   <form id="editProjectForm" action="/projects/<%= project._id %>/edit" method="POST">
     <div class="mb-3">
       <label for="name" class="form-label">Project Name</label>
-      <input type="text" id="name" name="name" class="form-control" value="<%= project.name %>" required>
+      <input type="text" id="name" name="name" class="form-control" value="<%= formatProjectNameForDisplay(project.name) %>" required>
     </div>
     <div class="mb-3">
       <label for="phase" class="form-label">Phase</label>
@@ -28,7 +28,7 @@
       <input type="text" id="customImage" name="customImage" class="form-control" value="<%= project.customImage %>">
     </div>
     <div class="mb-3">
-      <label for="EBF" class="form-label">Energiebezugsfläche (EBF) in m²</label>
+      <label for="EBF" class="form-label">Project m² (EBF)</label>
       <input type="number" id="EBF" name="EBF" class="form-control" value="<%= project.EBF %>" step="0.01" min="0" required>
     </div>
     <div class="button-container">

@@ -13,13 +13,12 @@ function initializeTableAndChart(projectId) {
     loadCo2Chart(projectId);
 }
 
-
 // Fetch and update project details
 function updateProjectDetails(projectId) {
     fetch(`/projects/${projectId}`)
         .then(response => response.json())
         .then(project => {
-            console.log("Updated project details:", project);  // Debug print
+            console.log("Updated project details:", project);
             $('#carbonFootprint').text(`${formatNumber(Math.round(project.totalCarbonFootprint) / 1000, 1)} tons`);
             $('#co2PerM2').text(`${formatNumber(project.co2PerSquareMeter, 1)} kg`);
             $('#ebfPerM2').text(`${formatNumber(project.EBF, 0)} m²`);
@@ -27,18 +26,28 @@ function updateProjectDetails(projectId) {
         .catch(error => console.error('Error updating project details:', error));
 }
 
-
+// Update project summary data
 function updateProjectSummary(data) {
     const totalCarbonFootprint = data.reduce((sum, element) => sum + parseFloat(element.total_co2 || 0), 0);
-    const EBF = parseFloat($('#ebfPerM2').text().split(' ')[0].replace(/,/g, '')) || 0; // Ensure EBF is fetched and parsed correctly
 
-    $('#carbonFootprint').text(`${formatNumber(Math.round(totalCarbonFootprint) / 1000, 1)} tons`);
+    // Retrieve EBF value from the span and parse it
+    const EBFText = $('#ebfPerM2').text().trim();
+    const EBF = parseFloat(EBFText.replace(/,/g, ''));
 
-    // Calculate and update CO₂-eq / m²
-    const co2PerSquareMeter = EBF > 0 ? totalCarbonFootprint / EBF : 0;
-    $('#co2PerM2').text(`${formatNumber(co2PerSquareMeter, 1)} kg`);
+    // Check for a valid EBF value
+    if (isNaN(EBF) || EBF <= 0) {
+        console.error('Invalid EBF value:', EBFText);
+        return;
+    }
 
-    // Load and update the CO₂-eq per storey chart
+    // Calculate CO₂-eq / m²
+    const co2PerSquareMeter = totalCarbonFootprint /1000 / EBF;
+
+    // Update the display values
+    $('#carbonFootprint').text(`${(Math.round(totalCarbonFootprint) / 1000).toFixed(3)} tons`);
+    $('#co2PerM2').text(`${co2PerSquareMeter.toFixed(3)} kg`);
+
+    // Ensure chart is up-to-date
     loadCo2Chart(window.projectId);
 }
 
@@ -70,24 +79,50 @@ function updateMaterial(url, data) {
         method: 'POST',
         contentType: 'application/json',
         data: JSON.stringify(data)
-    }).then((response) => {
+    }).then(() => {
         fetchBuildingElements(window.projectId)
             .then(buildingElements => {
                 const flattenedData = flattenElements(buildingElements);
                 const table = window.mainTable;
-                table.replaceData(flattenedData);
-
-                updateProjectSummary(flattenedData);
-
-                // Update CO₂-eq / m² based on new data
-                const { totalCarbonFootprint, EBF } = response;
-                const co2PerSquareMeter = EBF > 0 ? totalCarbonFootprint / EBF : 0;
-                $('#co2PerM2').text(`${formatNumber(co2PerSquareMeter, 1)} kg`);
+                table.replaceData(flattenedData).then(() => updateProjectSummary(flattenedData)); // Ensure updateProjectSummary is called after table data update
 
                 // Load and update the CO₂-eq per storey chart
                 loadCo2Chart(window.projectId);
             });
     }).catch(error => console.error('Error updating materials:', error));
+}
+
+function updateMaterialForCombinedRow(url, data, combinedRowIds) {
+    const updateData = combinedRowIds.map(materialId => ({
+        ...data,
+        materialId
+    }));
+
+    const updatePromises = updateData.map(data => {
+        return $.ajax({
+            url: url,
+            method: 'POST',
+            contentType: 'application/json',
+            data: JSON.stringify(data)
+        });
+    });
+
+    Promise.all(updatePromises)
+        .then(() => {
+            return fetchBuildingElements(window.projectId);
+        })
+        .then(buildingElements => {
+            const flattenedData = flattenElements(buildingElements);
+            const table = window.mainTable;
+            table.replaceData(flattenedData).then(() => updateProjectSummary(flattenedData)); // Ensure updateProjectSummary is called after table data update
+
+            if (currentGrouping.length > 0) {
+                updateTableGrouping();
+            }
+        })
+        .catch(error => {
+            console.error('Error updating combined rows:', error);
+        });
 }
 
 // Fetch building elements from the backend
@@ -103,17 +138,6 @@ function fetchBuildingElements(projectId) {
         return [];
     });
 }
-
-function updateProjectSummary(data) {
-    const totalCarbonFootprint = data.reduce((sum, element) => sum + parseFloat(element.total_co2 || 0), 0);
-    const EBF = parseFloat($('#ebfPerM2').text().split(' ')[0]); // Assume EBF is stored in span with id ebfPerM2
-    const co2PerSquareMeter = EBF > 0 ? totalCarbonFootprint / EBF : 0;
-
-    $('#carbonFootprint').text(`${(Math.round(totalCarbonFootprint) / 1000).toFixed(3)} tons`);
-    $('#co2PerM2').text(`${co2PerSquareMeter.toFixed(3)} kg`);
-    loadCo2Chart(window.projectId); // Ensure chart is up-to-date
-}
-
 
 // Initialize Tabulator after preloading material names
 function initializeTable(projectId, materialNames) {
@@ -224,16 +248,13 @@ function renderCo2Chart(data) {
     });
 }
 
-
-
 // Generate columns with combine rows icon
 function getColumns(materialNames, projectId) {
-    // Add a display value for "No Match"
     const materialLookup = materialNames.reduce((acc, name) => {
         acc[name] = name;
         return acc;
     }, {});
-    materialLookup["No Match"] = "No Match"; // Ensure "No Match" has a display value
+    materialLookup["No Match"] = "No Match";
 
     return [
         { title: `<div>GUID</div>`, field: "guid", width: 85, headerWordWrap: true, hozAlign: "left" },
@@ -264,46 +285,29 @@ function getColumns(materialNames, projectId) {
                 const row = cell.getRow();
                 const data = row.getData();
 
-                let updateUrl, updateData;
+                fetch(`/api/materials/details/${updatedMaterialName}`)
+                    .then(response => response.json())
+                    .then(materialDetails => {
+                        const newDensity = materialDetails.density;
+                        const newIndicator = materialDetails.indicator;
+                        const newTotalCO2 = data.volume * newDensity * newIndicator;
 
-                if (cell.getField() === "matched_material") {
-                    fetch(`/api/materials/details/${updatedMaterialName}`)
-                        .then(response => response.json())
-                        .then(materialDetails => {
-                            const newDensity = materialDetails.density;
-                            const newIndicator = materialDetails.indicator;
-                            const newTotalCO2 = data.volume * newDensity * newIndicator;
-
-                            row.update({
-                                density: newDensity,
-                                indikator: newIndicator,
-                                total_co2: newTotalCO2.toFixed(3)
-                            });
-
-                            updateUrl = `/api/projects/${projectId}/building_elements/update`;
-                            updateData = {
-                                materialId: data._id,
-                                matched_material_name: updatedMaterialName,
-                                density: newDensity,
-                                indikator: newIndicator,
-                                total_co2: newTotalCO2.toFixed(3)
-                            };
-                            updateMaterial(updateUrl, updateData);
+                        row.update({
+                            density: newDensity,
+                            indikator: newIndicator,
+                            total_co2: newTotalCO2.toFixed(3)
                         });
-                } else if (cell.getField() === "density") {
-                    const newDensity = parseFloat(updatedMaterialName);
-                    const newTotalCO2 = data.volume * newDensity * data.indikator;
 
-                    row.update({ total_co2: newTotalCO2.toFixed(3) });
+                        const materialIds = data._ids ? data._ids.split(',') : [data._id];
+                        const validMaterialIds = materialIds.filter(id => id && id !== "<varies>");
 
-                    updateUrl = `/api/projects/${projectId}/building_elements/update`;
-                    updateData = {
-                        materialId: data._id,
-                        density: newDensity,
-                        total_co2: newTotalCO2.toFixed(3)
-                    };
-                    updateMaterial(updateUrl, updateData);
-                }
+                        updateMaterialForCombinedRow(`/api/projects/${projectId}/building_elements/update`, {
+                            matched_material_name: updatedMaterialName,
+                            density: newDensity,
+                            indikator: newIndicator,
+                            total_co2: newTotalCO2.toFixed(3)
+                        }, validMaterialIds);
+                    });
             }
         },
         {

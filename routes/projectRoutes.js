@@ -270,13 +270,18 @@ router.post('/api/projects/:projectId/building_elements/update', isAuthenticated
               }, 0);
           }, 0);
 
-          const project = await Project.findByIdAndUpdate(projectId, { totalCarbonFootprint: totalFootprint });
-          const EBF = project.EBF || 0;
+          const project = await Project.findById(projectId);
+          project.totalCarbonFootprint = totalFootprint;
+          const EBF = project.EBF || 1; // Ensure EBF is not zero
+          const co2PerSquareMeter = totalFootprint / EBF;
+
+          await project.save();
 
           res.json({
               message: 'Material updated successfully',
               totalCarbonFootprint: totalFootprint,
-              EBF: EBF
+              EBF: EBF,
+              co2PerSquareMeter: co2PerSquareMeter  // Include in response
           });
       } else {
           res.status(404).json({ message: 'Building element not found' });
@@ -435,12 +440,13 @@ router.get('/projects/:projectId/edit', isAuthenticated, async (req, res) => {
     if (!project) {
       return res.status(404).send('Project not found');
     }
-    res.render('editProject', { project });
+    res.render('editProject', { project, formatProjectNameForDisplay });
   } catch (error) {
     console.error('Error rendering edit form:', error);
     res.status(500).send('Error rendering edit form.');
   }
 });
+
 
 // POST endpoint for updating a project's details
 router.post('/projects/:projectId/edit', isAuthenticated, async (req, res) => {
