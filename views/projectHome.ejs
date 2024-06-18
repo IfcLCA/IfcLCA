@@ -14,10 +14,10 @@
         .project-details {
             display: flex;
             justify-content: space-between;
-            align-items: center;
+            align-items: flex-start; /* Adjust to align image and buttons to top */
             width: 100%;
         }
-        .details-column, .image-column {
+        .details-column {
             flex: 1;
             min-width: 250px;
         }
@@ -26,24 +26,13 @@
             flex-direction: column;
             align-items: flex-start;
         }
-        .image-container {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: flex-end;
-            width: 100%;
-        }
-        .image-container img {
-            width: 250px;
-            height: auto;
-        }
         .chart-column {
+            flex: 2;
             display: flex;
             justify-content: center;
             align-items: center;
             min-width: 700px;
             padding: 10px;
-            flex: 0 1 auto;
         }
         .chart-card {
             width: 100%;
@@ -52,12 +41,24 @@
         .chart-container {
             padding: 5px;
         }
+        .image-column {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-end; /* Align image and buttons to the right */
+            justify-content: flex-start; /* Adjust to align image and buttons to top */
+            flex: 1;
+            min-width: 200px;
+            gap: 10px; /* Add space between image and buttons */
+        }
+        .image-container img {
+            width: 350px;
+            height: auto;
+            margin-bottom: 10px; /* Add space below the image */
+        }
         .btn-container {
             display: flex;
             flex-direction: column;
-            align-items: center;
-            gap: 10px;
-            margin-bottom: 10px;
+            gap: 10px; /* Add space between buttons */
         }
     </style>
 </head>
@@ -71,7 +72,7 @@
                 <p><strong>Phase:</strong> <%= project.phase %></p>
                 <p><strong>Description:</strong> <%= project.description %></p>
                 <p><strong>Carbon Footprint:</strong> <span id="carbonFootprint"><%= formatNumber(Math.round(project.totalCarbonFootprint) / 1000, 1) %> tons</span></p>
-                <p><strong>m²:</strong> <span id="ebfPerM2"><%= formatNumber(project.EBF, 0) %></span></p>
+                <p><strong>m²:</strong> <span id="ebfPerM2"><%= formatNumber(project.EBF, 0) %> m²</span></p>
                 <p><strong>CO₂-eq / m²:</strong> <span id="co2PerM2"><%= formatNumber(project.co2PerSquareMeter, 1) %> kg</span></p>
             </div>
         </div>
@@ -87,11 +88,13 @@
         </div>
         <div class="image-column">
             <div class="btn-container">
-                <a href="/projects/<%= project._id %>/edit" class="btn btn-primary">Edit Project</a>
+                <a href="/projects/<%= project._id %>/edit" class="btn btn-primary btn-edit">Edit Project</a>
             </div>
             <div class="image-container">
                 <img src="<%= project.customImage %>" alt="Project Image">
-                <a href="/projects/<%= project._id %>/add-row" class="btn btn-primary mt-3">Add Material</a>
+            </div>
+            <div class="btn-container">
+                <a href="/projects/<%= project._id %>/add-row" class="btn btn-success btn-add-material">Add Material</a>
             </div>
         </div>
     </div>

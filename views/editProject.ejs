@@ -7,7 +7,7 @@
   <div class="d-flex justify-content-between align-items-center">
     <h2>Edit Project</h2>
     <form action="/api/projects/<%= project._id %>/delete" method="POST" onsubmit="return confirm('Are you sure you want to delete this project? This action cannot be undone.');">
-      <button type="submit" class="btn btn-danger">Delete Project</button> 
+      <button type="submit" class="btn btn-danger">Delete Project</button>
     </form>
   </div>
   <form id="editProjectForm" action="/projects/<%= project._id %>/edit" method="POST">
@@ -31,8 +31,9 @@
       <label for="EBF" class="form-label">Project m² (EBF)</label>
       <input type="number" id="EBF" name="EBF" class="form-control" value="<%= project.EBF %>" step="0.01" min="0" required>
     </div>
-    <div class="button-container">
-      <button type="submit" class="btn btn-primary">Update Project</button>
+    <div class="d-flex justify-content-between">
+      <button type="submit" class="btn btn-success">Confirm</button>
+      <button type="button" class="btn btn-secondary" onclick="window.location.href='/dashboard'">Cancel</button>
     </div>
   </form>
 </main>

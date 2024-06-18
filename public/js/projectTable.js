@@ -44,8 +44,8 @@ function updateProjectSummary(data) {
     const co2PerSquareMeter = totalCarbonFootprint /1000 / EBF;
 
     // Update the display values
-    $('#carbonFootprint').text(`${(Math.round(totalCarbonFootprint) / 1000).toFixed(3)} tons`);
-    $('#co2PerM2').text(`${co2PerSquareMeter.toFixed(3)} kg`);
+    $('#carbonFootprint').text(`${(Math.round(totalCarbonFootprint) / 1000).toFixed(1)} tons`);
+    $('#co2PerM2').text(`${co2PerSquareMeter.toFixed(1)} kg`);
 
     // Ensure chart is up-to-date
     loadCo2Chart(window.projectId);
