@@ -184,7 +184,6 @@ function updateProjectSummary(data) {
     // Calculate CO₂-eq / m²
     const co2PerSquareMeter = totalCarbonFootprint /1000 / EBF;
 
-    // Update the display values
     $('#carbonFootprint').text(`${(Math.round(totalCarbonFootprint) / 1000).toFixed(1)} tons`);
     $('#co2PerM2').text(`${co2PerSquareMeter.toFixed(1)} kg`);
 
@@ -230,9 +229,6 @@ function updateMaterial(url, data) {
                 // Load and update the CO₂-eq per storey chart
                 loadCo2Chart(window.projectId);
             });
-
-        // Refresh project details
-        updateProjectDetails(window.projectId);
     }).catch(error => console.error('Error updating materials:', error));
 }
 
@@ -291,6 +287,25 @@ function toggleOverlay(isEmpty) {
     } else {
         overlay.style.display = 'none';
     }
+}
+
+// Initialize Tabulator after preloading material names
+function initializeTable(projectId, materialNames) {
+    fetchBuildingElements(projectId).then(buildingElements => {
+        var table = new Tabulator("#elements-table", {
+            height: "800px",
+            layout: "fitColumns",
+            data: flattenElements(buildingElements),
+            columns: getColumns(materialNames, projectId),
+            headerSortClickElement: "icon", // Sorting only on icon click
+            initialSort: [{ column: "guid", dir: "desc" }], // Sort by GUID by default
+            rowAdded: function(row) {
+                row.moveToTop(); // Move newly added row to the top
+            }
+        });
+
+        window.mainTable = table;
+    });
 }
 
 // Function to determine color based on CO₂ intensity
@@ -383,7 +398,7 @@ function renderCo2Chart(data) {
     });
 }
 
-// Define columns including the delete checkbox
+// Generate columns with combine rows icon
 function getColumns(materialNames, projectId) {
     const materialLookup = materialNames.reduce((acc, name) => {
         acc[name] = name;
@@ -454,7 +469,6 @@ function getColumns(materialNames, projectId) {
                     });
             }
         },
-        // Update cellEdited function for the density column
         {
             title: `<div>Density (kg/m³)</div>`, field: "density", formatter: "money", formatterParams: { precision: 2 }, width: 100, headerWordWrap: true, editor: "input",
             cellEdited: function (cell) {
@@ -463,21 +477,16 @@ function getColumns(materialNames, projectId) {
                 const data = row.getData();
                 const newTotalCO2 = data.volume * newDensity * data.indikator;
 
-                // Update row with new total CO2
                 row.update({ total_co2: newTotalCO2.toFixed(3) });
 
-                // Prepare update data
+                const updateUrl = `/api/projects/${projectId}/building_elements/update`;
                 const updateData = {
-                    materialId: data.materialId,
+                    materialId: data._id,
                     density: newDensity,
                     total_co2: newTotalCO2.toFixed(3)
                 };
 
-                // Update backend
-                updateMaterial(`/api/projects/${window.projectId}/building_elements/updateDensity`, updateData);
-
-                // Re-check densities and update notification
-                toggleInvalidDensityNotification(checkForInvalidDensities(cell.getTable().getData()));
+                updateMaterial(updateUrl, updateData);
             }
         },
         { title: `<div>Indicator (kg CO₂-eq/kg)</div>`, field: "indikator", formatter: "money", formatterParams: { precision: 3, thousand:"'" }, width: 100, headerWordWrap: true },
@@ -613,11 +622,11 @@ function combineGroup(group, fields) {
     return combined;
 }
 
+// Flatten building elements data
 function flattenElements(buildingElements) {
     return buildingElements.flatMap(element => {
         return element.materials_info.map(material => ({
-            materialId: material.materialId.$oid || material.materialId,  // Ensure ObjectID format
-            buildingElementId: element._id.$oid || element._id, // Include building element ID
+            _id: material.materialId.$oid || material.materialId,  // Ensure ObjectID format
             guid: element.guid,
             ifc_class: element.ifc_class,
             instance_name: element.instance_name,
@@ -633,7 +642,6 @@ function flattenElements(buildingElements) {
         }));
     });
 }
-
 
 // Add event listener for the "select-all" checkbox to handle bulk selection
 document.addEventListener('DOMContentLoaded', function () {
@@ -658,14 +666,4 @@ document.addEventListener('DOMContentLoaded', function () {
             });
         });
     }
-});
-
-document.addEventListener('DOMContentLoaded', function () {
-    const projectId = window.location.pathname.split('/').pop();
-    window.projectId = projectId; // Store projectId globally for reuse
-    fetchMaterialNames().then(materialNames => {
-        initializeTable(projectId, materialNames);
-    });
-
-    loadCo2Chart(projectId);
 });
