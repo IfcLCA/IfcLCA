@@ -230,6 +230,9 @@ function updateMaterial(url, data) {
                 // Load and update the CO₂-eq per storey chart
                 loadCo2Chart(window.projectId);
             });
+
+        // Refresh project details
+        updateProjectDetails(window.projectId);
     }).catch(error => console.error('Error updating materials:', error));
 }
 
@@ -451,6 +454,7 @@ function getColumns(materialNames, projectId) {
                     });
             }
         },
+        // Update cellEdited function for the density column
         {
             title: `<div>Density (kg/m³)</div>`, field: "density", formatter: "money", formatterParams: { precision: 2 }, width: 100, headerWordWrap: true, editor: "input",
             cellEdited: function (cell) {
@@ -459,16 +463,18 @@ function getColumns(materialNames, projectId) {
                 const data = row.getData();
                 const newTotalCO2 = data.volume * newDensity * data.indikator;
 
+                // Update row with new total CO2
                 row.update({ total_co2: newTotalCO2.toFixed(3) });
 
-                const updateUrl = `/api/projects/${projectId}/building_elements/update`;
+                // Prepare update data
                 const updateData = {
-                    materialId: data._id,
+                    materialId: data.materialId,
                     density: newDensity,
                     total_co2: newTotalCO2.toFixed(3)
                 };
 
-                updateMaterial(updateUrl, updateData);
+                // Update backend
+                updateMaterial(`/api/projects/${window.projectId}/building_elements/updateDensity`, updateData);
             }
         },
         { title: `<div>Indicator (kg CO₂-eq/kg)</div>`, field: "indikator", formatter: "money", formatterParams: { precision: 3, thousand:"'" }, width: 100, headerWordWrap: true },

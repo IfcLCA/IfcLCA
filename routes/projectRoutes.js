@@ -616,26 +616,51 @@ router.post('/api/projects/:projectId/building_elements/add', isAuthenticated, a
   }
 });
 
-router.post('/api/projects/:projectId/updateDensity', async (req, res) => {
-    try {
-        const projectId = req.params.projectId;
-        const newDensity = req.body.density;
+router.post('/api/projects/:projectId/building_elements/updateDensity', isAuthenticated, async (req, res) => {
+  try {
+      const { projectId } = req.params;
+      const { materialId, density, total_co2 } = req.body;
 
-        // Update density
-        const project = await Project.findById(projectId);
-        project.density = newDensity;
-        await project.save();
+      const buildingElement = await BuildingElement.findOneAndUpdate(
+          { projectId, "materials_info.materialId": materialId },
+          {
+              "$set": {
+                  "materials_info.$.density": density,
+                  "materials_info.$.total_co2": total_co2
+              }
+          },
+          { new: true }
+      );
 
-        // Recalculate CO2 value
-        const totalCO2 = project.volume * newDensity * project.co2Indicator;
-        project.totalCarbonFootprint = totalCO2;
-        await project.save();
+      if (buildingElement) {
+          const buildingElements = await BuildingElement.find({ projectId }).lean();
+          const totalFootprint = buildingElements.reduce((total, element) => {
+              return total + element.materials_info.reduce((elementTotal, material) => {
+                  return elementTotal + parseFloat(material.total_co2 || 0);
+              }, 0);
+          }, 0);
 
-        res.json({ success: true });
-    } catch (error) {
-        console.error('Error updating density:', error);
-        res.status(500).json({ message: "Error updating density", error: error.toString() });
-    }
+          const project = await Project.findById(projectId);
+          project.totalCarbonFootprint = totalFootprint;
+          const EBF = project.EBF || 1; // Ensure EBF is not zero
+          const co2PerSquareMeter = totalFootprint / EBF;
+
+          await project.save();
+
+          res.json({
+              message: 'Density updated successfully',
+              totalCarbonFootprint: totalFootprint,
+              EBF: EBF,
+              co2PerSquareMeter: co2PerSquareMeter  // Include in response
+          });
+      } else {
+          res.status(404).json({ message: 'Building element not found' });
+      }
+  } catch (error) {
+      console.error('Error updating density:', error);
+      res.status(500).json({ message: "Error updating density", error: error.toString() });
+  }
 });
+
 
 module.exports = router;
