@@ -597,7 +597,7 @@ router.post('/api/projects/:projectId/building_elements/add', isAuthenticated, a
               name: material,
               matched_material_name: material,
               density: density, // Use extracted density
-              indicator: indicator, // Use extracted indicator
+              indikator: indicator, // Use extracted indicator
               total_co2: totalCO2
           }]
       });
@@ -615,6 +615,7 @@ router.post('/api/projects/:projectId/building_elements/add', isAuthenticated, a
       res.status(500).json({ message: "Error adding building element", error: error.toString() });
   }
 });
+
 
 router.post('/api/projects/:projectId/building_elements/updateDensity', isAuthenticated, async (req, res) => {
   try {

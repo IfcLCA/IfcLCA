@@ -475,6 +475,9 @@ function getColumns(materialNames, projectId) {
 
                 // Update backend
                 updateMaterial(`/api/projects/${window.projectId}/building_elements/updateDensity`, updateData);
+
+                // Re-check densities and update notification
+                toggleInvalidDensityNotification(checkForInvalidDensities(cell.getTable().getData()));
             }
         },
         { title: `<div>Indicator (kg CO₂-eq/kg)</div>`, field: "indikator", formatter: "money", formatterParams: { precision: 3, thousand:"'" }, width: 100, headerWordWrap: true },
