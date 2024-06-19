@@ -67,15 +67,21 @@ function initializeTable(projectId, materialNames) {
                 }
             },
             rowAdded: function(row) {
+                adjustTableHeight(table); // Adjust height when a row is added
                 row.moveToTop();
                 toggleOverlay(table.getData().length === 0);
                 toggleInvalidDensityNotification(checkForInvalidDensities(table.getData())); // Check for invalid densities
             },
+            rowDeleted: function(row) {
+                adjustTableHeight(table); // Adjust height when a row is deleted
+            },
             dataLoaded: function(data) {
+                adjustTableHeight(table); // Adjust height when data is loaded
                 toggleOverlay(data.length === 0);
                 toggleInvalidDensityNotification(checkForInvalidDensities(data)); // Check for invalid densities
             },
             dataChanged: function(data) {
+                adjustTableHeight(table); // Adjust height when data is changed
                 toggleOverlay(data.length === 0);
                 toggleInvalidDensityNotification(checkForInvalidDensities(data)); // Check for invalid densities
             },
@@ -93,18 +99,22 @@ function initializeTable(projectId, materialNames) {
     });
 }
 
+
 function setupDeleteButton() {
     const deleteButton = document.getElementById('btn-delete-material');
     const applyDeleteButton = document.getElementById('btn-apply-delete');
     const cancelButton = document.getElementById('btn-cancel');
 
+    // Enter delete mode
     deleteButton.addEventListener('click', function() {
         isDeleteMode = true;
+        // Show the delete checkbox column
         window.mainTable.updateColumnDefinition("delete_checkbox", { visible: true });
-        window.mainTable.options.selectable = true; // Correctly enable row selection
+        window.mainTable.options.selectable = true; // Enable row selection
         toggleDeleteUI(true);
     });
 
+    // Apply delete action
     applyDeleteButton.addEventListener('click', function() {
         const selectedRows = window.mainTable.getSelectedRows();
         const selectedMaterialIds = selectedRows.map(row => row.getData().materialId); // Collect unique material IDs
@@ -126,18 +136,17 @@ function setupDeleteButton() {
                 });
         }
     });
-    
-    
 
+    // Cancel delete mode
     cancelButton.addEventListener('click', function() {
         isDeleteMode = false;
+        // Hide the delete checkbox column
         window.mainTable.updateColumnDefinition("delete_checkbox", { visible: false });
         window.mainTable.deselectRow();
-        window.mainTable.options.selectable = false; // Correctly disable row selection
+        window.mainTable.options.selectable = false; // Disable row selection
         toggleDeleteUI(false);
     });
 }
-
 
 function toggleDeleteUI(showDelete) {
     document.getElementById('btn-delete-material').style.display = showDelete ? 'none' : 'block';
@@ -289,24 +298,6 @@ function toggleOverlay(isEmpty) {
     }
 }
 
-// Initialize Tabulator after preloading material names
-function initializeTable(projectId, materialNames) {
-    fetchBuildingElements(projectId).then(buildingElements => {
-        var table = new Tabulator("#elements-table", {
-            height: "800px",
-            layout: "fitColumns",
-            data: flattenElements(buildingElements),
-            columns: getColumns(materialNames, projectId),
-            headerSortClickElement: "icon", // Sorting only on icon click
-            initialSort: [{ column: "guid", dir: "desc" }], // Sort by GUID by default
-            rowAdded: function(row) {
-                row.moveToTop(); // Move newly added row to the top
-            }
-        });
-
-        window.mainTable = table;
-    });
-}
 
 // Function to determine color based on CO₂ intensity
 function getCo2Color(value, min, max) {
