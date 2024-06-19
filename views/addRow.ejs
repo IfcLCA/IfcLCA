@@ -132,70 +132,80 @@
                     <button type="submit" class="btn btn-success">Confirm</button>
                     <button type="button" id="cancelButton" class="btn btn-secondary">Cancel</button>
                 </div>
+                <input type="hidden" id="density" name="density" />
+                <input type="hidden" id="indicator" name="indicator" />
             </form>
         </div>
     </div>
 </main>
 <%- include('partials/_footer.ejs') %>
 <script>
-document.addEventListener('DOMContentLoaded', function () {
-    var materialDropdown = $('#material');
-    var volumeInput = document.getElementById('volume');
-    var totalCO2Input = document.getElementById('totalCO2');
-
-    function updatePreview() {
-        var volume = parseFloat(volumeInput.value);
-        var material = materialDropdown.val();
-
-        if (!isNaN(volume) && material) {
-            axios.get(`/api/materials/details/${material}`).then(response => {
-                var density = response.data.density;
-                var indicator = response.data.indicator;
-                var totalCO2 = volume * density * indicator;
-
-                totalCO2Input.value = Math.round(totalCO2); // Round to zero decimal places
-            }).catch(error => console.error('Error fetching material details:', error));
+    document.addEventListener('DOMContentLoaded', function () {
+        var materialDropdown = $('#material');
+        var volumeInput = document.getElementById('volume');
+        var totalCO2Input = document.getElementById('totalCO2');
+        var densityInput = document.getElementById('density');
+        var indicatorInput = document.getElementById('indicator');
+    
+        function updatePreview() {
+            var volume = parseFloat(volumeInput.value);
+            var material = materialDropdown.val();
+    
+            if (!isNaN(volume) && material) {
+                axios.get(`/api/materials/details/${material}`).then(response => {
+                    var density = response.data.density;
+                    var indicator = response.data.indicator;
+                    var totalCO2 = volume * density * indicator;
+    
+                    totalCO2Input.value = Math.round(totalCO2); // Round to zero decimal places
+                    densityInput.value = density;
+                    indicatorInput.value = indicator;
+                }).catch(error => console.error('Error fetching material details:', error));
+            }
         }
-    }
-
-    axios.get('/api/materials/names').then(response => {
-        materialDropdown.select2({
-            data: response.data.map(material => ({ id: material, text: material })),
-            placeholder: 'Select a material',
-            allowClear: true,
-            width: 'resolve'
+    
+        axios.get('/api/materials/names').then(response => {
+            materialDropdown.select2({
+                data: response.data.map(material => ({ id: material, text: material })),
+                placeholder: 'Select a material',
+                allowClear: true,
+                width: 'resolve'
+            });
+        }).catch(error => console.error('Error fetching materials:', error));
+    
+        volumeInput.addEventListener('input', updatePreview);
+        materialDropdown.on('change', updatePreview);
+    
+        document.getElementById('addRowForm').addEventListener('submit', function(event) {
+            event.preventDefault();
+            var name = document.getElementById('name').value;
+            var volume = parseFloat(volumeInput.value);
+            var material = materialDropdown.val();
+            var totalCO2 = parseFloat(totalCO2Input.value);
+            var density = parseFloat(densityInput.value);
+            var indicator = parseFloat(indicatorInput.value);
+    
+            if (!name || isNaN(volume) || !material || isNaN(totalCO2)) {
+                alert('Please enter valid values.');
+                return;
+            }
+    
+            axios.post(`/api/projects/${window.location.pathname.split('/')[2]}/building_elements/add`, {
+                name: name,
+                volume: volume,
+                material: material,
+                totalCO2: totalCO2,
+                density: density,
+                indicator: indicator
+            }).then(() => {
+                window.location.href = `/projects/${window.location.pathname.split('/')[2]}`;
+            }).catch(error => console.error('Error adding row:', error));
         });
-    }).catch(error => console.error('Error fetching materials:', error));
-
-    volumeInput.addEventListener('input', updatePreview);
-    materialDropdown.on('change', updatePreview);
-
-    document.getElementById('addRowForm').addEventListener('submit', function(event) {
-        event.preventDefault();
-        var name = document.getElementById('name').value;
-        var volume = parseFloat(volumeInput.value);
-        var material = materialDropdown.val();
-        var totalCO2 = parseFloat(totalCO2Input.value);
-
-        if (!name || isNaN(volume) || !material || isNaN(totalCO2)) {
-            alert('Please enter valid values.');
-            return;
-        }
-
-        axios.post(`/api/projects/${window.location.pathname.split('/')[2]}/building_elements/add`, {
-            name: name,
-            volume: volume,
-            material: material,
-            totalCO2: totalCO2
-        }).then(() => {
+    
+        document.getElementById('cancelButton').addEventListener('click', function() {
             window.location.href = `/projects/${window.location.pathname.split('/')[2]}`;
-        }).catch(error => console.error('Error adding row:', error));
+        });
     });
-
-    document.getElementById('cancelButton').addEventListener('click', function() {
-        window.location.href = `/projects/${window.location.pathname.split('/')[2]}`;
-    });
-});
-</script>
+    </script>  
 </body>
 </html>
