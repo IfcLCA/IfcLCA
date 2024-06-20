@@ -168,7 +168,6 @@ function updateProjectDetails(projectId) {
     fetch(`/projects/${projectId}`)
         .then(response => response.json())
         .then(project => {
-            console.log("Updated project details:", project);
             $('#carbonFootprint').text(`${formatNumber(Math.round(project.totalCarbonFootprint) / 1000, 1)} tons`);
             $('#co2PerM2').text(`${formatNumber(project.co2PerSquareMeter, 1)} kg`);
             $('#ebfPerM2').text(`${formatNumber(project.EBF, 0)} m²`);
