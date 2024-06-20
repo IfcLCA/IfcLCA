@@ -100,7 +100,7 @@ function initializeTable(projectId, materialNames) {
     });
 }
 
-
+// Setup delete button functionality
 function setupDeleteButton() {
     const deleteButton = document.getElementById('btn-delete-material');
     const applyDeleteButton = document.getElementById('btn-apply-delete');
@@ -118,19 +118,26 @@ function setupDeleteButton() {
     // Apply delete action
     applyDeleteButton.addEventListener('click', function() {
         const selectedRows = window.mainTable.getSelectedRows();
-        const selectedMaterialIds = selectedRows.map(row => row.getData().materialId); // Collect unique material IDs
-    
+        const selectedMaterialIds = selectedRows.map(row => row.getData()._id); // Collect unique _ids
+
         if (selectedMaterialIds.length > 0) {
             axios.post(`/api/projects/${window.projectId}/building_elements/materials/delete`, { materialIds: selectedMaterialIds })
                 .then(() => {
-                    // Remove rows from the table
-                    selectedRows.forEach(row => row.delete());
+                    // Refresh table data after deletion
+                    fetchBuildingElements(window.projectId).then(buildingElements => {
+                        const flattenedData = flattenElements(buildingElements);
+                        window.mainTable.replaceData(flattenedData).then(() => {
+                            updateProjectSummary(flattenedData);
+                            adjustTableHeight(window.mainTable); // Adjust table height after data refresh
+                            toggleInvalidDensityNotification(checkForInvalidDensities(flattenedData));
+                        });
+                    });
+
                     // Hide the delete checkbox column
                     window.mainTable.updateColumnDefinition("delete_checkbox", { visible: false });
                     window.mainTable.deselectRow();
                     window.mainTable.options.selectable = false; // Disable row selection
                     toggleDeleteUI(false);
-                    loadCo2Chart(window.projectId);
                 })
                 .catch(error => {
                     console.error('Error deleting materials:', error);
@@ -148,6 +155,17 @@ function setupDeleteButton() {
         toggleDeleteUI(false);
     });
 }
+
+
+function adjustTableHeight(table) {
+    const numRows = table.getDataCount();
+    const newHeight = numRows < 30 
+        ? Math.max(Math.min(numRows * rowHeight, maxTableHeight), minTableHeight) + "px" 
+        : maxTableHeight + "px";
+    
+    table.setHeight(newHeight);
+}
+
 
 function toggleDeleteUI(showDelete) {
     document.getElementById('btn-delete-material').style.display = showDelete ? 'none' : 'block';
