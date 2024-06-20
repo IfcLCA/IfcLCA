@@ -472,15 +472,43 @@ function getColumns(materialNames, projectId) {
                 row.update({ total_co2: newTotalCO2.toFixed(3) });
 
                 const updateUrl = `/api/projects/${projectId}/building_elements/update`;
-                const updateData = {
-                    materialId: data._id,
-                    density: newDensity,
-                    total_co2: newTotalCO2.toFixed(3)
-                };
 
-                updateMaterial(updateUrl, updateData);
-                toggleInvalidDensityNotification(checkForInvalidDensities(cell.getTable().getData()));
+                // If the row is a combined row, update all associated rows
+                const materialIds = data._ids ? data._ids.split(',') : [data._id];
+                const validMaterialIds = materialIds.filter(id => id && id !== "<varies>");
+
+                const updatePromises = validMaterialIds.map(materialId => {
+                    return $.ajax({
+                        url: updateUrl,
+                        method: 'POST',
+                        contentType: 'application/json',
+                        data: JSON.stringify({
+                            materialId: materialId,
+                            density: newDensity,
+                            total_co2: newTotalCO2.toFixed(3)
+                        })
+                    });
+                });
+
+                Promise.all(updatePromises)
+                    .then(() => {
+                        // Refresh data in the table
+                        fetchBuildingElements(window.projectId).then(buildingElements => {
+                            const flattenedData = flattenElements(buildingElements);
+                            window.mainTable.replaceData(flattenedData).then(() => {
+                                if (currentGrouping.length > 0) {
+                                    updateTableGrouping();
+                                }
+                                updateProjectSummary(flattenedData);
+                                toggleInvalidDensityNotification(checkForInvalidDensities(flattenedData));
+                            });
+                        });
+                    })
+                    .catch(error => {
+                        console.error('Error updating density for combined rows:', error);
+                    });
             }
+
         },
         { title: `<div>Indicator (kg CO₂-eq/kg)</div>`, field: "indikator", formatter: "money", formatterParams: { precision: 3, thousand:"'" }, width: 100, headerWordWrap: true },
         { title: `<div>CO₂-eq (kg)</div>`, field: "total_co2", formatter: "money", formatterParams: { precision: 2, thousand:"'" }, width: 125, headerWordWrap: true, hozAlign: "left" }
