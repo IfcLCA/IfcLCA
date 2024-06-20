@@ -91,11 +91,14 @@
         <div class="details-column">
             <div class="details-container">
                 <h2 id="project-name"><%= formatProjectNameForDisplay(project.name) %></h2>
-                <p><strong>Phase:</strong> <%= project.phase %></p>
-                <p><strong>Description:</strong> <%= project.description %></p>
-                <p><strong>Carbon Footprint:</strong> <span id="carbonFootprint"><%= formatNumber(Math.round(project.totalCarbonFootprint) / 1000, 1) %> tons</span></p>
-                <p><strong>m²:</strong> <span id="ebfPerM2"><%= formatNumber(project.EBF, 0) %> m²</span></p>
-                <p><strong>CO₂-eq / m²:</strong> <span id="co2PerM2"><%= formatNumber(project.co2PerSquareMeter, 1) %> kg</span></p>
+                <p>Phase: <%= project.phase %></p>
+                <p>Description: <%= project.description %></p>
+                <p>Carbon Footprint: <span id="carbonFootprint"><%= formatNumber(Math.round(project.totalCarbonFootprint) / 1000, 1) %> tons</strong></p>
+                <p>m²: <strong id="ebfPerM2"><%= formatNumber(project.EBF, 0) %> m²</strong></p>
+                <p>CO₂-eq / m²: <strong id="co2PerM2"><%= formatNumber(project.co2PerSquareMeter, 1) %> kg</strong></p>
+                <p id="combining-columns-description" style="margin-top: 80px; font-size: 14px;">
+                    <small>Select the combine icon in headers to group by identical values in column.</small>
+                </p>
             </div>
         </div>
         <div class="chart-column">
@@ -123,7 +126,6 @@
                     <button id="btn-cancel" class="btn btn-secondary">Cancel</button>
                 </div>
             </div>
-           
         </div>
     </div>
     <div id="elements-table-container" style="position: relative;">
@@ -133,21 +135,18 @@
         <input type='checkbox' id='select-all' style='margin: 0;' />
     </div>
 
-<!-- Notification for Invalid Densities -->
-<div id="invalid-density-notification" style="display:none; position:fixed; top:50%; left:50%; transform:translate(-50%, -50%); background:#ffc; border:1px solid #ffa; padding:10px; border-radius:5px; z-index:1000; box-shadow: 0 2px 5px rgba(0,0,0,0.2); font-size:14px; color:#a00;">
-    <p>Some density fields are invalid. Please check and enter valid values.</p>
-  </div>
-  
-  
-  
+    <!-- Notification for Invalid Densities -->
+    <div id="invalid-density-notification" style="display:none; position:fixed; top:50%; left:50%; transform:translate(-50%, -50%); background:#ffc; border:1px solid #ffa; padding:10px; border-radius:5px; z-index:1000; box-shadow: 0 2px 5px rgba(0,0,0,0.2); font-size:14px; color:#a00;">
+        <p>Some density fields are invalid. Please check and enter valid values.</p>
+    </div>
 </main>
 <%- include('partials/_footer.ejs') %>
 <script src="https://cdn.jsdelivr.net/npm/tabulator-tables/dist/js/tabulator.min.js"></script>
 <script src="/js/uploadIfc.js"></script>
 <script src="/js/projectTable.js"></script>
 <% function formatNumber(value, decimals) { %>
-    <%  if (value == null || isNaN(value)) return '0'; %>
-    <%  return value.toLocaleString(undefined, { minimumFractionDigits: decimals, maximumFractionDigits: decimals }); %>
-    <% } %>
+    <% if (value == null || isNaN(value)) return '0'; %>
+    <% return Number(value).toLocaleString('de-CH', { minimumFractionDigits: decimals, maximumFractionDigits: decimals }); %>
+<% } %>
 </body>
 </html>

@@ -17,8 +17,9 @@ function initializeTableAndChart(projectId) {
 
 // Check if any density fields are invalid
 function checkForInvalidDensities(data) {
-    return data.some(row => !row.density || row.density <= 0);
+    return data.some(row => !Number.isFinite(parseFloat(row.density)) || parseFloat(row.density) <= 0);
 }
+
 
 // Show or hide notification for invalid densities
 function toggleInvalidDensityNotification(hasInvalidDensities) {
@@ -44,7 +45,7 @@ function initializeTable(projectId, materialNames) {
             data: flattenedData,
             columns: getColumns(materialNames, projectId),
             headerSortClickElement: "icon",
-            initialSort: [{ column: "density", dir: "asc" }], // Sort by density by default
+            initialSort: [{ column: "name", dir: "asc" }], // Sort by Material by default
             selectable: true, // Enable row selection
             rowSelectionChanged: function(data, rows) {
                 if (isDeleteMode) {
@@ -99,7 +100,7 @@ function initializeTable(projectId, materialNames) {
     });
 }
 
-
+// Setup delete button functionality
 function setupDeleteButton() {
     const deleteButton = document.getElementById('btn-delete-material');
     const applyDeleteButton = document.getElementById('btn-apply-delete');
@@ -117,19 +118,26 @@ function setupDeleteButton() {
     // Apply delete action
     applyDeleteButton.addEventListener('click', function() {
         const selectedRows = window.mainTable.getSelectedRows();
-        const selectedMaterialIds = selectedRows.map(row => row.getData().materialId); // Collect unique material IDs
-    
+        const selectedMaterialIds = selectedRows.map(row => row.getData()._id); // Collect unique _ids
+
         if (selectedMaterialIds.length > 0) {
             axios.post(`/api/projects/${window.projectId}/building_elements/materials/delete`, { materialIds: selectedMaterialIds })
                 .then(() => {
-                    // Remove rows from the table
-                    selectedRows.forEach(row => row.delete());
+                    // Refresh table data after deletion
+                    fetchBuildingElements(window.projectId).then(buildingElements => {
+                        const flattenedData = flattenElements(buildingElements);
+                        window.mainTable.replaceData(flattenedData).then(() => {
+                            updateProjectSummary(flattenedData);
+                            adjustTableHeight(window.mainTable); // Adjust table height after data refresh
+                            toggleInvalidDensityNotification(checkForInvalidDensities(flattenedData));
+                        });
+                    });
+
                     // Hide the delete checkbox column
                     window.mainTable.updateColumnDefinition("delete_checkbox", { visible: false });
                     window.mainTable.deselectRow();
                     window.mainTable.options.selectable = false; // Disable row selection
                     toggleDeleteUI(false);
-                    loadCo2Chart(window.projectId);
                 })
                 .catch(error => {
                     console.error('Error deleting materials:', error);
@@ -148,6 +156,17 @@ function setupDeleteButton() {
     });
 }
 
+
+function adjustTableHeight(table) {
+    const numRows = table.getDataCount();
+    const newHeight = numRows < 30 
+        ? Math.max(Math.min(numRows * rowHeight, maxTableHeight), minTableHeight) + "px" 
+        : maxTableHeight + "px";
+    
+    table.setHeight(newHeight);
+}
+
+
 function toggleDeleteUI(showDelete) {
     document.getElementById('btn-delete-material').style.display = showDelete ? 'none' : 'block';
     document.getElementById('btn-add-material').style.display = showDelete ? 'none' : 'block';
@@ -163,48 +182,29 @@ function toggleDeleteUI(showDelete) {
 }
 
 
-// Fetch and update project details
-function updateProjectDetails(projectId) {
-    fetch(`/projects/${projectId}`)
-        .then(response => response.json())
-        .then(project => {
-            console.log("Updated project details:", project);
-            $('#carbonFootprint').text(`${formatNumber(Math.round(project.totalCarbonFootprint) / 1000, 1)} tons`);
-            $('#co2PerM2').text(`${formatNumber(project.co2PerSquareMeter, 1)} kg`);
-            $('#ebfPerM2').text(`${formatNumber(project.EBF, 0)} m²`);
-        })
-        .catch(error => console.error('Error updating project details:', error));
-}
-
 // Update project summary data
 function updateProjectSummary(data) {
-    const totalCarbonFootprint = data.reduce((sum, element) => sum + parseFloat(element.total_co2 || 0), 0);
+    const totalCarbonFootprint = data.reduce((sum, element) => sum + parseFloat(element.total_co2 || 0), 0) / 1000; // Convert to tons
 
-    // Retrieve EBF value from the span and parse it
     const EBFText = $('#ebfPerM2').text().trim();
-    const EBF = parseFloat(EBFText.replace(/,/g, ''));
+    const EBF = parseFloat(EBFText.replace(/,/g, '')) || 1;
 
-    // Check for a valid EBF value
     if (isNaN(EBF) || EBF <= 0) {
         console.error('Invalid EBF value:', EBFText);
         return;
     }
 
-    // Calculate CO₂-eq / m²
-    const co2PerSquareMeter = totalCarbonFootprint /1000 / EBF;
+    const co2PerSquareMeter = totalCarbonFootprint*1000 / EBF; 
 
-    $('#carbonFootprint').text(`${(Math.round(totalCarbonFootprint) / 1000).toFixed(1)} tons`);
-    $('#co2PerM2').text(`${co2PerSquareMeter.toFixed(1)} kg`);
+    $('#carbonFootprint').text(`${formatNumber(totalCarbonFootprint, 1)} tons`);
+    $('#co2PerM2').text(`${formatNumber(co2PerSquareMeter, 1)} kg`);
 
-    // Ensure chart is up-to-date
     loadCo2Chart(window.projectId);
 }
-
-
 // Format numbers for display
 function formatNumber(value, decimals) {
     if (value == null || isNaN(value)) return '0';
-    return value.toLocaleString(undefined, { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
+    return Number(value).toLocaleString('de-CH', { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
 }
 
 // Fetch material names from the backend
@@ -428,35 +428,47 @@ function getColumns(materialNames, projectId) {
                 sort: "asc",
             },
             formatter: "lookup",
-            formatterParams: materialLookup, // Use materialLookup object
+            formatterParams: materialLookup,
             width: 300,
             cellEdited: function (cell) {
                 const updatedMaterialName = cell.getValue();
                 const row = cell.getRow();
                 const data = row.getData();
-
+        
                 fetch(`/api/materials/details/${updatedMaterialName}`)
                     .then(response => response.json())
                     .then(materialDetails => {
                         const newDensity = materialDetails.density;
                         const newIndicator = materialDetails.indicator;
                         const newTotalCO2 = data.volume * newDensity * newIndicator;
-
+        
                         row.update({
                             density: newDensity,
                             indikator: newIndicator,
                             total_co2: newTotalCO2.toFixed(3)
                         });
-
+        
                         const materialIds = data._ids ? data._ids.split(',') : [data._id];
                         const validMaterialIds = materialIds.filter(id => id && id !== "<varies>");
-
+        
                         updateMaterialForCombinedRow(`/api/projects/${projectId}/building_elements/update`, {
                             matched_material_name: updatedMaterialName,
                             density: newDensity,
                             indikator: newIndicator,
                             total_co2: newTotalCO2.toFixed(3)
-                        }, validMaterialIds);
+                        }, validMaterialIds).then(() => {
+                            // Refresh data in the table and update the summary after editing
+                            fetchBuildingElements(projectId).then(buildingElements => {
+                                const flattenedData = flattenElements(buildingElements);
+                                window.mainTable.replaceData(flattenedData).then(() => {
+                                    updateProjectSummary(flattenedData);
+                                    toggleInvalidDensityNotification(checkForInvalidDensities(flattenedData));
+                                });
+                            });
+                        });
+                    })
+                    .catch(error => {
+                        console.error('Error fetching material details:', error);
                     });
             }
         },
@@ -471,14 +483,43 @@ function getColumns(materialNames, projectId) {
                 row.update({ total_co2: newTotalCO2.toFixed(3) });
 
                 const updateUrl = `/api/projects/${projectId}/building_elements/update`;
-                const updateData = {
-                    materialId: data._id,
-                    density: newDensity,
-                    total_co2: newTotalCO2.toFixed(3)
-                };
 
-                updateMaterial(updateUrl, updateData);
+                // If the row is a combined row, update all associated rows
+                const materialIds = data._ids ? data._ids.split(',') : [data._id];
+                const validMaterialIds = materialIds.filter(id => id && id !== "<varies>");
+
+                const updatePromises = validMaterialIds.map(materialId => {
+                    return $.ajax({
+                        url: updateUrl,
+                        method: 'POST',
+                        contentType: 'application/json',
+                        data: JSON.stringify({
+                            materialId: materialId,
+                            density: newDensity,
+                            total_co2: newTotalCO2.toFixed(3)
+                        })
+                    });
+                });
+
+                Promise.all(updatePromises)
+                    .then(() => {
+                        // Refresh data in the table
+                        fetchBuildingElements(window.projectId).then(buildingElements => {
+                            const flattenedData = flattenElements(buildingElements);
+                            window.mainTable.replaceData(flattenedData).then(() => {
+                                if (currentGrouping.length > 0) {
+                                    updateTableGrouping();
+                                }
+                                updateProjectSummary(flattenedData);
+                                toggleInvalidDensityNotification(checkForInvalidDensities(flattenedData));
+                            });
+                        });
+                    })
+                    .catch(error => {
+                        console.error('Error updating density for combined rows:', error);
+                    });
             }
+
         },
         { title: `<div>Indicator (kg CO₂-eq/kg)</div>`, field: "indikator", formatter: "money", formatterParams: { precision: 3, thousand:"'" }, width: 100, headerWordWrap: true },
         { title: `<div>CO₂-eq (kg)</div>`, field: "total_co2", formatter: "money", formatterParams: { precision: 2, thousand:"'" }, width: 125, headerWordWrap: true, hozAlign: "left" }
@@ -507,24 +548,36 @@ function toggleColumnGrouping(field) {
     if (currentGrouping.includes(field)) {
         // Remove grouping for the specified field
         currentGrouping = currentGrouping.filter(f => f !== field);
-        if (headerElement) {
-            headerElement.style.backgroundColor = "";
-            headerElement.style.color = "";  // Reset text color
-        }
-        if (iconElement) iconElement.style.color = "";  // Reset icon color
     } else {
         // Add grouping for the specified field
         currentGrouping.push(field);
-        if (headerElement) {
-            headerElement.style.backgroundColor = "lightorange";
-            headerElement.style.color = "orange";  // Change text color
-        }
         if (iconElement) iconElement.style.color = "orange";  // Change icon color
     }
     updateTableGrouping();
 }
 
-// Update table grouping
+function updateCombiningColumnsDescription() {
+    const descriptionElement = document.getElementById('combining-columns-description');
+    if (descriptionElement) {
+        if (currentGrouping.length > 0) {
+            // Format column names in bold
+            const formattedColumns = currentGrouping.map(col => `<strong>${getColumnDisplayName(col)}</strong>`).join(', ');
+            descriptionElement.innerHTML = `Table grouped by: ${formattedColumns}`;
+            descriptionElement.style.display = 'block';
+        } else {
+            // Show a hint when no columns are used for combining
+            descriptionElement.innerHTML = `<small>Select the combine icon in some headers to group by identical values in that column.</small>`;
+            descriptionElement.style.display = 'block';
+        }
+    }
+}
+
+function getColumnDisplayName(columnField) {
+    const columns = window.mainTable.getColumns();
+    const column = columns.find(col => col.getField() === columnField);
+    return column ? column.getDefinition().title.replace(/<.*?>/g, '') : columnField;
+}
+
 function updateTableGrouping() {
     const table = window.mainTable;
     const data = table.getData();
@@ -540,27 +593,9 @@ function updateTableGrouping() {
         table.replaceData(groupedData).then(() => updateProjectSummary(groupedData)); // Update summary
     }
 
-    // Reset all headers
-    document.querySelectorAll('.tabulator-col-title').forEach(header => {
-        header.style.backgroundColor = "";  // Reset background color
-        header.style.color = "";  // Reset text color
-    });
-    document.querySelectorAll('.fa-compress').forEach(icon => {
-        icon.style.color = "";  // Reset icon color
-    });
-
-    // Mark grouped headers
-    currentGrouping.forEach(field => {
-        const headerElement = document.querySelector(`.tabulator-col[data-field="${field}"] .tabulator-col-title`);
-        const iconElement = headerElement ? headerElement.querySelector('i.fa-compress') : null;
-
-        if (headerElement) {
-            headerElement.style.backgroundColor = "lightorange";
-            headerElement.style.color = "orange";  // Change text color
-        }
-        if (iconElement) iconElement.style.color = "orange";  // Change icon color
-    });
+    updateCombiningColumnsDescription(); // Update description of combining columns
 }
+
 
 // Group data by current grouping fields
 function groupDataByFields(data, fields) {

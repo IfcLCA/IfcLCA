@@ -11,7 +11,7 @@ const Fuse = require('fuse.js');
 const BuildingElement = require('../models/BuildingElement');
 const CarbonMaterial = require('../models/CarbonMaterial');
 const { appendTimestampToProjectName, formatProjectNameForDisplay } = require('../utils/util');
-const { isNaN } = require('lodash'); // Import lodash's isNaN for robust NaN checks
+const { isNaN } = require('lodash'); 
 
 // Helper function to safely remove the file
 async function safeUnlink(filePath) {
@@ -39,7 +39,6 @@ module.exports = router;
 
 function parseDensity(density, materialName) {
   if (!density || density.includes("-")) {
-    console.log(`Density value is invalid or undefined for material '${materialName}'. Returning 0.`);
     return 0;
   }
   const parsed = parseFloat(density);
@@ -48,7 +47,6 @@ function parseDensity(density, materialName) {
 
 function parseTreibhausgasemissionen(value, materialName) {
   if (value === undefined) {
-    console.log(`Treibhausgasemissionen is undefined for material '${materialName}', setting to 0`);
     return 0;
   }
   const parsed = parseFloat(value);
