@@ -95,7 +95,7 @@
                 <p><strong>Description:</strong> <%= project.description %></p>
                 <p><strong>Carbon Footprint:</strong> <span id="carbonFootprint"><%= formatNumber(Math.round(project.totalCarbonFootprint) / 1000, 1) %> tons</span></p>
                 <p><strong>m²:</strong> <span id="ebfPerM2"><%= formatNumber(project.EBF, 0) %> m²</span></p>
-                <p><strong>CO₂-eq / m²:</strong> <span id="co2PerM2"><%= formatNumber(project.co2PerSquareMeter, 1) %> kg</span></p>
+                <p><strong>CO₂-eq / m²:</strong> <span id="co2PerM2"><%= formatNumber(project.co2PerSquareMeter, 1) %> kg</span></p>                
             </div>
         </div>
         <div class="chart-column">
@@ -146,8 +146,8 @@
 <script src="/js/uploadIfc.js"></script>
 <script src="/js/projectTable.js"></script>
 <% function formatNumber(value, decimals) { %>
-    <%  if (value == null || isNaN(value)) return '0'; %>
-    <%  return value.toLocaleString(undefined, { minimumFractionDigits: decimals, maximumFractionDigits: decimals }); %>
-    <% } %>
+    <% if (value == null || isNaN(value)) return '0'; %>
+    <% return Number(value).toLocaleString('de-CH', { minimumFractionDigits: decimals, maximumFractionDigits: decimals }); %>
+<% } %>
 </body>
 </html>

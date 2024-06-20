@@ -162,7 +162,6 @@ function toggleDeleteUI(showDelete) {
     }
 }
 
-
 // Fetch and update project details
 function updateProjectDetails(projectId) {
     fetch(`/projects/${projectId}`)
@@ -181,7 +180,7 @@ function updateProjectSummary(data) {
 
     // Retrieve EBF value from the span and parse it
     const EBFText = $('#ebfPerM2').text().trim();
-    const EBF = parseFloat(EBFText.replace(/,/g, ''));
+    const EBF = parseFloat(EBFText.replace(/,/g, '')) || 1;
 
     // Check for a valid EBF value
     if (isNaN(EBF) || EBF <= 0) {
@@ -190,20 +189,19 @@ function updateProjectSummary(data) {
     }
 
     // Calculate CO₂-eq / m²
-    const co2PerSquareMeter = totalCarbonFootprint /1000 / EBF;
+    const co2PerSquareMeter = totalCarbonFootprint / EBF;
 
-    $('#carbonFootprint').text(`${(Math.round(totalCarbonFootprint) / 1000).toFixed(1)} tons`);
-    $('#co2PerM2').text(`${co2PerSquareMeter.toFixed(1)} kg`);
+    $('#carbonFootprint').text(`${formatNumber(Math.round(totalCarbonFootprint) / 1000, 1)} tons`);
+    $('#co2PerM2').text(`${formatNumber(co2PerSquareMeter, 1)} kg`);
 
     // Ensure chart is up-to-date
     loadCo2Chart(window.projectId);
 }
 
-
 // Format numbers for display
 function formatNumber(value, decimals) {
     if (value == null || isNaN(value)) return '0';
-    return value.toLocaleString(undefined, { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
+    return Number(value).toLocaleString('de-CH', { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
 }
 
 // Fetch material names from the backend
