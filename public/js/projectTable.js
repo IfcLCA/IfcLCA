@@ -80,6 +80,7 @@ function initializeTable(projectId, materialNames) {
                 adjustTableHeight(table); // Adjust height when data is loaded
                 toggleOverlay(data.length === 0);
                 toggleInvalidDensityNotification(checkForInvalidDensities(data)); // Check for invalid densities
+            updateProjectSummary(data); // Update project summary data
             },
             dataChanged: function(data) {
                 adjustTableHeight(table); // Adjust height when data is changed
