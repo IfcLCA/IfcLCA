@@ -2,9 +2,9 @@
 let currentGrouping = [];
 let combinedRowsMap = {};
 let isDeleteMode = false;
-const rowHeight = 39; // Approximate height per row in pixels
+const rowHeight = 36; // Approximate height per row in pixels
 const maxTableHeight = 800; // Maximum table height in pixels
-const minTableHeight = 150; // Minimum table height in pixels
+const minTableHeight = 250; // Minimum table height in pixels
 
 // Initialize the table and chart on page load
 function initializeTableAndChart(projectId) {
