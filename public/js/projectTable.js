@@ -2,7 +2,7 @@
 let currentGrouping = [];
 let combinedRowsMap = {};
 let isDeleteMode = false;
-const rowHeight = 40; // Approximate height per row in pixels
+const rowHeight = 39; // Approximate height per row in pixels
 const maxTableHeight = 800; // Maximum table height in pixels
 const minTableHeight = 150; // Minimum table height in pixels
 
@@ -104,12 +104,6 @@ function initializeTable(projectId, materialNames) {
     });
 }
 
-// Adjust table height based on number of rows
-function adjustTableHeight(table) {
-    const numRows = table.getData().length;
-    const newHeight = calculateTableHeight(numRows);
-    table.setHeight(newHeight + "px");
-}
 
 // Calculate the table height based on number of rows
 function calculateTableHeight(numRows) {
@@ -146,11 +140,14 @@ function setupDeleteButton() {
                     // Refresh table data after deletion
                     fetchBuildingElements(window.projectId).then(buildingElements => {
                         const flattenedData = flattenElements(buildingElements);
-                        window.mainTable.replaceData(flattenedData).then(() => {
-                            adjustTableHeight(window.mainTable); // Adjust table height after data refresh
-                            toggleInvalidDensityNotification(checkForInvalidDensities(flattenedData)); // Check for invalid densities
-                            updateProjectSummary(window.mainTable); // Update project summary
-                        });
+                        window.mainTable.replaceData(flattenedData)
+                            .then(() => {
+                                updateProjectSummary(window.mainTable); // Update project summary data
+                                toggleInvalidDensityNotification(checkForInvalidDensities(flattenedData)); // Check for invalid densities
+                                toggleOverlay(flattenedData.length === 0); // Toggle overlay visibility
+                                adjustTableHeight(window.mainTable); // Adjust table height
+                            }
+                        );
                     });
     
                     // Hide the delete checkbox column
@@ -175,16 +172,6 @@ function setupDeleteButton() {
         window.mainTable.options.selectable = false; // Disable row selection
         toggleDeleteUI(false);
     });
-}
-
-
-function adjustTableHeight(table) {
-    const numRows = table.getDataCount();
-    const newHeight = numRows < 30 
-        ? Math.max(Math.min(numRows * rowHeight, maxTableHeight), minTableHeight) + "px" 
-        : maxTableHeight + "px";
-    
-    table.setHeight(newHeight);
 }
 
 
@@ -216,7 +203,7 @@ function updateProjectSummary(table) {
         return;
     }
 
-    const co2PerSquareMeter = totalCarbonFootprint / EBF; 
+    const co2PerSquareMeter = totalCarbonFootprint * 1000 / EBF; 
 
     $('#carbonFootprint').text(`${formatNumber(totalCarbonFootprint, 1)} tons`);
     $('#co2PerM2').text(`${formatNumber(co2PerSquareMeter, 1)} kg`);
