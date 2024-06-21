@@ -4,7 +4,7 @@ let combinedRowsMap = {};
 let isDeleteMode = false;
 const rowHeight = 40; // Approximate height per row in pixels
 const maxTableHeight = 800; // Maximum table height in pixels
-const minTableHeight = 200; // Minimum table height in pixels
+const minTableHeight = 150; // Minimum table height in pixels
 
 // Initialize the table and chart on page load
 function initializeTableAndChart(projectId) {
@@ -35,9 +35,7 @@ function initializeTable(projectId, materialNames) {
         const numRows = flattenedData.length;
 
         // Determine initial height
-        const initialHeight = numRows < 30 
-            ? Math.max(Math.min(numRows * rowHeight, maxTableHeight), minTableHeight) + "px" 
-            : maxTableHeight + "px";
+        const initialHeight = calculateTableHeight(numRows) + "px";
 
         var table = new Tabulator("#elements-table", {
             height: initialHeight, // Set initial height
@@ -48,48 +46,53 @@ function initializeTable(projectId, materialNames) {
             initialSort: [{ column: "name", dir: "asc" }], // Sort by Material by default
             selectable: true, // Enable row selection
             rowSelectionChanged: function(data, rows) {
-                if (isDeleteMode) {
-                    const selectedGuids = new Set(rows.map(row => row.getData().guid));
-                    table.getRows().forEach(row => {
-                        if (selectedGuids.has(row.getData().guid)) {
-                            row.select();
-                        } else {
-                            row.deselect();
-                        }
-                    });
+            if (isDeleteMode) {
+                const selectedGuids = new Set(rows.map(row => row.getData().guid));
+                table.getRows().forEach(row => {
+                if (selectedGuids.has(row.getData().guid)) {
+                    row.select();
+                } else {
+                    row.deselect();
                 }
-                // Update select-all checkbox based on row selections
-                const selectAllCheckbox = document.getElementById('select-all');
-                const allRows = table.getRows();
-                const selectedRows = table.getSelectedRows();
+                });
+            }
+            // Update select-all checkbox based on row selections
+            const selectAllCheckbox = document.getElementById('select-all');
+            const allRows = table.getRows();
+            const selectedRows = table.getSelectedRows();
 
-                if (selectAllCheckbox) {
-                    selectAllCheckbox.checked = selectedRows.length === allRows.length;
-                }
+            if (selectAllCheckbox) {
+                selectAllCheckbox.checked = selectedRows.length === allRows.length;
+            }
             },
             rowAdded: function(row) {
-                adjustTableHeight(table); // Adjust height when a row is added
-                row.moveToTop();
-                toggleOverlay(table.getData().length === 0);
-                toggleInvalidDensityNotification(checkForInvalidDensities(table.getData())); // Check for invalid densities
+            adjustTableHeight(table); // Adjust height when a row is added
+            row.moveToTop();
+            toggleOverlay(table.getData().length === 0);
+            toggleInvalidDensityNotification(checkForInvalidDensities(table.getData())); // Check for invalid densities
             },
             rowDeleted: function(row) {
-                adjustTableHeight(table); // Adjust height when a row is deleted
+            adjustTableHeight(table); // Adjust height when data is changed
+            toggleOverlay(table.getData().length === 0);
+            toggleInvalidDensityNotification(checkForInvalidDensities(table.getData)); // Check for invalid densities
+            updateProjectSummary(window.mainTable);
             },
             dataLoaded: function(data) {
-                adjustTableHeight(table); // Adjust height when data is loaded
-                toggleOverlay(data.length === 0);
-                toggleInvalidDensityNotification(checkForInvalidDensities(data)); // Check for invalid densities
-            updateProjectSummary(data); // Update project summary data
+            adjustTableHeight(table); // Adjust height when data is loaded
+            toggleOverlay(data.length === 0);
+            toggleInvalidDensityNotification(checkForInvalidDensities(data)); // Check for invalid densities
+            updateProjectSummary(table); // Update project summary data
             },
             dataChanged: function(data) {
-                adjustTableHeight(table); // Adjust height when data is changed
-                toggleOverlay(data.length === 0);
-                toggleInvalidDensityNotification(checkForInvalidDensities(data)); // Check for invalid densities
+            adjustTableHeight(table); // Adjust height when data is changed
+            toggleOverlay(data.length === 0);
+            toggleInvalidDensityNotification(checkForInvalidDensities(data)); // Check for invalid densities
+            updateProjectSummary(table); // Update project summary data
             },
             cellEdited: function(cell) {
-                toggleInvalidDensityNotification(checkForInvalidDensities(cell.getTable().getData())); // Check after edit
-            }
+            toggleInvalidDensityNotification(checkForInvalidDensities(cell.getTable().getData())); // Check after edit
+            updateProjectSummary(cell.getTable()); // Update project summary
+        }
         });
 
         window.mainTable = table;
@@ -99,6 +102,22 @@ function initializeTable(projectId, materialNames) {
         toggleOverlay(flattenedData.length === 0);
         toggleInvalidDensityNotification(checkForInvalidDensities(flattenedData)); // Check for invalid densities initially
     });
+}
+
+// Adjust table height based on number of rows
+function adjustTableHeight(table) {
+    const numRows = table.getData().length;
+    const newHeight = calculateTableHeight(numRows);
+    table.setHeight(newHeight + "px");
+}
+
+// Calculate the table height based on number of rows
+function calculateTableHeight(numRows) {
+    if (numRows > 25) {
+        return maxTableHeight;
+    } else {
+        return Math.max(Math.min(numRows * rowHeight, maxTableHeight), minTableHeight);
+    }
 }
 
 // Setup delete button functionality
@@ -120,7 +139,7 @@ function setupDeleteButton() {
     applyDeleteButton.addEventListener('click', function() {
         const selectedRows = window.mainTable.getSelectedRows();
         const selectedMaterialIds = selectedRows.map(row => row.getData()._id); // Collect unique _ids
-
+    
         if (selectedMaterialIds.length > 0) {
             axios.post(`/api/projects/${window.projectId}/building_elements/materials/delete`, { materialIds: selectedMaterialIds })
                 .then(() => {
@@ -128,12 +147,12 @@ function setupDeleteButton() {
                     fetchBuildingElements(window.projectId).then(buildingElements => {
                         const flattenedData = flattenElements(buildingElements);
                         window.mainTable.replaceData(flattenedData).then(() => {
-                            updateProjectSummary(flattenedData);
                             adjustTableHeight(window.mainTable); // Adjust table height after data refresh
-                            toggleInvalidDensityNotification(checkForInvalidDensities(flattenedData));
+                            toggleInvalidDensityNotification(checkForInvalidDensities(flattenedData)); // Check for invalid densities
+                            updateProjectSummary(window.mainTable); // Update project summary
                         });
                     });
-
+    
                     // Hide the delete checkbox column
                     window.mainTable.updateColumnDefinition("delete_checkbox", { visible: false });
                     window.mainTable.deselectRow();
@@ -145,6 +164,7 @@ function setupDeleteButton() {
                 });
         }
     });
+    
 
     // Cancel delete mode
     cancelButton.addEventListener('click', function() {
@@ -184,8 +204,9 @@ function toggleDeleteUI(showDelete) {
 
 
 // Update project summary data
-function updateProjectSummary(data) {
-    const totalCarbonFootprint = data.reduce((sum, element) => sum + parseFloat(element.total_co2 || 0), 0) / 1000; // Convert to tons
+function updateProjectSummary(table) {
+    const visibleRows = table.getRows().map(row => row.getData());
+    const totalCarbonFootprint = visibleRows.reduce((sum, element) => sum + parseFloat(element.total_co2 || 0), 0) / 1000; // Convert to tons
 
     const EBFText = $('#ebfPerM2').text().trim();
     const EBF = parseFloat(EBFText.replace(/,/g, '')) || 1;
@@ -195,18 +216,20 @@ function updateProjectSummary(data) {
         return;
     }
 
-    const co2PerSquareMeter = totalCarbonFootprint*1000 / EBF; 
+    const co2PerSquareMeter = totalCarbonFootprint / EBF; 
 
     $('#carbonFootprint').text(`${formatNumber(totalCarbonFootprint, 1)} tons`);
     $('#co2PerM2').text(`${formatNumber(co2PerSquareMeter, 1)} kg`);
 
     loadCo2Chart(window.projectId);
 }
+
 // Format numbers for display
 function formatNumber(value, decimals) {
     if (value == null || isNaN(value)) return '0';
     return Number(value).toLocaleString('de-CH', { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
 }
+
 
 // Fetch material names from the backend
 function fetchMaterialNames() {
@@ -234,7 +257,7 @@ function updateMaterial(url, data) {
             .then(buildingElements => {
                 const flattenedData = flattenElements(buildingElements);
                 const table = window.mainTable;
-                table.replaceData(flattenedData).then(() => updateProjectSummary(flattenedData)); // Ensure updateProjectSummary is called after table data update
+                table.replaceData(flattenedData).then(() => updateProjectSummary(window.mainTable)); // Ensure updateProjectSummary is called after table data update
 
                 // Load and update the CO₂-eq per storey chart
                 loadCo2Chart(window.projectId);
@@ -264,7 +287,7 @@ function updateMaterialForCombinedRow(url, data, combinedRowIds) {
         .then(buildingElements => {
             const flattenedData = flattenElements(buildingElements);
             const table = window.mainTable;
-            table.replaceData(flattenedData).then(() => updateProjectSummary(flattenedData)); // Ensure updateProjectSummary is called after table data update
+            table.replaceData(flattenedData).then(() => updateProjectSummary(window.mainTable)); // Ensure updateProjectSummary is called after table data update
 
             if (currentGrouping.length > 0) {
                 updateTableGrouping();
@@ -462,7 +485,7 @@ function getColumns(materialNames, projectId) {
                             fetchBuildingElements(projectId).then(buildingElements => {
                                 const flattenedData = flattenElements(buildingElements);
                                 window.mainTable.replaceData(flattenedData).then(() => {
-                                    updateProjectSummary(flattenedData);
+                                    updateProjectSummary(window.mainTable);
                                     toggleInvalidDensityNotification(checkForInvalidDensities(flattenedData));
                                 });
                             });
@@ -511,7 +534,7 @@ function getColumns(materialNames, projectId) {
                                 if (currentGrouping.length > 0) {
                                     updateTableGrouping();
                                 }
-                                updateProjectSummary(flattenedData);
+                                updateProjectSummary(window.mainTable);
                                 toggleInvalidDensityNotification(checkForInvalidDensities(flattenedData));
                             });
                         });
@@ -587,11 +610,11 @@ function updateTableGrouping() {
         // Reset table to original data
         fetchBuildingElements(window.projectId).then(buildingElements => {
             const flattenedData = flattenElements(buildingElements);
-            table.replaceData(flattenedData).then(() => updateProjectSummary(flattenedData)); // Update summary
+            table.replaceData(flattenedData).then(() => updateProjectSummary(window.mainTable)); // Update summary
         });
     } else {
         const groupedData = groupDataByFields(data, currentGrouping);
-        table.replaceData(groupedData).then(() => updateProjectSummary(groupedData)); // Update summary
+        table.replaceData(groupedData).then(() => updateProjectSummary(window.mainTable)); // Update summary
     }
 
     updateCombiningColumnsDescription(); // Update description of combining columns

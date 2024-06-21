@@ -24,14 +24,14 @@
           <li class="nav-item">
             <!-- Button to trigger file input -->
             <button type="button" class="btn btn-primary" onclick="document.getElementById('hiddenFileInput').click();">
-              Upload IFC
+              <strong>upload IFC</strong>
             </button>
             <!-- Hidden file input and form -->
             <form id="ifcUploadForm" action="/api/projects/<%= project._id %>/upload" method="POST" enctype="multipart/form-data" style="display: none;">
               <input type="file" id="hiddenFileInput" name="ifcFile" onchange="this.form.submit();" required>
               <% if (typeof uploadSuccess !== 'undefined' && uploadSuccess) { %>
                 <div class="alert alert-success" role="alert">
-                  IFC file uploaded successfully!
+                  </div>IFC file uploaded successfully!
                 </div>
               <% } %>
             </form>

@@ -21,7 +21,7 @@
               <div class="card-body">
                 <h5 class="card-title"><%= formatProjectNameForDisplay(project.name) %></h5>
                 <p class="card-text"><small><%= project.description %></small></p>
-                <p class="card-text">Carbon Footprint: <span class="bold-value"><%= (Math.round(project.totalCarbonFootprint) / 1000).toFixed(3) %> tons</span></p>
+                <p class="card-text">Carbon Footprint: <span class="bold-value"><%= project.totalCarbonFootprint.toFixed(3) %> tons</span></p>
                 <p class="card-text">Phase: <span class="bold-value"><%= project.phase %></span></p>
                 <p class="card-text">EBF: <span class="bold-value"><%= project.EBF %> m²</span></p>
                 <p class="card-text">CO₂-eq / m²: <span class="bold-value"><%= project.co2PerSquareMeter %> kg</span></p>
