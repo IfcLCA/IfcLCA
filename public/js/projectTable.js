@@ -132,9 +132,12 @@ function setupDeleteButton() {
                                 updateProjectSummary(window.mainTable); // Update project summary data
                                 toggleInvalidDensityNotification(checkForInvalidDensities(flattenedData)); // Check for invalid densities
                                 toggleOverlay(flattenedData.length === 0); // Toggle overlay visibility
-                                adjustTableHeight(window.mainTable); // Adjust table height
-                            }
-                        );
+                                
+                                // Adjust table height based on the new row count
+                                const newNumRows = flattenedData.length;
+                                const newHeight = calculateTableHeight(newNumRows) + "px";
+                                window.mainTable.setHeight(newHeight); // Adjust table height
+                            });
                     });
     
                     // Hide the delete checkbox column
