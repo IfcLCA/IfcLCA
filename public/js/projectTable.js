@@ -56,45 +56,20 @@ function initializeTable(projectId, materialNames) {
                 }
                 });
             }
-            // Update select-all checkbox based on row selections
-            const selectAllCheckbox = document.getElementById('select-all');
-            const allRows = table.getRows();
-            const selectedRows = table.getSelectedRows();
-
-            if (selectAllCheckbox) {
-                selectAllCheckbox.checked = selectedRows.length === allRows.length;
+            },
+            rowSelectionChanged: function(data, rows) {
+                const selectedRows = table.getSelectedRows();
+                const selectedMaterialIds = selectedRows.map(row => row.getData()._id); // Collect unique _ids
+                const applyDeleteButton = document.getElementById('btn-apply-delete');
+                applyDeleteButton.disabled = selectedMaterialIds.length === 0;
+            },
+            rowFormatter: function(row) {
+                const data = row.getData();
+                if (data.density <= 0) {
+                    row.getElement().style.backgroundColor = "rgba(255, 0, 0, 0.2)";
+                }           
             }
-            },
-            rowAdded: function(row) {
-            adjustTableHeight(table); // Adjust height when a row is added
-            row.moveToTop();
-            toggleOverlay(table.getData().length === 0);
-            toggleInvalidDensityNotification(checkForInvalidDensities(table.getData())); // Check for invalid densities
-            },
-            rowDeleted: function(row) {
-            adjustTableHeight(table); // Adjust height when data is changed
-            toggleOverlay(table.getData().length === 0);
-            toggleInvalidDensityNotification(checkForInvalidDensities(table.getData)); // Check for invalid densities
-            updateProjectSummary(window.mainTable);
-            },
-            dataLoaded: function(data) {
-            adjustTableHeight(table); // Adjust height when data is loaded
-            toggleOverlay(data.length === 0);
-            toggleInvalidDensityNotification(checkForInvalidDensities(data)); // Check for invalid densities
-            updateProjectSummary(table); // Update project summary data
-            },
-            dataChanged: function(data) {
-            adjustTableHeight(table); // Adjust height when data is changed
-            toggleOverlay(data.length === 0);
-            toggleInvalidDensityNotification(checkForInvalidDensities(data)); // Check for invalid densities
-            updateProjectSummary(table); // Update project summary data
-            },
-            cellEdited: function(cell) {
-            toggleInvalidDensityNotification(checkForInvalidDensities(cell.getTable().getData())); // Check after edit
-            updateProjectSummary(cell.getTable()); // Update project summary
-        }
         });
-
         window.mainTable = table;
         setupDeleteButton();
         setupSelectAllCheckbox();
@@ -103,6 +78,7 @@ function initializeTable(projectId, materialNames) {
         toggleInvalidDensityNotification(checkForInvalidDensities(flattenedData)); // Check for invalid densities initially
     });
 }
+
 
 
 // Calculate the table height based on number of rows
@@ -114,7 +90,6 @@ function calculateTableHeight(numRows) {
     }
 }
 
-// Setup delete button functionality
 function setupDeleteButton() {
     const deleteButton = document.getElementById('btn-delete-material');
     const applyDeleteButton = document.getElementById('btn-apply-delete');
@@ -132,7 +107,19 @@ function setupDeleteButton() {
     // Apply delete action
     applyDeleteButton.addEventListener('click', function() {
         const selectedRows = window.mainTable.getSelectedRows();
-        const selectedMaterialIds = selectedRows.map(row => row.getData()._id); // Collect unique _ids
+        
+        // Collect unique _ids from combined rows and individual rows
+        let selectedMaterialIds = [];
+        selectedRows.forEach(row => {
+            const data = row.getData();
+            if (data._ids) {
+                selectedMaterialIds = selectedMaterialIds.concat(data._ids.split(',').filter(id => id && id !== "<varies>"));
+            } else {
+                selectedMaterialIds.push(data._id);
+            }
+        });
+        
+        selectedMaterialIds = [...new Set(selectedMaterialIds)]; // Remove duplicates
     
         if (selectedMaterialIds.length > 0) {
             axios.post(`/api/projects/${window.projectId}/building_elements/materials/delete`, { materialIds: selectedMaterialIds })
@@ -161,7 +148,6 @@ function setupDeleteButton() {
                 });
         }
     });
-    
 
     // Cancel delete mode
     cancelButton.addEventListener('click', function() {
