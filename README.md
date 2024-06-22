@@ -1,4 +1,4 @@
-![Logo](/public/logo.png)
+![Logo](public\images\logo-small.png)
 
 # IfcLCA 🌐
 
