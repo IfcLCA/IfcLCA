@@ -1,39 +1,71 @@
 <!DOCTYPE html>
 <html lang="en">
-<%- include('partials/_head.ejs') %>
-<body>
-<%- include('partials/_header.ejs') %>
-<main role="main" class="container mt-4">
-  <h2>Create New Project</h2>
-  <form id="newProjectForm" action="/api/projects" method="POST">
-    <div class="mb-3">
-      <label for="name" class="form-label">Project Name</label>
-      <input type="text" id="name" name="name" class="form-control" required>
-    </div>
-    <div class="mb-3">
-      <label for="phase" class="form-label">Phase</label>
-      <input type="text" id="phase" name="phase" class="form-control">
-    </div>
-    <div class="mb-3">
-      <label for="description" class="form-label">Description</label>
-      <textarea id="description" name="description" class="form-control" rows="3"></textarea>
-    </div>
-    <div class="mb-3">
-      <label for="customImage" class="form-label">Custom Image URL</label>
-      <input type="text" id="customImage" name="customImage" class="form-control">
-    </div>
-    <div class="mb-3">
-      <label for="EBF" class="form-label">Energiebezugsfläche (EBF) in m²</label>
-      <input type="number" id="EBF" name="EBF" class="form-control" step="0.01" min="0" required>
-    </div>
-    <div class="d-flex justify-content-between">
-      <button type="submit" class="btn btn-success">Confirm</button>
-      <button type="button" class="btn btn-secondary" onclick="window.location.href='/dashboard'">Cancel</button>
-    </div>
-  </form>
-  <div id="message" class="mt-3"></div>
-</main>
-<%- include('partials/_footer.ejs') %>
-<script src="/js/projectForm.js" defer></script>
-</body>
+  <%- include('partials/_head.ejs') %>
+  <body>
+    <%- include('partials/_header.ejs') %>
+    <main role="main" class="container mt-4">
+      <h2>Create New Project</h2>
+      <form id="newProjectForm" action="/api/projects" method="POST">
+        <div class="mb-3">
+          <label for="name" class="form-label">Project Name</label>
+          <input
+            type="text"
+            id="name"
+            name="name"
+            class="form-control"
+            required
+          />
+        </div>
+        <div class="mb-3">
+          <label for="phase" class="form-label">Phase</label>
+          <input type="text" id="phase" name="phase" class="form-control" />
+        </div>
+        <div class="mb-3">
+          <label for="description" class="form-label">Description</label>
+          <textarea
+            id="description"
+            name="description"
+            class="form-control"
+            rows="3"
+          ></textarea>
+        </div>
+        <div class="mb-3">
+          <label for="customImage" class="form-label">Custom Image URL</label>
+          <input
+            type="text"
+            id="customImage"
+            name="customImage"
+            class="form-control"
+          />
+        </div>
+        <div class="mb-3">
+          <label for="EBF" class="form-label"
+            >Energiebezugsfläche (EBF) in m²</label
+          >
+          <input
+            type="number"
+            id="EBF"
+            name="EBF"
+            class="form-control"
+            step="0.01"
+            min="0"
+            required
+          />
+        </div>
+        <div class="d-flex justify-content-between">
+          <button type="submit" class="btn btn-success">Confirm</button>
+          <button
+            type="button"
+            class="btn btn-secondary"
+            onclick="window.location.href='/dashboard'"
+          >
+            Cancel
+          </button>
+        </div>
+      </form>
+      <div id="message" class="mt-3"></div>
+    </main>
+    <%- include('partials/_footer.ejs') %>
+    <script src="/js/projectForm.js" defer></script>
+  </body>
 </html>

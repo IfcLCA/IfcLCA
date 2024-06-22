@@ -3,13 +3,14 @@ require("dotenv").config();
 const mongoose = require("mongoose");
 const express = require("express");
 const session = require("express-session");
-const MongoStore = require('connect-mongo');
+const MongoStore = require("connect-mongo");
 const authRoutes = require("./routes/authRoutes");
-const projectRoutes = require('./routes/projectRoutes');
-
+const projectRoutes = require("./routes/projectRoutes");
 
 if (!process.env.DATABASE_URL || !process.env.SESSION_SECRET) {
-  console.error("Error: config environment variables not set. Please create/edit .env configuration file.");
+  console.error(
+    "Error: config environment variables not set. Please create/edit .env configuration file."
+  );
   process.exit(-1);
 }
 
@@ -29,7 +30,7 @@ app.use(express.static("public"));
 // Database connection
 mongoose
   .connect(process.env.DATABASE_URL)
-  .then(() => { })
+  .then(() => {})
   .catch((err) => {
     console.error(`Database connection error: ${err.message}`);
     console.error(err.stack);
@@ -43,7 +44,7 @@ app.use(
     resave: false,
     saveUninitialized: false,
     store: MongoStore.create({ mongoUrl: process.env.DATABASE_URL }),
-  }),
+  })
 );
 
 app.on("error", (error) => {
@@ -85,7 +86,7 @@ app.get("/", (req, res) => {
 
 // Dashboard route
 app.get("/dashboard", (req, res) => {
-  res.render('dashboard', { page: 'dashboard'});
+  res.render("dashboard", { page: "dashboard" });
 });
 
 // If no routes handled the request, it's a 404
@@ -100,5 +101,4 @@ app.use((err, req, res, next) => {
   res.status(500).send("There was an error serving your request.");
 });
 
-app.listen(port, () => {
-});
+app.listen(port, () => {});

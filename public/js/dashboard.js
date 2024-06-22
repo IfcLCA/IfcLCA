@@ -1,19 +1,19 @@
-document.addEventListener('DOMContentLoaded', function() {
-  fetch('/api/projects')
-    .then(response => {
+document.addEventListener("DOMContentLoaded", function () {
+  fetch("/api/projects")
+    .then((response) => {
       if (!response.ok) {
-        throw new Error('Network response was not ok');
+        throw new Error("Network response was not ok");
       }
       return response.json();
     })
-    .then(projects => {
-      const projectsContainer = document.getElementById('projects-container');
+    .then((projects) => {
+      const projectsContainer = document.getElementById("projects-container");
       if (!projectsContainer) {
-        console.error('Projects container not found on the page.');
+        console.error("Projects container not found on the page.");
         return;
       }
-      let allProjectsHtml = '';
-      projects.forEach(project => {
+      let allProjectsHtml = "";
+      projects.forEach((project) => {
         const cardHtml = `
           <a href="/projects/${project._id}" style="text-decoration: none; color: inherit;">
             <div class="card" style="width: 18rem;">
@@ -31,7 +31,7 @@ document.addEventListener('DOMContentLoaded', function() {
       });
       projectsContainer.innerHTML = allProjectsHtml;
     })
-    .catch(error => {
-      console.error('Error fetching projects:', error.message, error.stack);
+    .catch((error) => {
+      console.error("Error fetching projects:", error.message, error.stack);
     });
 });

@@ -1,54 +1,79 @@
 <!DOCTYPE html>
 <html lang="en">
-<%- include('partials/_head.ejs') %>
-<body>
-<%- include('partials/_header.ejs', { hasProjects: projects && projects.length > 0 }) %>
-<main role="main" class="container mt-4">
-  <div class="text-center mb-4">
-    <h1>Dashboard</h1>
-    <% if(query.deletionSuccess) { %>
-      <div class="alert alert-success" role="alert">Project deleted successfully!</div>
-    <% } %>
-    <% if(projects && projects.length > 0) { %>
-      <!-- Projects are displayed here -->
-      <div id="projects-container" class="d-flex flex-wrap justify-content-around">
-        <% projects.forEach(function(project) { %>
-          <a href="/projects/<%= project._id %>" style="text-decoration: none; color: inherit;">
-            <div class="card" style="width: 21.5rem; margin: 10px;">
+  <%- include('partials/_head.ejs') %>
+  <body>
+    <%- include('partials/_header.ejs', { hasProjects: projects &&
+    projects.length > 0 }) %>
+    <main role="main" class="container mt-4">
+      <div class="text-center mb-4">
+        <h1>Dashboard</h1>
+        <% if(query.deletionSuccess) { %>
+        <div class="alert alert-success" role="alert">
+          Project deleted successfully!
+        </div>
+        <% } %> <% if(projects && projects.length > 0) { %>
+        <!-- Projects are displayed here -->
+        <div
+          id="projects-container"
+          class="d-flex flex-wrap justify-content-around"
+        >
+          <% projects.forEach(function(project) { %>
+          <a
+            href="/projects/<%= project._id %>"
+            style="text-decoration: none; color: inherit"
+          >
+            <div class="card" style="width: 21.5rem; margin: 10px">
               <% if (project.customImage) { %>
-               <img src="<%= project.customImage %>" class="card-img-top" alt="<%= formatProjectNameForDisplay(project.name) %>">
-             <% } %>
+              <img
+                src="<%= project.customImage %>"
+                class="card-img-top"
+                alt="<%= formatProjectNameForDisplay(project.name) %>"
+              />
+              <% } %>
               <div class="card-body">
-                <h5 class="card-title"><%= formatProjectNameForDisplay(project.name) %></h5>
-                <p class="card-text"><small><%= project.description %></small></p>
-                <p class="card-text">Carbon Footprint: <span class="bold-value"><%= project.totalCarbonFootprint.toFixed(3) %> tons</span></p>
-                <p class="card-text">Phase: <span class="bold-value"><%= project.phase %></span></p>
-                <p class="card-text">EBF: <span class="bold-value"><%= project.EBF %> m²</span></p>
-                <p class="card-text">CO₂-eq / m²: <span class="bold-value"><%= project.co2PerSquareMeter %> kg</span></p>
+                <h5 class="card-title">
+                  <%= formatProjectNameForDisplay(project.name) %>
+                </h5>
+                <p class="card-text">
+                  <small><%= project.description %></small>
+                </p>
+                <p class="card-text">
+                  Carbon Footprint:
+                  <span class="bold-value"
+                    ><%= project.totalCarbonFootprint.toFixed(3) %> tons</span
+                  >
+                </p>
+                <p class="card-text">
+                  Phase: <span class="bold-value"><%= project.phase %></span>
+                </p>
+                <p class="card-text">
+                  EBF: <span class="bold-value"><%= project.EBF %> m²</span>
+                </p>
+                <p class="card-text">
+                  CO₂-eq / m²:
+                  <span class="bold-value"
+                    ><%= project.co2PerSquareMeter %> kg</span
+                  >
+                </p>
               </div>
             </div>
           </a>
-        <% }); %>
+          <% }); %>
+        </div>
+        <% } else { %>
+        <!-- Button in the middle of the page with description -->
+        <div class="text-center" style="margin-top: 50px">
+          <p>No projects found. Start by creating a new project.</p>
+          <a href="/newProject" class="btn btn-primary">Create New Project</a>
+        </div>
+        <% } %>
       </div>
-    <% } else { %>
-      <!-- Button in the middle of the page with description -->
-      <div class="text-center" style="margin-top: 50px;">
-        <p>No projects found. Start by creating a new project.</p>
-        <a href="/newProject" class="btn btn-primary">Create New Project</a>
-      </div>
-    <% } %>
-  </div>
-  <% if (locals.error_msg) { %>
-  <div class="alert alert-danger" role="alert">
-    <%= error_msg %>
-  </div>
-  <% } %>
-  <% if (locals.success_msg) { %>
-  <div class="alert alert-success" role="alert">
-    <%= success_msg %>
-  </div>
-  <% } %>
-</main>
-<%- include('partials/_footer.ejs') %>
-</body>
+      <% if (locals.error_msg) { %>
+      <div class="alert alert-danger" role="alert"><%= error_msg %></div>
+      <% } %> <% if (locals.success_msg) { %>
+      <div class="alert alert-success" role="alert"><%= success_msg %></div>
+      <% } %>
+    </main>
+    <%- include('partials/_footer.ejs') %>
+  </body>
 </html>
