@@ -7,9 +7,9 @@ Welcome to IfcLCA, an innovative web platform designed specifically for conducti
 
 IfcLCA is crafted with sustainability at its core, offering real-time LCA calculations based on currently established methodology in Switzerland (SIA 2032). This ensures users can make environmentally sound decisions in alignment with construction regulations and standards (adding more environmental databases is straightforward, but underlying methodologies can differ quite a bit, depending on where you perform an LCA).
 
-![Process Diagram](/public/process.png)
+![Process Diagram](/public/images/process.png)
 
-![Data Flow](/public/WebAppDataFlow.png)
+![Data Flow](/public/images/WebAppDataFlow.png)
 
 ## Key Features 🔑
 
