@@ -1,6 +1,6 @@
 # IfcLCA 🌐
 
-![Logo](<img src="public/images/logo-small.png" width="100">)
+![Logo](<img src="public/images/logo.png" width="100">)
 Welcome to IfcLCA, an innovative web platform designed specifically for conducting Life Cycle Assessments (LCAs) on Swiss construction projects. Utilizing Industry Foundation Classes (IFC) files, our platform simplifies the process of analyzing building elements' carbon footprints. With a user-friendly dashboard, IfcLCA presents a comprehensive overview of projects, making sustainability evaluations both accessible and impactful.
 
 ## Project Overview 🏢
