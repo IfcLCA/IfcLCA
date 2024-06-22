@@ -1,16 +1,13 @@
-![Logo](/public/logo.png)
-
 # IfcLCA 🌐
 
+<img src="public/images/logo.png" alt="Logo" width="150">
 Welcome to IfcLCA, an innovative web platform designed specifically for conducting Life Cycle Assessments (LCAs) on Swiss construction projects. Utilizing Industry Foundation Classes (IFC) files, our platform simplifies the process of analyzing building elements' carbon footprints. With a user-friendly dashboard, IfcLCA presents a comprehensive overview of projects, making sustainability evaluations both accessible and impactful.
 
 ## Project Overview 🏢
 
 IfcLCA is crafted with sustainability at its core, offering real-time LCA calculations based on currently established methodology in Switzerland (SIA 2032). This ensures users can make environmentally sound decisions in alignment with construction regulations and standards (adding more environmental databases is straightforward, but underlying methodologies can differ quite a bit, depending on where you perform an LCA).
 
-![Process Diagram](/public/process.png)
-
-![Data Flow](/public/WebAppDataFlow.png)
+![Process Diagram](/public/images/process.png)
 
 ## Key Features 🔑
 
@@ -20,14 +17,9 @@ IfcLCA is crafted with sustainability at its core, offering real-time LCA calcul
 - **Material Matching:** Automatically match sustainable materials within projects.
 - **Reporting:** Effortlessly export essential data and gain insights (planned in future release).
 
-## Join the opensource LCA initiative 🚀
+![Data Flow](/public/images/WebAppDataFlow.png)
 
-IfcLCA is steadfast in its commitment to open-source development, fostering a culture of collaboration and contribution. We believe in maintaining unwavering transparency, particularly when it comes to Life Cycle Assessments.
-Our platform's core features are, and always will be, openly available — allowing users and developers alike to scrutinize, enhance, and innovate within our shared ecosystem.
-This dedication not only fuels progress but also ensures accountability and integrity in our collective pursuit of sustainable construction practices.
-Whether you're a developer, architect, engineer, or a specialist in sustainability, your input is valuable in refining IfcLCA and reducing the carbon footprint in construction.
-
-### Quick Start for Browser Users
+## Quick Start for Browser Users
 
 Getting started with IfcLCA on your web browser is straightforward. Follow these steps to begin analyzing the carbon footprint of your construction projects:
 
@@ -62,9 +54,17 @@ Getting started with IfcLCA on your web browser is straightforward. Follow these
 
 It's that simple...
 
-## Open Source & Licensing 📄
+## Join the opensource LCA initiative 🚀
+
+IfcLCA is steadfast in its commitment to open-source development, fostering a culture of collaboration and contribution. We believe in maintaining unwavering transparency, particularly when it comes to Life Cycle Assessments.
+Our platform's core features are, and always will be, openly available — allowing users and developers alike to scrutinize, enhance, and innovate within our shared ecosystem.
+This dedication not only fuels progress but also ensures accountability and integrity in our collective pursuit of sustainable construction practices.
+Whether you're a developer, architect, engineer, or a specialist in sustainability, your input is valuable in refining IfcLCA and reducing the carbon footprint in construction.
+
+## Licensing 📄
 
 IfcLCA is proudly licensed under the **GNU Affero General Public License v3.0 (AGPLv3)**. This licensing ensures that all modifications and derivative works are freely available under the same terms, encouraging a vibrant community dedicated to advancing sustainable construction technologies.
+
 Our license allows users and developers to legally share and adapt the software, provided the same freedoms are preserved in derivative works.
 
 "Free as in Freedom, not just free beer." 🍻
