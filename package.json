@@ -19,7 +19,6 @@
     "chart.js": "^4.4.1",
     "connect-flash": "^0.1.1",
     "connect-mongo": "^5.1.0",
-    "crypto": "^1.0.1",
     "csv-writer": "^1.6.0",
     "dotenv": "^16.4.1",
     "ejs": "^3.1.9",
