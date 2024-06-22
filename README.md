@@ -9,8 +9,6 @@ IfcLCA is crafted with sustainability at its core, offering real-time LCA calcul
 
 ![Process Diagram](/public/images/process.png)
 
-![Data Flow](/public/images/WebAppDataFlow.png)
-
 ## Key Features 🔑
 
 - **Open Standards Support:** Leveraging IFC for interoperability and integration.
@@ -19,6 +17,8 @@ IfcLCA is crafted with sustainability at its core, offering real-time LCA calcul
 - **Material Matching:** Automatically match sustainable materials within projects.
 - **Reporting:** Effortlessly export essential data and gain insights (planned in future release).
 
+![Data Flow](/public/images/WebAppDataFlow.png)
+
 ## Join the opensource LCA initiative 🚀
 
 IfcLCA is steadfast in its commitment to open-source development, fostering a culture of collaboration and contribution. We believe in maintaining unwavering transparency, particularly when it comes to Life Cycle Assessments.
@@ -26,7 +26,7 @@ Our platform's core features are, and always will be, openly available — allow
 This dedication not only fuels progress but also ensures accountability and integrity in our collective pursuit of sustainable construction practices.
 Whether you're a developer, architect, engineer, or a specialist in sustainability, your input is valuable in refining IfcLCA and reducing the carbon footprint in construction.
 
-### Quick Start for Browser Users
+## Quick Start for Browser Users
 
 Getting started with IfcLCA on your web browser is straightforward. Follow these steps to begin analyzing the carbon footprint of your construction projects:
 
