@@ -17,10 +17,10 @@ def enrich_with_group_info_and_insert_to_mongodb(csv_file_path, db_name, collect
     current_group_info = {}
 
     for index, row in df.iterrows():
-        identifier = row.iloc[0]  # Assuming the first column is used for identification
+        identifier = row.iloc[0]  # first column is used for identification
         
         try:
-            # This tries to convert the identifier to an integer, useful for checking if it's an integer
+            # tries to convert the identifier to an integer, useful for checking if it's an integer
             int_identifier = int(identifier)
             is_integer = True
         except ValueError:

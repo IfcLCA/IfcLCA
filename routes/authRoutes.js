@@ -1,25 +1,25 @@
-const express = require('express');
-const path = require('path');
-const fs = require('fs');
-const User = require('../models/User');
-const bcrypt = require('bcryptjs');
-const crypto = require('crypto');
-const nodemailer = require('nodemailer');
-const rateLimit = require('express-rate-limit');
+const express = require("express");
+const path = require("path");
+const fs = require("fs");
+const User = require("../models/User");
+const bcrypt = require("bcryptjs");
+const crypto = require("crypto");
+const nodemailer = require("nodemailer");
+const rateLimit = require("express-rate-limit");
 const router = express.Router();
 
 // Configure nodemailer
 const transporter = nodemailer.createTransport({
-  service: 'Gmail',
+  service: "Gmail",
   auth: {
     user: process.env.EMAIL_USER,
     pass: process.env.EMAIL_PASS,
-  }
+  },
 });
 
 // Extract first name from email
 function extractFirstName(email) {
-  const parts = email.split('@')[0].split('.');
+  const parts = email.split("@")[0].split(".");
   const firstName = parts[0];
   return firstName.charAt(0).toUpperCase() + firstName.slice(1);
 }
@@ -28,109 +28,124 @@ function extractFirstName(email) {
 const authRateLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
   max: 5, // Limit each IP to 5 requests per windowMs
-  message: 'Too many requests from this IP, please try again after 15 minutes.'
+  message: "Too many requests from this IP, please try again after 15 minutes.",
 });
 
 // Register Route
-router.get('/auth/register', (req, res) => {
-  res.render('register', { query: req.query });
+router.get("/auth/register", (req, res) => {
+  res.render("register", { query: req.query });
 });
 
-router.post('/auth/register', authRateLimiter, async (req, res) => {
+router.post("/auth/register", authRateLimiter, async (req, res) => {
   try {
     const { username, password } = req.body;
-    const token = crypto.randomBytes(32).toString('hex');
+    const token = crypto.randomBytes(32).toString("hex");
     const firstName = extractFirstName(username);
 
     // Create the user with a confirmation token but don't activate yet
     const newUser = new User({
       username,
-      password,  // Store the plain password temporarily for hashing by pre-save hook
+      password, // Will be hashed in the pre-save hook
       confirmationToken: token,
-      isActive: false
+      isActive: false,
     });
 
     await newUser.save();
 
     // Read the email template
-    const emailTemplatePath = path.join(__dirname, '../views/emailTemplates/emailTemplate.html');
-    const emailTemplate = await fs.promises.readFile(emailTemplatePath, 'utf-8');
+    const emailTemplatePath = path.join(
+      __dirname,
+      "../views/emailTemplates/emailTemplate.html"
+    );
+    const emailTemplate = await fs.promises.readFile(
+      emailTemplatePath,
+      "utf-8"
+    );
 
     const emailContent = emailTemplate
       .replace(/<%= firstName %>/g, firstName)
-      .replace(/<%= confirmUrl %>/g, `http://${req.headers.host}/auth/confirm/${token}`);
+      .replace(
+        /<%= confirmUrl %>/g,
+        `http://${req.headers.host}/auth/confirm/${token}`
+      );
 
     // Send the confirmation email
     await transporter.sendMail({
       to: username,
-      subject: 'Email Confirmation - IfcLCA',
-      html: emailContent
+      subject: "Email Confirmation - IfcLCA",
+      html: emailContent,
     });
 
-    res.redirect('/auth/login?message=Confirmation email sent. Please check your inbox.');
+    res.redirect(
+      "/auth/login?message=Confirmation email sent. Please check your inbox."
+    );
   } catch (error) {
-    console.error('Registration error:', error);
-    res.status(500).send('Error during registration. Please try again.');
+    console.error("Registration error:", error);
+    res.status(500).send("Error during registration. Please try again.");
   }
 });
 
 // Email Confirmation Route
-router.get('/auth/confirm/:token', async (req, res) => {
+router.get("/auth/confirm/:token", async (req, res) => {
   try {
     const user = await User.findOne({ confirmationToken: req.params.token });
     if (!user) {
-      return res.status(400).send('Invalid or expired token');
+      return res.status(400).send("Invalid or expired token");
     }
 
     user.confirmationToken = null;
     user.isActive = true;
     await user.save();
 
-    res.redirect('/auth/login?message=Email confirmed successfully. You can now log in.');
+    res.redirect(
+      "/auth/login?message=Email confirmed successfully. You can now log in."
+    );
   } catch (error) {
-    console.error('Confirmation error:', error);
-    res.status(500).send('Error during email confirmation. Please try again.');
+    console.error("Confirmation error:", error);
+    res.status(500).send("Error during email confirmation. Please try again.");
   }
 });
 
 // Login Route
-router.get('/auth/login', (req, res) => {
-  res.render('login', { query: req.query });
+router.get("/auth/login", (req, res) => {
+  res.render("login", { query: req.query });
 });
 
-router.post('/auth/login', authRateLimiter, async (req, res) => {
+router.post("/auth/login", authRateLimiter, async (req, res) => {
   try {
     const { username, password } = req.body;
     const user = await User.findOne({ username });
     if (!user) {
-      return res.status(400).send('User not found');
+      return res.status(400).send("User not found");
     }
     if (!user.isActive) {
-      return res.status(400).send('Email not confirmed. Please check your email.');
+      return res
+        .status(400)
+        .send("Email not confirmed. Please check your email.");
     }
 
     const isMatch = await bcrypt.compare(password, user.password);
 
     if (isMatch) {
-      req.session.userId = user._id;  // Store user ID in session
-      req.session.username = user.username;  // Optionally store username
-      return res.redirect('/');
+      req.session.userId = user._id; // Store user ID in session
+      req.session.username = user.username; // Optionally store username
+      return res.redirect("/");
     } else {
-      return res.status(400).send('Password is incorrect');
+      return res.status(400).send("Password is incorrect");
     }
   } catch (error) {
-    console.error('Login error:', error);
-    return res.status(500).send('An error occurred during login.');
+    console.error("Login error:", error);
+    return res.status(500).send("An error occurred during login.");
   }
 });
 
-router.get('/auth/logout', (req, res) => {
-  req.session.destroy(err => {
+router.get("/auth/logout", (req, res) => {
+  req.session.destroy((err) => {
     if (err) {
-      console.error('Error during session destruction:', err);
-      return res.status(500).send('Error logging out');
+      console.error("Error during session destruction:", err);
+      return res.status(500).send("Error logging out");
     }
-    res.redirect('/auth/login');
+    res.redirect("/auth/login");
   });
 });
 

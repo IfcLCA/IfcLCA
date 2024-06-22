@@ -1,5 +1,5 @@
 body {
-  font-family: 'Nunito', sans-serif;
+  font-family: "Nunito", sans-serif;
   background-color: #f8f9fa;
 }
 
@@ -9,14 +9,13 @@ body {
 
 .card {
   margin-bottom: 20px;
-  box-shadow: 0 4px 8px rgba(0,0,0,.05);
-  border: 1px solid rgba(0,0,0,.125);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.05);
+  border: 1px solid rgba(0, 0, 0, 0.125);
   border-radius: 0.8rem;
 }
 
-
 .card-img-top {
-  padding-top: 20px; 
+  padding-top: 20px;
   width: 300px; /* Adjusted fixed width */
   height: auto; /* Ensure aspect ratio is maintained */
   max-height: 300px; /* Limit the height to prevent cards from getting too big */
@@ -30,7 +29,8 @@ body {
   text-align: left;
 }
 
-.card-title, .card-title small {
+.card-title,
+.card-title small {
   text-align: center;
   display: block;
   margin-bottom: 20px;
@@ -89,7 +89,8 @@ footer span {
   top: 0.5rem; /* Ensure it aligns well with the navbar */
 }
 
-.navbar .btn-primary, .navbar .btn-primary:hover {
+.navbar .btn-primary,
+.navbar .btn-primary:hover {
   background-color: #ff5722; /* Orange color as per user request */
   border-color: #ff5722;
 }
@@ -101,7 +102,7 @@ footer span {
 
 /* Table Styling */
 .tabulator {
-  font-family: 'Roboto', sans-serif;
+  font-family: "Roboto", sans-serif;
   border: 1px solid #e0e0e0;
   border-radius: 8px;
   overflow: hidden;
@@ -138,7 +139,6 @@ footer span {
 
 .tabulator-row:nth-of-type(odd) {
   background-color: #fafafa;
-  
 }
 
 .tabulator-row:nth-of-type(even) {
@@ -202,6 +202,7 @@ footer span {
   color: #333;
 }
 
-.tabulator, .tabulator-tableholder {
+.tabulator,
+.tabulator-tableholder {
   background-color: #ffffff; /* Set background color to white */
 }

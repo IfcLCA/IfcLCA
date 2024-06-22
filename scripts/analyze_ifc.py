@@ -133,21 +133,17 @@ def get_building_storey(element):
         return containing_storey.Name
     return None
 
+
+    # Retrieve property values directly
 def get_element_property(element, property_name):
     """
-    Retrieves a specific property value for an IFC element by property name.
+    Retrieves a specific property value for an IFC element by property name directly.
     """
-    # Attempt to retrieve all Psets for the element
     psets = ifcopenshell.util.element.get_psets(element)
     
-    # Iterate through all Psets and their properties
-    for pset_name, properties in psets.items():
-        # Check if the property exists in this Pset and return its value
-        if property_name in properties:
-            return properties[property_name]
-    
-    # Return None if the property was not found in any Pset
-    return None
+    # Return the property value if it exists
+    return next((properties[property_name] for properties in psets.values() if property_name in properties), None)
+
 
 def process_element(ifc_file, element, settings, ifc_file_path, user_id, session_id, projectId):
     """
@@ -198,7 +194,6 @@ def process_element(ifc_file, element, settings, ifc_file_path, user_id, session
         })
 
     is_multilayer = len(materials_info) > 1
-
     building_storey = get_building_storey(element)
     is_loadbearing = get_element_property(element, "IsLoadbearing")
     is_external = get_element_property(element, "IsExternal")
@@ -224,7 +219,9 @@ def process_element(ifc_file, element, settings, ifc_file_path, user_id, session
 
 
 def main(file_path, projectId):
-    # Connect to the MongoDB instance with the specified database
+    """
+    Main function to process the IFC file and store data in MongoDB.
+    """
     client = MongoClient("mongodb://localhost:27017/")
     db = client["IfcLCAdata_01"]
     collection = db["building_elements"]
@@ -233,22 +230,21 @@ def main(file_path, projectId):
     settings = geom.settings()
     settings.set(settings.USE_PYTHON_OPENCASCADE, True)
 
-    # Example values for demonstration
-    user_id = "example_user_id"  # Replace with actual user ID from Node.js or another source
-    session_id = "example_session_id"  # Replace with actual session ID from Node.js or another source
+    user_id = "example_user_id"  # Replace with actual user ID
+    session_id = "example_session_id"  # Replace with actual session ID
 
     elements = load_ifc_data(ifc_file)
 
-    total_volume = 0  # Initialize total volume accumulator
+    bulk_ops = []  # List to collect bulk operations
 
     for element in elements:
         element_data = process_element(ifc_file, element, settings, file_path, user_id, session_id, projectId)
         if element_data:
-            # Add the volume of the current element to the total volume
-            total_volume += element_data['total_volume']
-            # Insert the processed element data into the MongoDB collection
-            collection.insert_one(element_data)
-    
+            bulk_ops.append(element_data)
+
+    if bulk_ops:
+        collection.insert_many(bulk_ops)  # Perform bulk insert into MongoDB
+
 if __name__ == "__main__":
     if len(sys.argv) != 3:
         print("Usage: python script.py <path_to_ifc_file> <projectId>", file=sys.stderr)
