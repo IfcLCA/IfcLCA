@@ -6,6 +6,11 @@ from OCC.Core.GProp import GProp_GProps
 from collections import Counter
 from pymongo import MongoClient
 from bson import ObjectId
+from dotenv import load_dotenv
+import os
+
+# Load environment variables from .env file
+load_dotenv()
 
 
 def open_ifc_file(file_path):
@@ -222,7 +227,7 @@ def main(file_path, projectId):
     """
     Main function to process the IFC file and store data in MongoDB.
     """
-    client = MongoClient("mongodb://localhost:27017/")
+    client = MongoClient(os.getenv("DATABASE_URL"))
     db = client["IfcLCAdata_01"]
     collection = db["building_elements"]
 
