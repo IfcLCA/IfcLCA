@@ -19,6 +19,7 @@ const {
   formatProjectNameForDisplay,
 } = require("../utils/util");
 const { isNaN } = require("lodash");
+const { route } = require("./authRoutes");
 
 // ------------------------------------------
 // Static Routes
@@ -35,6 +36,14 @@ router.get("/disclaimer", (req, res) => {
 // Route for the /opensource page
 router.get("/opensource", (req, res) => {
   res.render("opensource");
+});
+
+router.get("/terms-and-conditions", (req, res) => {
+  res.render("terms-and-conditions");
+});
+
+router.get("/privacy-policy", (req, res) => {
+  res.render("privacy-policy");
 });
 
 // ------------------------------------------
