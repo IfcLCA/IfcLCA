@@ -75,7 +75,7 @@ function parseTreibhausgasemissionen(value, materialName) {
 
 // Priority materials map and Fuse.js settings
 const priorityMaterials = {
-  beton: "Hochbaubeton (ohne Bewehrung)",
+  Beton: "Hochbaubeton (ohne Bewehrung)",
   Holzwerkstoffplatte: "3- und 5-Schicht Massivholzplatte",
   Holz: "Brettschichtholz",
   CLT: "Brettsperrholz",
