@@ -227,6 +227,8 @@ def main(file_path, projectId):
     """
     Main function to process the IFC file and store data in MongoDB.
     """
+    print(f"Script started. File path: {file_path}, Project ID: {projectId}", file=sys.stderr)  # Debug print
+
     database_url = os.getenv("DATABASE_URL")
     client = MongoClient(database_url)
     db_name = database_url.split('/')[-1].split('?')[0]  # Extract the database name
