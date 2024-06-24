@@ -172,11 +172,6 @@ async function findBestMatchForMaterial(
 // API Routes: File Upload and Material Matching
 // ------------------------------------------
 
-const path = require("path");
-const { execFile } = require("child_process");
-const multer = require("multer");
-const fs = require("fs").promises;
-
 // Setup Multer for file upload
 const upload = multer({ dest: path.resolve(__dirname, "uploads") });
 
