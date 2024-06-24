@@ -196,10 +196,8 @@ router.post(
     }
 
     const projectId = req.params.projectId;
-    const filePath = path.normalize(req.file.path); // Normalize path
-    const scriptPath = path.normalize(
-      path.join(__dirname, "scripts", "analyze_ifc.py")
-    ); // Normalize path
+    let filePath = path.resolve(req.file.path); // Resolve to absolute path
+    let scriptPath = path.resolve(__dirname, "../../scripts/analyze_ifc.py");
 
     console.log(`Script path: ${scriptPath}`);
     console.log(`File path: ${filePath}`);
