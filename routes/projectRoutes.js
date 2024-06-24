@@ -172,18 +172,14 @@ async function findBestMatchForMaterial(
 // API Routes: File Upload and Material Matching
 // ------------------------------------------
 
+const path = require("path");
+const { execFile } = require("child_process");
+const multer = require("multer");
+const fs = require("fs").promises;
+
 // Setup Multer for file upload
 const upload = multer({ dest: path.resolve(__dirname, "uploads") });
 
-// Function to determine the correct Python command based on the platform
-function getPythonCommand() {
-  if (process.env.PYTHON_CMD) {
-    return process.env.PYTHON_CMD; // Use environment variable if set
-  }
-  return process.platform === "win32" ? "python" : "python";
-}
-
-// POST endpoint for IFC file upload and initial material matching
 router.post(
   "/api/projects/:projectId/upload",
   isAuthenticated,
@@ -196,8 +192,8 @@ router.post(
     }
 
     const projectId = req.params.projectId;
-    let filePath = path.resolve(req.file.path); // Resolve to absolute path
-    let scriptPath = "/var/www/ifclca/IfcLCA/scripts/analyze_ifc.py";
+    const filePath = path.resolve(req.file.path); // Resolve to absolute path
+    const scriptPath = "/var/www/ifclca/IfcLCA/scripts/analyze_ifc.py"; // Correct path to the script
 
     console.log(`Script path: ${scriptPath}`);
     console.log(`File path: ${filePath}`);
@@ -207,8 +203,9 @@ router.post(
       // Execute the Python script and wait for it to complete
       await new Promise((resolve, reject) => {
         execFile(
-          getPythonCommand(),
+          "python", // Use 'python' as the command
           [scriptPath, filePath, projectId],
+          { shell: true }, // Use shell to handle special characters
           (error, stdout, stderr) => {
             if (error) {
               console.error(`execFile error: ${error.message}`);
@@ -317,12 +314,13 @@ router.post(
         totalCarbonFootprint: totalFootprint,
       });
 
-      // Redirect to the project page or send a response to the client
-      res.redirect(`/projects/${projectId}`);
+      // Send a response to the client
       res.status(200).send("File processed successfully.");
     } catch (error) {
       console.error(`Processing error: ${error.message}`);
-      res.status(500).send(`Processing failed: ${error.message}`);
+      if (!res.headersSent) {
+        res.status(500).send(`Processing failed: ${error.message}`);
+      }
     }
   }
 );
