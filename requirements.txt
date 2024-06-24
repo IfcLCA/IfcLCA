@@ -1,4 +1,3 @@
 ifcopenshell
 pymongo
 python-dotenv
-OCC-Core

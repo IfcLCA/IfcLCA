@@ -1,8 +1,10 @@
+#!/opt/miniconda3/bin/python
+
 import sys
 import ifcopenshell
 from ifcopenshell import geom
-from OCC.Core.BRepGProp import brepgprop_VolumeProperties
 from OCC.Core.GProp import GProp_GProps
+from OCC.Core.BRepGProp import brepgprop_VolumeProperties
 from collections import Counter
 from pymongo import MongoClient
 from bson import ObjectId
@@ -116,15 +118,6 @@ def get_layer_volumes_and_materials(ifc_file, element, total_volume):
 
 
 def calculate_volume(shape):
-    """
-    Calculates the volume of a given shape using Open CASCADE technology.
-
-    Args:§
-        shape: The geometric shape object.
-
-    Returns:
-        volume (float): The calculated volume of the shape.
-    """
     prop = GProp_GProps()
     brepgprop_VolumeProperties(shape.geometry, prop)
     return prop.Mass()
