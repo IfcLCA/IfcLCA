@@ -309,8 +309,8 @@ router.post(
         totalCarbonFootprint: totalFootprint,
       });
 
-      // Send a response to the client
-      res.status(200).send("File processed successfully.");
+      // redirect to project home
+      res.redirect(`/projects/${projectId}`);
     } catch (error) {
       console.error(`Processing error: ${error.message}`);
       if (!res.headersSent) {
