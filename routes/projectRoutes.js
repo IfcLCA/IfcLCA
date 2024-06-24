@@ -172,7 +172,7 @@ async function findBestMatchForMaterial(
 // API Routes: File Upload and Material Matching
 // ------------------------------------------
 
-// Setup Multer for file upload
+// Setup Multer for file uploads
 const upload = multer({ dest: path.resolve(__dirname, "..", "uploads") });
 
 router.post(
