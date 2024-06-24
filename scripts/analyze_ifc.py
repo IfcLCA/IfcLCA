@@ -227,8 +227,10 @@ def main(file_path, projectId):
     """
     Main function to process the IFC file and store data in MongoDB.
     """
-    client = MongoClient(os.getenv("DATABASE_URL"))
-    db = client["IfcLCAdata_01"]
+    database_url = os.getenv("DATABASE_URL")
+    client = MongoClient(database_url)
+    db_name = database_url.split('/')[-1].split('?')[0]  # Extract the database name
+    db = client[db_name]  
     collection = db["building_elements"]
 
     ifc_file = open_ifc_file(file_path)

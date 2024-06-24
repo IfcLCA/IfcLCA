@@ -8,7 +8,7 @@ const router = express.Router();
 const Project = require("../models/Project");
 const { isAuthenticated } = require("./middleware/authMiddleware");
 const multer = require("multer");
-const { exec } = require("child_process");
+const { execFile } = require("child_process");
 const fs = require("fs").promises;
 const path = require("path");
 const Fuse = require("fuse.js");
@@ -173,7 +173,15 @@ async function findBestMatchForMaterial(
 // ------------------------------------------
 
 // Setup Multer for file upload
-const upload = multer({ dest: "uploads/" });
+const upload = multer({ dest: path.resolve(__dirname, "uploads") });
+
+// Function to determine the correct Python command based on the platform
+function getPythonCommand() {
+  if (process.env.PYTHON_CMD) {
+    return process.env.PYTHON_CMD; // Use environment variable if set
+  }
+  return process.platform === "win32" ? "python" : "python3";
+}
 
 // POST endpoint for IFC file upload and initial material matching
 router.post(
@@ -181,38 +189,45 @@ router.post(
   isAuthenticated,
   upload.single("ifcFile"),
   async (req, res) => {
+    console.log("Upload endpoint hit.");
     if (!req.file) {
+      console.error("No file uploaded.");
       return res.status(400).send("No file uploaded.");
     }
 
     const projectId = req.params.projectId;
-    const filePath = req.file.path;
+    const filePath = path.normalize(req.file.path); // Normalize path
+    const scriptPath = path.normalize(
+      path.join(__dirname, "scripts", "analyze_ifc.py")
+    ); // Normalize path
+
+    console.log(`Script path: ${scriptPath}`);
+    console.log(`File path: ${filePath}`);
+    console.log(`Running on platform: ${process.platform}`);
 
     try {
-      // Ensure no old elements for the project
-      await BuildingElement.deleteMany({ projectId });
-
       // Execute the Python script and wait for it to complete
       await new Promise((resolve, reject) => {
-        exec(
-          `${
-            process.env.PYTHON_CMD || "python"
-          } scripts/analyze_ifc.py "${filePath}" "${projectId}"`,
+        execFile(
+          getPythonCommand(),
+          [scriptPath, filePath, projectId],
           (error, stdout, stderr) => {
             if (error) {
-              console.error(`exec error: ${error}`);
-              console.error(`Analysis script stderr: ${stderr}`);
+              console.error(`execFile error: ${error.message}`);
+              console.error(`stderr: ${stderr}`);
               return reject(
                 new Error(`Python script execution failed: ${stderr}`)
               );
             }
+            console.log(`stdout: ${stdout}`);
             resolve(stdout);
           }
         );
       });
 
       // Remove the uploaded file after processing
-      await safeUnlink(filePath);
+      console.log(`Removing uploaded file: ${filePath}`);
+      await fs.unlink(filePath);
 
       // Fetch and process building elements
       const buildingElements = await BuildingElement.find({ projectId }).lean();
@@ -306,11 +321,10 @@ router.post(
 
       // Redirect to the project page or send a response to the client
       res.redirect(`/projects/${projectId}`);
+      res.status(200).send("File processed successfully.");
     } catch (error) {
-      // Remove the uploaded file if there's an error
-      await safeUnlink(filePath);
-      console.error("Error handling IFC upload:", error);
-      res.status(500).json({ error: error.message });
+      console.error(`Processing error: ${error.message}`);
+      res.status(500).send(`Processing failed: ${error.message}`);
     }
   }
 );
@@ -391,9 +405,7 @@ router.get("/newProject", isAuthenticated, (req, res) => {
 router.get("/projects/:projectId", isAuthenticated, async (req, res) => {
   try {
     const projectId = req.params.projectId;
-    const project = await Project.findById(projectId).populate(
-      "building_elements"
-    );
+    const project = await Project.findById(projectId);
     if (!project) {
       return res.status(404).send("Project not found");
     }
