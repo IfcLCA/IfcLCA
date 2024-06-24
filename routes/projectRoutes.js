@@ -195,6 +195,10 @@ router.post(
     console.log(`Running on platform: ${process.platform}`);
 
     try {
+      // Log the exact command being executed
+      const pythonCommand = `python ${scriptPath} ${filePath} ${projectId}`;
+      console.log(`Executing command: ${pythonCommand}`);
+
       // Execute the Python script and wait for it to complete
       await new Promise((resolve, reject) => {
         execFile(
