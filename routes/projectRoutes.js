@@ -180,7 +180,7 @@ function getPythonCommand() {
   if (process.env.PYTHON_CMD) {
     return process.env.PYTHON_CMD; // Use environment variable if set
   }
-  return process.platform === "win32" ? "python" : "python3";
+  return process.platform === "win32" ? "python" : "python";
 }
 
 // POST endpoint for IFC file upload and initial material matching
