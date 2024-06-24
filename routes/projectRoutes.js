@@ -197,7 +197,7 @@ router.post(
 
     const projectId = req.params.projectId;
     let filePath = path.resolve(req.file.path); // Resolve to absolute path
-    let scriptPath = path.resolve(__dirname, "../../scripts/analyze_ifc.py");
+    let scriptPath = "/var/www/ifclca/IfcLCA/scripts/analyze_ifc.py";
 
     console.log(`Script path: ${scriptPath}`);
     console.log(`File path: ${filePath}`);
