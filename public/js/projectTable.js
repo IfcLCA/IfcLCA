@@ -299,6 +299,52 @@ function toggleOverlay(isEmpty) {
   }
 }
 
+// Function to handle the file input and link click
+function setupOverlayLink() {
+  const uploadLink = document.getElementById("upload-link");
+  const hiddenFileInput = document.getElementById("hidden-file-input");
+
+  if (uploadLink && hiddenFileInput) {
+    uploadLink.addEventListener("click", function (event) {
+      event.preventDefault();
+      console.log("Upload link clicked");
+      hiddenFileInput.click();
+    });
+
+    hiddenFileInput.addEventListener("change", function () {
+      console.log("File input changed");
+      const projectId = window.location.pathname.split("/").pop();
+      const formData = new FormData();
+      formData.append("ifcFile", hiddenFileInput.files[0]);
+
+      fetch(`/api/projects/${projectId}/upload`, {
+        method: "POST",
+        body: formData,
+      })
+        .then((response) => {
+          if (!response.ok) {
+            throw new Error("File upload failed");
+          }
+          return response.json();
+        })
+        .then((data) => {
+          console.log("File uploaded successfully");
+          window.location.reload();
+        })
+        .catch((error) => {
+          console.error("Error uploading file:", error);
+        });
+    });
+  }
+}
+
+document.addEventListener("DOMContentLoaded", function () {
+  // Existing code...
+
+  // Call this function to set up the upload link and file input
+  setupOverlayLink();
+});
+
 // Show or hide notification for invalid densities
 function toggleInvalidDensityNotification(hasInvalidDensities) {
   const notification = document.getElementById("invalid-density-notification");

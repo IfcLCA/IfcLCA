@@ -138,9 +138,10 @@
     </div>
     <div id="elements-table-container" style="position: relative;">
         <div id="elements-table" class="mt-4"></div>
-        <div id="table-overlay" class="overlay">Upload an IFC file to see data</div>
-    </div>
-
+        <div id="table-overlay" class="overlay">
+            <p>Upload any <a href="#" id="upload-link">IFC file</a> to see data</p>
+            <input type="file" id="hidden-file-input" style="display: none;" />
+        </div>        
     <!-- Notification for Invalid Densities -->
     <div id="invalid-density-notification" style="display:none; position:fixed; top:50%; left:50%; transform:translate(-50%, -50%); background:#ffc; border:1px solid #ffa; padding:10px; border-radius:5px; z-index:1000; box-shadow: 0 2px 5px rgba(0,0,0,0.2); font-size:14px; color:#a00;">
         <p>Some density fields are invalid. Please check and enter valid values.</p>
