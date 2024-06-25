@@ -45,6 +45,7 @@ document.addEventListener("DOMContentLoaded", function () {
       });
     });
   }
+  setupOverlayLink();
 });
 
 // ------------------------------------------
@@ -337,13 +338,6 @@ function setupOverlayLink() {
     });
   }
 }
-
-document.addEventListener("DOMContentLoaded", function () {
-  // Existing code...
-
-  // Call this function to set up the upload link and file input
-  setupOverlayLink();
-});
 
 // Show or hide notification for invalid densities
 function toggleInvalidDensityNotification(hasInvalidDensities) {
