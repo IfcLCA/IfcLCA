@@ -1,11 +1,9 @@
 const isAuthenticated = (req, res, next) => {
   if (req.session && req.session.userId) {
-    return next(); // User is authenticated, proceed to the next middleware/route handler
+    return next();
   } else {
-    return res.status(401).send("You are not authenticated"); // User is not authenticated
+    return res.redirect("/auth/login");
   }
 };
 
-module.exports = {
-  isAuthenticated,
-};
+module.exports = { isAuthenticated };

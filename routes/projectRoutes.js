@@ -8,7 +8,7 @@ const router = express.Router();
 const Project = require("../models/Project");
 const { isAuthenticated } = require("./middleware/authMiddleware");
 const multer = require("multer");
-const { exec } = require("child_process");
+const { spawn } = require("child_process");
 const fs = require("fs").promises;
 const path = require("path");
 const Fuse = require("fuse.js");
@@ -194,25 +194,36 @@ router.post(
 
       // Execute the Python script and wait for it to complete
       await new Promise((resolve, reject) => {
-        exec(
-          `${
-            process.env.PYTHON_CMD || "python"
-          } scripts/analyze_ifc.py "${filePath}" "${projectId}"`,
-          (error, stdout, stderr) => {
-            if (error) {
-              console.error(`exec error: ${error}`);
-              console.error(`Analysis script stderr: ${stderr}`);
-              return reject(
-                new Error(`Python script execution failed: ${stderr}`)
-              );
-            }
-            resolve(stdout);
-          }
-        );
-      });
+        const pythonPath = "/opt/miniconda3/bin/python";
+        const scriptPath = "/var/www/ifclca/IfcLCA/scripts/analyze_ifc.py"; // Absolute path
+        const args = [scriptPath, filePath, projectId];
 
-      // Remove the uploaded file after processing
-      await safeUnlink(filePath);
+        const subprocess = spawn(pythonPath, args, {
+          cwd: "/var/www/ifclca/IfcLCA",
+        });
+
+        let stdoutData = "";
+        let stderrData = "";
+
+        subprocess.stdout.on("data", (data) => {
+          console.log(`stdout: ${data}`);
+          stdoutData += data.toString();
+        });
+
+        subprocess.stderr.on("data", (data) => {
+          console.error(`stderr: ${data}`);
+          stderrData += data.toString();
+        });
+
+        subprocess.on("close", (code) => {
+          if (code !== 0) {
+            return reject(
+              new Error(`Python script exited with code ${code}: ${stderrData}`)
+            );
+          }
+          resolve(stdoutData);
+        });
+      });
 
       // Fetch and process building elements
       const buildingElements = await BuildingElement.find({ projectId }).lean();
@@ -306,6 +317,9 @@ router.post(
 
       // Redirect to the project page or send a response to the client
       res.redirect(`/projects/${projectId}`);
+
+      // Remove the uploaded file after processing
+      await safeUnlink(filePath);
     } catch (error) {
       // Remove the uploaded file if there's an error
       await safeUnlink(filePath);
