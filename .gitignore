@@ -133,3 +133,5 @@ uploads/
 
 venv/
 .aider*
+
+ecosystem.config.js
