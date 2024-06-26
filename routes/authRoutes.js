@@ -149,4 +149,89 @@ router.get("/auth/logout", (req, res) => {
   });
 });
 
+// Show forgot password form
+router.get("/auth/forgot-password", (req, res) => {
+  res.render("forgot-password");
+});
+
+// Handle forgot password form submission
+router.post("/auth/forgot-password", async (req, res) => {
+  const { email } = req.body;
+  const user = await User.findOne({ username: email });
+
+  if (!user) {
+    return res.status(400).send("No user with that email address");
+  }
+
+  const token = crypto.randomBytes(32).toString("hex");
+  user.resetPasswordToken = token;
+  user.resetPasswordExpires = Date.now() + 3600000; // 1 hour
+  await user.save();
+
+  const emailTemplatePath = path.join(
+    __dirname,
+    "../views/emailTemplates/forgotPasswordTemplate.html"
+  );
+  const emailTemplate = await fs.promises.readFile(emailTemplatePath, "utf-8");
+
+  const emailContent = emailTemplate.replace(
+    /<%= resetUrl %>/g,
+    `http://${req.headers.host}/auth/reset/${token}`
+  );
+
+  const mailOptions = {
+    to: user.username,
+    from: process.env.EMAIL_USER,
+    subject: "Password Reset",
+    html: emailContent,
+  };
+
+  await transporter.sendMail(mailOptions);
+
+  res.redirect(
+    "/auth/login?message=Password reset email sent. Please check your inbox."
+  );
+});
+
+// Show reset password form
+router.get("/auth/reset/:token", async (req, res) => {
+  const user = await User.findOne({
+    resetPasswordToken: req.params.token,
+    resetPasswordExpires: { $gt: Date.now() },
+  });
+
+  if (!user) {
+    return res
+      .status(400)
+      .send("Password reset token is invalid or has expired.");
+  }
+
+  res.render("reset-password", { token: req.params.token });
+});
+
+// Handle reset password form submission
+router.post("/auth/reset/:token", async (req, res) => {
+  const user = await User.findOne({
+    resetPasswordToken: req.params.token,
+    resetPasswordExpires: { $gt: Date.now() },
+  });
+
+  if (!user) {
+    return res
+      .status(400)
+      .send("Password reset token is invalid or has expired.");
+  }
+
+  if (req.body.password !== req.body.confirm) {
+    return res.status(400).send("Passwords do not match.");
+  }
+
+  user.password = await bcrypt.hash(req.body.password, 10); // Hash the password before saving
+  user.resetPasswordToken = undefined;
+  user.resetPasswordExpires = undefined;
+  await user.save();
+
+  res.redirect("/auth/login?message=Password has been reset successfully.");
+});
+
 module.exports = router;
