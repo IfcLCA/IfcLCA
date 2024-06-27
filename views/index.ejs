@@ -1,6 +1,24 @@
 <!DOCTYPE html>
 <html lang="en">
-  <%- include('partials/_head.ejs') %>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      name="description"
+      content="IfcLCA - Your free and open-source tool for uploading and analyzing IFC files for sustainable construction."
+    />
+    <title>IfcLCA - Free and Open-Source IFC File Analysis</title>
+    <link
+      rel="stylesheet"
+      href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css"
+    />
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css"
+    />
+    <link rel="stylesheet" href="/css/styles.css" />
+    <%- include('partials/_head.ejs') %>
+  </head>
   <body>
     <%- include('partials/_header.ejs') %>
     <main role="main" class="container mt-4">
@@ -21,7 +39,7 @@
           break. We highly value your feedback to help us improve.<br />
           If you encounter any issues or have suggestions, please open a
           <a
-            href="https://github.com/your-repo/issues"
+            href="https://github.com/IfcLCA/IfcLCA/issues"
             target="_blank"
             style="color: #ff5722; text-decoration: underline"
             >GitHub issue</a
@@ -30,66 +48,69 @@
       </section>
 
       <!-- Action Call Section -->
-      <div class="text-center action-call" style="margin-top: 50px">
-        <a href="/newProject" class="btn btn-primary"
-          >Start Your Sustainable Project</a
+      <div class="text-center action-call mt-5">
+        <a href="/newProject" class="btn btn-primary btn-lg"
+          ><i class="fas fa-upload"></i> Start Your Sustainable Project</a
         >
       </div>
 
       <!-- Features Section -->
       <section class="features mt-5">
-        <div
-          class="container d-flex justify-content-center"
-          style="max-width: 100%"
-        >
-          <div class="row" style="max-width: 100%">
+        <div class="container">
+          <div class="row">
             <div class="col-12 col-md-4 mb-4">
-              <div class="card shadow" style="max-width: 500px; margin: 0 auto">
+              <div class="card shadow-sm h-100">
                 <img
                   src="/images/dashboard-preview.png"
                   class="card-img-top"
                   alt="Dashboard Preview"
                 />
                 <div class="card-body">
-                  <h5 class="card-title">Intuitive Dashboard</h5>
+                  <h5 class="card-title">
+                    <i class="fas fa-tachometer-alt"></i> Easy File Upload
+                  </h5>
                   <p class="card-text">
-                    Effortlessly manage your projects with an intuitive
-                    dashboard that provides comprehensive insights into your
-                    sustainability metrics.
+                    Easily upload any IFC file without any special requirements.
+                    Start analyzing your building data quickly and efficiently.
                   </p>
                 </div>
               </div>
             </div>
             <div class="col-12 col-md-4 mb-4">
-              <div class="card shadow" style="max-width: 500px; margin: 0 auto">
+              <div class="card shadow-sm h-100">
                 <img
                   src="/images/calculations-preview.png"
                   class="card-img-top"
                   alt="Calculations Preview"
                 />
                 <div class="card-body">
-                  <h5 class="card-title">Real-Time Analytics</h5>
+                  <h5 class="card-title">
+                    <i class="fas fa-chart-line"></i> Automatic Impact
+                    Calculation
+                  </h5>
                   <p class="card-text">
-                    Make data-driven decisions with real-time LCA calculations,
-                    enabling your team to assess and optimize the sustainability
-                    of your projects.
+                    Automatically calculate the environmental impact of
+                    materials in your uploaded IFC file. Easily edit and adjust
+                    the calculations to fit your project's needs.
                   </p>
                 </div>
               </div>
             </div>
             <div class="col-12 col-md-4 mb-4">
-              <div class="card shadow" style="max-width: 500px; margin: 0 auto">
+              <div class="card shadow-sm h-100">
                 <img
                   src="/images/reports-preview.png"
                   class="card-img-top"
                   alt="Reports Preview"
                 />
                 <div class="card-body">
-                  <h5 class="card-title">User-Centric Design</h5>
+                  <h5 class="card-title">
+                    <i class="fas fa-users"></i> Open-Source & Community
+                  </h5>
                   <p class="card-text">
-                    Our solution is crafted to meet today's sustainability
-                    challenges, offering a user-friendly interface and
-                    customizable options for seamless LCA integration.
+                    Benefit from a completely open-source platform and join a
+                    community of like-minded professionals. Customize and extend
+                    functionalities to suit your specific project needs.
                   </p>
                 </div>
               </div>
@@ -98,6 +119,19 @@
         </div>
       </section>
 
+      <!-- New Features Announcement Section -->
+      <section class="new-features">
+        <div class="container">
+          <h3>Exciting New Features Coming Soon! 🚀</h3>
+          <p>
+            Stay tuned for more features and enhancements as we continue to
+            develop and improve IfcLCA. Your feedback and contributions are
+            invaluable!
+          </p>
+        </div>
+      </section>
+
+      <!-- Open-Source Invitation Section -->
       <section class="open-source-invitation text-center mt-5">
         <div class="container">
           <h3>Join Our Open-Source Community</h3>
@@ -105,7 +139,9 @@
             Contribute to a greener future by collaborating on IfcLCA. Together,
             we can innovate for sustainability in construction.
           </p>
-          <a href="/opensource" class="btn btn-success">Get Involved</a>
+          <a href="/opensource" class="btn btn-success btn-lg"
+            ><i class="fas fa-hands-helping"></i> Get Involved</a
+          >
         </div>
       </section>
     </main>

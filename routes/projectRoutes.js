@@ -173,7 +173,16 @@ async function findBestMatchForMaterial(
 // ------------------------------------------
 
 // Setup Multer for file upload
-const upload = multer({ dest: "uploads/" });
+const upload = multer({
+  dest: "uploads/",
+  fileFilter: (req, file, cb) => {
+    if (file.originalname.endsWith(".ifc")) {
+      cb(null, true);
+    } else {
+      cb(null, false);
+    }
+  },
+});
 
 // POST endpoint for IFC file upload and initial material matching
 router.post(
@@ -181,11 +190,13 @@ router.post(
   isAuthenticated,
   upload.single("ifcFile"),
   async (req, res) => {
+    const projectId = req.params.projectId;
     if (!req.file) {
-      return res.status(400).send("No file uploaded.");
+      return res.redirect(
+        `/projects/${projectId}?error=Only .ifc files are allowed.`
+      );
     }
 
-    const projectId = req.params.projectId;
     const filePath = req.file.path;
 
     try {

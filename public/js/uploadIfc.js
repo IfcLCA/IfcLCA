@@ -5,6 +5,18 @@ document.addEventListener("DOMContentLoaded", function () {
 
   uploadForm.addEventListener("submit", function (event) {
     event.preventDefault();
+    const fileInput = document.querySelector('input[type="file"]');
+    const file = fileInput.files[0];
+
+    // Client-side validation for file extension
+    if (!file.name.endsWith(".ifc")) {
+      messageContainer.textContent = "Error: Only .ifc files are allowed.";
+      setTimeout(() => {
+        window.location.href = `/projects/${projectId}`;
+      }, 5000);
+      return;
+    }
+
     const formData = new FormData(uploadForm);
 
     fetch(`/api/projects/${projectId}/upload`, {
