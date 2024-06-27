@@ -17,13 +17,38 @@
       href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css"
     />
     <link rel="stylesheet" href="/css/styles.css" />
+    <style>
+      body.index-bg {
+        background-image: url("/images/bg_index.png");
+        background-size: cover;
+        background-position: center - center;
+        background-attachment: fixed;
+      }
+      .features .card {
+        transition: transform 0.3s ease-in-out;
+        background-color: #fff;
+        color: #333;
+      }
+      .features .card:hover {
+        transform: translateY(-10px);
+      }
+      .new-features {
+        background-color: #f1f1f1;
+        padding: 20px;
+        border-radius: 10px;
+        color: #333;
+        max-width: 1250px;
+        margin: 0 auto;
+      }
+    </style>
+
     <%- include('partials/_head.ejs') %>
   </head>
-  <body>
+  <body class="index-bg">
     <%- include('partials/_header.ejs') %>
     <main role="main" class="container mt-4">
       <!-- Welcome Section -->
-      <div class="text-center">
+      <div class="text-center header-bg">
         <h1>Welcome to IfcLCA</h1>
         <p class="tagline">
           Your trusted partner in sustainable construction analytics
@@ -36,14 +61,15 @@
         <p style="color: #e64a19; font-weight: bold">
           Please note that IfcLCA is currently in beta. Features and
           functionality are still under development, and things may change or
-          break. We highly value your feedback to help us improve.<br />
+          break. <br />
           If you encounter any issues or have suggestions, please open a
           <a
             href="https://github.com/IfcLCA/IfcLCA/issues"
             target="_blank"
             style="color: #ff5722; text-decoration: underline"
             >GitHub issue</a
-          >. Thank you for your understanding and contributions!
+          >. Thank you for your understanding and contributions. <br />
+          We highly value your feedback to help us improve.
         </p>
       </section>
 
@@ -60,11 +86,6 @@
           <div class="row">
             <div class="col-12 col-md-4 mb-4">
               <div class="card shadow-sm h-100">
-                <img
-                  src="/images/dashboard-preview.png"
-                  class="card-img-top"
-                  alt="Dashboard Preview"
-                />
                 <div class="card-body">
                   <h5 class="card-title">
                     <i class="fas fa-tachometer-alt"></i> Easy File Upload
@@ -78,11 +99,6 @@
             </div>
             <div class="col-12 col-md-4 mb-4">
               <div class="card shadow-sm h-100">
-                <img
-                  src="/images/calculations-preview.png"
-                  class="card-img-top"
-                  alt="Calculations Preview"
-                />
                 <div class="card-body">
                   <h5 class="card-title">
                     <i class="fas fa-chart-line"></i> Automatic Impact
@@ -98,11 +114,6 @@
             </div>
             <div class="col-12 col-md-4 mb-4">
               <div class="card shadow-sm h-100">
-                <img
-                  src="/images/reports-preview.png"
-                  class="card-img-top"
-                  alt="Reports Preview"
-                />
                 <div class="card-body">
                   <h5 class="card-title">
                     <i class="fas fa-users"></i> Open-Source & Community
@@ -120,9 +131,9 @@
       </section>
 
       <!-- New Features Announcement Section -->
-      <section class="new-features">
+      <section class="new-features text-center mt-5">
         <div class="container">
-          <h3>Exciting New Features Coming Soon! 🚀</h3>
+          <h3>🚀 Exciting New Features Coming Soon 🚀</h3>
           <p>
             Stay tuned for more features and enhancements as we continue to
             develop and improve IfcLCA. Your feedback and contributions are
@@ -145,6 +156,7 @@
         </div>
       </section>
     </main>
+
     <%- include('partials/_footer.ejs') %>
     <script src="/js/main.js"></script>
   </body>
