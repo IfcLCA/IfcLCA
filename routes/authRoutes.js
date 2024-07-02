@@ -42,15 +42,27 @@ router.post("/auth/register", authRateLimiter, async (req, res) => {
     const token = crypto.randomBytes(32).toString("hex");
     const firstName = extractFirstName(username);
 
-    // Create the user with a confirmation token but don't activate yet
-    const newUser = new User({
-      username,
-      password, // Will be hashed in the pre-save hook
-      confirmationToken: token,
-      isActive: false,
-    });
+    // Check if the user already exists
+    let user = await User.findOne({ username });
 
-    await newUser.save();
+    if (user && !user.isActive) {
+      // If user exists and is not active, update token and password
+      user.password = password; // Will be hashed in the pre-save hook
+      user.confirmationToken = token;
+      await user.save();
+    } else if (!user) {
+      // Create a new user
+      user = new User({
+        username,
+        password, // Will be hashed in the pre-save hook
+        confirmationToken: token,
+        isActive: false,
+      });
+      await user.save();
+    } else {
+      // If user is active, prevent registration
+      return res.status(400).send("User already exists and is active.");
+    }
 
     // Read the email template
     const emailTemplatePath = path.join(
@@ -77,7 +89,7 @@ router.post("/auth/register", authRateLimiter, async (req, res) => {
     });
 
     res.redirect(
-      "/auth/login?message=Confirmation email sent. Please check your inbox."
+      "/auth/login?message=Confirmation email sent. Please check your inbox❗and possibly your spam folder ❗"
     );
   } catch (error) {
     console.error("Registration error:", error);
