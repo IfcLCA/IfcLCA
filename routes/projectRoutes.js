@@ -236,6 +236,15 @@ router.post(
         });
       });
 
+      // Parse the output from the Python script
+      const parsedData = JSON.parse(stdoutData);
+
+      // Respond to the frontend with the basic IFC information
+      res.json({
+        elementCount: parsedData.elementCount,
+        uniqueMaterials: parsedData.uniqueMaterials,
+      });
+
       // Fetch and process building elements
       const buildingElements = await BuildingElement.find({ projectId }).lean();
       const carbonMaterials = await CarbonMaterial.find({}).lean();

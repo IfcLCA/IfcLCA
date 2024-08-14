@@ -2,6 +2,8 @@ document.addEventListener("DOMContentLoaded", function () {
   const uploadForm = document.getElementById("ifcUploadForm");
   const messageContainer = document.getElementById("uploadMessage");
   const projectId = window.location.pathname.split("/").pop();
+  const progressBar = document.getElementById("uploadProgressBar");
+  const spinner = document.getElementById("uploadSpinner");
 
   uploadForm.addEventListener("submit", function (event) {
     event.preventDefault();
@@ -19,6 +21,10 @@ document.addEventListener("DOMContentLoaded", function () {
 
     const formData = new FormData(uploadForm);
 
+    // Show progress bar and spinner
+    progressBar.style.display = "block";
+    spinner.style.display = "block";
+
     fetch(`/api/projects/${projectId}/upload`, {
       method: "POST",
       body: formData,
@@ -30,13 +36,26 @@ document.addEventListener("DOMContentLoaded", function () {
         return response.json();
       })
       .then((data) => {
-        messageContainer.textContent =
-          "File uploaded and processed successfully.";
+        // Hide progress bar and spinner
+        progressBar.style.display = "none";
+        spinner.style.display = "none";
+
+        // Display the basic IFC information
+        messageContainer.innerHTML = `
+          <p>File uploaded and processed successfully.</p>
+          <p>Number of elements: ${data.elementCount}</p>
+          <p>Number of unique materials: ${data.uniqueMaterials.length}</p>
+          <p>Materials: ${data.uniqueMaterials.join(", ")}</p>
+        `;
         setTimeout(() => {
           window.location.reload();
-        }, 2000);
+        }, 5000);
       })
       .catch((error) => {
+        // Hide progress bar and spinner
+        progressBar.style.display = "none";
+        spinner.style.display = "none";
+
         messageContainer.textContent = `Error: ${error.message}`;
       });
   });
