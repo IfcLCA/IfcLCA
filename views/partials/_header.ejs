@@ -22,6 +22,12 @@
           </li>
         <% } else if (page === 'projectHome' && project) { %>
           <li class="nav-item">
+            <!-- Green Export button -->
+            <a href="/api/projects/<%= project._id %>/export" class="btn btn-success mr-2">
+              <strong>Export</strong>
+            </a>
+          </li>
+          <li class="nav-item">
             <!-- Button to trigger file input -->
             <button type="button" class="btn btn-primary" onclick="document.getElementById('hiddenFileInput').click();">
               <strong>upload IFC</strong>
