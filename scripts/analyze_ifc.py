@@ -30,36 +30,99 @@ def load_ifc_data(ifc_file):
         sys.exit(1)
     return elements
 
-def get_class_metadata(elements):
+def calculate_bounding_box(curve):
     """
-    Returns a Counter object with the number of elements per IFC class
-    and a set of unique class names.
+    Calculate the bounding box for an IfcIndexedPolyCurve by examining the points
+    in the IfcCartesianPointList2D.
+
+    :param curve: An IfcIndexedPolyCurve that defines the profile's boundary.
+    :return: A dictionary with the bounding box dimensions: {"width": width, "height": height}
     """
-    class_counter = Counter()
-    unique_classes = set()
+    if not curve.is_a("IfcIndexedPolyCurve"):
+        raise NotImplementedError(f"Curve type {curve.is_a()} not supported for bounding box calculation.")
+    
+    point_list = curve.Points
+    coordinates = point_list.CoordList
 
-    for element in elements:
-        class_name = element.is_a()
-        class_counter[class_name] += 1
-        unique_classes.add(class_name)
+    # Initialize min and max coordinates with extreme values
+    min_x = float('inf')
+    max_x = float('-inf')
+    min_y = float('inf')
+    max_y = float('-inf')
 
-    return class_counter, unique_classes
+    # Iterate over the coordinate pairs
+    for coord in coordinates:
+        x, y = coord[0], coord[1]
+        
+        if x < min_x:
+            min_x = x
+        if x > max_x:
+            max_x = x
+        if y < min_y:
+            min_y = y
+        if y > max_y:
+            max_y = y
+
+    # Calculate the width and height of the bounding box
+    width = max_x - min_x
+    height = max_y - min_y
+
+    return {"width": width, "height": height}
+
+def approximate_arbitrary_profile_area(profile):
+    """
+    Approximate the area of an IfcArbitraryClosedProfileDef by assuming a bounding rectangle.
+    """
+    curve = profile.OuterCurve  # The boundary curve
+    bounding_box = calculate_bounding_box(curve)
+    area = bounding_box["width"] * bounding_box["height"]
+    return area
+
+def calculate_extruded_area_solid_volume(extruded_area_solid):
+    profile = extruded_area_solid.SweptArea
+    
+    if profile.is_a("IfcRectangleProfileDef"):
+        area = profile.XDim * profile.YDim
+    elif profile.is_a("IfcCircleProfileDef"):
+        radius = profile.Radius
+        area = 3.14159 * radius * radius
+    elif profile.is_a("IfcArbitraryClosedProfileDef"):
+        area = approximate_arbitrary_profile_area(profile)
+    else:
+        raise NotImplementedError(f"Profile type {profile.is_a()} not supported for area calculation.")
+
+    depth = extruded_area_solid.Depth
+    volume = area * depth
+
+    return volume
+
+def find_extruded_solid(element):
+    """
+    Finds an IfcExtrudedAreaSolid within the element's shape representation,
+    considering relationships through IfcShapeAspect and related entities.
+    """
+    if element.Representation:
+        for rep in element.Representation.Representations:
+            for item in rep.Items:
+                if item.is_a("IfcExtrudedAreaSolid"):
+                    return item
+
+    # Navigate through IfcShapeAspect if needed
+    if element.IsDefinedBy:
+        for rel in element.IsDefinedBy:
+            if rel.is_a("IfcRelDefinesByType"):
+                element_type = rel.RelatingType
+                if element_type.RepresentationMaps:
+                    for rep_map in element_type.RepresentationMaps:
+                        shape = rep_map.MappedRepresentation
+                        for item in shape.Items:
+                            if item.is_a("IfcExtrudedAreaSolid"):
+                                return item
+    return None
 
 def get_layer_volumes_and_materials(ifc_file, element, total_volume):
     material_layers_volumes = []
     material_layers_names = []
-
-    if ifc_file.schema == 'IFC4' or ifc_file.schema == 'IFC4X3':
-        # Dictionary to hold the widths of material constituents for volume calculation
-        constituent_widths = {}
-        # Retrieve all material constituents in the file
-        constituents = ifc_file.by_type("IfcMaterialConstituent")
-        for constituent in constituents:
-            # Attempt to find the next entity which might hold the quantity length
-            next_line_id = constituent.id() + 1
-            next_entity = ifc_file.by_id(next_line_id)
-            if next_entity and next_entity.is_a("IfcQuantityLength"):
-                constituent_widths[constituent.id()] = next_entity.LengthValue
 
     # Process associations to materials for the element
     if element.HasAssociations:
@@ -75,21 +138,19 @@ def get_layer_volumes_and_materials(ifc_file, element, total_volume):
                         layer_name = layer.Material.Name if layer.Material and layer.Material.Name else "Unnamed Material"
                         material_layers_volumes.append(round(layer_volume, 5))
                         material_layers_names.append(layer_name)
+
                 # Process material constituent sets (IFC4)
                 elif ifc_file.schema == 'IFC4' and material.is_a('IfcMaterialConstituentSet'):
-                    total_width = sum(constituent_widths.get(constituent.id(), 0) for constituent in material.MaterialConstituents)
-                    if total_width > 0:
-                        for constituent in material.MaterialConstituents:
-                            constituent_id = constituent.id()
-                            if constituent_id in constituent_widths:
-                                width = constituent_widths[constituent_id]
-                                proportion = width / total_width
-                                constituent_volume = total_volume * proportion
-                                constituent_name = constituent.Name if constituent.Name else "Unnamed Material"
-                                material_layers_volumes.append(round(constituent_volume, 5))
-                                material_layers_names.append(constituent_name)
+                    for constituent in material.MaterialConstituents:
+                        solid = find_extruded_solid(element)
+                        if solid and solid.is_a("IfcExtrudedAreaSolid"):
+                            volume = calculate_extruded_area_solid_volume(solid)
+                            constituent_name = constituent.Name if constituent.Name else "Unnamed Material"
+                            material_layers_volumes.append(round(volume, 5))
+                            material_layers_names.append(constituent_name)
 
     return material_layers_volumes, material_layers_names
+
 
 def calculate_volume(shape):
     prop = GProp_GProps()

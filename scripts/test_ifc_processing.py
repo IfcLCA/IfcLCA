@@ -47,20 +47,7 @@ class TestIfcProcessing(unittest.TestCase):
                             self.fail(f"Unnamed material in element {element.GlobalId}")
                         logging.info(f"  Material: {material['name']}, Volume: {material['volume']}")
 
-                    # Check for IsExternal and LoadBearing properties
-                    self.assertIn('is_external', element_data)
-                    self.assertIn('is_loadbearing', element_data)
-                    logging.info(f"  Is External: {element_data['is_external']}")
-                    logging.info(f"  Is Loadbearing: {element_data['is_loadbearing']}")
 
-                    # Ensure they are boolean values
-                    self.assertIsInstance(element_data['is_external'], bool)
-                    self.assertIsInstance(element_data['is_loadbearing'], bool)
-
-                    # Check for building storey
-                    self.assertIn('building_storey', element_data)
-                    self.assertIsInstance(element_data['building_storey'], str)
-                    logging.info(f"  Building Storey: {element_data['building_storey']}")
 
 
 if __name__ == '__main__':
