@@ -47,6 +47,7 @@ def get_layer_volumes_and_materials(ifc_file, element, total_volume):
                         material_layers_volumes.append(round(layer_volume, 5))
                         material_layers_names.append(layer_name)
 
+                #TODO: Add support for IfcMaterialConstituentSet by calculating volumes for each constituent (how to get from geometry to constituent isnt clear, maybe impossible...)
                 elif ifc_file.schema == 'IFC4' and material.is_a('IfcMaterialConstituentSet'):
                     # Use the first constituent's material for the entire element
                     first_constituent = material.MaterialConstituents[0]
