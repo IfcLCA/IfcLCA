@@ -1,6 +1,6 @@
 name: IfcLCA-app
 services:
-  - name: IfcLCA Preview
+  - name: ifclca-preview
     github:
       branch: main
       repo: IfcLCA/IfcLCA
