@@ -13,27 +13,10 @@ class TestIfcProcessing(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         # Directory containing test IFC files
-        cls.test_dir = 'C:/Users/LouisTrümpler/Documents/GitHub/01_IfcLCA/testfiles'
+        cls.test_dir = 'testfiles'
         cls.ifc_files = [os.path.join(cls.test_dir, file) for file in os.listdir(cls.test_dir) if file.endswith('.ifc')]
         cls.settings = geom.settings()
         cls.settings.set(cls.settings.USE_PYTHON_OPENCASCADE, True)
-
-    def test_open_ifc_files(self):
-        for ifc_file_path in self.ifc_files:
-            with self.subTest(ifc_file=ifc_file_path):
-                logging.info(f"\n---\nTesting file opening: {os.path.basename(ifc_file_path)}")
-                ifc_file = open_ifc_file(ifc_file_path)
-                self.assertIsInstance(ifc_file, ifcopenshell.file)
-                logging.info(f"Successfully opened IFC file: {os.path.basename(ifc_file_path)}")
-
-    def test_load_ifc_data(self):
-        for ifc_file_path in self.ifc_files:
-            with self.subTest(ifc_file=ifc_file_path):
-                logging.info(f"\n---\nLoading data from file: {os.path.basename(ifc_file_path)}")
-                ifc_file = open_ifc_file(ifc_file_path)
-                elements = load_ifc_data(ifc_file)
-                self.assertGreater(len(elements), 0)
-                logging.info(f"Loaded {len(elements)} elements from {os.path.basename(ifc_file_path)}")
 
     def test_process_elements(self):
         user_id = "test_user"
@@ -45,7 +28,7 @@ class TestIfcProcessing(unittest.TestCase):
                 logging.info(f"\n---\nProcessing elements in file: {os.path.basename(ifc_file_path)}")
                 ifc_file = open_ifc_file(ifc_file_path)
                 elements = load_ifc_data(ifc_file)
-                for i, element in enumerate(elements[:3]):  # Limiting to the first 3 elements for brevity
+                for i, element in enumerate(elements[:5]):  # Limiting to the first 5 elements for brevity
                     element_data = process_element(ifc_file, element, self.settings, ifc_file_path, user_id, session_id, projectId)
                     if element_data is None:
                         logging.error(f"Failed to process element {element.GlobalId} in {os.path.basename(ifc_file_path)}")
@@ -63,6 +46,22 @@ class TestIfcProcessing(unittest.TestCase):
                             logging.error(f"Unnamed material found in element {element.GlobalId} in {os.path.basename(ifc_file_path)}")
                             self.fail(f"Unnamed material in element {element.GlobalId}")
                         logging.info(f"  Material: {material['name']}, Volume: {material['volume']}")
+
+                    # Check for IsExternal and LoadBearing properties
+                    self.assertIn('is_external', element_data)
+                    self.assertIn('is_loadbearing', element_data)
+                    logging.info(f"  Is External: {element_data['is_external']}")
+                    logging.info(f"  Is Loadbearing: {element_data['is_loadbearing']}")
+
+                    # Ensure they are boolean values
+                    self.assertIsInstance(element_data['is_external'], bool)
+                    self.assertIsInstance(element_data['is_loadbearing'], bool)
+
+                    # Check for building storey
+                    self.assertIn('building_storey', element_data)
+                    self.assertIsInstance(element_data['building_storey'], str)
+                    logging.info(f"  Building Storey: {element_data['building_storey']}")
+
 
 if __name__ == '__main__':
     unittest.main()
