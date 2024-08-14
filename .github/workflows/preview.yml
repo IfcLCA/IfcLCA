@@ -24,20 +24,21 @@ jobs:
 
       - uses: actions/github-script@v7
         env:
-          BUILD_LOGS: ${{ steps.deploy.outputs.build_logs }}
-          DEPLOY_LOGS: ${{ steps.deploy.outputs.deploy_logs }}
+          APP_URL: ${{ fromJson(steps.deploy.outputs.app).live_url }}
         with:
           script: |
-            const { BUILD_LOGS, DEPLOY_LOGS } = process.env
             github.rest.issues.createComment({
               issue_number: context.issue.number,
               owner: context.repo.owner,
               repo: context.repo.repo,
-              body: `🚀 The app was successfully deployed at ${{ fromJson(steps.deploy.outputs.app).live_url }}.`
+              body: `🚀 The app was successfully deployed at ${process.env.APP_URL}.`
             })
 
       - uses: actions/github-script@v7
         if: failure()
+        env:
+          BUILD_LOGS: ${{ steps.deploy.outputs.build_logs || 'No build logs available.' }}
+          DEPLOY_LOGS: ${{ steps.deploy.outputs.deploy_logs || 'No deploy logs available.' }}
         with:
           script: |
             github.rest.issues.createComment({
@@ -51,7 +52,7 @@ jobs:
             <summary>Build logs</summary>
 
             \`\`\`
-            ${BUILD_LOGS}
+            ${process.env.BUILD_LOGS}
             \`\`\`
             </details>
 
@@ -59,7 +60,7 @@ jobs:
             <summary>Deploy logs</summary>
 
             \`\`\`
-            ${DEPLOY_LOGS}
+            ${process.env.DEPLOY_LOGS}
             \`\`\`
             </details>`
             })

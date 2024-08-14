@@ -3,4 +3,4 @@ services:
   - name: IfcLCA Preview
     github:
       branch: main
-      repo: https://github.com/IfcLCA/IfcLCA
+      repo: IfcLCA/IfcLCA
