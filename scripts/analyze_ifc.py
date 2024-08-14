@@ -9,45 +9,21 @@ from collections import Counter
 from pymongo import MongoClient
 from bson import ObjectId
 from dotenv import load_dotenv
+import re
 import os
+import asyncio
+from motor.motor_asyncio import AsyncIOMotorClient
 
-# Load environment variables from .env file
 load_dotenv()
 
-
 def open_ifc_file(file_path):
-    """
-    Opens an IFC file using ifcopenshell.
-
-    Args:
-        file_path (str): Path to the IFC file.
-
-    Returns:
-        ifc_file: The opened IFC file object.
-
-    Exits:
-        If the IFC file cannot be opened, the script exits with an error message.
-    """
     try:
-        ifc_file = ifcopenshell.open(file_path)
+        return ifcopenshell.open(file_path)
     except Exception as e:
         print(f"Error opening IFC file: {e}", file=sys.stderr)
         sys.exit(1)
-    return ifc_file
 
 def load_ifc_data(ifc_file):
-    """
-    Loads all elements of type 'IfcElement' from the IFC file.
-
-    Args:
-        ifc_file: The opened IFC file object.
-
-    Returns:
-        elements: A list of all building elements in the IFC file.
-
-    Exits:
-        If no building elements are found, the script exits with an error message.
-    """
     elements = ifc_file.by_type("IfcElement")
     if not elements:
         print("No building elements found in the IFC file.", file=sys.stderr)
@@ -55,44 +31,14 @@ def load_ifc_data(ifc_file):
     return elements
 
 def get_layer_volumes_and_materials(ifc_file, element, total_volume):
-    """
-    Extracts volumes and names of material layers for a given building element.
-
-    This function considers both simple material layer sets and constituent sets,
-    adapting to the IFC schema version.
-
-    Args:
-        ifc_file: The IFC file object opened with ifcopenshell.
-        element: The building element (IfcElement) to process.
-        total_volume: The total volume of the element, used to calculate layer volumes.
-
-    Returns:
-        Tuple[List[float], List[str]]: A tuple containing two lists:
-            - material_layers_volumes: The volumes of each material layer.
-            - material_layers_names: The names of each material layer.
-    """
     material_layers_volumes = []
     material_layers_names = []
 
-    if ifc_file.schema == 'IFC4' or ifc_file.schema == 'IFC4X3':
-        # Dictionary to hold the widths of material constituents for volume calculation
-        constituent_widths = {}
-        # Retrieve all material constituents in the file
-        constituents = ifc_file.by_type("IfcMaterialConstituent")
-        for constituent in constituents:
-            # Attempt to find the next entity which might hold the quantity length
-            next_line_id = constituent.id() + 1
-            next_entity = ifc_file.by_id(next_line_id)
-            if next_entity and next_entity.is_a("IfcQuantityLength"):
-                constituent_widths[constituent.id()] = next_entity.LengthValue
-
-    # Process associations to materials for the element
     if element.HasAssociations:
         for association in element.HasAssociations:
             if association.is_a('IfcRelAssociatesMaterial'):
                 material = association.RelatingMaterial
 
-                # Process material layer sets
                 if material.is_a('IfcMaterialLayerSetUsage') and material.ForLayerSet and material.ForLayerSet.MaterialLayers:
                     total_thickness = sum(layer.LayerThickness for layer in material.ForLayerSet.MaterialLayers)
                     for layer in material.ForLayerSet.MaterialLayers:
@@ -100,22 +46,17 @@ def get_layer_volumes_and_materials(ifc_file, element, total_volume):
                         layer_name = layer.Material.Name if layer.Material and layer.Material.Name else "Unnamed Material"
                         material_layers_volumes.append(round(layer_volume, 5))
                         material_layers_names.append(layer_name)
-                # Process material constituent sets (IFC4)
+
+                #TODO: Add support for IfcMaterialConstituentSet by calculating volumes for each constituent (how to get from geometry to constituent isnt clear, maybe impossible...)
                 elif ifc_file.schema == 'IFC4' and material.is_a('IfcMaterialConstituentSet'):
-                    total_width = sum(constituent_widths.get(constituent.id(), 0) for constituent in material.MaterialConstituents)
-                    if total_width > 0:
-                        for constituent in material.MaterialConstituents:
-                            constituent_id = constituent.id()
-                            if constituent_id in constituent_widths:
-                                width = constituent_widths[constituent_id]
-                                proportion = width / total_width
-                                constituent_volume = total_volume * proportion
-                                constituent_name = constituent.Name if constituent.Name else "Unnamed Material"
-                                material_layers_volumes.append(round(constituent_volume, 5))
-                                material_layers_names.append(constituent_name)
+                    # Use the first constituent's material for the entire element
+                    first_constituent = material.MaterialConstituents[0]
+                    constituent_name = first_constituent.Name if first_constituent.Name else "Unnamed Material"
+                    material_layers_volumes.append(round(total_volume, 5))
+                    material_layers_names.append(constituent_name)
+                    break  # Exit loop after using the first constituent
 
     return material_layers_volumes, material_layers_names
-
 
 def calculate_volume(shape):
     prop = GProp_GProps()
@@ -123,43 +64,22 @@ def calculate_volume(shape):
     return prop.Mass()
 
 def get_building_storey(element):
-    """
-    Attempts to find the building storey an element is contained in.
-    """
     containing_storey = ifcopenshell.util.element.get_container(element)
-    if containing_storey and containing_storey.is_a("IfcBuildingStorey"):
-        return containing_storey.Name
+    return containing_storey.Name if containing_storey and containing_storey.is_a("IfcBuildingStorey") else None
+
+def get_element_property(element, property_name):
+    pattern = re.compile(r'Pset_.*Common')
+
+    for definition in element.IsDefinedBy:
+        if definition.is_a('IfcRelDefinesByProperties'):
+            property_set = definition.RelatingPropertyDefinition
+            if property_set.is_a('IfcPropertySet') and pattern.match(property_set.Name):
+                for prop in property_set.HasProperties:
+                    if prop.Name == property_name:
+                        return prop.NominalValue.wrappedValue
     return None
 
-
-    # Retrieve property values directly
-def get_element_property(element, property_name):
-    """
-    Retrieves a specific property value for an IFC element by property name directly.
-    """
-    psets = ifcopenshell.util.element.get_psets(element)
-    
-    # Return the property value if it exists
-    return next((properties[property_name] for properties in psets.values() if property_name in properties), None)
-
-
-def process_element(ifc_file, element, settings, ifc_file_path, user_id, session_id, projectId):
-    """
-    Processes a single building element to extract detailed data and metadata, 
-    including handling of multilayer materials.
-
-    Args:
-        ifc_file: The opened IFC file object.
-        element: The building element to process.
-        settings: Geometry settings for shape creation.
-        ifc_file_path: Path of the IFC file being processed.
-        user_id: Identifier for the user who uploaded the file.
-        session_id: Identifier for the upload session.
-
-    Returns:
-        element_data (dict): Extracted data and metadata for the element, 
-                             including structured multilayer material information.
-    """
+async def process_element(ifc_file, element, settings, ifc_file_path, user_id, session_id, projectId):
     try:
         shape = geom.create_shape(settings, element)
         volume = calculate_volume(shape)
@@ -174,7 +94,7 @@ def process_element(ifc_file, element, settings, ifc_file_path, user_id, session
 
     if material_layers_names:
         materials_info = [{
-            "materialId": ObjectId(),  # Generate a new ObjectId for each material
+            "materialId": ObjectId(),
             "name": name,
             "volume": volume
         } for name, volume in zip(material_layers_names, material_layers_volumes)]
@@ -193,7 +113,7 @@ def process_element(ifc_file, element, settings, ifc_file_path, user_id, session
 
     is_multilayer = len(materials_info) > 1
     building_storey = get_building_storey(element)
-    is_loadbearing = get_element_property(element, "IsLoadbearing")
+    is_loadbearing = get_element_property(element, "LoadBearing")
     is_external = get_element_property(element, "IsExternal")
 
     element_data = {
@@ -214,13 +134,8 @@ def process_element(ifc_file, element, settings, ifc_file_path, user_id, session
    
     return element_data
 
-
-
-def main(file_path, projectId):
-    """
-    Main function to process the IFC file and store data in MongoDB.
-    """
-    client = MongoClient(os.getenv("DATABASE_URL"))
+async def main(file_path, projectId):
+    client = AsyncIOMotorClient(os.getenv("DATABASE_URL"))
     db = client["IfcLCAdata_01"]
     collection = db["building_elements"]
 
@@ -228,20 +143,20 @@ def main(file_path, projectId):
     settings = geom.settings()
     settings.set(settings.USE_PYTHON_OPENCASCADE, True)
 
-    user_id = "example_user_id"  # Replace with actual user ID
-    session_id = "example_session_id"  # Replace with actual session ID
+    user_id = "example_user_id"
+    session_id = "example_session_id"
 
     elements = load_ifc_data(ifc_file)
 
-    bulk_ops = []  # List to collect bulk operations
+    bulk_ops = []
 
     for element in elements:
-        element_data = process_element(ifc_file, element, settings, file_path, user_id, session_id, projectId)
+        element_data = await process_element(ifc_file, element, settings, file_path, user_id, session_id, projectId)
         if element_data:
             bulk_ops.append(element_data)
 
     if bulk_ops:
-        collection.insert_many(bulk_ops)  # Perform bulk insert into MongoDB
+        await collection.insert_many(bulk_ops)
 
 if __name__ == "__main__":
     if len(sys.argv) != 3:
@@ -250,4 +165,4 @@ if __name__ == "__main__":
 
     file_path = sys.argv[1]
     projectId = sys.argv[2]
-    main(file_path, projectId)
+    asyncio.run(main(file_path, projectId))

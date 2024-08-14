@@ -135,3 +135,5 @@ venv/
 .aider*
 
 ecosystem.config.js
+
+__pycache__/
