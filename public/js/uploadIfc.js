@@ -39,17 +39,6 @@ document.addEventListener("DOMContentLoaded", function () {
         // Hide progress bar and spinner
         progressBar.style.display = "none";
         spinner.style.display = "none";
-
-        // Display the basic IFC information
-        messageContainer.innerHTML = `
-          <p>File uploaded and processed successfully.</p>
-          <p>Number of elements: ${data.elementCount}</p>
-          <p>Number of unique materials: ${data.uniqueMaterials.length}</p>
-          <p>Materials: ${data.uniqueMaterials.join(", ")}</p>
-        `;
-        setTimeout(() => {
-          window.location.reload();
-        }, 5000);
       })
       .catch((error) => {
         // Hide progress bar and spinner

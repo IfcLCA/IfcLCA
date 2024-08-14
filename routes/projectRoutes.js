@@ -184,6 +184,7 @@ const upload = multer({
   },
 });
 
+// POST endpoint for IFC file upload and initial material matching
 router.post(
   "/api/projects/:projectId/upload",
   isAuthenticated,
@@ -202,10 +203,6 @@ router.post(
       // Ensure no old elements for the project
       await BuildingElement.deleteMany({ projectId });
 
-      // Define stdoutData and stderrData outside the promise
-      let stdoutData = "";
-      let stderrData = "";
-
       // Execute the Python script and wait for it to complete
       await new Promise((resolve, reject) => {
         const pythonPath = "/opt/miniconda3/bin/python";
@@ -215,6 +212,9 @@ router.post(
         const subprocess = spawn(pythonPath, args, {
           cwd: "/var/www/ifclca/IfcLCA",
         });
+
+        let stdoutData = "";
+        let stderrData = "";
 
         subprocess.stdout.on("data", (data) => {
           console.log(`stdout: ${data}`);
@@ -234,15 +234,6 @@ router.post(
           }
           resolve(stdoutData);
         });
-      });
-
-      // Parse the output from the Python script
-      const parsedData = JSON.parse(stdoutData);
-
-      // Respond to the frontend with the basic IFC information
-      res.json({
-        elementCount: parsedData.elementCount,
-        uniqueMaterials: parsedData.uniqueMaterials,
       });
 
       // Fetch and process building elements
