@@ -843,7 +843,7 @@ function renderBubbleChart(data) {
   const bubbleChartData = bubbleData.map((item) => ({
     x: item.totalVolume,
     y: item.totalCo2,
-    r: Math.sqrt(item.totalVolume / 10), // Adjust size scale if needed
+    r: Math.sqrt(item.totalVolume),
     label: item.material,
   }));
 
