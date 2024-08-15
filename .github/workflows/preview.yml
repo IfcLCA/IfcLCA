@@ -32,12 +32,12 @@ jobs:
           SSH_PASSWORD: ${{ secrets.SSH_PASSWORD }}
           SSH_HOST: ${{ secrets.SSH_HOST }}
           SSH_USERNAME: ${{ secrets.SSH_USERNAME }}
-          PREVIEW_DOMAIN: ${{ secrets.PREVIEW_DOMAIN }}
+          PREVIEW_PATH: ${{ secrets.PREVIEW_PATH }}
         run: |
           # Define the deployment directory and subdomain for the PR preview
           PR_NUMBER=${{ github.event.pull_request.number }}
-          DEPLOY_DIR="/var/www/previews/pr-${PR_NUMBER}"
-          PREVIEW_URL="https://${PR_NUMBER}.${PREVIEW_DOMAIN}"
+          DEPLOY_DIR="/var/www/${PREVIEW_PATH}/pr-${PR_NUMBER}"
+          PREVIEW_URL="https://ifclca.com/${PREVIEW_PATH}/pr-${PR_NUMBER}"
 
           # Create the directory and copy files
           sshpass -p $SSH_PASSWORD ssh -o StrictHostKeyChecking=no ${SSH_USERNAME}@${SSH_HOST} "mkdir -p ${DEPLOY_DIR}"
@@ -46,16 +46,11 @@ jobs:
           # Set up Nginx configuration
           sshpass -p $SSH_PASSWORD ssh -o StrictHostKeyChecking=no ${SSH_USERNAME}@${SSH_HOST} "
           echo '
-          server {
-              listen 80;
-              server_name ${PR_NUMBER}.${PREVIEW_DOMAIN};
-
+          location /${PREVIEW_PATH}/pr-${PR_NUMBER}/ {
               root ${DEPLOY_DIR};
               index index.html;
 
-              location / {
-                  try_files \$uri /index.html;
-              }
+              try_files \$uri /index.html;
           }
           ' | sudo tee /etc/nginx/sites-available/pr-${PR_NUMBER}
           sudo ln -s /etc/nginx/sites-available/pr-${PR_NUMBER} /etc/nginx/sites-enabled/
@@ -67,7 +62,7 @@ jobs:
         with:
           script: |
             const prNumber = context.issue.number;
-            const previewUrl = `https://${prNumber}.${process.env.PREVIEW_DOMAIN}`;
+            const previewUrl = `https://ifclca.com/${process.env.PREVIEW_PATH}/pr-${prNumber}`;
             github.rest.issues.createComment({
               issue_number: prNumber,
               owner: context.repo.owner,
@@ -81,10 +76,11 @@ jobs:
           SSH_PASSWORD: ${{ secrets.SSH_PASSWORD }}
           SSH_HOST: ${{ secrets.SSH_HOST }}
           SSH_USERNAME: ${{ secrets.SSH_USERNAME }}
+          PREVIEW_PATH: ${{ secrets.PREVIEW_PATH }}
         run: |
           PR_NUMBER=${{ github.event.pull_request.number }}
           sshpass -p $SSH_PASSWORD ssh -o StrictHostKeyChecking=no ${SSH_USERNAME}@${SSH_HOST} "
-          sudo rm -rf /var/www/previews/pr-${PR_NUMBER}
+          sudo rm -rf /var/www/${PREVIEW_PATH}/pr-${PR_NUMBER}
           sudo rm /etc/nginx/sites-available/pr-${PR_NUMBER}
           sudo rm /etc/nginx/sites-enabled/pr-${PR_NUMBER}
           sudo nginx -s reload
