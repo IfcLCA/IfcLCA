@@ -1,0 +1,70 @@
+name: App Platform Preview
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  pull-requests: write
+
+jobs:
+  test:
+    name: preview
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GH_PAT }}
+
+      - name: Deploy the app
+        id: deploy
+        uses: digitalocean/app_action/deploy@v2
+        with:
+          deploy_pr_preview: "true"
+          token: ${{ secrets.DIGITALOCEAN_ACCESS_TOKEN }}
+
+      - uses: actions/github-script@v7
+        env:
+          APP_URL: ${{ steps.deploy.outputs.app && fromJson(steps.deploy.outputs.app).live_url || '' }}
+        with:
+          script: |
+            if (process.env.APP_URL) {
+              github.rest.issues.createComment({
+                issue_number: context.issue.number,
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                body: `🚀 The app was successfully deployed at ${process.env.APP_URL}.`
+              })
+            }
+
+      - uses: actions/github-script@v7
+        if: failure()
+        env:
+          BUILD_LOGS: ${{ steps.deploy.outputs.build_logs || 'No build logs available.' }}
+          DEPLOY_LOGS: ${{ steps.deploy.outputs.deploy_logs || 'No deploy logs available.' }}
+        with:
+          script: |
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: `The app failed to be deployed. Logs can be found [here](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}).
+
+            ## Logs
+            <details>
+            <summary>Build logs</summary>
+
+            \`\`\`
+            ${process.env.BUILD_LOGS}
+            \`\`\`
+            </details>
+
+            <details>
+            <summary>Deploy logs</summary>
+
+            \`\`\`
+            ${process.env.DEPLOY_LOGS}
+            \`\`\`
+            </details>`
+            })

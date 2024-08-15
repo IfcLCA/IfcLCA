@@ -22,7 +22,7 @@ document.addEventListener("DOMContentLoaded", function () {
                 <h5 class="card-title">${project.name}</h5>
                 <p class="card-text">${project.description}</p>
                 <p class="card-text">Phase: ${project.phase}</p>
-                <p class="card-text">Carbon Footprint: ${project.totalCarbonFootprint}</p>
+                <p class="card-text">CO₂-eq: ${project.totalCarbonFootprint}</p>
               </div>
             </div>
           </a>

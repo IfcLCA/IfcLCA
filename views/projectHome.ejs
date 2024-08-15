@@ -150,6 +150,13 @@
     <div id="invalid-density-notification" style="display:none; position:fixed; top:50%; left:50%; transform:translate(-50%, -50%); background:#ffc; border:1px solid #ffa; padding:10px; border-radius:5px; z-index:1000; box-shadow: 0 2px 5px rgba(0,0,0,0.2); font-size:14px; color:#a00;">
         <p>Some density fields are invalid. Please check and enter valid values.</p>
     </div>
+    <div id="uploadMessage"></div>
+    <div id="uploadProgressBar" style="display:none; background:#e0e0e0; height:20px; width:100%; position:relative;">
+        <div style="background:#76c7c0; height:100%; width:100%;"></div>
+    </div>
+    <div id="uploadSpinner" style="display:none; text-align:center; margin-top:10px;">
+    <i class="fa fa-spinner fa-spin" style="font-size:24px;"></i>
+    </div>
 </main>
 <%- include('partials/_footer.ejs') %>
 <script src="https://cdn.jsdelivr.net/npm/tabulator-tables/dist/js/tabulator.min.js"></script>

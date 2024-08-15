@@ -132,8 +132,7 @@ dist
 uploads/
 
 venv/
-.aider*
-
+*.pyc
 ecosystem.config.js
 
 __pycache__/

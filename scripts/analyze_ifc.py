@@ -30,6 +30,24 @@ def load_ifc_data(ifc_file):
         sys.exit(1)
     return elements
 
+def get_unique_materials(ifc_file):
+    materials = set()
+    for element in ifc_file.by_type("IfcElement"):
+        element_materials = ifcopenshell.util.element.get_materials(element, should_inherit=True)
+        if element_materials:
+            materials.update(mat.Name for mat in element_materials if mat.Name)
+    return list(materials)
+
+def extract_basic_info(ifc_file):
+    elements = load_ifc_data(ifc_file)
+    element_count = len(elements)
+    unique_materials = get_unique_materials(ifc_file)
+
+    return {
+        "elementCount": element_count,
+        "uniqueMaterials": unique_materials
+    }
+
 def get_layer_volumes_and_materials(ifc_file, element, total_volume):
     material_layers_volumes = []
     material_layers_names = []
@@ -157,6 +175,9 @@ async def main(file_path, projectId):
 
     if bulk_ops:
         await collection.insert_many(bulk_ops)
+
+    basic_info = extract_basic_info(ifc_file)
+    return basic_info
 
 if __name__ == "__main__":
     if len(sys.argv) != 3:
