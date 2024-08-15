@@ -38,7 +38,7 @@ jobs:
 
           # Create the directory and copy files
           sshpass -p $SSH_PASSWORD ssh -o StrictHostKeyChecking=no ${SSH_USERNAME}@${SSH_HOST} "mkdir -p ${DEPLOY_DIR}"
-          sshpass -p $SSH_PASSWORD scp -r ./ ${SSH_USERNAME}@${SSH_HOST}:${DEPLOY_DIR}/
+          sshpass -p $SSH_PASSWORD scp -r * ${SSH_USERNAME}@${SSH_HOST}:${DEPLOY_DIR}/
 
           # Restart the app with PM2
           sshpass -p $SSH_PASSWORD ssh -o StrictHostKeyChecking=no ${SSH_USERNAME}@${SSH_HOST} "
