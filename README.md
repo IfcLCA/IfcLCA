@@ -12,7 +12,7 @@ IfcLCA is crafted with sustainability at its core, offering real-time LCA calcul
 ## Key Features 🔑
 
 - **Open Standards Support:** Leveraging IFC for interoperability and integration.
-- **Real-time LCA Calculations:** Assessing embodied carbon promptly (more to come).
+- **Real-time LCA Calculations:** Assessing embodied carbon promptly (more environmental impact indicators to come).
 - **User-Friendly Dashboard:** Streamlining project overviews and environmental impacts.
 - **Material Matching:** Automatically match sustainable materials within projects.
 - **Reporting:** Effortlessly export essential data and gain insights (planned in future release).
