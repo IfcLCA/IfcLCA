@@ -7,7 +7,10 @@
       name="description"
       content="IfcLCA - Your free and open-source tool for uploading and analyzing IFC files for sustainable construction."
     />
-    <title>IfcLCA - Free and Open-Source IFC File Analysis</title>
+    <title>
+      IfcLCA - Free and Open Source Life Cycle Assessment for the built
+      environment based on IFC
+    </title>
     <link
       rel="stylesheet"
       href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css"
@@ -21,29 +24,92 @@
       body.index-bg {
         background-image: url("/images/bg_index.png");
         background-size: cover;
-        background-position: center - center;
+        background-position: center;
         background-attachment: fixed;
+        color: #333;
       }
       .features .card {
         transition: transform 0.3s ease-in-out;
         background-color: #fff;
         color: #333;
+        border-radius: 10px;
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
       }
       .features .card:hover {
         transform: translateY(-10px);
+        box-shadow: 0 6px 12px rgba(0, 0, 0, 0.15);
       }
+      .card-text {
+        margin: 0;
+        text-indent: 0; /* Ensure no indentation */
+      }
+
+      /* Apply to all p elements to ensure no indentation */
+      p {
+        text-indent: 0; /* Reset any indent to zero */
+        margin-bottom: 1rem; /* Add some spacing below paragraphs for readability */
+      }
+
       .new-features {
-        background-color: #f1f1f1;
-        padding: 20px;
+        background-color: #f8f9fa;
+        padding: 30px;
         border-radius: 10px;
         color: #333;
         max-width: 1250px;
         margin: 0 auto;
       }
-    </style>
+      .btn-primary {
+        background-color: #007bff;
+        border-color: #007bff;
+        border-radius: 5px;
+      }
+      .btn-primary:hover {
+        background-color: #0056b3;
+        border-color: #004085;
+      }
+      .btn-success {
+        background-color: #28a745;
+        border-color: #28a745;
+        border-radius: 5px;
+      }
+      .btn-success:hover {
+        background-color: #218838;
+        border-color: #1e7e34;
+      }
 
+      /* Light mode tooltip */
+      .tooltip.bs-tooltip-top .tooltip-arrow::before,
+      .tooltip.bs-tooltip-auto[x-placement^="top"] .tooltip-arrow::before {
+        border-top-color: #f8f9fa;
+      }
+
+      .tooltip.bs-tooltip-right .tooltip-arrow::before,
+      .tooltip.bs-tooltip-auto[x-placement^="right"] .tooltip-arrow::before {
+        border-right-color: #f8f9fa;
+      }
+
+      .tooltip.bs-tooltip-bottom .tooltip-arrow::before,
+      .tooltip.bs-tooltip-auto[x-placement^="bottom"] .tooltip-arrow::before {
+        border-bottom-color: #f8f9fa;
+      }
+
+      .tooltip.bs-tooltip-left .tooltip-arrow::before,
+      .tooltip.bs-tooltip-auto[x-placement^="left"] .tooltip-arrow::before {
+        border-left-color: #f8f9fa;
+      }
+
+      .tooltip-inner {
+        color: #212529;
+        background-color: #f8f9fa;
+        border: 1px solid #ddd;
+        padding: 5px 10px;
+        font-size: 14px;
+        border-radius: 4px;
+      }
+
+    </style>
     <%- include('partials/_head.ejs') %>
-  </head>
+    </head>
   <body class="index-bg">
     <%- include('partials/_header.ejs') %>
     <main role="main" class="container mt-4">
@@ -51,7 +117,8 @@
       <div class="text-center header-bg">
         <h1>Welcome to IfcLCA</h1>
         <p class="tagline">
-          Your trusted partner in sustainable construction analytics
+          Your transparent and open partner in sustainable construction
+          analytics
         </p>
       </div>
 
@@ -59,25 +126,20 @@
       <section class="beta-warning text-center mt-4">
         <h4>Beta Version</h4>
         <p style="color: #e64a19; font-weight: bold">
-          Please note that IfcLCA is currently in beta. Features and
-          functionality are still under development, and things may change or
-          break. <br />
+          Please note that IfcLCA is currently in beta. Features and functionality are still under development, and things may change or break. <br />
           If you encounter any issues or have suggestions, please open a
-          <a
-            href="https://github.com/IfcLCA/IfcLCA/issues"
-            target="_blank"
-            style="color: #ff5722; text-decoration: underline"
-            >GitHub issue</a
-          >. Thank you for your understanding and contributions. <br />
-          We highly value your feedback to help us improve.
+          <a href="https://github.com/IfcLCA/IfcLCA/issues" target="_blank" style="color: #ff5722; text-decoration: underline" data-toggle="tooltip" title="GitHub is a platform for version control and collaboration. This link opens the issue tracker for our project.">GitHub issue</a>. 
+          Thank you for your understanding and contributions. <br />
+          We highly value all feedback, so please don't hesitate to reach out.
         </p>
+        
       </section>
 
       <!-- Action Call Section -->
       <div class="text-center action-call mt-5">
-        <a href="/newProject" class="btn btn-primary btn-lg"
-          ><i class="fas fa-upload"></i> Start Your Sustainable Project</a
-        >
+        <a href="/newProject" class="btn btn-primary btn-lg" data-toggle="tooltip" title="Set up a New Project by entering project details">
+          <i class="fas fa-upload"></i> Start Your Sustainable Project
+        </a>
       </div>
 
       <!-- Features Section -->
@@ -85,9 +147,23 @@
         <div class="container">
           <div class="row">
             <div class="col-12 col-md-4 mb-4">
-              <div class="card shadow-sm h-100">
+              <div class="card h-100">
                 <div class="card-body">
-                  <h5 class="card-title">
+                  <h5 class="card-title" data-toggle="tooltip" title="Learn more about our Free and Open Source platform">
+                    <i class="fas fa-users"></i> Free and Open Source
+                  </h5>
+                  <p class="card-text">
+                    Benefit from a completely open-source platform and join a
+                    community of like-minded professionals. Customize and extend
+                    functionalities to suit your specific project needs.
+                  </p>
+                </div>
+              </div>
+            </div>
+            <div class="col-12 col-md-4 mb-4">
+              <div class="card h-100">
+                <div class="card-body">
+                  <h5 class="card-title" data-toggle="tooltip" title="Upload and analyze IFC files quickly and easily">
                     <i class="fas fa-tachometer-alt"></i> Easy File Upload
                   </h5>
                   <p class="card-text">
@@ -98,11 +174,10 @@
               </div>
             </div>
             <div class="col-12 col-md-4 mb-4">
-              <div class="card shadow-sm h-100">
+              <div class="card h-100">
                 <div class="card-body">
-                  <h5 class="card-title">
-                    <i class="fas fa-chart-line"></i> Automatic Impact
-                    Calculation
+                  <h5 class="card-title" data-toggle="tooltip" title="Automatically calculate the environmental impact of your building materials">
+                    <i class="fas fa-chart-line"></i> Automatic Impact Calculation
                   </h5>
                   <p class="card-text">
                     Automatically calculate the environmental impact of
@@ -112,32 +187,29 @@
                 </div>
               </div>
             </div>
-            <div class="col-12 col-md-4 mb-4">
-              <div class="card shadow-sm h-100">
-                <div class="card-body">
-                  <h5 class="card-title">
-                    <i class="fas fa-users"></i> Open-Source & Community
-                  </h5>
-                  <p class="card-text">
-                    Benefit from a completely open-source platform and join a
-                    community of like-minded professionals. Customize and extend
-                    functionalities to suit your specific project needs.
-                  </p>
-                </div>
-              </div>
-            </div>
           </div>
         </div>
       </section>
 
       <!-- New Features Announcement Section -->
-      <section class="new-features text-center mt-5">
-        <div class="container">
-          <h3>🚀 Exciting New Features Coming Soon 🚀</h3>
-          <p>
-            Stay tuned for more features and enhancements as we continue to
-            develop and improve IfcLCA. Your feedback and contributions are
-            invaluable!
+      <section class="new-features text-center mt-3 narrow-container">
+          <h4>🚀 New Features 🚀</h4>
+          <p></p>
+          <p style="font-size: 1.2em">
+            - Improved IFC file upload and analysis allows larger file uploads
+            (will get even better)
+            <br />
+          </p>
+          <p style="font-size: 1.2em">
+            - Better user experience with tooltips on hover
+          </p>
+          <p style="font-size: 1.2em">
+            - Enhanced IFC parsing, more robust logic <br />
+            (unfortunately with some trade-offs if using IFC 2x3 and IFC 4
+            Reference View)
+          </p>
+          <p style="font-size: 1.2em">
+            - Export capabilities (IFC, Excel & Pdf) coming soon...
           </p>
         </div>
       </section>
@@ -150,14 +222,21 @@
             Contribute to a greener future by collaborating on IfcLCA. Together,
             we can innovate for sustainability in construction.
           </p>
-          <a href="/opensource" class="btn btn-success btn-lg"
-            ><i class="fas fa-hands-helping"></i> Get Involved</a
-          >
+          <a href="/opensource" class="btn btn-success btn-lg" data-toggle="tooltip" title="Contribute to the IfcLCA project by collaborating on GitHub. Help us innovate for sustainability in construction.">
+            <i class="fas fa-hands-helping"></i> Get Involved
+          </a>          
         </div>
       </section>
     </main>
 
     <%- include('partials/_footer.ejs') %>
     <script src="/js/main.js"></script>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+      $(function () {
+          $('[data-toggle="tooltip"]').tooltip();
+      });
+  </script>  
   </body>
 </html>

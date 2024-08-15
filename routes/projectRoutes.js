@@ -718,74 +718,59 @@ router.post(
 
 // POST endpoint to delete specific materials from building elements
 router.post(
-  "/api/projects/:projectId/upload",
+  "/api/projects/:projectId/building_elements/materials/delete",
   isAuthenticated,
-  upload.single("ifcFile"),
   async (req, res) => {
-    const projectId = req.params.projectId;
-    if (!req.file) {
-      return res.redirect(
-        `/projects/${projectId}?error=Only .ifc files are allowed.`
-      );
-    }
-
-    const filePath = req.file.path;
-
     try {
-      // Ensure no old elements for the project
-      await BuildingElement.deleteMany({ projectId });
+      const { projectId } = req.params;
+      const { materialIds } = req.body; // Get the material IDs to delete
 
-      // Declare variables to store stdout and stderr data
-      let stdoutData = "";
-      let stderrData = "";
-
-      // Execute the Python script and wait for it to complete
-      await new Promise((resolve, reject) => {
-        const pythonPath = "/opt/miniconda3/bin/python";
-        const scriptPath = "/var/www/ifclca/IfcLCA/scripts/analyze_ifc.py"; // Absolute path
-        const args = [scriptPath, filePath, projectId];
-
-        const subprocess = spawn(pythonPath, args, {
-          cwd: "/var/www/ifclca/IfcLCA",
-        });
-
-        subprocess.stdout.on("data", (data) => {
-          stdoutData += data.toString();
-        });
-
-        subprocess.stderr.on("data", (data) => {
-          stderrData += data.toString();
-        });
-
-        subprocess.on("close", (code) => {
-          if (code !== 0) {
-            return reject(
-              new Error(`Python script exited with code ${code}: ${stderrData}`)
-            );
-          }
-          resolve(); // We resolve here without returning stdoutData directly.
-        });
+      // Find building elements containing the specified materials
+      const buildingElements = await BuildingElement.find({
+        "materials_info.materialId": { $in: materialIds },
+        projectId,
       });
 
-      // After the Promise resolves, stdoutData should be available
-      if (!stdoutData) {
-        throw new Error("No output received from the Python script.");
+      // Track total CO2 removed
+      let totalCo2Removed = 0;
+
+      // Update or delete building elements
+      for (const element of buildingElements) {
+        const remainingMaterials = element.materials_info.filter(
+          (material) => !materialIds.includes(material.materialId.toString())
+        );
+
+        if (remainingMaterials.length === 0) {
+          // If no materials remain, delete the entire building element
+          totalCo2Removed += element.materials_info.reduce(
+            (sum, material) => sum + parseFloat(material.total_co2 || 0),
+            0
+          );
+          await BuildingElement.deleteOne({ _id: element._id });
+        } else {
+          // Otherwise, update the element with remaining materials
+          totalCo2Removed += element.materials_info.reduce((sum, material) => {
+            if (materialIds.includes(material.materialId.toString())) {
+              return sum + parseFloat(material.total_co2);
+            }
+            return sum;
+          }, 0);
+          element.materials_info = remainingMaterials;
+          await element.save();
+        }
       }
 
-      // Parse the output from the Python script
-      const parsedData = JSON.parse(stdoutData);
+      // Update project's total carbon footprint
+      const project = await Project.findById(projectId);
+      project.totalCarbonFootprint -= totalCo2Removed;
+      await project.save();
 
-      // Respond to the frontend with the basic IFC information
-      res.json({
-        elementCount: parsedData.elementCount,
-        uniqueMaterials: parsedData.uniqueMaterials,
-      });
+      res.json({ message: "Materials deleted successfully" });
     } catch (error) {
-      console.error("Error handling IFC upload:", error);
-      res.status(500).json({ error: error.message });
-    } finally {
-      // Remove the uploaded file after processing
-      await safeUnlink(filePath);
+      console.error("Error deleting materials:", error);
+      res
+        .status(500)
+        .json({ message: "Error deleting materials", error: error.toString() });
     }
   }
 );

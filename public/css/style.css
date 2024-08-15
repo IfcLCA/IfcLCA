@@ -26,8 +26,8 @@ body {
 
 .card-body {
   text-align: left;
+  padding: 1rem; /* Adjust as needed */
 }
-
 .card-title,
 .card-title small {
   text-align: center;
@@ -36,7 +36,10 @@ body {
 }
 
 .card-text {
-  text-indent: 20px;
+  margin: 0;
+  text-align: center;
+  padding: 0; /* Remove any padding */
+  text-indent: 0; /* Remove text indent */
 }
 
 .btn-primary {
@@ -82,21 +85,63 @@ footer span {
   text-align: center;
 }
 
+.navbar .ms-auto {
+  margin-left: auto;
+  display: flex;
+}
+
 .navbar .btn-primary {
-  position: absolute;
-  right: 1rem;
-  top: 0.5rem; /* Ensure it aligns well with the navbar */
+  margin-right: 1rem; /* Space after the "Upload IFC" button */
 }
 
 .navbar .btn-primary,
 .navbar .btn-primary:hover {
-  background-color: #ff5722; /* Orange color as per user request */
+  background-color: #ff5722; /* Orange color */
   border-color: #ff5722;
 }
 
 .navbar .btn-primary:hover {
   background-color: #e64a19;
   border-color: #e64a19;
+}
+
+/* Light mode tooltip */
+.tooltip.bs-tooltip-top .tooltip-arrow::before,
+.tooltip.bs-tooltip-auto[x-placement^="top"] .tooltip-arrow::before {
+  border-top-color: #f8f9fa;
+}
+
+.tooltip.bs-tooltip-right .tooltip-arrow::before,
+.tooltip.bs-tooltip-auto[x-placement^="right"] .tooltip-arrow::before {
+  border-right-color: #f8f9fa;
+}
+
+.tooltip.bs-tooltip-bottom .tooltip-arrow::before,
+.tooltip.bs-tooltip-auto[x-placement^="bottom"] .tooltip-arrow::before {
+  border-bottom-color: #f8f9fa;
+}
+
+.tooltip.bs-tooltip-left .tooltip-arrow::before,
+.tooltip.bs-tooltip-auto[x-placement^="left"] .tooltip-arrow::before {
+  border-left-color: #f8f9fa;
+}
+
+.tooltip-inner {
+  color: #212529;
+  background-color: #f8f9fa;
+  border: 1px solid #ddd;
+  padding: 5px 10px;
+  font-size: 14px;
+  border-radius: 4px;
+}
+
+.narrow-container {
+  max-width: fit-content;
+  padding: 20px 40px; /* Adjust the padding to your preference */
+  background-color: #f8f9fa; /* Optional: background color for better visibility */
+  margin: 0 auto; /* Center the container */
+  border-radius: 6px; /* Optional: add border-radius for rounded corners */
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1); /* Optional: add shadow for better visibility */
 }
 
 /* Table Styling */

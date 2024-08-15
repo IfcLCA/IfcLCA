@@ -1,59 +1,85 @@
 <nav class="navbar navbar-expand-md navbar-dark bg-dark">
   <a class="navbar-brand" href="/">
-    <img src="\images\logo.png" width="30" height="30" class="d-inline-block align-top" alt="">
+    <img
+      src="/images/logo.png"
+      width="30"
+      height="30"
+      class="d-inline-block align-top"
+      alt=""
+    />
     IfcLCA
   </a>
-  <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
+  <button
+    class="navbar-toggler"
+    type="button"
+    data-toggle="collapse"
+    data-target="#navbarNav"
+    aria-controls="navbarNav"
+    aria-expanded="false"
+    aria-label="Toggle navigation"
+  >
     <span class="navbar-toggler-icon"></span>
   </button>
   <div class="collapse navbar-collapse" id="navbarNav">
     <ul class="navbar-nav mr-auto">
       <% if (session && session.userId) { %>
-        <li class="nav-item">
-          <a class="nav-link" href="/dashboard">Dashboard</a>
-        </li>
+      <li class="nav-item">
+        <a class="nav-link" href="/dashboard">Dashboard</a>
+      </li>
+      <li class="nav-item">
+        <a class="nav-link" href="/auth/logout">Logout</a>
+      </li>
+      <% } else { %>
+      <li class="nav-item">
+        <a class="nav-link" href="/auth/login">Login</a>
+      </li>
       <% } %>
     </ul>
-    <ul class="navbar-nav ml-auto">
-      <% if (typeof page !== 'undefined') { %>
-        <% if (page === 'dashboard') { %>
-          <li class="nav-item">
-            <a href="/newProject" class="btn btn-primary">New Project</a>
-          </li>
-        <% } else if (page === 'projectHome' && project) { %>
-          <li class="nav-item">
-            <!-- Green Export button -->
-            <a href="/api/projects/<%= project._id %>/export" class="btn btn-success mr-2">
-              <strong>Export</strong>
-            </a>
-          </li>
-          <li class="nav-item">
-            <!-- Button to trigger file input -->
-            <button type="button" class="btn btn-primary" onclick="document.getElementById('hiddenFileInput').click();">
-              <strong>upload IFC</strong>
-            </button>
-            <!-- Hidden file input and form -->
-            <form id="ifcUploadForm" action="/api/projects/<%= project._id %>/upload" method="POST" enctype="multipart/form-data" style="display: none;">
-              <input type="file" id="hiddenFileInput" name="ifcFile" onchange="this.form.submit();" required>
-              <% if (typeof uploadSuccess !== 'undefined' && uploadSuccess) { %>
-                <div class="alert alert-success" role="alert">
-                  </div>IFC file uploaded successfully!
-                </div>
-              <% } %>
-            </form>
-          </li>
-        <% } %>
-      <% } %>
-      <% if (session && session.userId) { %>
-        <li class="nav-item">
-          <a class="nav-link" href="/auth/logout">Logout</a>
-        </li>
-      <% } else { %>
-        <li class="nav-item">
-          <a class="nav-link" href="/auth/login">Login</a>
-        </li>
+    <ul class="navbar-nav ms-auto">
+      <% if (typeof page !== 'undefined' && page === 'projectHome' && project) {
+      %>
+      <li class="nav-item me-2">
+        <a
+          href="/api/projects/<%= project._id %>/export"
+          class="btn btn-success"
+          data-toggle="tooltip"
+          title="Export results (Coming Soon...)"
+        >
+          <strong>Export</strong>
+        </a>
+      </li>
+      <li class="nav-item">
+        <button
+          type="button"
+          class="btn btn-primary"
+          onclick="document.getElementById('hiddenFileInput').click();"
+          data-toggle="tooltip"
+          title="Upload an IFC file, this will overwrite current project elements..."
+        >
+          <strong>Upload IFC</strong>
+        </button>
+        <form
+          id="ifcUploadForm"
+          action="/api/projects/<%= project._id %>/upload"
+          method="POST"
+          enctype="multipart/form-data"
+          style="display: none"
+        >
+          <input
+            type="file"
+            id="hiddenFileInput"
+            name="ifcFile"
+            onchange="this.form.submit();"
+            required
+          />
+          <% if (typeof uploadSuccess !== 'undefined' && uploadSuccess) { %>
+          <div class="alert alert-success" role="alert">
+            IFC file uploaded successfully!
+          </div>
+          <% } %>
+        </form>
+      </li>
       <% } %>
     </ul>
   </div>
 </nav>
-
