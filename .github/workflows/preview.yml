@@ -1,70 +1,91 @@
-name: App Platform Preview
+name: Nginx Preview Deployment
 
 on:
   pull_request:
     branches: [main]
 
-permissions:
-  pull-requests: write
-
 jobs:
-  test:
-    name: preview
+  deploy:
+    name: Deploy Preview App
     runs-on: ubuntu-latest
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-        with:
-          token: ${{ secrets.GH_PAT }}
 
-      - name: Deploy the app
-        id: deploy
-        uses: digitalocean/app_action/deploy@v2
+      - name: Set up Node.js
+        uses: actions/setup-node@v3
         with:
-          deploy_pr_preview: "true"
-          token: ${{ secrets.DIGITALOCEAN_ACCESS_TOKEN }}
+          node-version: "14"
 
-      - uses: actions/github-script@v7
+      - name: Install dependencies
+        run: npm install
+
+      - name: Build the app
+        run: npm run build
+
+      - name: Install SSHPass
+        run: sudo apt-get install -y sshpass
+
+      - name: Deploy to Nginx server
         env:
-          APP_URL: ${{ steps.deploy.outputs.app && fromJson(steps.deploy.outputs.app).live_url || '' }}
+          SSH_PASSWORD: ${{ secrets.SSH_PASSWORD }}
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+          SSH_USERNAME: ${{ secrets.SSH_USERNAME }}
+          PREVIEW_DOMAIN: ${{ secrets.PREVIEW_DOMAIN }}
+        run: |
+          # Define the deployment directory and subdomain for the PR preview
+          PR_NUMBER=${{ github.event.pull_request.number }}
+          DEPLOY_DIR="/var/www/previews/pr-${PR_NUMBER}"
+          PREVIEW_URL="https://${PR_NUMBER}.${PREVIEW_DOMAIN}"
+
+          # Create the directory and copy files
+          sshpass -p $SSH_PASSWORD ssh -o StrictHostKeyChecking=no ${SSH_USERNAME}@${SSH_HOST} "mkdir -p ${DEPLOY_DIR}"
+          sshpass -p $SSH_PASSWORD scp -r ./build/* ${SSH_USERNAME}@${SSH_HOST}:${DEPLOY_DIR}/
+
+          # Set up Nginx configuration
+          sshpass -p $SSH_PASSWORD ssh -o StrictHostKeyChecking=no ${SSH_USERNAME}@${SSH_HOST} "
+          echo '
+          server {
+              listen 80;
+              server_name ${PR_NUMBER}.${PREVIEW_DOMAIN};
+
+              root ${DEPLOY_DIR};
+              index index.html;
+
+              location / {
+                  try_files \$uri /index.html;
+              }
+          }
+          ' | sudo tee /etc/nginx/sites-available/pr-${PR_NUMBER}
+          sudo ln -s /etc/nginx/sites-available/pr-${PR_NUMBER} /etc/nginx/sites-enabled/
+          sudo nginx -s reload
+          "
+
+      - name: Post a comment with the preview URL
+        uses: actions/github-script@v7
         with:
           script: |
-            if (process.env.APP_URL) {
-              github.rest.issues.createComment({
-                issue_number: context.issue.number,
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                body: `🚀 The app was successfully deployed at ${process.env.APP_URL}.`
-              })
-            }
-
-      - uses: actions/github-script@v7
-        if: failure()
-        env:
-          BUILD_LOGS: ${{ steps.deploy.outputs.build_logs || 'No build logs available.' }}
-          DEPLOY_LOGS: ${{ steps.deploy.outputs.deploy_logs || 'No deploy logs available.' }}
-        with:
-          script: |
+            const prNumber = context.issue.number;
+            const previewUrl = `https://${prNumber}.${process.env.PREVIEW_DOMAIN}`;
             github.rest.issues.createComment({
-              issue_number: context.issue.number,
+              issue_number: prNumber,
               owner: context.repo.owner,
               repo: context.repo.repo,
-              body: `The app failed to be deployed. Logs can be found [here](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}).
-
-            ## Logs
-            <details>
-            <summary>Build logs</summary>
-
-            \`\`\`
-            ${process.env.BUILD_LOGS}
-            \`\`\`
-            </details>
-
-            <details>
-            <summary>Deploy logs</summary>
-
-            \`\`\`
-            ${process.env.DEPLOY_LOGS}
-            \`\`\`
-            </details>`
+              body: `🚀 The preview app was successfully deployed at ${previewUrl}.`
             })
+
+      - name: Cleanup after PR merge/close
+        if: github.event.action == 'closed'
+        env:
+          SSH_PASSWORD: ${{ secrets.SSH_PASSWORD }}
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+          SSH_USERNAME: ${{ secrets.SSH_USERNAME }}
+        run: |
+          PR_NUMBER=${{ github.event.pull_request.number }}
+          sshpass -p $SSH_PASSWORD ssh -o StrictHostKeyChecking=no ${SSH_USERNAME}@${SSH_HOST} "
+          sudo rm -rf /var/www/previews/pr-${PR_NUMBER}
+          sudo rm /etc/nginx/sites-available/pr-${PR_NUMBER}
+          sudo rm /etc/nginx/sites-enabled/pr-${PR_NUMBER}
+          sudo nginx -s reload
+          "
