@@ -816,47 +816,140 @@ function getCo2Color(value, min, max) {
   return "rgba(255, 99, 132, 0.8)"; // Red
 }
 
+// Function to render the bubble chart
+function renderBubbleChart(data) {
+  const ctx = document.getElementById("bubbleChart").getContext("2d");
+
+  // Process data to get the total volume and total CO2eq per material
+  const bubbleData = data.reduce((acc, element) => {
+    element.materials_info.forEach((material) => {
+      const existing = acc.find(
+        (entry) => entry.material === material.matched_material_name
+      );
+      if (existing) {
+        existing.totalVolume += parseFloat(material.volume);
+        existing.totalCo2 += parseFloat(material.total_co2);
+      } else {
+        acc.push({
+          material: material.matched_material_name,
+          totalVolume: parseFloat(material.volume),
+          totalCo2: parseFloat(material.total_co2),
+        });
+      }
+    });
+    return acc;
+  }, []);
+
+  const bubbleChartData = bubbleData.map((item) => ({
+    x: item.totalVolume,
+    y: item.totalCo2,
+    r: Math.sqrt(item.totalVolume / 10), // Adjust size scale if needed
+    label: item.material,
+  }));
+
+  const minCo2 = Math.min(...bubbleChartData.map((item) => item.y));
+  const maxCo2 = Math.max(...bubbleChartData.map((item) => item.y));
+
+  const bubbleColors = bubbleChartData.map((item) =>
+    getCo2Color(item.y, minCo2, maxCo2)
+  );
+
+  new Chart(ctx, {
+    type: "bubble",
+    data: {
+      datasets: [
+        {
+          label: "CO₂eq per Material",
+          data: bubbleChartData,
+          backgroundColor: bubbleColors,
+          borderColor: bubbleColors.map((color) => color.replace("0.8", "1.0")),
+          borderWidth: 1,
+        },
+      ],
+    },
+    options: {
+      responsive: true,
+      plugins: {
+        legend: {
+          display: false,
+        },
+        tooltip: {
+          callbacks: {
+            label: function (context) {
+              return `${context.raw.label}: Volume: ${context.raw.x.toFixed(
+                2
+              )} m³, CO₂eq: ${context.raw.y.toFixed(2)} kg`;
+            },
+          },
+        },
+      },
+      scales: {
+        x: {
+          beginAtZero: true,
+          title: {
+            display: true,
+            text: "Volume / Material (m³)",
+          },
+        },
+        y: {
+          beginAtZero: true,
+          title: {
+            display: true,
+            text: "CO₂eq / Material (kg)",
+            position: "left",
+          },
+        },
+      },
+    },
+  });
+}
+
+// Modify the loadCo2Chart function to fetch data and render both charts
 function loadCo2Chart(projectId) {
-  fetch(`/api/projects/${projectId}/co2_per_storey`)
+  fetch(`/api/projects/${projectId}/building_elements`)
     .then((response) => response.json())
-    .then((data) => {
-      renderCo2Chart(data);
+    .then((buildingElements) => {
+      renderCo2Chart(buildingElements); // Render the CO2 chart per storey
+      renderBubbleChart(buildingElements); // Render the bubble chart
     })
     .catch((error) =>
-      console.error("Error fetching CO₂-eq data per storey:", error)
+      console.error("Error fetching building elements:", error)
     );
 }
 
-function renderCo2Chart(data) {
+// Function to render the CO₂ chart per storey (unchanged)
+function renderCo2Chart(buildingElements) {
   const ctx = document.getElementById("co2Chart").getContext("2d");
-  const labels = data.map((item) => item.storey);
-  const EBF =
-    parseFloat($("#ebfPerM2").text().split(" ")[0].replace(/,/g, "")) || 1; // Ensure EBF is not zero
 
-  // Divide each CO₂-eq value by EBF to get values per m²
-  const co2Values = data.map((item) => item.co2_eq / EBF);
+  const storeyData = buildingElements.reduce((acc, element) => {
+    const storey = element.building_storey || "Unknown";
+    if (!acc[storey]) {
+      acc[storey] = { co2_eq: 0, count: 0 };
+    }
+    acc[storey].co2_eq += element.materials_info.reduce(
+      (sum, material) => sum + parseFloat(material.total_co2 || 0),
+      0
+    );
+    acc[storey].count += 1;
+    return acc;
+  }, {});
 
-  // Calculate min and max CO₂ values
+  const labels = Object.keys(storeyData);
+  const co2Values = labels.map((storey) => storeyData[storey].co2_eq);
+
   const minCo2 = Math.min(...co2Values);
   const maxCo2 = Math.max(...co2Values);
-
   const barColors = co2Values.map((value) =>
     getCo2Color(value, minCo2, maxCo2)
   );
 
-  // Destroy the previous chart instance if it exists
-  if (co2ChartInstance) {
-    co2ChartInstance.destroy();
-  }
-
-  // Create a new chart instance and assign it to co2ChartInstance
-  co2ChartInstance = new Chart(ctx, {
+  new Chart(ctx, {
     type: "bar",
     data: {
       labels: labels,
       datasets: [
         {
-          label: "CO₂-eq per m² (kg/m²)", // Update chart title
+          label: "CO₂-eq per Building Storey",
           data: co2Values,
           backgroundColor: barColors,
           borderColor: barColors.map((color) => color.replace("0.8", "1.0")),
@@ -873,7 +966,7 @@ function renderCo2Chart(data) {
         tooltip: {
           callbacks: {
             label: function (context) {
-              return context.raw.toLocaleString() + " kg CO₂-eq/m²";
+              return `${context.raw.toFixed(2)} kg CO₂eq`;
             },
           },
         },
@@ -889,7 +982,7 @@ function renderCo2Chart(data) {
           beginAtZero: true,
           title: {
             display: true,
-            text: "CO₂-eq per m² (kg/m²)",
+            text: "CO₂-eq (kg)",
           },
         },
       },
