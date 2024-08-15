@@ -4,6 +4,7 @@
 
 const express = require("express");
 const mongoose = require("mongoose");
+const ExcelJS = require("exceljs");
 const router = express.Router();
 const Project = require("../models/Project");
 const { isAuthenticated } = require("./middleware/authMiddleware");
@@ -829,6 +830,108 @@ router.get(
     } catch (error) {
       console.error("Failed to fetch material details:", error);
       res.status(500).send("Internal Server Error");
+    }
+  }
+);
+
+// ------------------------------------------
+// API Routes: Export functionality
+// ------------------------------------------
+
+// GET endpoint for exporting project data to Excel
+router.get(
+  "/api/projects/:projectId/export",
+  isAuthenticated,
+  async (req, res) => {
+    try {
+      const projectId = req.params.projectId;
+      const project = await Project.findById(projectId).lean();
+      const buildingElements = await BuildingElement.find({ projectId }).lean();
+
+      if (!project || buildingElements.length === 0) {
+        return res
+          .status(404)
+          .send("Project not found or no building elements available");
+      }
+
+      // Create a new workbook and add the LCA worksheet
+      const workbook = new ExcelJS.Workbook();
+      const worksheetLCA = workbook.addWorksheet("LCA");
+
+      const now = new Date();
+      const formattedDate = now.toLocaleString("de-CH"); // Formatting as per Swiss locale
+      const timestamp = now
+        .toISOString()
+        .split("T")[1]
+        .replace(/:/g, "-")
+        .split(".")[0]; // HH-MM-SS format
+
+      // Add column headers in the LCA sheet (row 1)
+      worksheetLCA.columns = [
+        { header: "GUID", key: "guid", width: 20 },
+        { header: "IfcClass", key: "ifc_class", width: 15 },
+        { header: "Name", key: "instance_name", width: 30 },
+        { header: "Building-Storey", key: "building_storey", width: 20 },
+        { header: "Load-bearing", key: "is_loadbearing", width: 15 },
+        { header: "External", key: "is_external", width: 15 },
+        { header: "Volume", key: "volume", width: 15 },
+        { header: "Material", key: "name", width: 30 },
+        { header: "Matched Material", key: "matched_material", width: 30 },
+        { header: "Density (kg/m³)", key: "density", width: 20 },
+        { header: "Indicator (kg CO₂-eq/kg)", key: "indikator", width: 25 },
+        { header: "CO₂-eq (kg)", key: "total_co2", width: 20 },
+      ];
+
+      // Add rows for each building element to the LCA sheet
+      buildingElements.forEach((element) => {
+        element.materials_info.forEach((material) => {
+          worksheetLCA.addRow({
+            guid: element.guid,
+            ifc_class: element.ifc_class,
+            instance_name: element.instance_name,
+            building_storey: element.building_storey,
+            is_loadbearing: element.is_loadbearing ? "Yes" : "No",
+            is_external: element.is_external ? "Yes" : "No",
+            volume: material.volume,
+            name: material.name,
+            matched_material: material.matched_material_name || "No Match",
+            density: material.density || 0,
+            indikator: material.indikator || 0,
+            total_co2: material.total_co2 || 0,
+          });
+        });
+      });
+
+      // Create a second sheet called "Project Info" and add metadata
+      const worksheetProjectInfo = workbook.addWorksheet("Project Info");
+
+      worksheetProjectInfo.addRow([`Exported on: ${formattedDate}`]);
+      worksheetProjectInfo.addRow([
+        `Project Name: ${formatProjectNameForDisplay(project.name)}`,
+        `Project Description: ${project.description || "N/A"}`,
+        `Project Phase: ${project.phase || "N/A"}`,
+      ]);
+
+      worksheetProjectInfo.addRow([]); // Empty row for spacing, if needed
+
+      // Set up the file name using the display name of the project and only the date
+      const fileNameDate = now.toISOString().split("T")[0]; // Only the date part
+      const fileName = `${formatProjectNameForDisplay(
+        project.name
+      )}_${fileNameDate}.xlsx`;
+
+      res.setHeader("Content-Disposition", `attachment; filename=${fileName}`);
+      res.setHeader(
+        "Content-Type",
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+      );
+
+      // Write the workbook to the response
+      await workbook.xlsx.write(res);
+      res.end();
+    } catch (error) {
+      console.error("Error exporting project data:", error);
+      res.status(500).send("Error exporting project data");
     }
   }
 );
