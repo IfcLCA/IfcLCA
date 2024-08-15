@@ -134,7 +134,7 @@
           </div>
         </div>
       </div>
-      <div class="btn-container">
+      <div id="action-buttons" class="btn-row">
         <button
           id="btn-delete-material"
           class="btn btn-secondary"
@@ -151,6 +151,24 @@
           title="Add new material from Eco-Database"
           >Add Material</a
         >
+      </div>
+      <div id="confirm-buttons" class="btn-row" style="display: none">
+        <button
+          id="btn-apply-delete"
+          class="btn btn-danger"
+          data-toggle="tooltip"
+          title="Apply the changes made"
+        >
+          Apply Changes
+        </button>
+        <button
+          id="btn-cancel"
+          class="btn btn-secondary"
+          data-toggle="tooltip"
+          title="Cancel the changes"
+        >
+          Cancel
+        </button>
       </div>
       <div
         id="elements-table-container"
