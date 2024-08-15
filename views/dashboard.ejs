@@ -75,5 +75,11 @@
       <% } %>
     </main>
     <%- include('partials/_footer.ejs') %>
+    <!-- Initialize tooltips -->
+    <script>
+      $(function () {
+        $('[data-toggle="tooltip"]').tooltip();
+      });
+    </script>
   </body>
 </html>

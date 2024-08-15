@@ -7,7 +7,13 @@
       <h2>Create New Project</h2>
       <form id="newProjectForm" action="/api/projects" method="POST">
         <div class="mb-3">
-          <label for="name" class="form-label">Project Name</label>
+          <label
+            for="name"
+            class="form-label"
+            data-toggle="tooltip"
+            title="Enter the name of your project"
+            >Project Name</label
+          >
           <input
             type="text"
             id="name"
@@ -17,11 +23,23 @@
           />
         </div>
         <div class="mb-3">
-          <label for="phase" class="form-label">Phase</label>
+          <label
+            for="phase"
+            class="form-label"
+            data-toggle="tooltip"
+            title="Specify the current phase of the project"
+            >Phase</label
+          >
           <input type="text" id="phase" name="phase" class="form-control" />
         </div>
         <div class="mb-3">
-          <label for="description" class="form-label">Description</label>
+          <label
+            for="description"
+            class="form-label"
+            data-toggle="tooltip"
+            title="Provide a brief description of your project"
+            >Description</label
+          >
           <textarea
             id="description"
             name="description"
@@ -30,7 +48,13 @@
           ></textarea>
         </div>
         <div class="mb-3">
-          <label for="customImage" class="form-label">Custom Image URL</label>
+          <label
+            for="customImage"
+            class="form-label"
+            data-toggle="tooltip"
+            title="Paste a URL for a custom image to represent your project"
+            >Custom Image URL</label
+          >
           <input
             type="text"
             id="customImage"
@@ -39,7 +63,11 @@
           />
         </div>
         <div class="mb-3">
-          <label for="EBF" class="form-label"
+          <label
+            for="EBF"
+            class="form-label"
+            data-toggle="tooltip"
+            title="Enter the energy reference area (EBF) in square meters"
             >Energiebezugsfläche (EBF) in m²</label
           >
           <input
@@ -53,11 +81,20 @@
           />
         </div>
         <div class="d-flex justify-content-between">
-          <button type="submit" class="btn btn-success">Confirm</button>
+          <button
+            type="submit"
+            class="btn btn-success"
+            data-toggle="tooltip"
+            title="Confirm and create the new project"
+          >
+            Confirm
+          </button>
           <button
             type="button"
             class="btn btn-secondary"
             onclick="window.location.href='/dashboard'"
+            data-toggle="tooltip"
+            title="Cancel the creation and return to the dashboard"
           >
             Cancel
           </button>

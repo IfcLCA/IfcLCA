@@ -79,6 +79,17 @@
           <% } %>
         </form>
       </li>
+      <% } else if (typeof page !== 'undefined' && page === 'dashboard') { %>
+      <li class="nav-item">
+        <a
+          href="/newProject"
+          class="btn btn-primary"
+          data-toggle="tooltip"
+          title="Start a new project by entering project details"
+        >
+          <strong>Start New Project</strong>
+        </a>
+      </li>
       <% } %>
     </ul>
   </div>
