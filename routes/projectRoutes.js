@@ -213,26 +213,19 @@ router.post(
           cwd: "/var/www/ifclca/IfcLCA",
         });
 
-        let stdoutData = "";
-        let stderrData = "";
-
         subprocess.stdout.on("data", (data) => {
           console.log(`stdout: ${data}`);
-          stdoutData += data.toString();
         });
 
         subprocess.stderr.on("data", (data) => {
           console.error(`stderr: ${data}`);
-          stderrData += data.toString();
         });
 
         subprocess.on("close", (code) => {
           if (code !== 0) {
-            return reject(
-              new Error(`Python script exited with code ${code}: ${stderrData}`)
-            );
+            return reject(new Error(`Python script exited with code ${code}`));
           }
-          resolve(stdoutData);
+          resolve(); // Resolve without passing stdoutData
         });
       });
 
