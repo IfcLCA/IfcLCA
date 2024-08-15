@@ -32,39 +32,21 @@ jobs:
           SSH_PASSWORD: ${{ secrets.SSH_PASSWORD }}
           SSH_HOST: ${{ secrets.SSH_HOST }}
           SSH_USERNAME: ${{ secrets.SSH_USERNAME }}
-          PREVIEW_PATH: ${{ secrets.PREVIEW_PATH }}
         run: |
-          # Define the deployment directory and subdomain for the PR preview
-          PR_NUMBER=${{ github.event.pull_request.number }}
-          DEPLOY_DIR="/var/www/${PREVIEW_PATH}/pr-${PR_NUMBER}"
-          PREVIEW_URL="https://ifclca.com/${PREVIEW_PATH}/pr-${PR_NUMBER}"
+          # Define the deployment directory for the preview
+          DEPLOY_DIR="/var/www/ifclca_previews"
 
           # Create the directory and copy files
           sshpass -p $SSH_PASSWORD ssh -o StrictHostKeyChecking=no ${SSH_USERNAME}@${SSH_HOST} "mkdir -p ${DEPLOY_DIR}"
           sshpass -p $SSH_PASSWORD scp -r ./build/* ${SSH_USERNAME}@${SSH_HOST}:${DEPLOY_DIR}/
 
-          # Set up Nginx configuration
-          sshpass -p $SSH_PASSWORD ssh -o StrictHostKeyChecking=no ${SSH_USERNAME}@${SSH_HOST} "
-          echo '
-          location /${PREVIEW_PATH}/pr-${PR_NUMBER}/ {
-              root ${DEPLOY_DIR};
-              index index.html;
-
-              try_files \$uri /index.html;
-          }
-          ' | sudo tee /etc/nginx/sites-available/pr-${PR_NUMBER}
-          sudo ln -s /etc/nginx/sites-available/pr-${PR_NUMBER} /etc/nginx/sites-enabled/
-          sudo nginx -s reload
-          "
-
       - name: Post a comment with the preview URL
         uses: actions/github-script@v7
         with:
           script: |
-            const prNumber = context.issue.number;
-            const previewUrl = `https://ifclca.com/${process.env.PREVIEW_PATH}/pr-${prNumber}`;
+            const previewUrl = `https://ifclca.com/preview`;
             github.rest.issues.createComment({
-              issue_number: prNumber,
+              issue_number: context.issue.number,
               owner: context.repo.owner,
               repo: context.repo.repo,
               body: `🚀 The preview app was successfully deployed at ${previewUrl}.`
@@ -76,12 +58,7 @@ jobs:
           SSH_PASSWORD: ${{ secrets.SSH_PASSWORD }}
           SSH_HOST: ${{ secrets.SSH_HOST }}
           SSH_USERNAME: ${{ secrets.SSH_USERNAME }}
-          PREVIEW_PATH: ${{ secrets.PREVIEW_PATH }}
         run: |
-          PR_NUMBER=${{ github.event.pull_request.number }}
           sshpass -p $SSH_PASSWORD ssh -o StrictHostKeyChecking=no ${SSH_USERNAME}@${SSH_HOST} "
-          sudo rm -rf /var/www/${PREVIEW_PATH}/pr-${PR_NUMBER}
-          sudo rm /etc/nginx/sites-available/pr-${PR_NUMBER}
-          sudo rm /etc/nginx/sites-enabled/pr-${PR_NUMBER}
-          sudo nginx -s reload
+          sudo rm -rf /var/www/ifclca_previews/*
           "
