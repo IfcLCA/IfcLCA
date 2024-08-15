@@ -134,12 +134,12 @@
           </div>
         </div>
       </div>
-      <div id="action-buttons" class="btn-row">
+      <div class="btn-container">
         <button
           id="btn-delete-material"
           class="btn btn-secondary"
           data-toggle="tooltip"
-          title="Delete selected material"
+          title="Delete one or more rows from table"
         >
           Delete
         </button>
@@ -151,25 +151,28 @@
           title="Add new material from Eco-Database"
           >Add Material</a
         >
+        <!-- Added buttons for Apply Changes and Cancel with 10px gap -->
+        <div id="confirm-buttons" class="btn-row" style="display: none">
+          <button
+            id="btn-apply-delete"
+            class="btn btn-danger"
+            data-toggle="tooltip"
+            title="Apply the changes made"
+          >
+            Apply Changes
+          </button>
+          <button
+            id="btn-cancel"
+            class="btn btn-secondary"
+            data-toggle="tooltip"
+            title="Cancel the changes"
+            style="margin-left: 10px"
+          >
+            Cancel
+          </button>
+        </div>
       </div>
-      <div id="confirm-buttons" class="btn-row" style="display: none">
-        <button
-          id="btn-apply-delete"
-          class="btn btn-danger"
-          data-toggle="tooltip"
-          title="Apply the changes made"
-        >
-          Apply Changes
-        </button>
-        <button
-          id="btn-cancel"
-          class="btn btn-secondary"
-          data-toggle="tooltip"
-          title="Cancel the changes"
-        >
-          Cancel
-        </button>
-      </div>
+
       <div
         id="elements-table-container"
         style="position: relative; margin-bottom: 60px"
