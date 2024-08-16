@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="en">
+  <%- include('partials/_head.ejs') %>
+  <body>
+    <%- include('partials/_header.ejs') %>
+    <main role="main" class="container mt-4">
+      <div class="d-flex justify-content-between align-items-center">
+        <h2>Material Matching Template for <%= project.name %></h2>
+      </div>
+      <form
+        id="materialPresetsForm"
+        action="/projects/<%= project._id %>/material-presets"
+        method="POST"
+      >
+        <div id="preset-list-container">
+          <ul id="preset-list" class="list-group">
+            <% project.materialPresets.forEach(function(preset, index) { const
+            [ifcName, carbonName] = preset.split('__match__'); %>
+            <li
+              class="list-group-item d-flex justify-content-between align-items-center"
+            >
+              <div class="w-100">
+                <div class="form-group">
+                  <label for="ifcMaterial-<%= index %>"
+                    >IFC Material Name <%= index + 1 %></label
+                  >
+                  <input
+                    type="text"
+                    name="ifcMaterials[<%= index %>]"
+                    value="<%= ifcName %>"
+                    class="form-control"
+                    id="ifcMaterial-<%= index %>"
+                  />
+                </div>
+                <div class="form-group">
+                  <label for="carbonMaterial-<%= index %>"
+                    >Carbon Database Material Name <%= index + 1 %></label
+                  >
+                  <input
+                    type="text"
+                    name="carbonMaterials[<%= index %>]"
+                    value="<%= carbonName %>"
+                    class="form-control"
+                    id="carbonMaterial-<%= index %>"
+                  />
+                </div>
+              </div>
+              <button
+                type="button"
+                class="btn btn-danger delete-preset-btn ml-3"
+                onclick="removePreset(this)"
+              >
+                Delete
+              </button>
+            </li>
+            <% }); %>
+          </ul>
+          <button type="button" class="btn btn-primary mt-3" id="addPresetBtn">
+            Add Preset
+          </button>
+        </div>
+        <div class="d-flex justify-content-between mt-4">
+          <button type="submit" class="btn btn-success">Save Presets</button>
+          <button
+            type="button"
+            class="btn btn-secondary"
+            onclick="window.location.href='/projects/<%= project._id %>/edit'"
+          >
+            Cancel
+          </button>
+        </div>
+      </form>
+    </main>
+    <%- include('partials/_footer.ejs') %>
+    <script>
+      // Function to add a new preset
+      document
+        .getElementById("addPresetBtn")
+        .addEventListener("click", function () {
+          const presetList = document.getElementById("preset-list");
+          const index = presetList.children.length;
+          const listItem = document.createElement("li");
+          listItem.className =
+            "list-group-item d-flex justify-content-between align-items-center";
+          listItem.innerHTML = `
+          <div class="w-100">
+            <div class="form-group">
+              <label for="ifcMaterial-${index}">IFC Material Name ${
+            index + 1
+          }</label>
+              <input type="text" name="ifcMaterials[${index}]" class="form-control" id="ifcMaterial-${index}">
+            </div>
+            <div class="form-group">
+              <label for="carbonMaterial-${index}">Carbon Database Name ${
+            index + 1
+          }</label>
+              <input type="text" name="carbonMaterials[${index}]" class="form-control" id="carbonMaterial-${index}">
+            </div>
+          </div>
+          <button type="button" class="btn btn-danger delete-preset-btn ml-3" onclick="removePreset(this)">Delete</button>
+        `;
+          presetList.appendChild(listItem);
+        });
+
+      // Function to remove a preset
+      function removePreset(button) {
+        const listItem = button.closest("li");
+        listItem.remove();
+      }
+    </script>
+  </body>
+</html>

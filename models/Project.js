@@ -10,13 +10,14 @@ const projectSchema = new mongoose.Schema({
     type: mongoose.Schema.Types.ObjectId,
     ref: "User",
   },
-  EBF: Number, // EBF (m2) is optional,
+  EBF: Number, // EBF (m2) is optional
   building_elements: [
     {
       type: mongoose.Schema.Types.ObjectId,
       ref: "BuildingElement",
     },
   ],
+  materialPresets: [String],
 });
 
 projectSchema.pre("save", function (next) {
