@@ -74,8 +74,7 @@ function parseTreibhausgasemissionen(value, materialName) {
   return isNaN(parsed) ? 0 : parsed;
 }
 
-async function configureFuseWithPresets(projectId) {
-  // Fetch the project and its material presets
+async function getPriorityFuseInstance(projectId) {
   const project = await Project.findById(projectId).lean();
 
   if (
@@ -86,28 +85,17 @@ async function configureFuseWithPresets(projectId) {
     return null; // No presets available
   }
 
-  // Build the priority materials list from presets
-  const priorityMaterials = {};
-  project.materialPresets.forEach((preset) => {
+  const priorityMaterialsList = project.materialPresets.map((preset) => {
     const [ifcMaterial, carbonMaterial] = preset.split("__match__");
-    priorityMaterials[ifcMaterial.toLowerCase()] = carbonMaterial;
+    return { BAUMATERIALIEN: carbonMaterial };
   });
 
-  // Build the Fuse.js search list from priority materials
-  const priorityMaterialsList = Object.values(priorityMaterials).map(
-    (material) => ({ BAUMATERIALIEN: material })
-  );
-
-  // Create a new Fuse.js instance
-  return new Fuse(priorityMaterialsList, {
-    keys: ["BAUMATERIALIEN"],
-    threshold: 0.7,
-    includeScore: true,
-    shouldSort: true,
-  });
+  return createFuseInstance(priorityMaterialsList);
 }
 
-function findBestPriorityMaterial(materialName, priorityFuse) {
+const priorityFuse = await getPriorityFuseInstance(projectId);
+
+function findBestPriorityMaterial(materialName) {
   const matches = priorityFuse.search(materialName);
   return matches.length > 0 ? matches[0].item.BAUMATERIALIEN : null;
 }
@@ -115,7 +103,6 @@ function findBestPriorityMaterial(materialName, priorityFuse) {
 async function findBestMatchForMaterial(
   material,
   carbonMaterials,
-  priorityFuse,
   allMaterialsFuse
 ) {
   const materialNameLower = material.name.toLowerCase();
@@ -243,8 +230,6 @@ router.post(
       // Fetch and process building elements
       const buildingElements = await BuildingElement.find({ projectId }).lean();
       const carbonMaterials = await CarbonMaterial.find({}).lean();
-      // Configure the priority Fuse based on material presets
-      const priorityFuse = await configureFuseWithPresets(projectId);
       allMaterialsFuse = new Fuse(carbonMaterials, fuseOptions);
 
       const bulkOps = []; // to collect bulk update operations
