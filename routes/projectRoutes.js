@@ -93,8 +93,10 @@ async function getPriorityFuseInstance(projectId) {
   return createFuseInstance(priorityMaterialsList);
 }
 
-const priorityFuse = await getPriorityFuseInstance(projectId);
-
+router.post("/api/projects/:projectId/upload", isAuthenticated, upload.single("ifcFile"), async (req, res) => {
+  const projectId = req.params.projectId;
+  const priorityFuse = await getPriorityFuseInstance(projectId);
+  
 function findBestPriorityMaterial(materialName) {
   const matches = priorityFuse.search(materialName);
   return matches.length > 0 ? matches[0].item.BAUMATERIALIEN : null;
