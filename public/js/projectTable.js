@@ -637,7 +637,7 @@ function getColumns(materialNames, projectId) {
       headerWordWrap: true,
     },
     {
-      title: `<div>CO₂-eq (kg)</div>`,
+      title: `<div>CO₂-eq</div>`,
       field: "total_co2",
       formatter: "money",
       formatterParams: { precision: 2, thousand: "'" },
@@ -802,7 +802,6 @@ function combineGroup(group, fields) {
 // Chart Functions
 // ------------------------------------------
 
-// Function to determine color based on CO₂ intensity
 function getCo2Color(value, min, max) {
   const thresholds = {
     low: min + (max - min) * 0.25,
@@ -843,12 +842,19 @@ function renderBubbleChart(data) {
   const bubbleChartData = bubbleData.map((item) => ({
     x: item.totalVolume,
     y: item.totalCo2,
-    r: Math.sqrt(item.totalVolume),
+    r: Math.sqrt(item.totalVolume), // Adjust size scale dynamically
     label: item.material,
   }));
 
   const minCo2 = Math.min(...bubbleChartData.map((item) => item.y));
   const maxCo2 = Math.max(...bubbleChartData.map((item) => item.y));
+
+  const maxVolume = Math.max(...bubbleChartData.map((item) => item.x));
+  const maxRadius = Math.min(ctx.canvas.width, ctx.canvas.height) / 6;
+
+  bubbleChartData.forEach((item) => {
+    item.r = Math.sqrt(item.x / maxVolume) * maxRadius;
+  });
 
   const bubbleColors = bubbleChartData.map((item) =>
     getCo2Color(item.y, minCo2, maxCo2)
@@ -869,18 +875,39 @@ function renderBubbleChart(data) {
     },
     options: {
       responsive: true,
+      maintainAspectRatio: false,
       plugins: {
-        legend: {
-          display: false,
+        zoom: {
+          pan: {
+            enabled: true,
+            mode: "xy",
+            threshold: 10,
+          },
+          zoom: {
+            enabled: true,
+            drag: false,
+            mode: "xy",
+            speed: 0.1,
+          },
         },
         tooltip: {
           callbacks: {
             label: function (context) {
-              return `${context.raw.label}: Volume: ${context.raw.x.toFixed(
-                2
-              )} m³, CO₂eq: ${context.raw.y.toFixed(2)} kg`;
+              const value = context.raw.y;
+              const formattedValue =
+                value > 10000
+                  ? `${(value / 1000).toLocaleString("de-CH")} tons`
+                  : `${value.toLocaleString("de-CH")} kg`;
+              return `${
+                context.raw.label
+              }: Volume: ${context.raw.x.toLocaleString(
+                "de-CH"
+              )} m³, CO₂eq: ${formattedValue}`;
             },
           },
+        },
+        legend: {
+          display: false,
         },
       },
       scales: {
@@ -888,14 +915,25 @@ function renderBubbleChart(data) {
           beginAtZero: true,
           title: {
             display: true,
-            text: "Volume / Material (m³)",
+            text: "Volume per Material (m³)",
           },
         },
         y: {
-          beginAtZero: true,
+          type: "logarithmic",
+          ticks: {
+            callback: function (value, index, values) {
+              if (value >= 1000) {
+                return `${(value / 1000).toLocaleString("de-CH")} tons`;
+              }
+              return value.toLocaleString("de-CH");
+            },
+            min: 1,
+            max: Math.max(...bubbleChartData.map((item) => item.y)) * 1.1, // Adjust to allow a bit more space
+            count: 5, // Control number of ticks
+          },
           title: {
             display: true,
-            text: "CO₂eq / Material (kg)",
+            text: "CO₂eq / Material",
             position: "left",
           },
         },
@@ -904,7 +942,6 @@ function renderBubbleChart(data) {
   });
 }
 
-// Modify the loadCo2Chart function to fetch data and render both charts
 function loadCo2Chart(projectId) {
   fetch(`/api/projects/${projectId}/building_elements`)
     .then((response) => response.json())
@@ -917,7 +954,6 @@ function loadCo2Chart(projectId) {
     );
 }
 
-// Function to render the CO₂ chart per storey (unchanged)
 function renderCo2Chart(buildingElements) {
   const ctx = document.getElementById("co2Chart").getContext("2d");
 
@@ -959,6 +995,7 @@ function renderCo2Chart(buildingElements) {
     },
     options: {
       responsive: true,
+      maintainAspectRatio: false,
       plugins: {
         legend: {
           display: false,
@@ -966,7 +1003,12 @@ function renderCo2Chart(buildingElements) {
         tooltip: {
           callbacks: {
             label: function (context) {
-              return `${context.raw.toFixed(2)} kg CO₂eq`;
+              const value = context.raw;
+              const formattedValue =
+                value > 10000
+                  ? `${(value / 1000).toLocaleString("de-CH")} tons`
+                  : `${value.toLocaleString("de-CH")} kg`;
+              return `${formattedValue}`;
             },
           },
         },
@@ -982,7 +1024,15 @@ function renderCo2Chart(buildingElements) {
           beginAtZero: true,
           title: {
             display: true,
-            text: "CO₂-eq (kg)",
+            text: "CO₂-eq",
+          },
+          ticks: {
+            callback: function (value) {
+              if (value >= 1000) {
+                return `${(value / 1000).toLocaleString("de-CH")} tons`;
+              }
+              return value.toLocaleString("de-CH");
+            },
           },
         },
       },

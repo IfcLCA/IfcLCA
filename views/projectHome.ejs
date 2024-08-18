@@ -15,56 +15,35 @@
     />
     <!-- Load Chart.js -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@1.0.0"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels"></script>
     <!-- Custom CSS -->
     <style>
       .project-container {
         display: flex;
-        align-items: left;
-        gap: 20px;
+        align-items: flex-start;
         width: 100%;
       }
 
       .details-container {
-        flex: 1; /* Make the details take up half the width of the charts */
-        min-width: 250px; /* Ensure it doesn't shrink too much */
-      }
-
-      .charts-container {
-        flex: 3;
-        display: flex;
-        justify-content: space-between;
-        gap: 10px;
-        max-width: 100%;
-      }
-
-      .chart-column {
-        flex: 1;
-        display: flex;
-        justify-content: center;
-        align-items: center;
-        padding: 10px;
-        max-width: 100%;
+        flex: 1; /* Project details take 1/3 of the width */
+        min-width: 250px;
       }
 
       .chart-container {
+        flex: 2; /* Bar chart takes the remaining space */
         width: 100%;
+        height: 100%;
+        min-height: 250px;
       }
 
-      .btn-container {
+      .charts-container {
         display: flex;
-        gap: 10px;
-        justify-content: flex-end;
-        margin-bottom: 20px;
+        flex-wrap: wrap;
+        justify-content: space-between;
       }
 
-      .editbtn-container {
-        display: flex;
-        gap: 10px;
-        justify-content: flex-start;
-        margin-bottom: 20px;
-      }
-
-      @media (max-width: 1200px) {
+      @media (max-width: 700px) {
         .project-container {
           flex-direction: column;
         }
@@ -72,10 +51,18 @@
         .charts-container {
           flex-direction: column;
         }
+      }
 
-        .chart-column {
-          max-width: 100%;
-        }
+      .btn-container {
+        display: flex;
+        gap: 10px;
+        justify-content: flex-end;
+      }
+
+      .editbtn-container {
+        display: flex;
+        gap: 10px;
+        justify-content: flex-start;
       }
     </style>
   </head>
@@ -108,30 +95,27 @@
               ><%= formatNumber(project.co2PerSquareMeter, 1) %> kg</strong
             >
           </p>
-          <div class=".editbtn-container">
+          <div class="editbtn-container">
             <a
               href="/projects/<%= project._id %>/edit"
               id="btn-edit-project"
               class="btn btn-primary"
               data-toggle="tooltip"
               title="Change the project details"
-              >Edit Project</a
+              >Edit Project Details & Settings</a
             >
           </div>
         </div>
-        <div class="charts-container">
-          <div class="chart-column">
-            <div class="chart-container">
-              <canvas id="co2Chart" width="auto" height="120"></canvas>
-              <!-- Adjusted height -->
-            </div>
-          </div>
-          <div class="chart-column">
-            <div class="chart-container">
-              <canvas id="bubbleChart" width="auto" height="120"></canvas>
-              <!-- Adjusted height -->
-            </div>
-          </div>
+        <!-- Placing the bar chart next to the project details -->
+        <div class="chart-container">
+          <canvas id="co2Chart" width="auto"></canvas>
+        </div>
+      </div>
+
+      <!-- The bubble chart stays below -->
+      <div class="charts-container">
+        <div class="chart-container">
+          <canvas id="bubbleChart" width="auto"></canvas>
         </div>
       </div>
       <div class="btn-container">
