@@ -93,10 +93,6 @@ async function getPriorityFuseInstance(projectId) {
   return createFuseInstance(priorityMaterialsList);
 }
 
-router.post("/api/projects/:projectId/upload", isAuthenticated, upload.single("ifcFile"), async (req, res) => {
-  const projectId = req.params.projectId;
-  const priorityFuse = await getPriorityFuseInstance(projectId);
-  
 function findBestPriorityMaterial(materialName) {
   const matches = priorityFuse.search(materialName);
   return matches.length > 0 ? matches[0].item.BAUMATERIALIEN : null;
@@ -191,6 +187,7 @@ router.post(
   upload.single("ifcFile"),
   async (req, res) => {
     const projectId = req.params.projectId;
+    const priorityFuse = await getPriorityFuseInstance(projectId);
     if (!req.file) {
       return res.redirect(
         `/projects/${projectId}?error=Only .ifc files are allowed.`
@@ -198,7 +195,6 @@ router.post(
     }
 
     const filePath = req.file.path;
-
     try {
       // Ensure no old elements for the project
       await BuildingElement.deleteMany({ projectId });
