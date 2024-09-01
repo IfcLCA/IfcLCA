@@ -41,6 +41,8 @@
         display: flex;
         flex-wrap: wrap;
         justify-content: space-between;
+        gap: 20px;
+        margin-top: 20px;
       }
 
       @media (max-width: 700px) {
@@ -63,6 +65,34 @@
         display: flex;
         gap: 10px;
         justify-content: flex-start;
+      }
+
+      /* Viewer-specific styles */
+      #viewer-container {
+        flex: 1;
+        position: relative;
+        width: 100%;
+        height: 200px;
+      }
+
+      #viewer-container canvas,
+      #viewer-container #modelTree {
+        pointer-events: none;
+      }
+
+      #viewer-container:hover canvas,
+      #viewer-container:hover #modelTree {
+        pointer-events: auto;
+      }
+
+      /* Prevent scrolling when hovering over the viewer */
+      #viewer-container {
+        overflow: hidden;
+      }
+
+      /* Fix for scrolling */
+      body.no-scroll {
+        overflow: hidden;
       }
     </style>
   </head>
@@ -112,12 +142,15 @@
         </div>
       </div>
 
-      <!-- The bubble chart stays below -->
+      <!-- The charts and viewer container stays below -->
       <div class="charts-container">
         <div class="chart-container">
           <canvas id="bubbleChart" width="auto"></canvas>
         </div>
+        <!-- Include the viewer partial here -->
+        <div id="viewer-container"><%- include('partials/_viewer.ejs') %></div>
       </div>
+
       <div class="btn-container">
         <button
           id="btn-delete-material"
@@ -174,22 +207,6 @@
             onchange="document.getElementById('ifcUploadForm').submit();"
           />
         </div>
-        <!-- Hidden file input and form shared with navbar -->
-        <form
-          id="ifcUploadForm"
-          action="/api/projects/<%= project._id %>/upload"
-          method="POST"
-          enctype="multipart/form-data"
-          style="display: none"
-        >
-          <input
-            type="file"
-            id="hiddenFileInput"
-            name="ifcFile"
-            onchange="this.form.submit();"
-            required
-          />
-        </form>
       </div>
       <!-- Notification for Invalid Densities -->
       <div
@@ -247,6 +264,16 @@
     <script>
       $(function () {
         $('[data-toggle="tooltip"]').tooltip();
+      });
+
+      // Handle scrolling behavior
+      const viewerContainer = document.getElementById("viewer-container");
+      viewerContainer.addEventListener("mouseenter", function () {
+        document.body.classList.add("no-scroll");
+      });
+
+      viewerContainer.addEventListener("mouseleave", function () {
+        document.body.classList.remove("no-scroll");
       });
     </script>
   </body>

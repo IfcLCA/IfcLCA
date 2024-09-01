@@ -338,7 +338,7 @@ router.post(
       });
 
       // Redirect to the project page or send a response to the client
-      res.redirect(`/projects/${projectId}`);
+      ///res.redirect(`/projects/${projectId}`);
 
       // Remove the uploaded file after processing
       await safeUnlink(filePath);
