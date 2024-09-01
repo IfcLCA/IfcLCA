@@ -29,7 +29,7 @@ document.addEventListener("DOMContentLoaded", function () {
       })
       .then((res) => {
         chartWrapper.innerHTML = res.data;
-        // Reinitialize charts if necessary
+        // Optionally reinitialize charts if necessary
       })
       .then(() => {
         // Update table
@@ -37,7 +37,7 @@ document.addEventListener("DOMContentLoaded", function () {
       })
       .then((res) => {
         tableWrapper.innerHTML = res.data;
-        // Reinitialize table if necessary
+        // Optionally reinitialize table if necessary
       })
       .then(() => {
         uploadMessage.innerHTML = "IFC file uploaded successfully!";

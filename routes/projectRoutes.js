@@ -548,6 +548,43 @@ router.post("/projects/:projectId/edit", isAuthenticated, async (req, res) => {
   }
 });
 
+router.get("/projects/:projectId/details", async (req, res) => {
+  try {
+    const projectId = req.params.projectId;
+    const project = await Project.findById(projectId).lean();
+    res.render("partials/_projectDetails", { project }, (err, html) => {
+      if (err) throw err;
+      res.send(html);
+    });
+  } catch (error) {
+    res.status(500).send("Error loading project details.");
+  }
+});
+
+router.get("/projects/:projectId/charts", async (req, res) => {
+  try {
+    // Pass any necessary data for the charts
+    res.render("partials/_charts", {}, (err, html) => {
+      if (err) throw err;
+      res.send(html);
+    });
+  } catch (error) {
+    res.status(500).send("Error loading charts.");
+  }
+});
+
+router.get("/projects/:projectId/table", async (req, res) => {
+  try {
+    // Pass any necessary data for the table
+    res.render("partials/_table", {}, (err, html) => {
+      if (err) throw err;
+      res.send(html);
+    });
+  } catch (error) {
+    res.status(500).send("Error loading table.");
+  }
+});
+
 // ------------------------------------------
 // API Routes: Table Management
 // ------------------------------------------
