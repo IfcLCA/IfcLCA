@@ -19,6 +19,9 @@ document.addEventListener("DOMContentLoaded", function () {
     axios
       .post(uploadForm.action, formData)
       .then((response) => {
+        // Here, replace `projectId` with a valid variable or ID reference as appropriate
+        const projectId = response.data.projectId || window.projectId;
+
         // Update project details
         return axios.get(`/projects/${projectId}/details`);
       })

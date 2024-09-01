@@ -352,6 +352,7 @@ router.post(
         });
 
         res.json({
+          projectId: project._id,
           projectDetails: projectDetailsHtml,
           charts: chartsHtml,
           table: tableHtml,
