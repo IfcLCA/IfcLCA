@@ -50,6 +50,22 @@ router.get("/privacy-policy", (req, res) => {
 // ------------------------------------------
 // Helper Functions
 // ------------------------------------------
+function formatCarbonFootprint(value) {
+  if (value < 2000) {
+    return `${Math.round(value).toLocaleString()} kg`;
+  } else if (value < 1500000) {
+    return `${(value / 1000).toFixed(1).toLocaleString()} tons`;
+  } else {
+    return `${(value / 1000000).toFixed(3).toLocaleString()} Mio tons`;
+  }
+}
+
+// Inject this function into the res.locals so it can be used in EJS templates
+router.use((req, res, next) => {
+  res.locals.formatCarbonFootprint = formatCarbonFootprint;
+  next();
+});
+
 async function safeUnlink(filePath) {
   try {
     await fs.unlink(filePath);
@@ -200,9 +216,6 @@ router.post(
 
       // Skip the Python script execution permanently
       console.log("IFC file uploaded successfully, skipping Python script.");
-
-      // Redirect to the project page
-      res.redirect(`/projects/${projectId}`);
 
       // If not needed anymore, remove the uploaded file after processing
       await safeUnlink(filePath);
