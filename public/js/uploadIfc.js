@@ -1,43 +1,53 @@
 document.addEventListener("DOMContentLoaded", function () {
-  const ifcUploadForm = document.getElementById("ifcUploadForm");
+  const uploadForm = document.getElementById("ifcUploadForm");
+  const projectDetailsWrapper = document.getElementById(
+    "project-details-wrapper"
+  );
+  const chartWrapper = document.getElementById("chart-wrapper");
+  const tableWrapper = document.getElementById("table-wrapper");
   const uploadSpinner = document.getElementById("uploadSpinner");
   const uploadProgressBar = document.getElementById("uploadProgressBar");
   const uploadMessage = document.getElementById("uploadMessage");
 
-  if (ifcUploadForm) {
-    ifcUploadForm.addEventListener("submit", async function (event) {
-      event.preventDefault();
+  uploadForm.addEventListener("submit", function (event) {
+    event.preventDefault();
+    const formData = new FormData(uploadForm);
 
-      const formData = new FormData(ifcUploadForm);
+    uploadSpinner.style.display = "block";
+    uploadProgressBar.style.display = "block";
 
-      try {
-        uploadSpinner.style.display = "block";
-        uploadProgressBar.style.display = "block";
-
-        const response = await fetch(ifcUploadForm.action, {
-          method: "POST",
-          body: formData,
-        });
-
-        if (!response.ok) {
-          throw new Error("Failed to upload IFC file.");
-        }
-
-        const data = await response.json();
-
-        // Replace the project details, charts, and table sections with the new HTML
-        document.querySelector(".project-container").innerHTML =
-          data.projectDetails;
-        document.getElementById("chart-wrapper").innerHTML = data.charts;
-        document.getElementById("table-wrapper").innerHTML = data.table;
-
+    axios
+      .post(uploadForm.action, formData)
+      .then((response) => {
+        // Update project details
+        return axios.get(`/projects/${projectId}/details`);
+      })
+      .then((res) => {
+        projectDetailsWrapper.innerHTML = res.data;
+        // Update charts
+        return axios.get(`/projects/${projectId}/charts`);
+      })
+      .then((res) => {
+        chartWrapper.innerHTML = res.data;
+        // Reinitialize charts if necessary
+      })
+      .then(() => {
+        // Update table
+        return axios.get(`/projects/${projectId}/table`);
+      })
+      .then((res) => {
+        tableWrapper.innerHTML = res.data;
+        // Reinitialize table if necessary
+      })
+      .then(() => {
         uploadMessage.innerHTML = "IFC file uploaded successfully!";
-      } catch (error) {
+      })
+      .catch((error) => {
         uploadMessage.innerHTML = `Error: ${error.message}`;
-      } finally {
+      })
+      .finally(() => {
         uploadSpinner.style.display = "none";
         uploadProgressBar.style.display = "none";
-      }
-    });
-  }
+      });
+  });
 });
