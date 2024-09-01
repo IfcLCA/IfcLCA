@@ -340,8 +340,7 @@ router.post(
 
       try {
         // After processing, render the updated partials
-        // Fetch the updated project and building elements after processing
-        const project = await Project.findById(projectId).lean(); // Ensure the project is fetched here
+        const project = await Project.findById(projectId).lean();
         const buildingElements = await BuildingElement.find({
           projectId,
         }).lean();

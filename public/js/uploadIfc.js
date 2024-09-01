@@ -19,30 +19,15 @@ document.addEventListener("DOMContentLoaded", function () {
     axios
       .post(uploadForm.action, formData)
       .then((response) => {
-        // Here, replace `projectId` with a valid variable or ID reference as appropriate
-        const projectId = response.data.projectId || window.projectId;
+        // Update the content of the project details, charts, and table
+        projectDetailsWrapper.innerHTML = response.data.projectDetails;
+        chartWrapper.innerHTML = response.data.charts;
+        tableWrapper.innerHTML = response.data.table;
 
-        // Update project details
-        return axios.get(`/projects/${projectId}/details`);
-      })
-      .then((res) => {
-        projectDetailsWrapper.innerHTML = res.data;
-        // Update charts
-        return axios.get(`/projects/${projectId}/charts`);
-      })
-      .then((res) => {
-        chartWrapper.innerHTML = res.data;
-        // Optionally reinitialize charts if necessary
-      })
-      .then(() => {
-        // Update table
-        return axios.get(`/projects/${projectId}/table`);
-      })
-      .then((res) => {
-        tableWrapper.innerHTML = res.data;
-        // Optionally reinitialize table if necessary
-      })
-      .then(() => {
+        // Reinitialize any necessary components after the content update
+        reinitializeCharts();
+        reinitializeTable(window.projectId);
+
         uploadMessage.innerHTML = "IFC file uploaded successfully!";
       })
       .catch((error) => {
@@ -53,4 +38,16 @@ document.addEventListener("DOMContentLoaded", function () {
         uploadProgressBar.style.display = "none";
       });
   });
+
+  function reinitializeCharts() {
+    // Reinitialize charts here if necessary
+    loadCo2Chart(window.projectId); // Assuming this loads the CO2 and Bubble charts
+  }
+
+  function reinitializeTable(projectId) {
+    // Reinitialize the table after updating the content
+    fetchMaterialNames().then((materialNames) => {
+      initializeTable(projectId, materialNames);
+    });
+  }
 });
