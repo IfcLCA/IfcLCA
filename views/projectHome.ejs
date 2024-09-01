@@ -41,6 +41,8 @@
         display: flex;
         flex-wrap: wrap;
         justify-content: space-between;
+        gap: 20px;
+        margin-top: 20px;
       }
 
       @media (max-width: 700px) {
@@ -64,42 +66,33 @@
         gap: 10px;
         justify-content: flex-start;
       }
-      /* Viewer Styles */
-      #container {
+
+      /* Viewer-specific styles */
+      #viewer-container {
+        flex: 1;
         position: relative;
         width: 100%;
-        height: 400px;
+        height: 200px;
       }
-      #myCanvas {
-        width: 100%;
-        height: 100%;
-        background: lightblue;
-        background-image: linear-gradient(lightblue, white);
+
+      #viewer-container canvas,
+      #viewer-container #modelTree {
+        pointer-events: none;
       }
-      #modelTree {
-        position: absolute;
-        top: 10px;
-        left: 10px;
-        width: 300px;
-        max-height: 400px;
-        overflow-y: auto;
-        background: rgba(240, 240, 240, 0.9);
-        border: 1px solid #ccc;
-        border-radius: 4px;
-        padding: 10px;
-        z-index: 20;
+
+      #viewer-container:hover canvas,
+      #viewer-container:hover #modelTree {
+        pointer-events: auto;
       }
-      #uploadButton {
-        position: fixed;
-        top: 10px;
-        right: 10px;
-        z-index: 10;
-        background-color: #4caf50;
-        color: white;
-        padding: 10px;
-        border: none;
-        border-radius: 4px;
-        cursor: pointer;
+
+      /* Prevent scrolling when hovering over the viewer */
+      #viewer-container {
+        overflow: hidden;
+      }
+
+      /* Fix for scrolling */
+      body.no-scroll {
+        overflow: hidden;
       }
     </style>
   </head>
@@ -149,12 +142,15 @@
         </div>
       </div>
 
-      <!-- The bubble chart stays below -->
+      <!-- The charts and viewer container stays below -->
       <div class="charts-container">
         <div class="chart-container">
           <canvas id="bubbleChart" width="auto"></canvas>
         </div>
+        <!-- Include the viewer partial here -->
+        <div id="viewer-container"><%- include('partials/_viewer.ejs') %></div>
       </div>
+
       <div class="btn-container">
         <button
           id="btn-delete-material"
@@ -211,27 +207,6 @@
             onchange="document.getElementById('ifcUploadForm').submit();"
           />
         </div>
-        <!-- IFC Viewer -->
-        <div id="container">
-          <canvas id="myCanvas"></canvas>
-          <div id="modelTree"></div>
-        </div>
-        <!-- Hidden file input and form shared with navbar -->
-        <form
-          id="ifcUploadForm"
-          action="/api/projects/<%= project._id %>/upload"
-          method="POST"
-          enctype="multipart/form-data"
-          style="display: none"
-        >
-          <input
-            type="file"
-            id="hiddenFileInput"
-            name="ifcFile"
-            onchange="this.form.submit();"
-            required
-          />
-        </form>
       </div>
       <!-- Notification for Invalid Densities -->
       <div
@@ -290,92 +265,15 @@
       $(function () {
         $('[data-toggle="tooltip"]').tooltip();
       });
-    </script>
-    <script type="module">
-      import {
-        Viewer,
-        WebIFCLoaderPlugin,
-        TreeViewPlugin,
-      } from "https://cdn.jsdelivr.net/npm/@xeokit/xeokit-sdk/dist/xeokit-sdk.es.min.js";
-      import * as WebIFC from "https://cdn.jsdelivr.net/npm/web-ifc@0.0.51/web-ifc-api.js";
 
-      document.addEventListener("DOMContentLoaded", function () {
-        const hiddenFileInput = document.getElementById("hiddenFileInput");
-        const container = document.getElementById("container");
+      // Handle scrolling behavior
+      const viewerContainer = document.getElementById("viewer-container");
+      viewerContainer.addEventListener("mouseenter", function () {
+        document.body.classList.add("no-scroll");
+      });
 
-        const loadViewerWithDelay = () => {
-          setTimeout(() => {
-            // Initialize the Viewer only after a short delay
-            const viewer = new Viewer({
-              canvasId: "myCanvas",
-              transparent: true,
-            });
-
-            // Set up the camera
-            viewer.camera.eye = [-3.933, 2.855, 27.018];
-            viewer.camera.look = [4.4, 3.724, 8.899];
-            viewer.camera.up = [-0.018, 0.999, 0.039];
-
-            // Initialize WebIFC API
-            const IfcAPI = new WebIFC.IfcAPI();
-            IfcAPI.SetWasmPath("https://cdn.jsdelivr.net/npm/web-ifc@0.0.51/");
-
-            let currentModel = null;
-
-            IfcAPI.Init().then(() => {
-              const webIFCLoader = new WebIFCLoaderPlugin(viewer, {
-                WebIFC,
-                IfcAPI,
-              });
-
-              const treeView = new TreeViewPlugin(viewer, {
-                containerElement: document.getElementById("modelTree"),
-                autoExpandDepth: 2,
-              });
-
-              const loadIFCModel = (arrayBuffer) => {
-                if (currentModel) {
-                  currentModel.destroy();
-                  treeView.removeModel(currentModel.id);
-                }
-
-                const model = webIFCLoader.load({
-                  id: "uploadedModel",
-                  ifc: arrayBuffer,
-                  edges: true,
-                  loadMetadata: true,
-                });
-
-                model.on("loaded", () => {
-                  currentModel = model;
-                  viewer.cameraFlight.flyTo({
-                    worldAABB: model.worldAABB,
-                  });
-                });
-
-                model.on("error", (error) => {
-                  console.error("Failed to load IFC model:", error);
-                });
-              };
-
-              hiddenFileInput.addEventListener("change", function (event) {
-                const file = event.target.files[0];
-                if (file && file.name.endsWith(".ifc")) {
-                  const reader = new FileReader();
-                  reader.onload = function (e) {
-                    const arrayBuffer = e.target.result;
-                    loadIFCModel(arrayBuffer);
-                  };
-                  reader.readAsArrayBuffer(file);
-                } else {
-                  alert("Please upload a valid IFC file.");
-                }
-              });
-            });
-          }, 100); // Delay of 1 second to ensure the page has reloaded
-        };
-
-        loadViewerWithDelay(); // Call the function to load the viewer with a delay
+      viewerContainer.addEventListener("mouseleave", function () {
+        document.body.classList.remove("no-scroll");
       });
     </script>
   </body>
