@@ -19,23 +19,23 @@ document.addEventListener("DOMContentLoaded", function () {
     axios
       .post(uploadForm.action, formData)
       .then((response) => {
-        // Update the content of the project details, charts, and table
-        projectDetailsWrapper.innerHTML = response.data.projectDetails;
-        chartWrapper.innerHTML = response.data.charts;
-        tableWrapper.innerHTML = response.data.table;
+        // Update project details
+        document.getElementById("project-details-wrapper").innerHTML =
+          response.data.projectDetails;
 
-        // Reinitialize any necessary components after the content update
-        reinitializeCharts();
-        reinitializeTable(window.projectId);
+        // Update charts
+        document.getElementById("chart-wrapper").innerHTML =
+          response.data.charts;
 
-        uploadMessage.innerHTML = "IFC file uploaded successfully!";
+        // Update table
+        document.getElementById("table-wrapper").innerHTML =
+          response.data.table;
+
+        // Reinitialize any necessary components (e.g., charts, tables)
+        initializeTableAndChart(window.projectId);
       })
       .catch((error) => {
-        uploadMessage.innerHTML = `Error: ${error.message}`;
-      })
-      .finally(() => {
-        uploadSpinner.style.display = "none";
-        uploadProgressBar.style.display = "none";
+        console.error("Error during upload and update:", error);
       });
   });
 

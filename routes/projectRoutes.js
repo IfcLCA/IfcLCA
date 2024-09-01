@@ -362,6 +362,13 @@ router.post(
           path.join(__dirname, "../views/partials/_table.ejs"),
           { buildingElements }
         );
+
+        // Send the HTML strings back to the client
+        res.json({
+          projectDetails: projectDetailsHtml,
+          charts: chartsHtml,
+          table: tableHtml,
+        });
       } catch (error) {
         console.error("Error rendering partials:", error);
         res.status(500).json({ error: error.message });
