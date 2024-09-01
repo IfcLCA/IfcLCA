@@ -337,8 +337,9 @@ router.post(
         totalCarbonFootprint: totalFootprint,
       });
 
-      // Redirect to the project page or send a response to the client
-      ///res.redirect(`/projects/${projectId}`);
+      // Send the updated project data back to the client
+      const updatedProject = await Project.findById(projectId).lean();
+      res.json({ project: updatedProject, buildingElements: updatedElements });
 
       // Remove the uploaded file after processing
       await safeUnlink(filePath);
