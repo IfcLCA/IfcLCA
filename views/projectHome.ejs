@@ -15,35 +15,56 @@
     />
     <!-- Load Chart.js -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@1.0.0"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels"></script>
     <!-- Custom CSS -->
     <style>
       .project-container {
         display: flex;
-        align-items: flex-start;
+        align-items: left;
+        gap: 20px;
         width: 100%;
       }
 
       .details-container {
-        flex: 1; /* Project details take 1/3 of the width */
+        flex: 1;
         min-width: 250px;
       }
 
-      .chart-container {
-        flex: 2; /* Bar chart takes the remaining space */
-        width: 100%;
-        height: 100%;
-        min-height: 250px;
-      }
-
       .charts-container {
+        flex: 3;
         display: flex;
-        flex-wrap: wrap;
         justify-content: space-between;
+        gap: 10px;
+        max-width: 100%;
       }
 
-      @media (max-width: 700px) {
+      .chart-column {
+        flex: 1;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        padding: 10px;
+        max-width: 100%;
+      }
+
+      .chart-container {
+        width: 100%;
+      }
+
+      .btn-container {
+        display: flex;
+        gap: 10px;
+        justify-content: flex-end;
+        margin-bottom: 20px;
+      }
+
+      .editbtn-container {
+        display: flex;
+        gap: 10px;
+        justify-content: flex-start;
+        margin-bottom: 20px;
+      }
+
+      @media (max-width: 1200px) {
         .project-container {
           flex-direction: column;
         }
@@ -51,24 +72,55 @@
         .charts-container {
           flex-direction: column;
         }
+
+        .chart-column {
+          max-width: 100%;
+        }
       }
 
-      .btn-container {
-        display: flex;
-        gap: 10px;
-        justify-content: flex-end;
+      /* Viewer Styles */
+      #container {
+        position: relative;
+        width: 100%;
+        height: 400px;
       }
-
-      .editbtn-container {
-        display: flex;
-        gap: 10px;
-        justify-content: flex-start;
+      #myCanvas {
+        width: 100%;
+        height: 100%;
+        background: lightblue;
+        background-image: linear-gradient(lightblue, white);
+      }
+      #modelTree {
+        position: absolute;
+        top: 10px;
+        left: 10px;
+        width: 300px;
+        max-height: 400px;
+        overflow-y: auto;
+        background: rgba(240, 240, 240, 0.9);
+        border: 1px solid #ccc;
+        border-radius: 4px;
+        padding: 10px;
+        z-index: 20;
+      }
+      #uploadButton {
+        position: fixed;
+        top: 10px;
+        right: 10px;
+        z-index: 10;
+        background-color: #4caf50;
+        color: white;
+        padding: 10px;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
       }
     </style>
   </head>
   <body>
     <%- include('partials/_header.ejs', { hasProjects: false }) %>
     <main role="main" class="container mt-4">
+      <!-- Existing Project Information and Charts -->
       <div class="project-container">
         <div class="details-container">
           <h2 id="project-name">
@@ -102,137 +154,30 @@
               class="btn btn-primary"
               data-toggle="tooltip"
               title="Change the project details"
-              >Edit Project Details & Settings</a
+              >Edit Project</a
             >
           </div>
         </div>
-        <!-- Placing the bar chart next to the project details -->
-        <div class="chart-container">
-          <canvas id="co2Chart" width="auto"></canvas>
+        <div class="charts-container">
+          <div class="chart-column">
+            <div class="chart-container">
+              <canvas id="co2Chart" width="auto" height="120"></canvas>
+            </div>
+          </div>
+          <div class="chart-column">
+            <div class="chart-container">
+              <canvas id="bubbleChart" width="auto" height="120"></canvas>
+            </div>
+          </div>
         </div>
       </div>
 
-      <!-- The bubble chart stays below -->
-      <div class="charts-container">
-        <div class="chart-container">
-          <canvas id="bubbleChart" width="auto"></canvas>
-        </div>
+      <!-- IFC Viewer -->
+      <div id="container">
+        <canvas id="myCanvas"></canvas>
+        <div id="modelTree"></div>
       </div>
-      <div class="btn-container">
-        <button
-          id="btn-delete-material"
-          class="btn btn-secondary"
-          data-toggle="tooltip"
-          title="Delete one or more rows from table"
-        >
-          Delete
-        </button>
-        <a
-          href="/projects/<%= project._id %>/add-row"
-          id="btn-add-material"
-          class="btn btn-success"
-          data-toggle="tooltip"
-          title="Add new material from Eco-Database"
-          >Add Material</a
-        >
-        <!-- Added buttons for Apply Changes and Cancel with 10px gap -->
-        <div id="confirm-buttons" class="btn-row" style="display: none">
-          <button
-            id="btn-apply-delete"
-            class="btn btn-danger"
-            data-toggle="tooltip"
-            title="Apply the changes made"
-          >
-            Apply Changes
-          </button>
-          <button
-            id="btn-cancel"
-            class="btn btn-secondary"
-            data-toggle="tooltip"
-            title="Cancel the changes"
-            style="margin-left: 10px"
-          >
-            Cancel
-          </button>
-        </div>
-      </div>
-
-      <div
-        id="elements-table-container"
-        style="position: relative; margin-bottom: 60px"
-      >
-        <div id="elements-table" class="mt-4"></div>
-        <div id="table-overlay" class="overlay">
-          <p>
-            Upload any <a href="#" id="upload-link">IFC file</a> to see data
-          </p>
-          <input
-            type="file"
-            id="hidden-file-input"
-            name="ifcFile"
-            style="display: none"
-            onchange="document.getElementById('ifcUploadForm').submit();"
-          />
-        </div>
-        <!-- Hidden file input and form shared with navbar -->
-        <form
-          id="ifcUploadForm"
-          action="/api/projects/<%= project._id %>/upload"
-          method="POST"
-          enctype="multipart/form-data"
-          style="display: none"
-        >
-          <input
-            type="file"
-            id="hiddenFileInput"
-            name="ifcFile"
-            onchange="this.form.submit();"
-            required
-          />
-        </form>
-      </div>
-      <!-- Notification for Invalid Densities -->
-      <div
-        id="invalid-density-notification"
-        style="
-          display: none;
-          position: fixed;
-          top: 50%;
-          left: 50%;
-          transform: translate(-50%, -50%);
-          background: #ffc;
-          border: 1px solid #ffa;
-          padding: 10px;
-          border-radius: 5px;
-          z-index: 1000;
-          box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
-          font-size: 14px;
-          color: #a00;
-        "
-      >
-        <p>
-          Some density fields are invalid. Please check and enter valid values.
-        </p>
-      </div>
-      <div id="uploadMessage"></div>
-      <div
-        id="uploadProgressBar"
-        style="
-          display: none;
-          background: #e0e0e0;
-          height: 20px;
-          width: 100%;
-          position: relative;
-        "
-      >
-        <div style="background: #76c7c0; height: 100%; width: 100%"></div>
-      </div>
-      <div
-        id="uploadSpinner"
-        style="display: none; text-align: center; margin-top: 10px"
-      >
-        <i class="fa fa-spinner fa-spin" style="font-size: 24px"></i>
-      </div>
+      <input type="file" id="uploadButton" accept=".ifc" />
     </main>
     <%- include('partials/_footer.ejs') %>
     <script src="https://cdn.jsdelivr.net/npm/tabulator-tables/dist/js/tabulator.min.js"></script>
@@ -247,6 +192,84 @@
     <script>
       $(function () {
         $('[data-toggle="tooltip"]').tooltip();
+      });
+    </script>
+    <script type="module">
+      import {
+        Viewer,
+        WebIFCLoaderPlugin,
+        TreeViewPlugin,
+      } from "https://cdn.jsdelivr.net/npm/@xeokit/xeokit-sdk/dist/xeokit-sdk.es.min.js";
+      import * as WebIFC from "https://cdn.jsdelivr.net/npm/web-ifc@0.0.51/web-ifc-api.js";
+
+      // Initialize Viewer
+      const viewer = new Viewer({
+        canvasId: "myCanvas",
+        transparent: true,
+      });
+
+      // Set up the camera
+      viewer.camera.eye = [-3.933, 2.855, 27.018];
+      viewer.camera.look = [4.4, 3.724, 8.899];
+      viewer.camera.up = [-0.018, 0.999, 0.039];
+
+      // Initialize WebIFC API
+      const IfcAPI = new WebIFC.IfcAPI();
+      IfcAPI.SetWasmPath("https://cdn.jsdelivr.net/npm/web-ifc@0.0.51/");
+
+      let currentModel = null;
+
+      IfcAPI.Init().then(() => {
+        const webIFCLoader = new WebIFCLoaderPlugin(viewer, {
+          WebIFC,
+          IfcAPI,
+        });
+
+        const treeView = new TreeViewPlugin(viewer, {
+          containerElement: document.getElementById("modelTree"),
+          autoExpandDepth: 2,
+        });
+
+        const loadIFCModel = (arrayBuffer) => {
+          if (currentModel) {
+            currentModel.destroy();
+            treeView.removeModel(currentModel.id);
+          }
+
+          const model = webIFCLoader.load({
+            id: "uploadedModel",
+            ifc: arrayBuffer,
+            edges: true,
+            loadMetadata: true,
+          });
+
+          model.on("loaded", () => {
+            currentModel = model;
+            viewer.cameraFlight.flyTo({
+              worldAABB: model.worldAABB,
+            });
+          });
+
+          model.on("error", (error) => {
+            console.error("Failed to load IFC model:", error);
+          });
+        };
+
+        document
+          .getElementById("uploadButton")
+          .addEventListener("change", function (event) {
+            const file = event.target.files[0];
+            if (file && file.name.endsWith(".ifc")) {
+              const reader = new FileReader();
+              reader.onload = function (e) {
+                const arrayBuffer = e.target.result;
+                loadIFCModel(arrayBuffer);
+              };
+              reader.readAsArrayBuffer(file);
+            } else {
+              alert("Please upload a valid IFC file.");
+            }
+          });
       });
     </script>
   </body>

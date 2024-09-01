@@ -50,23 +50,6 @@ router.get("/privacy-policy", (req, res) => {
 // ------------------------------------------
 // Helper Functions
 // ------------------------------------------
-
-function formatCarbonFootprint(value) {
-  if (value < 2000) {
-    return `${Math.round(value).toLocaleString()} kg`;
-  } else if (value < 1500000) {
-    return `${(value / 1000).toFixed(1).toLocaleString()} tons`;
-  } else {
-    return `${(value / 1000000).toFixed(3).toLocaleString()} Mio tons`;
-  }
-}
-
-// Inject this function into the res.locals so it can be used in EJS templates
-router.use((req, res, next) => {
-  res.locals.formatCarbonFootprint = formatCarbonFootprint;
-  next();
-});
-
 async function safeUnlink(filePath) {
   try {
     await fs.unlink(filePath);
@@ -91,32 +74,24 @@ function parseTreibhausgasemissionen(value, materialName) {
   return isNaN(parsed) ? 0 : parsed;
 }
 
-// Priority materials map and Fuse.js settings
-const priorityMaterials = {
-  Beton: "Hochbaubeton (ohne Bewehrung)",
-  Holzwerkstoffplatte: "3- und 5-Schicht Massivholzplatte",
-  Holz: "Brettschichtholz",
-  CLT: "Brettsperrholz",
-  Stahl: "Stahlprofil, blank",
-  S235: "Stahlprofil, blank",
-  S355: "Stahlprofil, blank",
-  S335: "Stahlprofil, blank",
-  S335J0: "Stahlprofil, blank",
-  Beton_vorfabriziert: "Betonfertigteil, hochfester Beton, ab Werk",
-};
+async function getPriorityFuseInstance(projectId) {
+  const project = await Project.findById(projectId).lean();
 
-const fuseOptions = {
-  keys: ["BAUMATERIALIEN"],
-  threshold: 0.7,
-  includeScore: true,
-  shouldSort: true,
-};
+  if (
+    !project ||
+    !project.materialPresets ||
+    project.materialPresets.length === 0
+  ) {
+    return null; // No presets available
+  }
 
-const priorityMaterialsList = Object.values(priorityMaterials).map(
-  (material) => ({ BAUMATERIALIEN: material })
-);
-const priorityFuse = new Fuse(priorityMaterialsList, fuseOptions);
-let allMaterialsFuse;
+  const priorityMaterialsList = project.materialPresets.map((preset) => {
+    const [ifcMaterial, carbonMaterial] = preset.split("__match__");
+    return { BAUMATERIALIEN: carbonMaterial };
+  });
+
+  return createFuseInstance(priorityMaterialsList);
+}
 
 function findBestPriorityMaterial(materialName) {
   const matches = priorityFuse.search(materialName);
@@ -129,7 +104,10 @@ async function findBestMatchForMaterial(
   allMaterialsFuse
 ) {
   const materialNameLower = material.name.toLowerCase();
-  const priorityMaterialName = findBestPriorityMaterial(materialNameLower);
+  const priorityMaterialName = findBestPriorityMaterial(
+    materialNameLower,
+    priorityFuse
+  );
   let matchedMaterial = null;
 
   if (priorityMaterialName) {
@@ -202,13 +180,13 @@ const upload = multer({
   },
 });
 
-// POST endpoint for IFC file upload and initial material matching
 router.post(
   "/api/projects/:projectId/upload",
   isAuthenticated,
   upload.single("ifcFile"),
   async (req, res) => {
     const projectId = req.params.projectId;
+
     if (!req.file) {
       return res.redirect(
         `/projects/${projectId}?error=Only .ifc files are allowed.`
@@ -216,131 +194,17 @@ router.post(
     }
 
     const filePath = req.file.path;
-
     try {
       // Ensure no old elements for the project
       await BuildingElement.deleteMany({ projectId });
 
-      // Execute the Python script and wait for it to complete
-      await new Promise((resolve, reject) => {
-        const pythonPath = "/opt/miniconda3/bin/python";
-        const scriptPath = "/var/www/ifclca/IfcLCA/scripts/analyze_ifc.py"; // Absolute path
-        const args = [scriptPath, filePath, projectId];
+      // Skip the Python script execution permanently
+      console.log("IFC file uploaded successfully, skipping Python script.");
 
-        const subprocess = spawn(pythonPath, args, {
-          cwd: "/var/www/ifclca/IfcLCA",
-        });
-
-        subprocess.stdout.on("data", (data) => {
-          console.log(`stdout: ${data}`);
-        });
-
-        subprocess.stderr.on("data", (data) => {
-          console.error(`stderr: ${data}`);
-        });
-
-        subprocess.on("close", (code) => {
-          if (code !== 0) {
-            return reject(new Error(`Python script exited with code ${code}`));
-          }
-          resolve(); // Resolve without passing stdoutData
-        });
-      });
-
-      // Fetch and process building elements
-      const buildingElements = await BuildingElement.find({ projectId }).lean();
-      const carbonMaterials = await CarbonMaterial.find({}).lean();
-      allMaterialsFuse = new Fuse(carbonMaterials, fuseOptions);
-
-      const bulkOps = []; // to collect bulk update operations
-
-      for (const element of buildingElements) {
-        if (!element.materials_info) {
-          console.warn(
-            `Building element ${element._id} has no materials_info. Initializing as empty array.`
-          );
-          element.materials_info = [];
-        }
-
-        for (const material of element.materials_info) {
-          material.buildingElementId = element._id;
-          const bestMatch = await findBestMatchForMaterial(
-            material,
-            carbonMaterials,
-            allMaterialsFuse
-          );
-          if (bestMatch) {
-            const density = parseDensity(
-              bestMatch["Rohdichte/Flächenmasse"],
-              bestMatch.BAUMATERIALIEN
-            );
-            const indikator = parseTreibhausgasemissionen(
-              bestMatch["Treibhausgasemissionen, Total,  (in kg CO2-eq)"],
-              bestMatch.BAUMATERIALIEN
-            );
-            const totalCO2eq = material.volume * density * indikator;
-
-            bulkOps.push({
-              updateOne: {
-                filter: {
-                  _id: element._id,
-                  "materials_info.materialId": material.materialId,
-                },
-                update: {
-                  $set: {
-                    "materials_info.$.matched_material_id": bestMatch._id,
-                    "materials_info.$.matched_material_name":
-                      bestMatch.BAUMATERIALIEN,
-                    "materials_info.$.density": density,
-                    "materials_info.$.indikator": indikator,
-                    "materials_info.$.total_co2": totalCO2eq.toFixed(3),
-                  },
-                },
-              },
-            });
-          } else {
-            bulkOps.push({
-              updateOne: {
-                filter: {
-                  _id: element._id,
-                  "materials_info.materialId": material.materialId,
-                },
-                update: {
-                  $set: {
-                    "materials_info.$.matched_material_name": "No Match",
-                  },
-                },
-              },
-            });
-          }
-        }
-      }
-
-      // Perform bulk update
-      if (bulkOps.length > 0) {
-        await BuildingElement.bulkWrite(bulkOps);
-      }
-
-      // Calculate total footprint for the project
-      const updatedElements = await BuildingElement.find({ projectId }).lean();
-      const totalFootprint = updatedElements.reduce((total, element) => {
-        if (!element.materials_info) return total; // Skip if no materials_info
-        return (
-          total +
-          element.materials_info.reduce((elementTotal, material) => {
-            return elementTotal + parseFloat(material.total_co2 || 0);
-          }, 0)
-        );
-      }, 0);
-
-      await Project.findByIdAndUpdate(projectId, {
-        totalCarbonFootprint: totalFootprint,
-      });
-
-      // Redirect to the project page or send a response to the client
+      // Redirect to the project page
       res.redirect(`/projects/${projectId}`);
 
-      // Remove the uploaded file after processing
+      // If not needed anymore, remove the uploaded file after processing
       await safeUnlink(filePath);
     } catch (error) {
       // Remove the uploaded file if there's an error
@@ -505,6 +369,7 @@ router.post("/projects/:projectId/edit", isAuthenticated, async (req, res) => {
     if (EBF < 0) {
       throw new Error("Invalid EBF value. EBF must be greater than 0.");
     }
+
     const updatedProject = await Project.findByIdAndUpdate(
       projectId,
       {
@@ -514,17 +379,96 @@ router.post("/projects/:projectId/edit", isAuthenticated, async (req, res) => {
         customImage,
         totalCarbonFootprint,
         EBF,
+        materialPresets: req.session.materialPresets || [], // Save presets to project
       },
       { new: true }
     );
+
     if (!updatedProject) {
       return res.status(404).send("Project not found");
     }
+
+    // Clear the session data after saving
+    delete req.session.materialPresets;
+
     res.redirect(`/projects/${projectId}`);
   } catch (error) {
     console.error("Error updating project:", error);
     res.status(500).send("Error updating project");
   }
+});
+
+// Route to display the material presets configuration page
+router.get(
+  "/projects/:projectId/material-presets",
+  isAuthenticated,
+  async (req, res) => {
+    try {
+      const { projectId } = req.params;
+      const project = await Project.findById(projectId);
+
+      if (!project) {
+        return res.status(404).send("Project not found");
+      }
+
+      // Load presets from session if available, otherwise from the project
+      const materialPresets =
+        req.session.materialPresets || project.materialPresets;
+
+      res.render("materialPresets", { project, materialPresets });
+    } catch (error) {
+      console.error("Error fetching project for material presets:", error);
+      res.status(500).send("Error fetching project for material presets.");
+    }
+  }
+);
+
+// POST route to save material presets temporarily in session
+router.post(
+  "/projects/:projectId/material-presets",
+  isAuthenticated,
+  async (req, res) => {
+    try {
+      const { projectId } = req.params;
+      const { ifcMaterials, carbonMaterials } = req.body;
+
+      if (
+        !ifcMaterials ||
+        !carbonMaterials ||
+        ifcMaterials.length !== carbonMaterials.length
+      ) {
+        return res
+          .status(400)
+          .send(
+            "Invalid input. Please provide both IFC and Carbon Database names."
+          );
+      }
+
+      const materialPresets = ifcMaterials.map((ifcMaterial, index) => {
+        const carbonMaterial = carbonMaterials[index] || "";
+        return `${ifcMaterial}__match__${carbonMaterial}`;
+      });
+
+      // Store the presets in the session instead of saving to the database
+      req.session.materialPresets = materialPresets;
+
+      res.redirect(`/projects/${projectId}/edit`);
+    } catch (error) {
+      console.error("Error saving material presets:", error);
+      res.status(500).send("Error saving material presets.");
+    }
+  }
+);
+
+// Route to cancel project edit and clear session data
+router.get("/projects/:projectId/cancel-edit", isAuthenticated, (req, res) => {
+  const { projectId } = req.params;
+
+  // Clear the session data for material presets
+  delete req.session.materialPresets;
+
+  // Redirect back to the project page or dashboard
+  res.redirect(`/projects/${projectId}`);
 });
 
 // ------------------------------------------
