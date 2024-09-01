@@ -337,9 +337,29 @@ router.post(
         totalCarbonFootprint: totalFootprint,
       });
 
-      // Send the updated project data back to the client
-      const updatedProject = await Project.findById(projectId).lean();
-      res.json({ project: updatedProject, buildingElements: updatedElements });
+      try {
+        // After processing, render the updated partials
+        const projectDetailsHtml = await ejs.renderFile(
+          "views/partials/_projectDetails.ejs",
+          { project }
+        );
+        const chartsHtml = await ejs.renderFile("views/partials/_charts.ejs", {
+          project,
+          buildingElements,
+        });
+        const tableHtml = await ejs.renderFile("views/partials/_table.ejs", {
+          buildingElements,
+        });
+
+        res.json({
+          projectDetails: projectDetailsHtml,
+          charts: chartsHtml,
+          table: tableHtml,
+        });
+      } catch (error) {
+        console.error("Error rendering partials:", error);
+        res.status(500).json({ error: error.message });
+      }
 
       // Remove the uploaded file after processing
       await safeUnlink(filePath);
