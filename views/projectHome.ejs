@@ -100,7 +100,7 @@
     <%- include('partials/_header.ejs', { hasProjects: false }) %>
     <main role="main" class="container mt-4">
       <div class="project-container">
-        <div class="details-container">
+        <div id="project-details-wrapper" class="details-container">
           <h2 id="project-name">
             <%= formatProjectNameForDisplay(project.name) %>
           </h2>
@@ -108,10 +108,10 @@
           <p>Description: <%= project.description %></p>
           <p>
             Carbon Footprint:
-            <span id="carbonFootprint"
-              ><%= formatNumber(Math.round(project.totalCarbonFootprint) / 1000,
-              1) %> tons</span
-            >
+            <span id="carbonFootprint">
+              <%= formatNumber(Math.round(project.totalCarbonFootprint) / 1000,
+              1) %> tons
+            </span>
           </p>
           <p>
             m²:
@@ -121,9 +121,9 @@
           </p>
           <p>
             CO₂-eq / m²:
-            <strong id="co2PerM2"
-              ><%= formatNumber(project.co2PerSquareMeter, 1) %> kg</strong
-            >
+            <strong id="co2PerM2">
+              <%= formatNumber(project.co2PerSquareMeter, 1) %> kg
+            </strong>
           </p>
           <div class="editbtn-container">
             <a
@@ -132,19 +132,20 @@
               class="btn btn-primary"
               data-toggle="tooltip"
               title="Change the project details"
-              >Edit Project Details & Settings</a
             >
+              Edit Project Details & Settings
+            </a>
           </div>
         </div>
         <!-- Placing the bar chart next to the project details -->
-        <div class="chart-container">
+        <div id="chart-wrapper" class="chart-container">
           <canvas id="co2Chart" width="auto"></canvas>
         </div>
       </div>
 
       <!-- The charts and viewer container stays below -->
       <div class="charts-container">
-        <div class="chart-container">
+        <div id="chart-wrapper" class="chart-container">
           <canvas id="bubbleChart" width="auto"></canvas>
         </div>
         <!-- Include the viewer partial here -->
@@ -166,8 +167,9 @@
           class="btn btn-success"
           data-toggle="tooltip"
           title="Add new material from Eco-Database"
-          >Add Material</a
         >
+          Add Material
+        </a>
         <!-- Added buttons for Apply Changes and Cancel with 10px gap -->
         <div id="confirm-buttons" class="btn-row" style="display: none">
           <button
@@ -194,14 +196,16 @@
         id="elements-table-container"
         style="position: relative; margin-bottom: 60px"
       >
-        <div id="elements-table" class="mt-4"></div>
+        <div id="table-wrapper" class="mt-4">
+          <!-- Table content will be injected here -->
+        </div>
         <div id="table-overlay" class="overlay">
           <p>
             Upload any <a href="#" id="upload-link">IFC file</a> to see data
           </p>
           <input
             type="file"
-            id="hidden-file-input"
+            id="hiddenFileInput"
             name="ifcFile"
             style="display: none"
             onchange="document.getElementById('ifcUploadForm').submit();"
