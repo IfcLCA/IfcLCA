@@ -340,18 +340,31 @@ router.post(
 
       try {
         // After processing, render the updated partials
+        // Fetch the updated project and building elements after processing
+        const project = await Project.findById(projectId).lean(); // Ensure the project is fetched here
+        const buildingElements = await BuildingElement.find({
+          projectId,
+        }).lean();
+
+        if (!project) {
+          throw new Error("Project not found");
+        }
+
+        // Render the partials as HTML strings
         const projectDetailsHtml = await ejs.renderFile(
-          "views/partials/_projectDetails.ejs",
+          path.join(__dirname, "../views/partials/_projectDetails.ejs"),
           { project }
         );
-        const chartsHtml = await ejs.renderFile("views/partials/_charts.ejs", {
-          project,
-          buildingElements,
-        });
-        const tableHtml = await ejs.renderFile("views/partials/_table.ejs", {
-          buildingElements,
-        });
+        const chartsHtml = await ejs.renderFile(
+          path.join(__dirname, "../views/partials/_charts.ejs"),
+          { project, buildingElements }
+        );
+        const tableHtml = await ejs.renderFile(
+          path.join(__dirname, "../views/partials/_table.ejs"),
+          { buildingElements }
+        );
 
+        // Send the HTML strings back to the client
         res.json({
           projectDetails: projectDetailsHtml,
           charts: chartsHtml,
