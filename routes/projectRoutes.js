@@ -21,6 +21,7 @@ const {
 } = require("../utils/util");
 const { isNaN } = require("lodash");
 const { route } = require("./authRoutes");
+const ejs = require("ejs");
 
 // ------------------------------------------
 // Static Routes
@@ -352,7 +353,6 @@ router.post(
         });
 
         res.json({
-          projectId: project._id,
           projectDetails: projectDetailsHtml,
           charts: chartsHtml,
           table: tableHtml,
