@@ -353,7 +353,7 @@ router.post(
         // Render the partials as HTML strings
         const projectDetailsHtml = await ejs.renderFile(
           path.join(__dirname, "../views/partials/_projectDetails.ejs"),
-          { project }
+          { project, formatProjectNameForDisplay }
         );
         const chartsHtml = await ejs.renderFile(
           path.join(__dirname, "../views/partials/_charts.ejs"),
