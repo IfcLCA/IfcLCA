@@ -29,14 +29,6 @@ jobs:
         run: |
           echo "Pull Request Number: ${{ github.event.pull_request.number }}"
 
-      - name: Deploy to Server using SSH with Password
-        env:
-          SSH_PASSWORD: ${{ secrets.SSH_PASSWORD }}
-          SSH_USERNAME: ${{ secrets.SSH_USERNAME }}
-          SSH_HOST: your-server-ip-or-hostname
-        run: |
-          sshpass -p $SSH_PASSWORD scp -o StrictHostKeyChecking=no -r ./your_local_directory $SSH_USERNAME@$SSH_HOST:/var/www/preview
-
       - name: Deploy to Nginx server
         env:
           SSH_PASSWORD: ${{ secrets.SSH_PASSWORD }}
@@ -56,7 +48,7 @@ jobs:
 
           tar -czf deploy.tar.gz *
           sshpass -p $SSH_PASSWORD scp -v deploy.tar.gz ${SSH_USERNAME}@${SSH_HOST}:${DEPLOY_DIR}/
-          sshpass -p $SSH_PASSWORD ssh -o StrictHostKeyChecking=no ${SSH_USERNAME}@${SSH_HOST} "
+          sshpass -p $SSH_PASSWORD scp -o StrictHostKeyChecking=no -r $SSH_USERNAME@$SSH_HOST:/var/www/preview
             cd ${DEPLOY_DIR} && tar -xzf deploy.tar.gz
           "
 
