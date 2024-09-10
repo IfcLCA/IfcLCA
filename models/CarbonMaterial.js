@@ -43,7 +43,6 @@ const carbonMaterialSchema = new mongoose.Schema(
         return this["[group]"] || value;
       },
     },
-    "[group]": String, // Include this field to capture the raw data
   },
   {
     timestamps: true,

@@ -525,7 +525,9 @@ function getColumns(materialNames, projectId) {
         const row = cell.getRow();
         const data = row.getData();
 
-        fetch(`/api/materials/details/${updatedMaterialName}`)
+        const encodedMaterialName = encodeURIComponent(updatedMaterialName); // Encode the material name
+
+        fetch(`/api/materials/details/${encodedMaterialName}`)
           .then((response) => response.json())
           .then((materialDetails) => {
             const newDensity = materialDetails.density;
@@ -552,18 +554,7 @@ function getColumns(materialNames, projectId) {
                 total_co2: newTotalCO2.toFixed(3),
               },
               validMaterialIds
-            ).then(() => {
-              // Refresh data in the table and update the summary after editing
-              fetchBuildingElements(projectId).then((buildingElements) => {
-                const flattenedData = flattenElements(buildingElements);
-                window.mainTable.replaceData(flattenedData).then(() => {
-                  updateProjectSummary(window.mainTable);
-                  toggleInvalidDensityNotification(
-                    checkForInvalidDensities(flattenedData)
-                  );
-                });
-              });
-            });
+            );
           })
           .catch((error) => {
             console.error("Error fetching material details:", error);
@@ -877,19 +868,6 @@ function renderBubbleChart(data) {
       responsive: true,
       maintainAspectRatio: false,
       plugins: {
-        zoom: {
-          pan: {
-            enabled: true,
-            mode: "xy",
-            threshold: 10,
-          },
-          zoom: {
-            enabled: true,
-            drag: false,
-            mode: "xy",
-            speed: 0.1,
-          },
-        },
         tooltip: {
           callbacks: {
             label: function (context) {

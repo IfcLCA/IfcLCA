@@ -53,7 +53,7 @@ projectSchema.methods.calculateTotalCarbonFootprint = async function () {
     buildingElements.forEach((element) => {
       element.materials_info.forEach((materialInfo) => {
         const density = parseFloat(
-          materialInfo.material["Rohdichte/Flächenmasse"]
+          materialInfo.material["Rohdichte/ Flächenmasse"]
         );
         const volume = parseFloat(materialInfo.volume);
         const co2Indicator = parseFloat(

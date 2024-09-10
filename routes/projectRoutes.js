@@ -145,7 +145,7 @@ async function findBestMatchForMaterial(
 
   if (matchedMaterial) {
     const density = parseDensity(
-      matchedMaterial["Rohdichte/Flächenmasse"],
+      matchedMaterial["Rohdichte/ Flächenmasse"],
       matchedMaterial.BAUMATERIALIEN
     );
     const indikator = parseTreibhausgasemissionen(
@@ -271,7 +271,7 @@ router.post(
           );
           if (bestMatch) {
             const density = parseDensity(
-              bestMatch["Rohdichte/Flächenmasse"],
+              bestMatch["Rohdichte/ Flächenmasse"],
               bestMatch.BAUMATERIALIEN
             );
             const indikator = parseTreibhausgasemissionen(
@@ -822,7 +822,7 @@ router.get(
   isAuthenticated,
   async (req, res) => {
     try {
-      const materialName = req.params.name;
+      const materialName = decodeURIComponent(req.params.name); // Decode the material name
       const material = await CarbonMaterial.findOne({
         BAUMATERIALIEN: materialName,
       }).lean();
@@ -832,7 +832,7 @@ router.get(
       }
 
       const density = parseDensity(
-        material["Rohdichte/Flächenmasse"],
+        material["Rohdichte/ Flächenmasse"],
         materialName
       );
       const indicator = parseTreibhausgasemissionen(
