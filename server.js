@@ -6,6 +6,7 @@ const session = require("express-session");
 const MongoStore = require("connect-mongo");
 const authRoutes = require("./routes/authRoutes");
 const projectRoutes = require("./routes/projectRoutes");
+const rateLimit = require("express-rate-limit");
 
 if (!process.env.DATABASE_URL || !process.env.SESSION_SECRET) {
   console.error(
@@ -16,6 +17,17 @@ if (!process.env.DATABASE_URL || !process.env.SESSION_SECRET) {
 
 const app = express();
 const port = process.env.PORT || 3000;
+
+// Define global rate limiter
+const globalLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 500, // Limit each IP to 100 requests per windowMs
+  message: "Too many requests from this IP, please try again later.",
+  headers: true, // Send rate limit info in headers
+});
+
+// Apply the global rate limiter
+app.use(globalLimiter);
 
 // Middleware to parse request bodies
 app.use(express.urlencoded({ extended: true }));
