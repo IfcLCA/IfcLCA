@@ -76,17 +76,23 @@ jobs:
           "
 
       - name: Post a comment with the preview URL
+        if: github.event_name == 'pull_request'
         uses: actions/github-script@v7
         with:
           script: |
             const prNumber = context.issue.number || "manual";
-            const previewUrl = `https://ifclca.com/${process.env.PREVIEW_DOMAIN}/pr-${prNumber}`;
+            const previewUrl = `https://${process.env.PREVIEW_DOMAIN || 'ifclca.com'}/pr-${prNumber}`;
             github.rest.issues.createComment({
-              issue_number: context.issue.number || 0,
+              issue_number: context.issue.number,
               owner: context.repo.owner,
               repo: context.repo.repo,
               body: `🚀 The preview app was successfully deployed at ${previewUrl}.`
             })
+
+      - name: Log deployment URL (for manual deployments)
+        if: github.event_name != 'pull_request'
+        run: |
+          echo "🚀 The app was successfully deployed at https://${{ secrets.PREVIEW_DOMAIN }}/manual-deploy"
 
       - name: Cleanup after PR merge/close
         if: github.event.action == 'closed'
