@@ -32,10 +32,10 @@ jobs:
           SSH_PASSWORD: ${{ secrets.SSH_PASSWORD }}
           SSH_HOST: ${{ secrets.SSH_HOST }}
           SSH_USERNAME: ${{ secrets.SSH_USERNAME }}
-          PREVIEW_PATH: ${{ secrets.PREVIEW_PATH }}
+          PREVIEW_DOMAIN: ${{ secrets.PREVIEW_DOMAIN }}
         run: |
           # Define the deployment directory
-          DEPLOY_DIR="/var/www/${PREVIEW_PATH}/pr-${{ github.event.pull_request.number }}"
+          DEPLOY_DIR="/var/www/${PREVIEW_DOMAIN}/pr-${{ github.event.pull_request.number }}"
 
           # Create the directory and copy files
           sshpass -p $SSH_PASSWORD ssh -o StrictHostKeyChecking=no ${SSH_USERNAME}@${SSH_HOST} "mkdir -p ${DEPLOY_DIR}"
@@ -52,7 +52,7 @@ jobs:
         with:
           script: |
             const prNumber = context.issue.number;
-            const previewUrl = `https://ifclca.com/${process.env.PREVIEW_PATH}/pr-${prNumber}`;
+            const previewUrl = `https://ifclca.com/${process.env.PREVIEW_DOMAIN}/pr-${prNumber}`;
             github.rest.issues.createComment({
               issue_number: prNumber,
               owner: context.repo.owner,
@@ -66,10 +66,10 @@ jobs:
           SSH_PASSWORD: ${{ secrets.SSH_PASSWORD }}
           SSH_HOST: ${{ secrets.SSH_HOST }}
           SSH_USERNAME: ${{ secrets.SSH_USERNAME }}
-          PREVIEW_PATH: ${{ secrets.PREVIEW_PATH }}
+          PREVIEW_DOMAIN: ${{ secrets.PREVIEW_DOMAIN }}
         run: |
           PR_NUMBER=${{ github.event.pull_request.number }}
           sshpass -p $SSH_PASSWORD ssh -o StrictHostKeyChecking=no ${SSH_USERNAME}@${SSH_HOST} "
-          sudo rm -rf /var/www/${PREVIEW_PATH}/pr-${PR_NUMBER}
+          sudo rm -rf /var/www/${PREVIEW_DOMAIN}/pr-${PR_NUMBER}
           sudo nginx -s reload
           "
