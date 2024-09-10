@@ -67,7 +67,12 @@ jobs:
           sshpass -p $SSH_PASSWORD ssh -o StrictHostKeyChecking=no ${SSH_USERNAME}@${SSH_HOST} "
             cd ${DEPLOY_DIR} &&
             tar -xzf deploy.tar.gz &&
-            pm2 startOrReload ecosystem.config.js --env production
+            ls -l ${DEPLOY_DIR} # Verify files after extraction
+          "
+
+          # Restart the app using the correct ecosystem.config.js path
+          sshpass -p $SSH_PASSWORD ssh -o StrictHostKeyChecking=no ${SSH_USERNAME}@${SSH_HOST} "
+            pm2 startOrReload /var/www/ifclca/IfcLCA/ecosystem.config.js --env production
           "
 
       - name: Post a comment with the preview URL
