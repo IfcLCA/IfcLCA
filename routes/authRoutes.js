@@ -74,11 +74,13 @@ router.post("/auth/register", authRateLimiter, async (req, res) => {
       "utf-8"
     );
 
+    const baseUrl = process.env.BASE_URL || "http://localhost:3000";
+
     const emailContent = emailTemplate
       .replace(/<%= firstName %>/g, firstName)
       .replace(
         /<%= confirmUrl %>/g,
-        `http://${req.headers.host}/auth/confirm/${token}`
+        `${baseUrl}/auth/confirm/${token}` // Use the trusted base URL
       );
 
     // Send the confirmation email
