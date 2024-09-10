@@ -46,9 +46,12 @@ jobs:
 
           echo "Deploying to: ${DEPLOY_DIR}"
 
-          # Create the directory and copy files
-          sshpass -p $SSH_PASSWORD ssh -o StrictHostKeyChecking=no -v ${SSH_USERNAME}@${SSH_HOST} "mkdir -p ${DEPLOY_DIR}"
-          sshpass -p $SSH_PASSWORD scp -v -r * ${SSH_USERNAME}@${SSH_HOST}:${DEPLOY_DIR}/
+          tar -czf deploy.tar.gz *
+          sshpass -p $SSH_PASSWORD scp -v deploy.tar.gz ${SSH_USERNAME}@${SSH_HOST}:${DEPLOY_DIR}/
+          sshpass -p $SSH_PASSWORD ssh -o StrictHostKeyChecking=no ${SSH_USERNAME}@${SSH_HOST} "
+            cd ${DEPLOY_DIR} && tar -xzf deploy.tar.gz
+          "
+
 
           # Restart the app with PM2
           sshpass -p $SSH_PASSWORD ssh -v -o StrictHostKeyChecking=no ${SSH_USERNAME}@${SSH_HOST} "
