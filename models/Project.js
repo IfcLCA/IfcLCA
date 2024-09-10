@@ -57,9 +57,7 @@ projectSchema.methods.calculateTotalCarbonFootprint = async function () {
         );
         const volume = parseFloat(materialInfo.volume);
         const co2Indicator = parseFloat(
-          materialInfo.material[
-            "Treibhausgasemissionen, Total,  (in kg CO2-eq)"
-          ]
+          materialInfo.material["Treibhausgasemissionen, Total [kg CO2-eq]"]
         );
 
         if (!isNaN(density) && !isNaN(volume) && !isNaN(co2Indicator)) {

@@ -149,7 +149,7 @@ async function findBestMatchForMaterial(
       matchedMaterial.BAUMATERIALIEN
     );
     const indikator = parseTreibhausgasemissionen(
-      matchedMaterial["Treibhausgasemissionen, Total,  (in kg CO2-eq)"],
+      matchedMaterial["Treibhausgasemissionen, Total [kg CO2-eq]"],
       matchedMaterial.BAUMATERIALIEN
     );
     const totalCO2eq = material.volume * density * indikator;
@@ -275,7 +275,7 @@ router.post(
               bestMatch.BAUMATERIALIEN
             );
             const indikator = parseTreibhausgasemissionen(
-              bestMatch["Treibhausgasemissionen, Total,  (in kg CO2-eq)"],
+              bestMatch["Treibhausgasemissionen, Total [kg CO2-eq]"],
               bestMatch.BAUMATERIALIEN
             );
             const totalCO2eq = material.volume * density * indikator;
@@ -836,7 +836,7 @@ router.get(
         materialName
       );
       const indicator = parseTreibhausgasemissionen(
-        material["Treibhausgasemissionen, Total,  (in kg CO2-eq)"],
+        material["Treibhausgasemissionen, Total [kg CO2-eq]"],
         materialName
       );
 
