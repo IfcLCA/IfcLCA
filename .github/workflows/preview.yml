@@ -3,6 +3,9 @@ name: Nginx Preview Deployment
 on:
   pull_request:
     branches: [main]
+  push:
+    branches:
+      - main
   workflow_dispatch:
 
 jobs:
@@ -13,6 +16,16 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+
+      - name: Install SSHPass
+        run: sudo apt-get install -y sshpass
+
+      - name: Add server to known_hosts
+        env:
+          SSH_HOST: ${{ secrets.SSH_HOST }} # The hostname or IP address of your server
+        run: |
+          mkdir -p ~/.ssh
+          ssh-keyscan -H $SSH_HOST >> ~/.ssh/known_hosts
 
       - name: Set up Node.js
         uses: actions/setup-node@v3
