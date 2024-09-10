@@ -46,17 +46,12 @@ jobs:
           SSH_USERNAME: ${{ secrets.SSH_USERNAME }}
           PREVIEW_DOMAIN: ${{ secrets.PREVIEW_DOMAIN }}
         run: |
-          # Check if the PR number is available
-          if [ -z "${{ github.event.pull_request.number }}" ]; then
-            echo "No pull request number found, using manual deployment directory."
-            DEPLOY_DIR="/var/www/${PREVIEW_DOMAIN}/manual-deploy"
-          else
-            DEPLOY_DIR="/var/www/${PREVIEW_DOMAIN}/pr-${{ github.event.pull_request.number }}"
-          fi
+          # Set deployment directory to /var/www/preview/manual-deploy
+          DEPLOY_DIR="/var/www/${PREVIEW_DOMAIN}/manual-deploy"
 
           echo "Deploying to: ${DEPLOY_DIR}"
 
-          # Create deployment directory
+          # Create deployment directory on the server
           sshpass -p $SSH_PASSWORD ssh -o StrictHostKeyChecking=no ${SSH_USERNAME}@${SSH_HOST} "mkdir -p ${DEPLOY_DIR}"
 
           # Archive and copy the project
@@ -70,29 +65,27 @@ jobs:
             ls -l ${DEPLOY_DIR} # Verify files after extraction
           "
 
-          # Restart the app using the correct ecosystem.config.js path
+          # Copy the ecosystem.preview.config.js to the server
+          sshpass -p $SSH_PASSWORD scp -o StrictHostKeyChecking=no ecosystem.preview.config.js ${SSH_USERNAME}@${SSH_HOST}:${DEPLOY_DIR}/
+
+          # Restart the app using PM2 and the correct ecosystem.preview.config.js path
           sshpass -p $SSH_PASSWORD ssh -o StrictHostKeyChecking=no ${SSH_USERNAME}@${SSH_HOST} "
-            pm2 startOrReload /var/www/ifclca/IfcLCA/ecosystem.config.js --env production
+            cd ${DEPLOY_DIR} &&
+            pm2 startOrReload ${DEPLOY_DIR}/ecosystem.preview.config.js --env preview
           "
 
       - name: Post a comment with the preview URL
-        if: github.event_name == 'pull_request'
         uses: actions/github-script@v7
         with:
           script: |
             const prNumber = context.issue.number || "manual";
-            const previewUrl = `https://${process.env.PREVIEW_DOMAIN || 'ifclca.com'}/pr-${prNumber}`;
+            const previewUrl = `https://ifclca.com/${process.env.PREVIEW_DOMAIN}/pr-${prNumber}`;
             github.rest.issues.createComment({
-              issue_number: context.issue.number,
+              issue_number: context.issue.number || 0,
               owner: context.repo.owner,
               repo: context.repo.repo,
               body: `🚀 The preview app was successfully deployed at ${previewUrl}.`
             })
-
-      - name: Log deployment URL (for manual deployments)
-        if: github.event_name != 'pull_request'
-        run: |
-          echo "🚀 The app was successfully deployed at https://${{ secrets.PREVIEW_DOMAIN }}/manual-deploy"
 
       - name: Cleanup after PR merge/close
         if: github.event.action == 'closed'
