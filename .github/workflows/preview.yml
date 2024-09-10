@@ -22,10 +22,12 @@ jobs:
       - name: Install dependencies
         run: npm install
 
-      # No build step needed if your app doesn't require one
-
       - name: Install SSHPass
         run: sudo apt-get install -y sshpass
+
+      - name: Log PR number (for debugging)
+        run: |
+          echo "Pull Request Number: ${{ github.event.pull_request.number }}"
 
       - name: Deploy to Nginx server
         env:
@@ -34,16 +36,22 @@ jobs:
           SSH_USERNAME: ${{ secrets.SSH_USERNAME }}
           PREVIEW_DOMAIN: ${{ secrets.PREVIEW_DOMAIN }}
         run: |
-          # Define the deployment directory
-          DEPLOY_DIR="/var/www/${PREVIEW_DOMAIN}/pr-${{ github.event.pull_request.number }}"
+          # Check if the PR number is available
+          if [ -z "${{ github.event.pull_request.number }}" ]; then
+            echo "No pull request number found, using manual deployment directory."
+            DEPLOY_DIR="/var/www/${PREVIEW_DOMAIN}/manual-deploy"
+          else
+            DEPLOY_DIR="/var/www/${PREVIEW_DOMAIN}/pr-${{ github.event.pull_request.number }}"
+          fi
+
+          echo "Deploying to: ${DEPLOY_DIR}"
 
           # Create the directory and copy files
           sshpass -p $SSH_PASSWORD ssh -o StrictHostKeyChecking=no -v ${SSH_USERNAME}@${SSH_HOST} "mkdir -p ${DEPLOY_DIR}"
           sshpass -p $SSH_PASSWORD scp -v -r * ${SSH_USERNAME}@${SSH_HOST}:${DEPLOY_DIR}/
 
-
           # Restart the app with PM2
-          sshpass -p $SSH_PASSWORD ssh -o StrictHostKeyChecking=no ${SSH_USERNAME}@${SSH_HOST} "
+          sshpass -p $SSH_PASSWORD ssh -v -o StrictHostKeyChecking=no ${SSH_USERNAME}@${SSH_HOST} "
             cd ${DEPLOY_DIR} &&
             pm2 startOrReload ecosystem.config.js --env production
           "
@@ -52,10 +60,10 @@ jobs:
         uses: actions/github-script@v7
         with:
           script: |
-            const prNumber = context.issue.number;
+            const prNumber = context.issue.number || "manual";
             const previewUrl = `https://ifclca.com/${process.env.PREVIEW_DOMAIN}/pr-${prNumber}`;
             github.rest.issues.createComment({
-              issue_number: prNumber,
+              issue_number: context.issue.number,
               owner: context.repo.owner,
               repo: context.repo.repo,
               body: `🚀 The preview app was successfully deployed at ${previewUrl}.`
