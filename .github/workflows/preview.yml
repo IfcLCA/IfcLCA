@@ -58,6 +58,9 @@ jobs:
           tar -czf deploy.tar.gz *
           sshpass -p $SSH_PASSWORD scp -o StrictHostKeyChecking=no deploy.tar.gz ${SSH_USERNAME}@${SSH_HOST}:${DEPLOY_DIR}/
 
+          # Copy the ecosystem.preview.config.js to the server
+          sshpass -p $SSH_PASSWORD scp -o StrictHostKeyChecking=no ecosystem.preview.config.js ${SSH_USERNAME}@${SSH_HOST}:${DEPLOY_DIR}/
+
           # Extract and deploy the archive on the remote server
           sshpass -p $SSH_PASSWORD ssh -o StrictHostKeyChecking=no ${SSH_USERNAME}@${SSH_HOST} "
             cd ${DEPLOY_DIR} &&
@@ -65,12 +68,8 @@ jobs:
             ls -l ${DEPLOY_DIR} # Verify files after extraction
           "
 
-          # Copy the ecosystem.preview.config.js to the server
-          sshpass -p $SSH_PASSWORD scp -o StrictHostKeyChecking=no ecosystem.preview.config.js ${SSH_USERNAME}@${SSH_HOST}:${DEPLOY_DIR}/
-
-          # Restart the app using PM2 and the correct ecosystem.preview.config.js path
+          # Restart the app using the correct ecosystem.preview.config.js path
           sshpass -p $SSH_PASSWORD ssh -o StrictHostKeyChecking=no ${SSH_USERNAME}@${SSH_HOST} "
-            cd ${DEPLOY_DIR} &&
             pm2 startOrReload ${DEPLOY_DIR}/ecosystem.preview.config.js --env preview
           "
 
