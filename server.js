@@ -56,12 +56,6 @@ app.use(
     resave: false,
     saveUninitialized: false,
     store: MongoStore.create({ mongoUrl: process.env.DATABASE_URL }),
-    cookie: {
-      secure: process.env.NODE_ENV === "production", // Only set the secure flag in production
-      httpOnly: true, // Prevents client-side JavaScript from accessing the cookie
-      sameSite: "strict", // Prevents CSRF attacks by restricting how cookies are sent
-      maxAge: 1000 * 60 * 60 * 24, // Cookie expiration (e.g., 24 hours)
-    },
   })
 );
 
