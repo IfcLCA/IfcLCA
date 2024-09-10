@@ -22,6 +22,8 @@ const {
 const { isNaN } = require("lodash");
 const { route } = require("./authRoutes");
 
+const UPLOADS_DIR = path.resolve(__dirname, "../uploads"); // Define the safe root directory for uploads
+
 // ------------------------------------------
 // Static Routes
 // ------------------------------------------
@@ -69,7 +71,16 @@ router.use((req, res, next) => {
 
 async function safeUnlink(filePath) {
   try {
-    await fs.unlink(filePath);
+    // Resolve the file path relative to the uploads directory
+    const resolvedPath = path.resolve(UPLOADS_DIR, filePath);
+
+    // Ensure the resolved path is within the uploads directory
+    if (!resolvedPath.startsWith(UPLOADS_DIR)) {
+      throw new Error("Invalid file path: Path traversal detected");
+    }
+
+    // Unlink the file safely
+    await fs.unlink(resolvedPath);
   } catch (error) {
     console.warn(`Failed to remove file at ${filePath}: ${error.message}`);
   }
