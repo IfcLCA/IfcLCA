@@ -3,6 +3,7 @@ name: Nginx Preview Deployment
 on:
   pull_request:
     branches: [main]
+  workflow_dispatch:
 
 jobs:
   deploy:
