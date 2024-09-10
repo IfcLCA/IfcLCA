@@ -22,7 +22,7 @@ jobs:
 
       - name: Add server to known_hosts
         env:
-          SSH_HOST: ${{ secrets.SSH_HOST }} # The hostname or IP address of your server
+          SSH_HOST: ${{ secrets.SSH_HOST }}
         run: |
           mkdir -p ~/.ssh
           ssh-keyscan -H $SSH_HOST >> ~/.ssh/known_hosts
@@ -30,13 +30,10 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v3
         with:
-          node-version: "14" # Ensure this matches your server environment
+          node-version: "14"
 
       - name: Install dependencies
         run: npm install
-
-      - name: Install SSHPass
-        run: sudo apt-get install -y sshpass
 
       - name: Log PR number (for debugging)
         run: |
@@ -59,16 +56,17 @@ jobs:
 
           echo "Deploying to: ${DEPLOY_DIR}"
 
+          # Create deployment directory
+          sshpass -p $SSH_PASSWORD ssh -o StrictHostKeyChecking=no ${SSH_USERNAME}@${SSH_HOST} "mkdir -p ${DEPLOY_DIR}"
+
+          # Archive and copy the project
           tar -czf deploy.tar.gz *
-          sshpass -p $SSH_PASSWORD scp -v deploy.tar.gz ${SSH_USERNAME}@${SSH_HOST}:${DEPLOY_DIR}/
-          sshpass -p $SSH_PASSWORD scp -o StrictHostKeyChecking=no -r $SSH_USERNAME@$SSH_HOST:/var/www/preview
-            cd ${DEPLOY_DIR} && tar -xzf deploy.tar.gz
-          "
+          sshpass -p $SSH_PASSWORD scp -o StrictHostKeyChecking=no deploy.tar.gz ${SSH_USERNAME}@${SSH_HOST}:${DEPLOY_DIR}/
 
-
-          # Restart the app with PM2
-          sshpass -p $SSH_PASSWORD ssh -v -o StrictHostKeyChecking=no ${SSH_USERNAME}@${SSH_HOST} "
+          # Extract and deploy the archive on the remote server
+          sshpass -p $SSH_PASSWORD ssh -o StrictHostKeyChecking=no ${SSH_USERNAME}@${SSH_HOST} "
             cd ${DEPLOY_DIR} &&
+            tar -xzf deploy.tar.gz &&
             pm2 startOrReload ecosystem.config.js --env production
           "
 
@@ -79,7 +77,7 @@ jobs:
             const prNumber = context.issue.number || "manual";
             const previewUrl = `https://ifclca.com/${process.env.PREVIEW_DOMAIN}/pr-${prNumber}`;
             github.rest.issues.createComment({
-              issue_number: context.issue.number,
+              issue_number: context.issue.number || 0,
               owner: context.repo.owner,
               repo: context.repo.repo,
               body: `🚀 The preview app was successfully deployed at ${previewUrl}.`
@@ -95,6 +93,6 @@ jobs:
         run: |
           PR_NUMBER=${{ github.event.pull_request.number }}
           sshpass -p $SSH_PASSWORD ssh -o StrictHostKeyChecking=no ${SSH_USERNAME}@${SSH_HOST} "
-          sudo rm -rf /var/www/${PREVIEW_DOMAIN}/pr-${PR_NUMBER}
-          sudo nginx -s reload
+            sudo rm -rf /var/www/${PREVIEW_DOMAIN}/pr-${PR_NUMBER} &&
+            sudo nginx -s reload
           "
