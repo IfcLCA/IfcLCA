@@ -232,14 +232,29 @@ router.post(
       // Ensure no old elements for the project
       await BuildingElement.deleteMany({ projectId });
 
+      // Determine if this is production or preview based on environment variable
+      const environment = process.env.NODE_ENV || "production"; // Fallback to production if NODE_ENV is not set
+
+      // Use different Python paths and script paths based on environment
+      const pythonPath = "/opt/miniconda3/bin/python"; // Assuming Python path stays the same for both
+
+      // Set script path and working directory based on environment
+      const scriptPath =
+        environment === "production"
+          ? "/var/www/ifclca/IfcLCA/scripts/analyze_ifc.py"
+          : "/var/www/preview/scripts/analyze_ifc.py"; // Update for preview path
+
+      const workingDirectory =
+        environment === "production"
+          ? "/var/www/ifclca/IfcLCA"
+          : "/var/www/preview"; // Update for preview working directory
+
       // Execute the Python script and wait for it to complete
       await new Promise((resolve, reject) => {
-        const pythonPath = "/opt/miniconda3/bin/python";
-        const scriptPath = "/var/www/ifclca/IfcLCA/scripts/analyze_ifc.py"; // Absolute path
         const args = [scriptPath, filePath, projectId];
 
         const subprocess = spawn(pythonPath, args, {
-          cwd: "/var/www/ifclca/IfcLCA",
+          cwd: workingDirectory, // Dynamically set the working directory
         });
 
         subprocess.stdout.on("data", (data) => {
