@@ -1,19 +1,10 @@
-#!/opt/miniconda3/bin/python
-
-import sys
 import ifcopenshell
 from ifcopenshell import geom
 import ifcopenshell.util.element
 import ifcopenshell.util.shape
-from bson import ObjectId
-from dotenv import load_dotenv
-import os
 import logging
-import asyncio
-from motor.motor_asyncio import AsyncIOMotorClient
-
-# Load environment variables
-load_dotenv()
+import os
+from bson import ObjectId
 
 # Setup logging
 logging.basicConfig(level=logging.INFO)
@@ -23,7 +14,7 @@ def open_ifc_file(file_path):
         return ifcopenshell.open(file_path)
     except Exception as e:
         logging.error(f"Error opening IFC file: {e}")
-        sys.exit(1)
+        return None
 
 def get_layer_volumes_from_layerset(material_layers, total_volume):
     if total_volume is None:
@@ -43,13 +34,11 @@ def get_layer_volumes_from_layerset(material_layers, total_volume):
     return material_layers_volumes, material_layers_names
 
 def get_volume_from_base_quantities(element):
-    # Retrieve NetVolume from BaseQuantities or IfcElementQuantity
     base_quantities = ifcopenshell.util.element.get_pset(element, "BaseQuantities", qtos_only=True)
     
     if base_quantities and "NetVolume" in base_quantities:
         return base_quantities["NetVolume"]
 
-    # If NetVolume isn't in BaseQuantities, check related IfcElementQuantity
     for rel in element.IsDefinedBy:
         if rel.is_a('IfcRelDefinesByProperties'):
             property_set = rel.RelatingPropertyDefinition
@@ -59,24 +48,7 @@ def get_volume_from_base_quantities(element):
                         return quantity.VolumeValue
     return None
 
-def get_building_storey(element):
-    containing_storey = ifcopenshell.util.element.get_container(element)
-    return containing_storey.Name if containing_storey and containing_storey.is_a("IfcBuildingStorey") else None
-
-def get_element_property(element, property_name):
-    element_class = element.is_a()[3:]  # Remove 'Ifc' prefix
-    pset_name = f"Pset_{element_class}Common"
-
-    # Try to retrieve property from dynamically constructed property set
-    prop_value = ifcopenshell.util.element.get_pset(element, pset_name, property_name)
-    
-    # Fallback to a general property set if the specific one doesn't exist
-    if prop_value is None:
-        prop_value = ifcopenshell.util.element.get_pset(element, "Pset_ElementCommon", property_name)
-
-    return prop_value
-
-async def process_element(ifc_file, element, settings, ifc_file_path, user_id, session_id, projectId):
+def process_element(ifc_file, element, settings, ifc_file_path):
     # Retrieve quantities (e.g., BaseQuantities)
     net_volume = get_volume_from_base_quantities(element)
 
@@ -138,62 +110,46 @@ async def process_element(ifc_file, element, settings, ifc_file_path, user_id, s
             "volume": net_volume
         })
 
-    building_storey = get_building_storey(element)
-    is_loadbearing = get_element_property(element, "LoadBearing")
-    is_external = get_element_property(element, "IsExternal")
-
     element_data = {
         "guid": element.GlobalId,
         "instance_name": element.Name if element.Name else "Unnamed",
         "ifc_class": element.is_a(),
         "materials_info": materials_info,
         "total_volume": net_volume,
-        "is_multilayer": len(materials_info) > 1,
-        "ifc_file_origin": ifc_file_path,
-        "user_id": user_id,
-        "session_id": session_id,
-        "projectId": projectId,
-        "building_storey": building_storey,
-        "is_loadbearing": is_loadbearing,
-        "is_external": is_external
+        "ifc_file_origin": ifc_file_path
     }
 
     return element_data
 
-async def main(file_path, projectId):
-    client = AsyncIOMotorClient(os.getenv("DATABASE_URL"))
-    db = client["IfcLCAdata_01"]
-    collection = db["building_elements"]
-
+def process_ifc_file(file_path):
     ifc_file = open_ifc_file(file_path)
-    settings = geom.settings()
-    settings.set(settings.USE_PYTHON_OPENCASCADE, True)
+    if ifc_file:
+        settings = geom.settings()
 
-    user_id = "example_user_id"
-    session_id = "example_session_id"
+        elements = ifc_file.by_type("IfcElement")
+        print(f"\n---\nProcessing file: {os.path.basename(file_path)}")
+        print(f"Total elements found: {len(elements)}")
 
-    elements = ifc_file.by_type("IfcElement")
-
-    bulk_ops = []
-    for element in elements:
-        element_data = await process_element(ifc_file, element, settings, file_path, user_id, session_id, projectId)
-        if element_data:
-            bulk_ops.append(element_data)
-
-    if bulk_ops:
-        await collection.insert_many(bulk_ops)
-
-    basic_info = {
-        "elementCount": len(elements),
-        "uniqueMaterials": list({mat["name"] for elem in bulk_ops for mat in elem["materials_info"]})
-    }
-    return basic_info
+        # Process each element
+        for element in elements[:5]:  # Limiting to the first 5 elements for brevity
+            element_data = process_element(ifc_file, element, settings, file_path)
+            
+            if element_data:
+                print(f"Element GUID: {element_data['guid']}, Type: {element_data['ifc_class']}, Volume: {element_data['total_volume']} m³")
+                for material in element_data['materials_info']:
+                    print(f"  Material: {material['name']}, Volume: {material['volume']} m³")
+            else:
+                print(f"Failed to process element {element.GlobalId}")
 
 if __name__ == "__main__":
-    if len(sys.argv) != 3:
-        print("Usage: python script.py <path_to_ifc_file> <projectId>")
-        sys.exit(1)
+    folder_path = "C:/Users/LouisTrümpler/Documents/GitHub/01_IfcLCA/testfiles"
 
-    file_path = sys.argv[1]
-    projectId = sys.argv[2]
-    asyncio.run(main(file_path, projectId))
+    # List all IFC files in the directory
+    ifc_files = [os.path.join(folder_path, f) for f in os.listdir(folder_path) if f.endswith('.ifc')]
+
+    if not ifc_files:
+        print("No IFC files found in the folder.")
+    else:
+        # Process each IFC file and print results to console
+        for ifc_file_path in ifc_files:
+            process_ifc_file(ifc_file_path)
