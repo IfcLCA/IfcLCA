@@ -2,7 +2,7 @@ module.exports = {
   apps: [
     {
       name: "IfcLCA-App-Preview",
-      script: "/var/www/preview/manual-deploy/server.js", // Adjusted to the new deployment path
+      script: "/var/www/preview/server.js",
       env: {
         NODE_ENV: "preview",
         PORT: process.env.PORT || 3000,
