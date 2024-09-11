@@ -34,7 +34,7 @@ jobs:
 
       - name: Copy .env from Secure Location on Server
         run: |
-          sshpass -p $SSH_PASSWORD ssh ${SSH_USERNAME}@${SSH_HOST} "cp /var/www/secrets/preview/.env ${DEPLOY_DIR}/" -o StrictHostKeyChecking=no
+          sshpass -p $SSH_PASSWORD ssh ${SSH_USERNAME}@${SSH_HOST} "cp /var/www/secrets/preview/.env" -o StrictHostKeyChecking=no
 
       - name: Deploy to Nginx server
         env:
