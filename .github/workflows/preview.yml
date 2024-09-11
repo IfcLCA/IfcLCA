@@ -1,6 +1,9 @@
 name: Nginx Preview Deployment
 
 on:
+  pull_request:
+    branches:
+      - main
   workflow_dispatch:
 
 jobs:
@@ -30,6 +33,10 @@ jobs:
       - name: Install dependencies
         run: npm install
 
+      # Optional: If your project requires a build step (e.g., React/Vue apps)
+      - name: Build project
+        run: npm run build
+
       - name: Deploy to Nginx server
         env:
           SSH_PASSWORD: ${{ secrets.SSH_PASSWORD }}
@@ -42,17 +49,17 @@ jobs:
 
           echo "Deploying to: ${DEPLOY_DIR}"
 
-          # Create deployment directory on the server
+          # SSH to create deployment directory on the server
           sshpass -p $SSH_PASSWORD ssh -o StrictHostKeyChecking=no ${SSH_USERNAME}@${SSH_HOST} "sudo mkdir -p ${DEPLOY_DIR}"
 
-          # Archive and copy the project
+          # Archive the project and copy to the server
           tar -czf deploy.tar.gz *
           sshpass -p $SSH_PASSWORD scp -o StrictHostKeyChecking=no deploy.tar.gz ${SSH_USERNAME}@${SSH_HOST}:${DEPLOY_DIR}/
 
           # Copy the ecosystem preview config to the server
           sshpass -p $SSH_PASSWORD scp -o StrictHostKeyChecking=no ecosystem.preview.config.js ${SSH_USERNAME}@${SSH_HOST}:${DEPLOY_DIR}/
 
-          # Extract and deploy the archive on the remote server
+          # Deploy the archive on the remote server
           sshpass -p $SSH_PASSWORD ssh -o StrictHostKeyChecking=no ${SSH_USERNAME}@${SSH_HOST} "
             sudo chown -R nodeuser:nodeuser ${DEPLOY_DIR} &&
             cd ${DEPLOY_DIR} &&

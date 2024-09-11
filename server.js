@@ -33,9 +33,6 @@ app.use(globalLimiter);
 app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
 
-// Set base URL based on the environment (production or preview)
-const baseUrl = process.env.NODE_ENV === "preview" ? "/preview" : "/";
-
 // Setting the templating engine to EJS
 app.set("view engine", "ejs");
 
@@ -88,33 +85,23 @@ app.use((req, res, next) => {
   next();
 });
 
-// Dynamic route prefix middleware for preview environment
-if (process.env.NODE_ENV === "preview") {
-  app.use((req, res, next) => {
-    if (req.originalUrl.startsWith("/preview")) {
-      req.url = req.originalUrl.replace("/preview", ""); // Remove '/preview' prefix for internal routing
-    }
-    next();
-  });
-}
-
 // Authentication Routes
-app.use(baseUrl, authRoutes);
+app.use(authRoutes);
 
 // Project Routes
-app.use(baseUrl, projectRoutes);
+app.use(projectRoutes);
 
-// Preview route (index page)
-app.get(`${baseUrl}`, (req, res) => {
+// Root path response
+app.get("/", (req, res) => {
   res.render("index");
 });
 
 // Dashboard route
-app.get(`${baseUrl}dashboard`, (req, res) => {
+app.get("/dashboard", (req, res) => {
   res.render("dashboard", { page: "dashboard" });
 });
 
-// 404 route handling
+// If no routes handled the request, it's a 404
 app.use((req, res, next) => {
   res.status(404).send("Page not found.");
 });
@@ -126,7 +113,4 @@ app.use((err, req, res, next) => {
   res.status(500).send("There was an error serving your request.");
 });
 
-// Start the server
-app.listen(port, () => {
-  console.log(`App running on port ${port} in ${process.env.NODE_ENV} mode`);
-});
+app.listen(port, () => {});
