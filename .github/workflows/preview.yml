@@ -67,5 +67,8 @@ jobs:
             sudo chown -R nodeuser:nodeuser ${DEPLOY_DIR} &&
             cd ${DEPLOY_DIR} &&
             tar -xzf deploy.tar.gz &&
+            # Make the analyze_ifc.py file executable
+            sudo chmod +x ${DEPLOY_DIR}/scripts/analyze_ifc.py &&
+            # Restart the preview app using PM2
             pm2 startOrReload ${DEPLOY_DIR}/ecosystem.preview.config.js --env preview
           "
