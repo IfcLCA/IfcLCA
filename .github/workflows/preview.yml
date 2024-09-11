@@ -1,11 +1,8 @@
 name: Nginx Preview Deployment
 
 on:
-  pull_request:
-    branches: [main]
   push:
-    branches:
-      - main
+    branches: [main]
   workflow_dispatch:
 
 jobs:
@@ -35,10 +32,6 @@ jobs:
       - name: Install dependencies
         run: npm install
 
-      - name: Log PR number (for debugging)
-        run: |
-          echo "Pull Request Number: ${{ github.event.pull_request.number }}"
-
       - name: Deploy to Nginx server
         env:
           SSH_PASSWORD: ${{ secrets.SSH_PASSWORD }}
@@ -46,56 +39,28 @@ jobs:
           SSH_USERNAME: ${{ secrets.SSH_USERNAME }}
           PREVIEW_DOMAIN: ${{ secrets.PREVIEW_DOMAIN }}
         run: |
-          # Set deployment directory to /var/www/preview/manual-deploy
-          DEPLOY_DIR="/var/www/${PREVIEW_DOMAIN}/manual-deploy"
+          # Set deployment directory to /var/www/preview
+          DEPLOY_DIR="/var/www/preview"
 
           echo "Deploying to: ${DEPLOY_DIR}"
 
           # Create deployment directory on the server
-          sshpass -p $SSH_PASSWORD ssh -o StrictHostKeyChecking=no ${SSH_USERNAME}@${SSH_HOST} "mkdir -p ${DEPLOY_DIR}"
+          sshpass -p $SSH_PASSWORD ssh -o StrictHostKeyChecking=no ${SSH_USERNAME}@${SSH_HOST} "sudo mkdir -p ${DEPLOY_DIR}"
 
           # Archive and copy the project
           tar -czf deploy.tar.gz *
           sshpass -p $SSH_PASSWORD scp -o StrictHostKeyChecking=no deploy.tar.gz ${SSH_USERNAME}@${SSH_HOST}:${DEPLOY_DIR}/
 
-          # Copy the ecosystem.preview.config.js to the server
+          # Copy the .env file to the server
+          sshpass -p $SSH_PASSWORD scp -o StrictHostKeyChecking=no .env ${SSH_USERNAME}@${SSH_HOST}:${DEPLOY_DIR}/
+
+          # Copy the ecosystem preview config to the server
           sshpass -p $SSH_PASSWORD scp -o StrictHostKeyChecking=no ecosystem.preview.config.js ${SSH_USERNAME}@${SSH_HOST}:${DEPLOY_DIR}/
 
           # Extract and deploy the archive on the remote server
           sshpass -p $SSH_PASSWORD ssh -o StrictHostKeyChecking=no ${SSH_USERNAME}@${SSH_HOST} "
+            sudo chown -R nodeuser:nodeuser ${DEPLOY_DIR} &&
             cd ${DEPLOY_DIR} &&
             tar -xzf deploy.tar.gz &&
-            ls -l ${DEPLOY_DIR} # Verify files after extraction
-          "
-
-          # Restart the app using the correct ecosystem.preview.config.js path
-          sshpass -p $SSH_PASSWORD ssh -o StrictHostKeyChecking=no ${SSH_USERNAME}@${SSH_HOST} "
             pm2 startOrReload ${DEPLOY_DIR}/ecosystem.preview.config.js --env preview
-          "
-
-      - name: Post a comment with the preview URL
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const prNumber = context.issue.number || "manual";
-            const previewUrl = `https://ifclca.com/${process.env.PREVIEW_DOMAIN}/pr-${prNumber}`;
-            github.rest.issues.createComment({
-              issue_number: context.issue.number || 0,
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              body: `🚀 The preview app was successfully deployed at ${previewUrl}.`
-            })
-
-      - name: Cleanup after PR merge/close
-        if: github.event.action == 'closed'
-        env:
-          SSH_PASSWORD: ${{ secrets.SSH_PASSWORD }}
-          SSH_HOST: ${{ secrets.SSH_HOST }}
-          SSH_USERNAME: ${{ secrets.SSH_USERNAME }}
-          PREVIEW_DOMAIN: ${{ secrets.PREVIEW_DOMAIN }}
-        run: |
-          PR_NUMBER=${{ github.event.pull_request.number }}
-          sshpass -p $SSH_PASSWORD ssh -o StrictHostKeyChecking=no ${SSH_USERNAME}@${SSH_HOST} "
-            sudo rm -rf /var/www/${PREVIEW_DOMAIN}/pr-${PR_NUMBER} &&
-            sudo nginx -s reload
           "
