@@ -1,7 +1,7 @@
 import unittest
 import ifcopenshell
 from ifcopenshell import geom
-from analyze_ifc import open_ifc_file, load_ifc_data, process_element
+from analyze_ifc import open_ifc_file, process_element
 import os
 import logging
 
@@ -27,7 +27,10 @@ class TestIfcProcessing(unittest.IsolatedAsyncioTestCase):
             with self.subTest(ifc_file=ifc_file_path):
                 logging.info(f"\n---\nProcessing elements in file: {os.path.basename(ifc_file_path)}")
                 ifc_file = open_ifc_file(ifc_file_path)
-                elements = load_ifc_data(ifc_file)
+                
+                # Load elements directly here instead of using a function that doesn't exist
+                elements = ifc_file.by_type("IfcElement")
+                
                 for i, element in enumerate(elements[:5]):  # Limiting to the first 5 elements for brevity
                     element_data = await process_element(ifc_file, element, self.settings, ifc_file_path, user_id, session_id, projectId)
                     if element_data is None:
