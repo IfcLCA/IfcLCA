@@ -7,6 +7,7 @@ from pymongo import MongoClient
 from bson import ObjectId
 from dotenv import load_dotenv
 import os
+import logging
 import asyncio
 from motor.motor_asyncio import AsyncIOMotorClient
 
@@ -42,14 +43,20 @@ def get_building_storey(element):
     return containing_storey.Name if containing_storey and containing_storey.is_a("IfcBuildingStorey") else None
 
 def get_element_property(element, property_name):
-    psets = ifcopenshell.util.element.get_psets(element)
-    for pset in psets.values():
-        if property_name in pset:
-            return pset[property_name]
+    # Dynamically retrieve properties
+    pset_name = None
+    if property_name == "LoadBearing":
+        pset_name = "Pset_WallCommon"
+    elif property_name == "IsExternal":
+        pset_name = "Pset_WallCommon"
+    
+    if pset_name:
+        return ifcopenshell.util.element.get_pset(element, pset_name, property_name)
     return None
 
 async def process_element(ifc_file, element, settings, ifc_file_path, user_id, session_id, projectId):
-    qtos = ifcopenshell.util.element.get_psets(element, qtos_only=True)
+    # Dynamically retrieve quantities (e.g., BaseQuantities)
+    qtos = ifcopenshell.util.element.get_pset(element, "BaseQuantities", qtos_only=True)
     net_volume = get_volume_from_base_quantities(qtos)
 
     if not net_volume:  # Fall back to geometry calculation if NetVolume is missing
@@ -95,7 +102,7 @@ async def process_element(ifc_file, element, settings, ifc_file_path, user_id, s
             "volume": net_volume
         })
 
-    # Fetch additional properties like building storey, loadbearing, and externality
+    # Fetch additional properties like building storey, loadbearing, and externality dynamically
     building_storey = get_building_storey(element)
     is_loadbearing = get_element_property(element, "LoadBearing")
     is_external = get_element_property(element, "IsExternal")
