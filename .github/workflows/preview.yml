@@ -30,8 +30,15 @@ jobs:
         with:
           node-version: "14"
 
-      - name: Install dependencies
+      - name: Install Node.js dependencies
         run: npm install
+
+      - name: Install Python
+        run: sudo apt-get install -y python3 python3-pip
+
+      - name: Install Python dependencies
+        run: |
+          pip3 install -r requirements.txt
 
       - name: Deploy to Nginx server
         env:
