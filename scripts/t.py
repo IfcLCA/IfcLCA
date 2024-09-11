@@ -49,11 +49,12 @@ def get_volume_from_base_quantities(element):
     return None
 
 def process_element(ifc_file, element, settings, ifc_file_path):
-    # Retrieve quantities (e.g., BaseQuantities)
+    # Step 1: Check for direct material assignment and use base quantities
     net_volume = get_volume_from_base_quantities(element)
 
+    # If no base quantity, attempt to calculate from geometry (direct material assignment only)
     if not net_volume:
-        logging.warning(f"No NetVolume found for element {element.GlobalId}")
+        logging.warning(f"No NetVolume found for element {element.GlobalId}, attempting geometry-based volume calculation.")
         try:
             shape = geom.create_shape(settings, element)
             if shape and shape.geometry:
@@ -66,11 +67,14 @@ def process_element(ifc_file, element, settings, ifc_file_path):
             net_volume = None
 
     materials_info = []
+
+    # Step 2: Process material assignment
     if element.HasAssociations:
         for association in element.HasAssociations:
             if association.is_a('IfcRelAssociatesMaterial'):
                 material = association.RelatingMaterial
 
+                # IfcMaterialLayerSetUsage (Layer Set) - No shape creation, calculate using layers
                 if material.is_a('IfcMaterialLayerSetUsage'):
                     layerset = material.ForLayerSet
                     if net_volume:
@@ -82,28 +86,41 @@ def process_element(ifc_file, element, settings, ifc_file_path):
                         } for name, volume in zip(material_layers_names, material_layers_volumes)]
                     break
 
+                # IfcMaterialConstituentSet - Use shape creation for constituents
                 elif material.is_a('IfcMaterialConstituentSet'):
                     shape_aspects = getattr(element, 'HasShapeAspects', None)
                     if shape_aspects and len(shape_aspects) == len(material.MaterialConstituents):
                         for aspect, constituent in zip(shape_aspects, material.MaterialConstituents):
                             try:
+                                logging.info(f"Creating shape for aspect {aspect.GlobalId}")
                                 shape = geom.create_shape(settings, aspect)
-                                aspect_volume = ifcopenshell.util.shape.get_volume(shape.geometry) if shape and shape.geometry else None
+                                
+                                if shape and shape.geometry:
+                                    aspect_volume = ifcopenshell.util.shape.get_volume(shape.geometry)
+                                    logging.info(f"Volume for aspect {aspect.GlobalId}: {aspect_volume}")
+                                else:
+                                    logging.warning(f"No geometry found for aspect {aspect.GlobalId}")
+                                    aspect_volume = None
+
                                 materials_info.append({
                                     "materialId": ObjectId(),
-                                    "name": constituent.Material.Name,
+                                    "name": constituent.Material.Name if constituent.Material and constituent.Material.Name else "Unnamed Material",
                                     "volume": aspect_volume
                                 })
+
                             except Exception as e:
                                 logging.error(f"Error calculating volume for aspect {aspect.GlobalId}: {e}")
+                    else:
+                        logging.warning(f"No shape aspects or mismatch with material constituents for element {element.GlobalId}")
                     break
 
-    # Fallback if no shape aspects or multilayer material found
+    # Step 3: Fallback to basic material assignment if no constituents or layer sets
     if not materials_info:
         material_name = "Unnamed Material"
         materials = ifcopenshell.util.element.get_materials(element, should_inherit=True)
         if materials:
             material_name = materials[0].Name if materials[0].Name else "Unnamed Material"
+        logging.info(f"No constituent materials, using fallback material: {material_name}")
         materials_info.append({
             "materialId": ObjectId(),
             "name": material_name,
