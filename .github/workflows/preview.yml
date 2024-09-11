@@ -32,10 +32,6 @@ jobs:
       - name: Install dependencies
         run: npm install
 
-      - name: Copy .env from Secure Location on Server
-        run: |
-          sshpass -p "$SSH_PASSWORD" ssh -o StrictHostKeyChecking=no "$SSH_USERNAME@$SSH_HOST" "sudo cp /var/www/secrets/preview/.env $DEPLOY_DIR/"
-
       - name: Deploy to Nginx server
         env:
           SSH_PASSWORD: ${{ secrets.SSH_PASSWORD }}
