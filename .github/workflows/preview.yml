@@ -32,13 +32,6 @@ jobs:
       - name: Install dependencies
         run: npm install
 
-      - name: Copy existing .env from server's secure location
-        run: |
-          sshpass -p "$SSH_PASSWORD" ssh -o StrictHostKeyChecking=no "$SSH_USERNAME@$SSH_HOST" \
-            "sudo cp /var/www/secrets/preview/.env /var/www/preview/.env && \
-             sudo chown nodeuser:nodeuser /var/www/preview/.env && \
-             sudo chmod 600 /var/www/preview/.env"
-
       - name: Deploy to Nginx server
         env:
           SSH_PASSWORD: ${{ secrets.SSH_PASSWORD }}
@@ -51,7 +44,7 @@ jobs:
 
           echo "Deploying to: ${DEPLOY_DIR}"
 
-          # Create deployment directory on the server if it doesn't exist
+          # Create deployment directory on the server
           sshpass -p $SSH_PASSWORD ssh -o StrictHostKeyChecking=no ${SSH_USERNAME}@${SSH_HOST} "sudo mkdir -p ${DEPLOY_DIR}"
 
           # Archive and copy the project
