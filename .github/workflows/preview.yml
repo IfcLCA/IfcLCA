@@ -32,6 +32,16 @@ jobs:
       - name: Install dependencies
         run: npm install
 
+      - name: Copy .env to the server
+        run: |
+          # Ensure .env exists at the destination before deployment
+          sshpass -p "$SSH_PASSWORD" ssh -o StrictHostKeyChecking=no "$SSH_USERNAME@$SSH_HOST" "
+            sudo mkdir -p /var/www/preview &&
+            sudo chown -R nodeuser:nodeuser /var/www/preview"
+
+          # Copy .env file from local to server
+          sshpass -p "$SSH_PASSWORD" scp -o StrictHostKeyChecking=no .env "$SSH_USERNAME@$SSH_HOST:/var/www/preview/.env"
+
       - name: Deploy to Nginx server
         env:
           SSH_PASSWORD: ${{ secrets.SSH_PASSWORD }}
@@ -50,9 +60,6 @@ jobs:
           # Archive and copy the project
           tar -czf deploy.tar.gz *
           sshpass -p $SSH_PASSWORD scp -o StrictHostKeyChecking=no deploy.tar.gz ${SSH_USERNAME}@${SSH_HOST}:${DEPLOY_DIR}/
-
-          # Copy the .env file to the server
-          sshpass -p $SSH_PASSWORD scp -o StrictHostKeyChecking=no .env ${SSH_USERNAME}@${SSH_HOST}:${DEPLOY_DIR}/
 
           # Copy the ecosystem preview config to the server
           sshpass -p $SSH_PASSWORD scp -o StrictHostKeyChecking=no ecosystem.preview.config.js ${SSH_USERNAME}@${SSH_HOST}:${DEPLOY_DIR}/
