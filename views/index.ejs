@@ -110,9 +110,10 @@
         font-size: 14px;
         border-radius: 4px;
       }
+
     </style>
     <%- include('partials/_head.ejs') %>
-  </head>
+    </head>
   <body class="index-bg">
     <%- include('partials/_header.ejs') %>
     <main role="main" class="container mt-4">
@@ -129,30 +130,18 @@
       <section class="beta-warning text-center mt-4">
         <h4>Beta Version</h4>
         <p style="color: #e64a19; font-weight: bold">
-          Please note that IfcLCA is currently in beta. Features and
-          functionality are still under development, and things may change or
-          break. <br />
+          Please note that IfcLCA is currently in beta. Features and functionality are still under development, and things may change or break. <br />
           If you encounter any issues or have suggestions, please open a
-          <a
-            href="https://github.com/IfcLCA/IfcLCA/issues"
-            target="_blank"
-            style="color: #ff5722; text-decoration: underline"
-            data-toggle="tooltip"
-            title="GitHub is a platform for version control and collaboration. This link opens the issue tracker for our project."
-            >GitHub issue</a
-          >. Thank you for your understanding and contributions. <br />
+          <a href="https://github.com/IfcLCA/IfcLCA/issues" target="_blank" style="color: #ff5722; text-decoration: underline" data-toggle="tooltip" title="GitHub is a platform for version control and collaboration. This link opens the issue tracker for our project.">GitHub issue</a>. 
+          Thank you for your understanding and contributions. <br />
           We highly value all feedback, so please don't hesitate to reach out.
         </p>
+        
       </section>
 
       <!-- Action Call Section -->
       <div class="text-center action-call mt-5">
-        <a
-          href="/newProject"
-          class="btn btn-primary btn-lg"
-          data-toggle="tooltip"
-          title="Set up a New Project by entering project details"
-        >
+        <a href="/newProject" class="btn btn-primary btn-lg" data-toggle="tooltip" title="Set up a New Project by entering project details">
           <i class="fas fa-upload"></i> Start Your Sustainable Project
         </a>
       </div>
@@ -164,11 +153,7 @@
             <div class="col-12 col-md-4 mb-4">
               <div class="card h-100">
                 <div class="card-body">
-                  <h5
-                    class="card-title"
-                    data-toggle="tooltip"
-                    title="Learn more about our Free and Open Source platform"
-                  >
+                  <h5 class="card-title" data-toggle="tooltip" title="Learn more about our Free and Open Source platform">
                     <i class="fas fa-users"></i> Free and Open Source
                   </h5>
                   <p class="card-text">
@@ -182,11 +167,7 @@
             <div class="col-12 col-md-4 mb-4">
               <div class="card h-100">
                 <div class="card-body">
-                  <h5
-                    class="card-title"
-                    data-toggle="tooltip"
-                    title="Upload and analyze IFC files quickly and easily"
-                  >
+                  <h5 class="card-title" data-toggle="tooltip" title="Upload and analyze IFC files quickly and easily">
                     <i class="fas fa-tachometer-alt"></i> Easy File Upload
                   </h5>
                   <p class="card-text">
@@ -199,13 +180,8 @@
             <div class="col-12 col-md-4 mb-4">
               <div class="card h-100">
                 <div class="card-body">
-                  <h5
-                    class="card-title"
-                    data-toggle="tooltip"
-                    title="Automatically calculate the environmental impact of your building materials"
-                  >
-                    <i class="fas fa-chart-line"></i> Automatic Impact
-                    Calculation
+                  <h5 class="card-title" data-toggle="tooltip" title="Automatically calculate the environmental impact of your building materials">
+                    <i class="fas fa-chart-line"></i> Automatic Impact Calculation
                   </h5>
                   <p class="card-text">
                     Automatically calculate the environmental impact of
@@ -221,25 +197,24 @@
 
       <!-- New Features Announcement Section -->
       <section class="new-features text-center mt-3 narrow-container">
-        <h4>🚀 New Features 🚀</h4>
-        <p style="font-size: 1.2em">
-          Enhanced IFC Parsing and Material Extraction:
-        </p>
-        <p style="font-size: 1.2em">
-          - Optimized material extraction process for better performance and
-          accuracy, now requiring BaseQuantities data for volume calculations,
-          except in cases involving `IfcMaterialLayer`.
-        </p>
-        <p style="font-size: 1.2em">
-          - Introduced multi-processing capabilities, utilizing all available
-          CPU cores to significantly enhance performance when processing large
-          IFC files, reducing overall runtime.
-        </p>
-        <p style="font-size: 1.2em">
-          - Enhanced error handling throughout the extraction process, ensuring
-          robust operations even when IFC files contain incomplete or missing
-          data, particularly during element and material extraction.
-        </p>
+          <h4>🚀 New Features 🚀</h4>
+          <p></p>
+          <p style="font-size: 1.2em">
+            - Improved IFC file upload and analysis allows larger file uploads<br />
+            (still some room for further optimization) <br />
+          </p>
+          <p style="font-size: 1.2em">
+            - Better user experience with tooltips and additional results graph <br />
+            showing environmental impact per material
+          </p>
+          <p style="font-size: 1.2em">
+            - Enhanced IFC parsing, more robust logic<br />
+            (unfortunately with some trade-offs if using IFC4 Reference View & IfcMaterialConstituents, use Design Transfer View for full functionality)
+          </p>
+          <p style="font-size: 1.2em">
+            - Download LCA table as Excel File and start closing the loop...
+          </p>
+        </div>
       </section>
 
       <!-- Open-Source Invitation Section -->
@@ -250,14 +225,9 @@
             Contribute to a greener future by collaborating on IfcLCA. Together,
             we can innovate for more sustainability in construction.
           </p>
-          <a
-            href="/opensource"
-            class="btn btn-success btn-lg"
-            data-toggle="tooltip"
-            title="Contribute to the IfcLCA project by collaborating on GitHub. Help us innovate for sustainability in construction."
-          >
+          <a href="/opensource" class="btn btn-success btn-lg" data-toggle="tooltip" title="Contribute to the IfcLCA project by collaborating on GitHub. Help us innovate for sustainability in construction.">
             <i class="fas fa-hands-helping"></i> Get Involved
-          </a>
+          </a>          
         </div>
       </section>
     </main>
@@ -276,8 +246,8 @@
     ></script>
     <script>
       $(function () {
-        $('[data-toggle="tooltip"]').tooltip();
+          $('[data-toggle="tooltip"]').tooltip();
       });
-    </script>
+  </script>  
   </body>
 </html>
