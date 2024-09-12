@@ -10,12 +10,13 @@ from concurrent.futures import ThreadPoolExecutor
 from motor.motor_asyncio import AsyncIOMotorClient
 from dotenv import load_dotenv
 from bson import ObjectId
+import multiprocessing
 
 
 load_dotenv()
 
 # Initialize ThreadPoolExecutor globally for concurrent shape creation
-executor = ThreadPoolExecutor(max_workers=10)  # Adjust the worker count as needed
+executor = ThreadPoolExecutor(max_workers=multiprocessing.cpu_count())
 
 # Open IFC file and load data
 def open_ifc_file(file_path):
@@ -27,7 +28,7 @@ def open_ifc_file(file_path):
 
 # Lazy loading and batching of IFC elements
 def load_ifc_data_in_batches(ifc_file, batch_size=100):
-    elements = ifc_file.by_type("IfcElement")
+    elements = ifc_file.by_type("IfcProduct")
     for i in range(0, len(elements), batch_size):
         yield elements[i:i + batch_size]
 
@@ -165,7 +166,7 @@ async def process_batch(ifc_file, batch, file_path, user_id, session_id, project
 
 # Main function to process the entire IFC file
 async def main(file_path, projectId):
-    client = AsyncIOMotorClient(os.getenv("DATABASE_URL"), maxPoolSize=100)
+    client = AsyncIOMotorClient(os.getenv("DATABASE_URL"), maxPoolSize=500)
     db = client["IfcLCAdata_01"]
     collection = db["building_elements"]
 
@@ -175,19 +176,28 @@ async def main(file_path, projectId):
     user_id = "example_user_id"   
     session_id = "example_session_id" 
 
-    # Process elements in batches
-    for batch in load_ifc_data_in_batches(ifc_file, batch_size=500):
-        bulk_ops = []
-        # Pass user_id, session_id, and projectId to process_batch
-        processed_elements = await process_batch(ifc_file, batch, file_path, user_id, session_id, projectId)
-        
-        for element_data in processed_elements:
-            if element_data:
-                bulk_ops.append(element_data)
+    # Initialize variables for batch processing
+    bulk_ops = []  # Initialize the list for bulk MongoDB operations
+    batch_count = 0  # Initialize the batch counter
 
-        # Insert each batch of elements into MongoDB
-        if bulk_ops:
+    # Process each batch of IFC elements
+    for batch in load_ifc_data_in_batches(ifc_file, batch_size=500):
+        # Process the elements in the batch asynchronously
+        processed_elements = await process_batch(ifc_file, batch, file_path, user_id, session_id, projectId)
+
+        # Append the processed elements to bulk operations
+        bulk_ops.extend(processed_elements)
+        batch_count += 1
+        
+        # Insert the accumulated bulk operations into MongoDB every 5 batches
+        if batch_count % 5 == 0 and bulk_ops:
             await collection.insert_many(bulk_ops)
+            bulk_ops.clear()  # Clear the bulk operations after insertion
+
+    # Insert any remaining operations after the loop ends
+    if bulk_ops:
+        await collection.insert_many(bulk_ops)
+
 
 # Script entry point
 if __name__ == "__main__":
