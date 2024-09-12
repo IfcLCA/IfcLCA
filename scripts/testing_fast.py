@@ -2,15 +2,16 @@
 
 import sys
 import ifcopenshell
+from ifcopenshell import geom
 import ifcopenshell.util.element
 import ifcopenshell.util.shape
+from pymongo import MongoClient
+from bson import ObjectId
+from dotenv import load_dotenv
 import os
 import asyncio
-from concurrent.futures import ThreadPoolExecutor
 from motor.motor_asyncio import AsyncIOMotorClient
-from dotenv import load_dotenv
-from bson import ObjectId
-
+from concurrent.futures import ThreadPoolExecutor
 
 load_dotenv()
 
@@ -37,7 +38,7 @@ def get_layer_volumes_and_materials(element, total_volume):
     material_layers_names = []
 
     if total_volume is None:
-        total_volume = 0  # If volume is None, set to 0 for reporting
+        return material_layers_volumes, material_layers_names
 
     if element.HasAssociations:
         for association in element.HasAssociations:
@@ -47,52 +48,21 @@ def get_layer_volumes_and_materials(element, total_volume):
                 if material.is_a('IfcMaterialLayerSetUsage'):
                     total_thickness = sum(layer.LayerThickness for layer in material.ForLayerSet.MaterialLayers)
                     for layer in material.ForLayerSet.MaterialLayers:
-                        layer_volume = total_volume * (layer.LayerThickness / total_thickness) if total_volume else 0
+                        layer_volume = total_volume * (layer.LayerThickness / total_thickness)
                         layer_name = layer.Material.Name if layer.Material and layer.Material.Name else "Unnamed Material"
                         material_layers_volumes.append(round(layer_volume, 5))
                         material_layers_names.append(layer_name)
 
                 elif material.is_a('IfcMaterialConstituentSet') and hasattr(material, 'MaterialConstituents'):
-                    # Assign total volume to the first constituent and set the rest to 0
-                    for i, constituent in enumerate(material.MaterialConstituents):
-                        constituent_name = constituent.Name if constituent.Name else "Unnamed Material"
-                        material_volume = total_volume if i == 0 else 0  # First constituent gets the total volume, others get 0
-                        material_layers_volumes.append(round(material_volume, 5))
-                        material_layers_names.append(constituent_name)
+                    first_constituent = material.MaterialConstituents[0]
+                    constituent_name = first_constituent.Name if first_constituent.Name else "Unnamed Material"
+                    material_layers_volumes.append(round(total_volume, 5))
+                    material_layers_names.append(constituent_name)
 
     return material_layers_volumes, material_layers_names
 
-# Attempt to retrieve the volume from the element's BaseQuantities
-def get_volume_from_basequantities(element):
-    for rel_def in element.IsDefinedBy:
-        if rel_def.is_a("IfcRelDefinesByProperties"):
-            prop_set = rel_def.RelatingPropertyDefinition
-            if prop_set.is_a("IfcElementQuantity"):
-                for quantity in prop_set.Quantities:
-                    # Handle volume quantities
-                    if quantity.is_a("IfcQuantityVolume") and (quantity.Name == "NetVolume" or quantity.Name == "GrossVolume"):
-                        try:
-                            return float(quantity.VolumeValue)
-                        except (ValueError, AttributeError):
-                            continue
-                    
-                    # Handle length-based quantities which may represent volumes (e.g., NetVolume in IFCQUANTITYLENGTH)
-                    if quantity.is_a("IfcQuantityLength") and (quantity.Name == "NetVolume" or quantity.Name == "GrossVolume"):
-                        try:
-                            return float(quantity.LengthValue)  # Accessing LengthValue for volume
-                        except (ValueError, AttributeError):
-                            continue
-    return None
-
-
 # Attempt to retrieve the volume from the element's properties
 def get_volume_from_properties(element):
-    # First try to get the volume from BaseQuantities
-    volume = get_volume_from_basequantities(element)
-    if volume is not None:
-        return volume
-
-    # If no volume is found in BaseQuantities, use properties (Psets)
     volume = get_element_property(element, "NetVolume") or get_element_property(element, "GrossVolume")
     if volume:
         try:
@@ -100,6 +70,11 @@ def get_volume_from_properties(element):
         except ValueError:
             return None
     return None
+
+# Calculate volume from element shape (runs in thread pool)
+async def calculate_volume(shape):
+    loop = asyncio.get_running_loop()
+    return await loop.run_in_executor(executor, ifcopenshell.util.shape.get_volume, shape.geometry)
 
 # Get building storey and properties
 def get_building_storey(element):
@@ -113,13 +88,19 @@ def get_element_property(element, property_name):
     return ifcopenshell.util.element.get_pset(element, pset_name, property_name) or ifcopenshell.util.element.get_pset(element, "Pset_ElementCommon", property_name)
 
 # Process each IFC element to extract data (runs async)
-async def process_element(element, file_path, user_id, session_id, projectId):
-    # Try to get volume from properties or BaseQuantities
+async def process_element(ifc_file, element, settings, ifc_file_path, user_id, session_id, projectId):
+    # Try to get volume from properties first
     volume = get_volume_from_properties(element)
-    if volume is None:
-        volume = 0  # Use 0 for volume when none is found
 
-    # Get material layers and volumes
+    # If volume is not found in properties, calculate it from the shape
+    if volume is None:
+        try:
+            shape = geom.create_shape(settings, element)
+            volume = await calculate_volume(shape)
+        except Exception as e:
+            print(f"Error processing element {element.GlobalId}: {e}", file=sys.stderr)
+            return None
+
     material_layers_volumes, material_layers_names = get_layer_volumes_and_materials(element, volume)
 
     # Build material info
@@ -138,7 +119,6 @@ async def process_element(element, file_path, user_id, session_id, projectId):
             "volume": volume
         })
 
-    # Build the element data dictionary for output
     element_data = {
         "guid": element.GlobalId,
         "instance_name": element.Name if element.Name else "Unnamed",
@@ -146,7 +126,7 @@ async def process_element(element, file_path, user_id, session_id, projectId):
         "materials_info": materials_info,
         "total_volume": volume,
         "is_multilayer": len(materials_info) > 1,
-        "ifc_file_origin": file_path,
+        "ifc_file_origin": ifc_file_path,
         "user_id": user_id,
         "session_id": session_id,
         "projectId": projectId,
@@ -154,32 +134,29 @@ async def process_element(element, file_path, user_id, session_id, projectId):
         "is_loadbearing": get_element_property(element, "LoadBearing"),
         "is_external": get_element_property(element, "IsExternal")
     }
-
+    print(element_data)
     return element_data
 
-
-# Main function to process each batch of elements asynchronously
-async def process_batch(ifc_file, batch, file_path, user_id, session_id, projectId):
-    tasks = [process_element(element, file_path, user_id, session_id, projectId) for element in batch]
+# Main function to process the entire IFC file
+async def process_batch(ifc_file, batch, settings, file_path, user_id, session_id, projectId):
+    tasks = [process_element(ifc_file, element, settings, file_path, user_id, session_id, projectId) for element in batch]
     return await asyncio.gather(*tasks)
 
-# Main function to process the entire IFC file
 async def main(file_path, projectId):
     client = AsyncIOMotorClient(os.getenv("DATABASE_URL"), maxPoolSize=100)
     db = client["IfcLCAdata_01"]
     collection = db["building_elements"]
 
     ifc_file = open_ifc_file(file_path)
+    settings = geom.settings()
 
-    # Mock data for user_id and session_id
-    user_id = "example_user_id"   
-    session_id = "example_session_id" 
+    user_id = "example_user_id"
+    session_id = "example_session_id"
 
     # Process elements in batches
     for batch in load_ifc_data_in_batches(ifc_file, batch_size=500):
         bulk_ops = []
-        # Pass user_id, session_id, and projectId to process_batch
-        processed_elements = await process_batch(ifc_file, batch, file_path, user_id, session_id, projectId)
+        processed_elements = await process_batch(ifc_file, batch, settings, file_path, user_id, session_id, projectId)
         
         for element_data in processed_elements:
             if element_data:
