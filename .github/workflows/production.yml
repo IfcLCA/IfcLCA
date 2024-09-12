@@ -56,6 +56,6 @@ jobs:
             sudo chown -R nodeuser:nodeuser ${DEPLOY_DIR} &&
             cd ${DEPLOY_DIR} &&
             tar -xzf deploy.tar.gz &&
-            # Restart the production app using PM2 with existing ecosystem.config.js
-            pm2 startOrReload ${DEPLOY_DIR}/ecosystem.config.js --env production
+            # Restart the production app using PM2 by restarting the existing process
+            pm2 restart 0
           "
