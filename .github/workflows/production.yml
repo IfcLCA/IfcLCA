@@ -1,0 +1,61 @@
+name: Nginx Production Deployment
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    name: Deploy Production App
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install SSHPass
+        run: sudo apt-get install -y sshpass
+
+      - name: Add server to known_hosts
+        env:
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+        run: |
+          mkdir -p ~/.ssh
+          ssh-keyscan -H $SSH_HOST >> ~/.ssh/known_hosts
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: "14"
+
+      - name: Install Node.js dependencies
+        run: npm install
+
+      - name: Deploy to Nginx server
+        env:
+          SSH_PASSWORD: ${{ secrets.SSH_PASSWORD }}
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+          SSH_USERNAME: ${{ secrets.SSH_USERNAME }}
+        run: |
+          # Set deployment directory to /var/www/ifclca/IfcLCA
+          DEPLOY_DIR="/var/www/ifclca/IfcLCA"
+
+          echo "Deploying to: ${DEPLOY_DIR}"
+
+          # Create deployment directory on the server if it doesn't exist
+          sshpass -p $SSH_PASSWORD ssh -o StrictHostKeyChecking=no ${SSH_USERNAME}@${SSH_HOST} "sudo mkdir -p ${DEPLOY_DIR}"
+
+          # Archive and copy the project
+          tar -czf deploy.tar.gz *
+          sshpass -p $SSH_PASSWORD scp -o StrictHostKeyChecking=no deploy.tar.gz ${SSH_USERNAME}@${SSH_HOST}:${DEPLOY_DIR}/
+
+          # Extract and deploy the archive on the remote server
+          sshpass -p $SSH_PASSWORD ssh -o StrictHostKeyChecking=no ${SSH_USERNAME}@${SSH_HOST} "
+            sudo chown -R nodeuser:nodeuser ${DEPLOY_DIR} &&
+            cd ${DEPLOY_DIR} &&
+            tar -xzf deploy.tar.gz &&
+            # Restart the production app using PM2 with existing ecosystem.config.js
+            pm2 startOrReload ${DEPLOY_DIR}/ecosystem.config.js --env production
+          "
