@@ -1,16 +1,14 @@
 import { io } from "socket.io-client";
 
 const socket = io();
-let progressBar;
-let progressText;
+const uploadForm = document.getElementById("ifcUploadForm");
+const messageContainer = document.getElementById("uploadMessage");
+const projectId = window.location.pathname.split("/").pop();
+const progressBar = document.getElementById("uploadProgressBar");
+const progressText = document.getElementById("uploadProgressText");
+const spinner = document.getElementById("uploadSpinner");
 
 document.addEventListener("DOMContentLoaded", function () {
-  const uploadForm = document.getElementById("ifcUploadForm");
-  const messageContainer = document.getElementById("uploadMessage");
-  const projectId = window.location.pathname.split("/").pop();
-  const progressBar = document.getElementById("uploadProgressBar");
-  const spinner = document.getElementById("uploadSpinner");
-
   uploadForm.addEventListener("submit", function (event) {
     event.preventDefault();
     const fileInput = document.querySelector('input[type="file"]');

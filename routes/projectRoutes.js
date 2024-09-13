@@ -276,7 +276,9 @@ router.post(
           const output = data.toString().trim();
           if (output.startsWith("PROGRESS:")) {
             const progress = parseInt(output.split(":")[1]);
-            io.emit("uploadProgress", { progress, status: "Processing" });
+            req.app
+              .get("io")
+              .emit("uploadProgress", { progress, status: "Processing" });
           } else {
             console.log(`Python script output: ${output}`);
           }

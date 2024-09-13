@@ -235,7 +235,10 @@
       </div>
     </main>
     <%- include('partials/_footer.ejs') %>
+    <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.11.6/dist/umd/popper.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/tabulator-tables/dist/js/tabulator.min.js"></script>
+    <script src="/socket.io/socket.io.js"></script>
     <script src="/js/uploadIfc.js"></script>
     <script src="/js/projectTable.js"></script>
     <% function formatNumber(value, decimals) { %> <% if (value == null ||
@@ -245,8 +248,13 @@
 
     <!-- Initialize tooltips -->
     <script>
-      $(function () {
-        $('[data-toggle="tooltip"]').tooltip();
+      document.addEventListener("DOMContentLoaded", function () {
+        var tooltipTriggerList = [].slice.call(
+          document.querySelectorAll('[data-bs-toggle="tooltip"]')
+        );
+        var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
+          return new bootstrap.Tooltip(tooltipTriggerEl);
+        });
       });
     </script>
   </body>

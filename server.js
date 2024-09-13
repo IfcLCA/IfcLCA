@@ -9,7 +9,6 @@ const projectRoutes = require("./routes/projectRoutes");
 const rateLimit = require("express-rate-limit");
 const http = require("http");
 const socketIo = require("socket.io");
-const { io } = require("../server");
 
 if (!process.env.DATABASE_URL || !process.env.SESSION_SECRET) {
   console.error(
@@ -21,6 +20,7 @@ if (!process.env.DATABASE_URL || !process.env.SESSION_SECRET) {
 const app = express();
 const server = http.createServer(app);
 const io = socketIo(server);
+app.set("io", io);
 const port = process.env.PORT || 3000;
 
 // Define global rate limiter
