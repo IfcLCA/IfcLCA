@@ -1,59 +1,67 @@
 <!DOCTYPE html>
 <html lang="en">
   <%- include('partials/_head.ejs') %>
+  <link rel="stylesheet" href="/css/styles.css" />
   <body>
     <%- include('partials/_header.ejs') %>
 
     <main role="main" class="container mt-4">
-      <div class="open-source-intro text-center">
-        <h2>Join Our Open Source Community</h2>
-        <p>
-          Contributions are welcome! If you're interested in making IfcLCA even
-          better, we invite you to contribute to our open-source project.
-        </p>
-      </div>
+      
+      <main role="main" class="container mt-5">
+        <!-- Intro Section -->
+        <div class="text-center mb-5">
+          <h2>🚀 IfcLCA is an Open Source project 🚀</h2>
+          <p class="lead">We believe in the power of collaboration
+            and transparency. </p>
+            
+            <p class="lead"> Our code is available on GitHub, and we welcome
+            contributions from the community that help drive innovation in sustainable construction analytics.</p>
+        </div>
+      
+          <!-- Card for How to Contribute -->
+          <div class="row justify-content-center mb-4">
+            <div class="col-lg-8">
+              <div class="card shadow-lg">
+                <div class="card-body">
 
-      <section class="how-to-contribute">
-        <h3>How to Contribute</h3>
-        <p>
-          Whether you're fixing bugs, adding new features, improving
-          documentation, or spreading the word, we value your help.
-        </p>
-        <ol>
-          <p>
-            - Check out our
-            <a href="https://github.com/IfcLCA/IfcLCA" target="_blank"
-              >GitHub repository</a
-            >.
-          </p>
-          <p>- Take a look at the open issues or start a new discussion.</p>
-          <p>- Report any Bugs or unexpected behavior as GitHub Issues.</p>
-          <p>
-            - Fork and submit pull requests with a clear description of your
-            improvements.
-          </p>
-        </ol>
-      </section>
-
-      <section class="get-started">
-        <h3>Get Started</h3>
-        <p>
-          Not sure where to start? Have a look at the
-          <a href="/contributing">contributing guidelines</a> for a step-by-step
-          guide on how to make your first contribution.
-        </p>
-      </section>
-
-      <section class="community">
-        <h3>Community</h3>
-        <p>
-          Join our community of developers and contributors. Connect, share, and
-          collaborate with like-minded individuals.
-        </p>
-      </section>
-    </main>
-
+                  <ul class="list-group list-group-flush">
+                    <li class="list-group-item">
+                      <strong>How to Contribute:</strong> Whether you're fixing bugs, adding new features, improving documentation, or spreading the word, we value your help. 
+                      <a href="https://github.com/IfcLCA/IfcLCA" target="_blank">Visit GitHub</a> to get started.
+                    </li>
+                    <li class="list-group-item">
+                      <strong>Get Started:</strong> Whether you're a developer or not, we invite you to help make IfcLCA even better by submitting code, reporting bugs, or suggesting improvements. 
+                      <a href="/contributing" class="text-primary">Check out our guidelines</a> to learn how to make your first contribution.
+                    </li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+          </div>
+    
+          <!-- Card for Community -->
+          <div class="row justify-content-center">
+            <div class="col-lg-8">
+              <div class="card shadow-lg">
+                <div class="card-body">
+                  <h2 class="card-title text-center mb-4">
+                    Join the IfcLCA Community
+                  </h2>
+                  <p class="card-text text-center">
+                    Connect with like-minded sustainability professionals in the AEC industry.
+                  </p>
+                  <p class="card-text text-center">
+                    Share your ideas, collaborate on projects, and help shape the future of sustainable construction analytics.
+                  </p>
+                  <div class="d-flex justify-content-center mt-4">
+                    <a href="https://github.com/IfcLCA/IfcLCA/discussions" target="_blank" class="btn btn-primary">Join Discussions</a>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </main>
+      
     <%- include('partials/_footer.ejs') %>
-    <script src="/js/main.js"></script>
   </body>
 </html>
