@@ -12,6 +12,12 @@
 
   <!-- Local CSS -->
   <link rel="stylesheet" href="/css/style.css" />
+  <style>
+    /* Add any critical styles here to prevent FOUC */
+    body {
+      visibility: hidden;
+    }
+  </style>
 
   <!-- Favicon -->
   <link rel="icon" href="/favicon.ico" type="image/x-icon" />
@@ -19,21 +25,26 @@
   <!-- jQuery with integrity and crossorigin -->
   <script
     src="https://code.jquery.com/jquery-3.6.0.min.js"
-    integrity="sha384-KyZXEAg3QhqLMpG8r+Knujsl5+5hb7O4yw+g4Hf5rp/E6sE5+24kBQ5UJG0lRezg"
+    integrity="sha384-vtXRMe3mGCbOeY7l30aIg8H9p3GdeSe4IFlP6G8JMa7o7lXvnz3GFKzPxzJdPfGK"
     crossorigin="anonymous"
   ></script>
 
   <!-- Popper.js with integrity and crossorigin -->
   <script
     src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.11.7/dist/umd/popper.min.js"
-    integrity="sha384-oBqDVmMz4fnFO9gybBogGzW79hQq1rxfblEyZLlqxDl5GKt7j93fAb1QyV9KtW0J"
+    integrity="sha384-zYPOMqeu1DAVkHiLqWBUTcbYfZ8osu1Nd6Z89ify25QV9guujx43ITvfi12/QExE"
     crossorigin="anonymous"
   ></script>
 
   <!-- Bootstrap JS with integrity and crossorigin -->
   <script
     src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"
-    integrity="sha384-pzjw8f+ua7Kw1TIq9b6+9bhbVRmK7kmdXp6H2dghFLgVsBL9Lg/IZyo+g6qQOGl5"
+    integrity="sha384-C6RzsynM9kWDrMNeT87bh95OGNyZPhcTNXj1NW7RuBCsyN/o0jlpcV8Qyq46cDfL"
     crossorigin="anonymous"
   ></script>
+  <script>
+    document.addEventListener("DOMContentLoaded", function () {
+      document.body.style.visibility = "visible";
+    });
+  </script>
 </head>

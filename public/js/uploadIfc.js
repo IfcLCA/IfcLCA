@@ -1,5 +1,3 @@
-import { io } from "socket.io-client";
-
 const socket = io();
 const uploadForm = document.getElementById("ifcUploadForm");
 const messageContainer = document.getElementById("uploadMessage");
@@ -17,9 +15,6 @@ document.addEventListener("DOMContentLoaded", function () {
     // Client-side validation for file extension
     if (!file.name.endsWith(".ifc")) {
       messageContainer.textContent = "Error: Only .ifc files are allowed.";
-      setTimeout(() => {
-        window.location.href = `/projects/${projectId}`;
-      }, 5000);
       return;
     }
 
@@ -43,6 +38,7 @@ document.addEventListener("DOMContentLoaded", function () {
         // Hide progress bar and spinner
         progressBar.style.display = "none";
         spinner.style.display = "none";
+        // Handle successful upload
       })
       .catch((error) => {
         // Hide progress bar and spinner
