@@ -4,42 +4,97 @@
   <body>
     <%- include('partials/_header.ejs') %>
 
-    <main role="main" class="container mt-4">
-      <h2>Contributing Guidelines</h2>
-      <p>
-        Thank you for your interest in contributing to IfcLCA! We appreciate all
-        the help from the community. Here's how you can contribute:
-      </p>
+    <main role="main" class="container mt-5">
+      <!-- Card for Non-Developers -->
+      <div class="row justify-content-center mb-4">
+        <div class="col-lg-8">
+          <div class="card shadow-lg">
+            <div class="card-body">
+              <h2 class="card-title text-center mb-4">
+                Contributing for Everyone
+              </h2>
+              <p class="card-title text-center">
+                You don’t need to be a dev to contribute to IfcLCA! Here’s how
+                you can make an impact:
+              </p>
 
-      <ol>
-        <li>
-          <strong>Read our Code of Conduct:</strong> We expect all contributors
-          to adhere to the standards of our community.
-        </li>
-        <li>
-          <strong>Fork the Repository:</strong> Make sure to fork the repository
-          and work on your own copy.
-        </li>
-        <li>
-          <strong>Make Your Changes:</strong> Implement your features or fixes
-          in your forked repository.
-        </li>
-        <li>
-          <strong>Write Clear Commit Messages:</strong> Each commit should
-          contain a clear message about what was changed.
-        </li>
-        <li>
-          <strong>Submit a Pull Request:</strong> Once you're ready, submit a
-          pull request to the main repository and explain why this Pull benefits
-          the project.
-        </li>
-      </ol>
-      <p>
-        For more detailed information, please visit our
-        <a href="https://github.com/IfcLCA/IfcLCA/blob/main/CONTRIBUTING.md"
-          >GitHub repository contributing guide</a
-        >.
-      </p>
+              <ul class="list-group list-group-flush">
+                <li class="list-group-item">
+                  <strong>Report Bugs:</strong> If you encounter any bugs or
+                  unexpected behavior, please
+                  <a
+                    href="https://github.com/IfcLCA/IfcLCA/issues"
+                    target="_blank"
+                    >report them on GitHub</a
+                  >. Your feedback helps us improve.
+                </li>
+                <li class="list-group-item">
+                  <strong>Suggest Features:</strong> Have an idea for a new
+                  feature or improvement? Start a
+                  <a
+                    href="https://github.com/IfcLCA/IfcLCA/discussions"
+                    target="_blank"
+                    >discussion on GitHub</a
+                  >, and let’s talk about it!
+                </li>
+                <li class="list-group-item">
+                  <strong>Spread the Word:</strong> Help us reach more people by
+                  sharing IfcLCA with your network, online communities, and
+                  social media.
+                </li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Card for Developers -->
+      <div class="row justify-content-center">
+        <div class="col-lg-8">
+          <div class="card shadow-lg">
+            <div class="card-body">
+              <h2 class="card-title text-center mb-4">
+                Contributing for Developers
+              </h2>
+              <p class="card-title text-center">
+                You play a crucial role in enhancing IfcLCA. Here’s how:
+              </p>
+
+              <ol class="list-group list-group-flush">
+                <li class="list-group-item">
+                  <strong>Read our Code of Conduct:</strong> We expect all
+                  contributors to adhere to the standards of our community.
+                </li>
+                <li class="list-group-item">
+                  <strong>Fork the Repository:</strong> Make sure to fork the
+                  repository and work on your own copy.
+                </li>
+                <li class="list-group-item">
+                  <strong>Make Your Changes:</strong> Implement your features or
+                  fixes in your forked repository.
+                </li>
+                <li class="list-group-item">
+                  <strong>Write Clear Commit Messages:</strong> Each commit
+                  should contain a clear message about what was changed.
+                </li>
+                <li class="list-group-item">
+                  <strong>Submit a Pull Request:</strong> Once you're ready,
+                  submit a pull request to the main repository and explain why
+                  this pull request benefits the project.
+                </li>
+              </ol>
+              <p class="card-text text-center mt-3">
+                For more detailed information, please visit our
+                <a
+                  href="https://github.com/IfcLCA/IfcLCA/blob/main/CONTRIBUTING.md"
+                  target="_blank"
+                  >GitHub repository contributing guide</a
+                >.
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
     </main>
 
     <%- include('partials/_footer.ejs') %>
