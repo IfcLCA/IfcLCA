@@ -1,0 +1,462 @@
+/* 1. General Styles */
+body {
+  font-family: "Nunito", sans-serif;
+  color: #333;
+}
+
+.bold-value {
+  font-weight: bold;
+}
+
+/* 2. Layout */
+.container {
+  padding-top: 20px;
+  padding-bottom: 20px;
+  width: 90%;
+  max-width: 1700px;
+  margin: 0 auto;
+}
+
+.narrow-container {
+  max-width: fit-content;
+  padding: 20px 40px;
+  background-color: #f8f9fa;
+  margin: 0 auto;
+  border-radius: 6px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+/* 3. Navigation */
+.navbar-dark .navbar-brand {
+  color: #ff5722 !important;
+}
+
+.navbar .ms-auto {
+  margin-left: auto;
+  display: flex;
+}
+
+.navbar .btn-primary {
+  margin-right: 1rem;
+}
+
+/* 4. Buttons */
+.btn-primary {
+  background-color: #ff5722;
+  border-color: #ff5722;
+}
+
+.btn-primary:hover {
+  background-color: #e64a19;
+  border-color: #e64a19;
+}
+
+.btn-success {
+  background-color: #28a745;
+  border-color: #28a745;
+}
+
+.btn-success:hover {
+  background-color: #218838;
+  border-color: #1e7e34;
+}
+
+/* 5. Cards */
+.card {
+  margin-bottom: 20px;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.05);
+  border: 1px solid rgba(0, 0, 0, 0.125);
+  border-radius: 0.8rem;
+}
+
+.card-img-top {
+  padding-top: 20px;
+  width: 300px;
+  height: auto;
+  max-height: 300px;
+  object-fit: cover;
+  display: block;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.card-body {
+  text-align: left;
+  padding: 1rem;
+}
+
+.card-title,
+.card-title small {
+  text-align: center;
+  display: block;
+  margin-bottom: 20px;
+}
+
+.card-text {
+  margin: 0;
+  text-align: center;
+  padding: 0;
+  text-indent: 0;
+}
+
+/* 6. Forms */
+.form-control {
+  border-radius: 0.25rem;
+}
+
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.form-group label {
+  flex: 1;
+}
+
+.form-group input,
+.form-group select {
+  width: 100%;
+  padding: 8px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+}
+
+/* 7. Alerts */
+.alert-success {
+  color: #3c763d;
+  background-color: #dff0d8;
+  border-color: #d6e9c6;
+  padding: 15px;
+  margin-bottom: 20px;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  text-align: center;
+}
+
+/* 8. Footer */
+footer {
+  background-color: #f8f9fa;
+  padding: 1px 0;
+  border-top: 1px solid #e7e7e7;
+}
+
+footer span {
+  color: #777;
+}
+
+/* 9. Tooltips */
+.tooltip-inner {
+  color: #212529;
+  background-color: #f8f9fa;
+  border: 1px solid #ddd;
+  padding: 5px 10px;
+  font-size: 14px;
+  border-radius: 4px;
+}
+
+.tooltip {
+  position: relative;
+  display: inline-block;
+  cursor: pointer;
+  margin-left: 5px;
+  color: #007bff;
+  text-decoration: underline;
+}
+
+.tooltip .tooltiptext {
+  visibility: hidden;
+  width: 200px;
+  background-color: #555;
+  color: #fff;
+  text-align: center;
+  border-radius: 5px;
+  padding: 5px;
+  position: absolute;
+  z-index: 1;
+  bottom: 125%;
+  left: 50%;
+  margin-left: -100px;
+  opacity: 0;
+  transition: opacity 0.3s;
+}
+
+.tooltip:hover .tooltiptext {
+  visibility: visible;
+  opacity: 1;
+}
+
+/* 10. Tables */
+.tabulator {
+  font-family: "Roboto", sans-serif;
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12), 0 1px 2px rgba(0, 0, 0, 0.24);
+}
+
+.tabulator-header {
+  background-color: #f5f5f5;
+  color: #616161;
+  height: auto;
+}
+
+.tabulator-header .tabulator-col-sorter {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-left: 4px;
+}
+
+.tabulator-header .tabulator-col:last-child {
+  border-right: none;
+}
+
+.tabulator-tableholder {
+  overflow-x: auto;
+  background-color: #ffffff;
+}
+
+.tabulator-row {
+  border-bottom: 1px solid #e0e0e0;
+}
+
+.tabulator-row:nth-of-type(odd) {
+  background-color: #fafafa;
+}
+
+.tabulator-row:nth-of-type(even) {
+  background-color: #ffffff;
+}
+
+.tabulator-row:hover {
+  background-color: #f1f1f1;
+}
+
+.tabulator-cell {
+  padding: 10px 6px;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.tabulator-cell a {
+  color: #1e88e5;
+  text-decoration: none;
+}
+
+.tabulator-cell a:hover {
+  text-decoration: underline;
+}
+
+.tabulator-pagination {
+  margin-top: 10px;
+  text-align: center;
+  display: flex;
+  justify-content: center;
+  gap: 5px;
+}
+
+.tabulator-pagination button {
+  background-color: #1e88e5;
+  color: #ffffff;
+  border: none;
+  border-radius: 4px;
+  padding: 8px 12px;
+  cursor: pointer;
+  transition: background-color 0.3s ease;
+}
+
+.tabulator-pagination button:hover {
+  background-color: #1565c0;
+}
+
+/* 11. Project-specific styles */
+.project-container {
+  display: flex;
+  align-items: flex-start;
+  width: 100%;
+}
+
+.details-container {
+  flex: 1;
+  min-width: 250px;
+}
+
+.chart-container {
+  flex: 2;
+  width: 100%;
+  height: 100%;
+  min-height: 250px;
+}
+
+.charts-container {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+}
+
+.btn-container {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+}
+
+.editbtn-container {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-start;
+}
+
+.form-group .inline-group {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+}
+
+.form-group .inline-group .total-co2-input {
+  width: fit-content;
+  border: 2px solid #28a745;
+  border-radius: 4px;
+  background-color: #f9f9f9;
+  padding: 8px;
+  font-weight: bold;
+  text-align: center;
+  margin-top: 10px;
+  display: flex;
+  align-items: center;
+}
+
+.total-co2-input span {
+  margin-left: 4px;
+}
+
+.button-group {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 20px;
+}
+
+.overlay {
+  display: none;
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  padding: 10px;
+  background-color: rgba(255, 255, 255, 0.8);
+  border: 1px solid #ccc;
+  border-radius: 5px;
+  z-index: 10;
+  text-align: center;
+  font-size: 18px;
+  color: #333;
+}
+
+/* 12. Media Queries */
+@media (max-width: 700px) {
+  .project-container,
+  .charts-container {
+    flex-direction: column;
+  }
+}
+
+/* Project Home styles */
+.project-container {
+  display: flex;
+  align-items: flex-start;
+  width: 100%;
+}
+
+.details-container {
+  flex: 1;
+  min-width: 250px;
+}
+
+.chart-container {
+  flex: 2;
+  width: 100%;
+  height: 100%;
+  min-height: 250px;
+}
+
+.charts-container {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+}
+
+.btn-container {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+}
+
+.editbtn-container {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-start;
+}
+
+/* Add Row styles */
+.card {
+  margin: 20px auto;
+  padding: 20px;
+  max-width: 700px;
+}
+
+.form-group .inline-group label {
+  margin-bottom: 0;
+}
+
+/* Index page styles */
+body.index-bg {
+  background-image: url("/images/bg_index.png");
+  background-size: cover;
+  background-position: center;
+  background-attachment: fixed;
+  color: #333;
+}
+
+.features .card {
+  transition: transform 0.3s ease-in-out;
+  background-color: #fff;
+  color: #333;
+  border-radius: 10px;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+}
+
+.features .card:hover {
+  transform: translateY(-10px);
+  box-shadow: 0 6px 12px rgba(0, 0, 0, 0.15);
+}
+
+p {
+  text-indent: 0;
+  margin-bottom: 1rem;
+}
+
+.new-features {
+  background-color: #f8f9fa;
+  padding: 30px;
+  border-radius: 10px;
+  color: #333;
+  max-width: 1250px;
+  margin: 0 auto;
+}
+
+/* Footer styles */
+footer {
+  background-color: #f8f9fa;
+  color: #6c757d;
+  font-size: 14px;
+  font-family: "Helvetica Neue", Arial, sans-serif;
+}
+
+/* Media Queries */
+@media (max-width: 700px) {
+  .project-container,
+  .charts-container {
+    flex-direction: column;
+  }
+}
