@@ -9,7 +9,7 @@
     />
     <title>
       IfcLCA - Free and Open Source Life Cycle Assessment for the built
-      environment based on IFC
+      environment based on Ifc
     </title>
     <link
       rel="stylesheet"
@@ -31,17 +31,16 @@
       <div class="text-center header-bg">
         <h1>Welcome to IfcLCA</h1>
         <p class="tagline">
-          Your transparent and open partner in sustainable construction
-          analytics
+          <h4>Your transparent and open partner in sustainable construction
+            analytics</h4>
         </p>
       </div>
 
       <!-- Beta Warning Section -->
       <section class="beta-warning text-center mt-4">
-        <h4>Beta Version</h4>
         <p style="color: #e64a19; font-weight: bold">
-          Please note that IfcLCA is currently in beta. Features and
-          functionality are still under development, and things may change or
+          Please note that IfcLCA is currently released as Beta-Version. Features and
+          functionality are still under development and things may change or
           break. <br />
           If you encounter any issues or have suggestions, please open a
           <a
@@ -69,23 +68,19 @@
       </div>
 
       <!-- Features Section -->
-      <section class="features mt-5">
+      <section class="features mt-4">
         <div class="container">
           <div class="row">
             <div class="col-12 col-md-4 mb-4">
               <div class="card h-100">
                 <div class="card-body">
-                  <h5
-                    class="card-title"
-                    data-toggle="tooltip"
-                    title="Learn more about our Free and Open Source platform"
-                  >
+                  <h5 class="card-title">
                     <i class="fas fa-users"></i> Free and Open Source
                   </h5>
                   <p class="card-text">
-                    Benefit from a completely open-source platform and join a
-                    community of like-minded professionals. Customize and extend
-                    functionalities to suit your specific project needs.
+                    IfcLCA is and will always be a Free and Open Source
+                    platform, developed by the community for the community. Join
+                    us in making a difference.
                   </p>
                 </div>
               </div>
@@ -93,16 +88,11 @@
             <div class="col-12 col-md-4 mb-4">
               <div class="card h-100">
                 <div class="card-body">
-                  <h5
-                    class="card-title"
-                    data-toggle="tooltip"
-                    title="Upload and analyze IFC files quickly and easily"
-                  >
+                  <h5 class="card-title">
                     <i class="fas fa-tachometer-alt"></i> Easy File Upload
                   </h5>
                   <p class="card-text">
-                    Easily upload any IFC file without any special requirements.
-                    Start analyzing your building data quickly and efficiently.
+                    Upload any Ifc file without special requirements and start analyzing your building data quickly and efficiently. The Ifc will be deleted from our server right after processing, no files get saved.
                   </p>
                 </div>
               </div>
@@ -110,17 +100,13 @@
             <div class="col-12 col-md-4 mb-4">
               <div class="card h-100">
                 <div class="card-body">
-                  <h5
-                    class="card-title"
-                    data-toggle="tooltip"
-                    title="Automatically calculate the environmental impact of your building materials"
-                  >
+                  <h5 class="card-title">
                     <i class="fas fa-chart-line"></i> Automatic Impact
                     Calculation
                   </h5>
                   <p class="card-text">
                     Automatically calculate the environmental impact of
-                    materials in your uploaded IFC file. Easily edit and adjust
+                    materials in your uploaded Ifc file. Edit and adjust
                     the calculations to fit your project's needs.
                   </p>
                 </div>
@@ -130,48 +116,43 @@
         </div>
       </section>
 
-      <!-- New Features Announcement Section -->
-      <section class="new-features text-center mt-3 narrow-container">
-        <h4>🚀 New Features 🚀</h4>
-        <p style="font-size: 1.2em">
-          Enhanced IFC Parsing and Material Extraction:
-        </p>
-        <p style="font-size: 1.2em">
-          - Optimized material extraction process for better performance and
-          accuracy, now requiring BaseQuantities data for volume calculations,
-          except in cases involving `IfcMaterialLayer`.
-        </p>
-        <p style="font-size: 1.2em">
-          - Introduced multi-processing capabilities, utilizing all available
-          CPU cores to significantly enhance performance when processing large
-          IFC files, reducing overall runtime.
-        </p>
-        <p style="font-size: 1.2em">
-          - Enhanced error handling in the extraction process, ensuring robust
-          operations even when IFC files contain incomplete or missing data,
-          particularly during element and material extraction.
-        </p>
-      </section>
-
-      <!-- Open-Source Invitation Section -->
-      <section class="open-source-invitation text-center mt-5 mb-5">
-        <div class="container">
-          <h3>Join Our Open-Source Community</h3>
-          <p>
-            Contribute to a greener future by collaborating on IfcLCA. Together,
-            we can innovate for more sustainability in construction.
-          </p>
-          <a
-            href="/opensource"
-            class="btn btn-success btn-lg"
-            data-toggle="tooltip"
-            title="Contribute to the IfcLCA project by collaborating on GitHub. Help us innovate for sustainability in construction."
-          >
-            <i class="fas fa-hands-helping"></i> Get Involved
-          </a>
+    <!-- New Features Announcement Section -->
+    <section class="row justify-content-center">
+      <div class="col-lg-8">
+        <div class="card shadow-lg">
+          <div class="card-body">
+            <h2 class="card-title text-center">🚀 Enhanced Material Extraction: 🚀</h2>
+            <ol class="list-group list-group-flush">
+              <li class="list-group-item">
+                <strong>Optimized material extraction:</strong> Now using
+                multi-processing for better performance, and requiring
+                BaseQuantities, except for `IfcMaterialLayer`.
+              </li>
+              <ol class="list-group list-group-flush">
+                <li class="list-group-item">
+                  <strong>Enhanced error handling</strong> in the extraction process, ensuring robust
+                  operations even when Ifc files contain incomplete or missing data.
+                </li>
+              </ol>
+          </div>
         </div>
-      </section>
-    </main>
+      </div>
+    </section>
+
+    <!-- Open-Source Invitation Section -->
+    <section class="open-source-invitation text-center">
+      <div class="container">
+        <h3>Join Our Open-Source Community</h3>
+        <p>
+          Contribute to a greener future by collaborating on IfcLCA. Together, we
+          can innovate for more sustainability in construction.
+        </p>
+        <a href="/opensource" class="btn btn-success btn-lg" data-toggle="tooltip" title="Contribute to the IfcLCA project by collaborating on GitHub. Help us innovate for sustainability in construction.">
+          <i class="fas fa-hands-helping"></i> Get Involved
+        </a>
+      </div>
+    </section>
+
 
     <%- include('partials/_footer.ejs') %>
     <script>
