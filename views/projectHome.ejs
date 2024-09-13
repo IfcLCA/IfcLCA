@@ -235,15 +235,10 @@
       </div>
     </main>
     <%- include('partials/_footer.ejs') %>
+    <!-- Move all script tags here -->
     <script src="https://cdn.jsdelivr.net/npm/tabulator-tables/dist/js/tabulator.min.js"></script>
     <script src="/js/uploadIfc.js"></script>
     <script src="/js/projectTable.js"></script>
-    <% function formatNumber(value, decimals) { %> <% if (value == null ||
-    isNaN(value)) return '0'; %> <% return Number(value).toLocaleString('de-CH',
-    { minimumFractionDigits: decimals, maximumFractionDigits: decimals }); %> <%
-    } %>
-
-    <!-- Initialize tooltips -->
     <script>
       $(function () {
         $('[data-toggle="tooltip"]').tooltip();
