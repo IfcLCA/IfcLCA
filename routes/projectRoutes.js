@@ -271,6 +271,16 @@ router.post(
           }
           resolve(); // Resolve without passing stdoutData
         });
+
+        subprocess.stdout.on("data", (data) => {
+          const output = data.toString().trim();
+          if (output.startsWith("PROGRESS:")) {
+            const progress = parseInt(output.split(":")[1]);
+            io.emit("uploadProgress", { progress, status: "Processing" });
+          } else {
+            console.log(`Python script output: ${output}`);
+          }
+        });
       });
 
       // Fetch and process building elements

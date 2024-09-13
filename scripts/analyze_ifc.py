@@ -179,14 +179,20 @@ async def main(file_path, projectId):
     # Initialize variables for batch processing
     bulk_ops = []  # Initialize the list for bulk MongoDB operations
     batch_count = 0  # Initialize the batch counter
+    total_elements = len(list(ifc_file.by_type("IfcProduct")))
+    processed_elements = 0
 
     # Process each batch of IFC elements
     for batch in load_ifc_data_in_batches(ifc_file, batch_size=500):
         # Process the elements in the batch asynchronously
-        processed_elements = await process_batch(ifc_file, batch, file_path, user_id, session_id, projectId)
+        processed_elements += len(batch)
+        progress = int((processed_elements / total_elements) * 100)
+        print(f"PROGRESS:{progress}", flush=True)  # Send progress update
+
+        processed_batch = await process_batch(ifc_file, batch, file_path, user_id, session_id, projectId)
 
         # Append the processed elements to bulk operations
-        bulk_ops.extend(processed_elements)
+        bulk_ops.extend(processed_batch)
         batch_count += 1
         
         # Insert the accumulated bulk operations into MongoDB every 5 batches
@@ -197,6 +203,8 @@ async def main(file_path, projectId):
     # Insert any remaining operations after the loop ends
     if bulk_ops:
         await collection.insert_many(bulk_ops)
+
+    print("PROGRESS:100", flush=True)  # Send final progress update
 
 
 # Script entry point

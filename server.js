@@ -7,6 +7,9 @@ const MongoStore = require("connect-mongo");
 const authRoutes = require("./routes/authRoutes");
 const projectRoutes = require("./routes/projectRoutes");
 const rateLimit = require("express-rate-limit");
+const http = require("http");
+const socketIo = require("socket.io");
+const { io } = require("../server");
 
 if (!process.env.DATABASE_URL || !process.env.SESSION_SECRET) {
   console.error(
@@ -16,6 +19,8 @@ if (!process.env.DATABASE_URL || !process.env.SESSION_SECRET) {
 }
 
 const app = express();
+const server = http.createServer(app);
+const io = socketIo(server);
 const port = process.env.PORT || 3000;
 
 // Define global rate limiter
@@ -113,4 +118,17 @@ app.use((err, req, res, next) => {
   res.status(500).send("There was an error serving your request.");
 });
 
-app.listen(port, () => {});
+// WebSocket connection handling
+io.on("connection", (socket) => {
+  console.log("New WebSocket connection");
+
+  socket.on("disconnect", () => {
+    console.log("WebSocket disconnected");
+  });
+});
+
+server.listen(port, () => {
+  console.log(`Server running on port ${port}`);
+});
+
+module.exports = { app, io };

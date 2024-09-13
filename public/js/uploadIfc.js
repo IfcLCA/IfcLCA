@@ -1,3 +1,7 @@
+const socket = io();
+let progressBar;
+let progressText;
+
 document.addEventListener("DOMContentLoaded", function () {
   const uploadForm = document.getElementById("ifcUploadForm");
   const messageContainer = document.getElementById("uploadMessage");
@@ -47,5 +51,20 @@ document.addEventListener("DOMContentLoaded", function () {
 
         messageContainer.textContent = `Error: ${error.message}`;
       });
+  });
+
+  // WebSocket event listeners
+  socket.on("uploadProgress", (data) => {
+    progressBar.value = data.progress;
+    progressText.textContent = `${data.progress}% - ${data.status}`;
+  });
+
+  socket.on("processingComplete", (data) => {
+    progressBar.value = 100;
+    progressText.textContent = "Processing complete!";
+    messageContainer.textContent = data.message;
+    setTimeout(() => {
+      window.location.href = `/projects/${projectId}`;
+    }, 3000);
   });
 });
