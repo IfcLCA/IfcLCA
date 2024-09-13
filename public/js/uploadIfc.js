@@ -1,3 +1,5 @@
+import { io } from "socket.io-client";
+
 const socket = io();
 let progressBar;
 let progressText;
