@@ -146,6 +146,28 @@ footer span {
 }
 
 /* 9. Tooltips */
+
+/* Light mode tooltip */
+.tooltip.bs-tooltip-top .tooltip-arrow::before,
+.tooltip.bs-tooltip-auto[x-placement^="top"] .tooltip-arrow::before {
+  border-top-color: #f8f9fa;
+}
+
+.tooltip.bs-tooltip-right .tooltip-arrow::before,
+.tooltip.bs-tooltip-auto[x-placement^="right"] .tooltip-arrow::before {
+  border-right-color: #f8f9fa;
+}
+
+.tooltip.bs-tooltip-bottom .tooltip-arrow::before,
+.tooltip.bs-tooltip-auto[x-placement^="bottom"] .tooltip-arrow::before {
+  border-bottom-color: #f8f9fa;
+}
+
+.tooltip.bs-tooltip-left .tooltip-arrow::before,
+.tooltip.bs-tooltip-auto[x-placement^="left"] .tooltip-arrow::before {
+  border-left-color: #f8f9fa;
+}
+
 .tooltip-inner {
   color: #212529;
   background-color: #f8f9fa;
@@ -155,35 +177,13 @@ footer span {
   border-radius: 4px;
 }
 
-.tooltip {
-  position: relative;
-  display: inline-block;
-  cursor: pointer;
-  margin-left: 5px;
-  color: #007bff;
-  text-decoration: underline;
-}
-
-.tooltip .tooltiptext {
-  visibility: hidden;
-  width: 200px;
-  background-color: #555;
-  color: #fff;
-  text-align: center;
-  border-radius: 5px;
-  padding: 5px;
-  position: absolute;
-  z-index: 1;
-  bottom: 125%;
-  left: 50%;
-  margin-left: -100px;
-  opacity: 0;
-  transition: opacity 0.3s;
-}
-
-.tooltip:hover .tooltiptext {
-  visibility: visible;
-  opacity: 1;
+.narrow-container {
+  max-width: fit-content;
+  padding: 20px 40px; /* Adjust the padding to your preference */
+  background-color: #f8f9fa; /* Optional: background color for better visibility */
+  margin: 0 auto; /* Center the container */
+  border-radius: 6px; /* Optional: add border-radius for rounded corners */
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1); /* Optional: add shadow for better visibility */
 }
 
 /* 10. Tables */
