@@ -28,7 +28,7 @@ def open_ifc_file(file_path):
 
 # Lazy loading and batching of IFC elements
 def load_ifc_data_in_batches(ifc_file, batch_size=100):
-    elements = ifc_file.by_type("IfcProduct")
+    elements = ifc_file.by_type("IfcElement")
     for i in range(0, len(elements), batch_size):
         yield elements[i:i + batch_size]
 
