@@ -107,7 +107,7 @@ def extract_thickness_from_quantity_based_on_constituent(ifc_file, constituent):
 
 # Attempt to retrieve the volume from the element's BaseQuantities
 def get_volume_from_basequantities(element):
-    for rel_def in getattr(element, 'IsDefinedBy', []):
+    for rel_def in element.IsDefinedBy:
         if rel_def.is_a("IfcRelDefinesByProperties"):
             prop_set = rel_def.RelatingPropertyDefinition
             if prop_set.is_a("IfcElementQuantity"):
@@ -118,7 +118,7 @@ def get_volume_from_basequantities(element):
                             return float(quantity.VolumeValue)
                         except (ValueError, AttributeError):
                             continue
-
+                    
                     # Handle length-based quantities which may represent volumes (e.g., NetVolume in IFCQUANTITYLENGTH)
                     if quantity.is_a("IfcQuantityLength") and (quantity.Name == "NetVolume" or quantity.Name == "GrossVolume"):
                         try:
