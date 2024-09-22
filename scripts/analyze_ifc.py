@@ -12,6 +12,9 @@ from dotenv import load_dotenv
 from bson import ObjectId
 import multiprocessing
 
+from ifcopenshell.util.unit import calculate_unit_scale
+
+
 
 load_dotenv()
 
@@ -54,14 +57,28 @@ def get_layer_volumes_and_materials(element, total_volume):
                         material_layers_names.append(layer_name)
 
                 elif material.is_a('IfcMaterialConstituentSet') and hasattr(material, 'MaterialConstituents'):
-                    # Assign total volume to the first constituent and set the rest to 0
-                    for i, constituent in enumerate(material.MaterialConstituents):
+                    total_thickness = 0.0
+                    constituent_thickness_map = {}
+
+                    # First, calculate total thickness using Fractions or Widths
+                    for constituent in material.MaterialConstituents:
+                        thickness = extract_thickness(element, constituent)
+                        constituent_thickness_map[constituent] = thickness
+                        total_thickness += thickness
+
+                    # Now, assign volumes based on Fraction or Width-derived thickness
+                    for constituent in material.MaterialConstituents:
+                        thickness = constituent_thickness_map.get(constituent, 0.0)
+                        if thickness and total_thickness > 0:
+                            layer_volume = total_volume * (thickness / total_thickness)
+                        else:
+                            layer_volume = 0.0
                         constituent_name = constituent.Name if constituent.Name else "Unnamed Material"
-                        material_volume = total_volume if i == 0 else 0  # First constituent gets the total volume, others get 0
-                        material_layers_volumes.append(round(material_volume, 5))
+                        material_layers_volumes.append(round(layer_volume, 5))
                         material_layers_names.append(constituent_name)
 
     return material_layers_volumes, material_layers_names
+
 
 # Attempt to retrieve the volume from the element's BaseQuantities
 def get_volume_from_basequantities(element):
@@ -101,6 +118,37 @@ def get_volume_from_properties(element):
         except ValueError:
             return None
     return None
+
+def extract_thickness(element, constituent):
+    """
+    Extract the thickness for a material constituent using Fraction or Width.
+
+    Parameters:
+    - element: The IFC element containing the material constituents.
+    - constituent: The IfcMaterialConstituent entity.
+
+    Returns:
+    - thickness_mm: The thickness in millimeters.
+    """
+    # Attempt to get the Fraction attribute
+    fraction = getattr(constituent, 'Fraction', None)
+    if fraction is not None:
+        return float(fraction)
+
+    # If Fraction is not present, attempt to extract Width
+    for rel_def in getattr(constituent, 'IsDefinedBy', []):
+        if rel_def.is_a("IfcRelDefinesByProperties"):
+            prop_set = rel_def.RelatingPropertyDefinition
+            if prop_set.is_a("IfcElementQuantity"):
+                for quantity in prop_set.Quantities:
+                    if quantity.is_a("IfcQuantityLength") and quantity.Name.strip().lower() == "width":
+                        try:
+                            width_mm = float(quantity.LengthValue) * calculate_unit_scale(element.file) * 1000.0  # Convert to millimeters
+                            return width_mm
+                        except (ValueError, AttributeError):
+                            continue
+    return 0.0  # Default thickness if neither Fraction nor Width is found
+
 
 # Get building storey and properties
 def get_building_storey(element):
