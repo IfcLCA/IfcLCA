@@ -33,42 +33,8 @@ def load_ifc_data_in_batches(ifc_file, batch_size=100):
     for i in range(0, len(elements), batch_size):
         yield elements[i:i + batch_size]
 
-# Helper function to extract thickness using Fraction or Width
-def extract_thickness(ifc_file, constituent):
-    """
-    Extract the thickness for a material constituent using Fraction or Width.
-
-    Parameters:
-    - ifc_file: The opened IFC file.
-    - constituent: The IfcMaterialConstituent entity.
-
-    Returns:
-    - thickness_mm: The thickness in millimeters.
-    """
-    # Attempt to get the Fraction attribute
-    fraction = getattr(constituent, 'Fraction', None)
-    if fraction is not None:
-        try:
-            return float(fraction)
-        except (ValueError, TypeError):
-            return 0.0
-
-    # If Fraction is not present, attempt to extract Width
-    for rel_def in getattr(constituent, 'IsDefinedBy', []):
-        if rel_def.is_a("IfcRelDefinesByProperties"):
-            prop_set = rel_def.RelatingPropertyDefinition
-            if prop_set.is_a("IfcElementQuantity"):
-                for quantity in prop_set.Quantities:
-                    if quantity.is_a("IfcQuantityLength") and quantity.Name.strip().lower() == "width":
-                        try:
-                            width_mm = float(quantity.LengthValue) * calculate_unit_scale(ifc_file) * 1000.0  # Convert to millimeters
-                            return width_mm
-                        except (ValueError, AttributeError):
-                            continue
-    return 0.0  # Default thickness if neither Fraction nor Width is found
-
 # Simplified material extraction with error handling
-def get_layer_volumes_and_materials(element, total_volume, ifc_file):
+def get_layer_volumes_and_materials(element, total_volume):
     material_layers_volumes = []
     material_layers_names = []
 
@@ -83,48 +49,102 @@ def get_layer_volumes_and_materials(element, total_volume, ifc_file):
                 if material.is_a('IfcMaterialLayerSetUsage'):
                     total_thickness = sum(layer.LayerThickness for layer in material.ForLayerSet.MaterialLayers)
                     for layer in material.ForLayerSet.MaterialLayers:
-                        if total_thickness > 0:
-                            layer_volume = total_volume * (layer.LayerThickness / total_thickness)
-                        else:
-                            layer_volume = 0
+                        layer_volume = total_volume * (layer.LayerThickness / total_thickness) if total_volume else 0
                         layer_name = layer.Material.Name if layer.Material and layer.Material.Name else "Unnamed Material"
                         material_layers_volumes.append(round(layer_volume, 5))
                         material_layers_names.append(layer_name)
 
                 elif material.is_a('IfcMaterialConstituentSet') and hasattr(material, 'MaterialConstituents'):
-                    total_thickness = 0.0
-                    constituent_thickness_map = {}
-
-                    # First, calculate total thickness using Fractions or Widths
-                    for constituent in material.MaterialConstituents:
-                        thickness = extract_thickness(ifc_file, constituent)
-                        constituent_thickness_map[constituent] = thickness
-                        total_thickness += thickness
-
-                    # Now, assign volumes based on Fraction or Width-derived thickness
-                    for constituent in material.MaterialConstituents:
-                        thickness = constituent_thickness_map.get(constituent, 0.0)
-                        if thickness and total_thickness > 0:
-                            layer_volume = total_volume * (thickness / total_thickness)
-                        else:
-                            layer_volume = 0.0
+                    # Assign fractions based on widths or use widths as fallback
+                    fractions = assign_constituent_fractions(material, element)
+                    for i, constituent in enumerate(material.MaterialConstituents):
                         constituent_name = constituent.Name if constituent.Name else "Unnamed Material"
-                        material_layers_volumes.append(round(layer_volume, 5))
+                        material_volume = total_volume * fractions[i] if total_volume else 0
+                        material_layers_volumes.append(round(material_volume, 5))
                         material_layers_names.append(constituent_name)
-
-                        # Assign Fraction attribute using set_attribute
-                        if total_thickness > 0:
-                            fraction = thickness / total_thickness
-                        else:
-                            fraction = 0.0
-                        constituent.set_attribute('Fraction', fraction)
-                        print(f"Constituent: {constituent_name}, Thickness: {thickness} mm, Fraction: {fraction}")
 
     return material_layers_volumes, material_layers_names
 
+def assign_constituent_fractions(constituent_set, element):
+    """
+    Assigns fractions to material constituents based on their widths. If widths are not available,
+    uses width as a fallback to compute fractions.
+
+    Parameters:
+    - constituent_set: The IfcMaterialConstituentSet instance.
+    - element: The IfcElement associated with the constituent set.
+
+    Returns:
+    - List of fractions corresponding to each constituent.
+    """
+    fractions = []
+    unit_scale_to_mm = 1000.0  # Assuming model units are in meters; adjust as needed
+
+    constituents = constituent_set.MaterialConstituents or []
+    if not constituents:
+        return [1.0] * len(constituents)  # Avoid division by zero
+
+    # Find elements associated with this constituent set via IfcRelAssociatesMaterial
+    associated_relations = element.get_inverse('IfcRelAssociatesMaterial')
+    associated_elements = [
+        rel.RelatedObjects[0] for rel in associated_relations
+        if rel.is_a('IfcRelAssociatesMaterial') and rel.RelatedObjects
+    ]
+    if not associated_elements:
+        return [1.0] * len(constituents)  # Default fraction if no associated elements
+
+    # Collect quantities associated with the elements
+    quantities = []
+    for assoc_element in associated_elements:
+        for rel in getattr(assoc_element, 'IsDefinedBy', []):
+            if rel.is_a('IfcRelDefinesByProperties'):
+                prop_def = rel.RelatingPropertyDefinition
+                if prop_def.is_a('IfcElementQuantity'):
+                    quantities.extend(prop_def.Quantities)
+
+    # Build a mapping of quantity names to quantities
+    quantity_name_map = {}
+    for q in quantities:
+        if q.is_a('IfcPhysicalComplexQuantity'):
+            q_name = (q.Name or '').strip().lower()
+            quantity_name_map.setdefault(q_name, []).append(q)
+
+    # Handle constituents with duplicate names by order of appearance
+    constituent_indices = {}
+    constituent_widths = {}
+    total_width_mm = 0.0
+
+    for constituent in constituents:
+        constituent_name = (constituent.Name or "Unnamed Constituent").strip().lower()
+        count = constituent_indices.get(constituent_name, 0)
+        constituent_indices[constituent_name] = count + 1
+
+        width_mm = 0.0
+        quantities_with_name = quantity_name_map.get(constituent_name, [])
+
+        if count < len(quantities_with_name):
+            matched_quantity = quantities_with_name[count]
+            # Extract 'Width' sub-quantity
+            for sub_q in matched_quantity.HasQuantities:
+                if sub_q.is_a('IfcQuantityLength') and (sub_q.Name or '').strip().lower() == 'width':
+                    raw_length_value = sub_q.LengthValue or 0.0
+                    width_mm = raw_length_value * unit_scale_to_mm
+                    break
+
+        constituent_widths[constituent] = width_mm
+        total_width_mm += width_mm
+
+    if total_width_mm == 0.0:
+        # If total width is zero, assign equal fractions
+        fractions = [1.0 / len(constituents)] * len(constituents)
+    else:
+        fractions = [constituent_widths[constituent] / total_width_mm for constituent in constituents]
+
+    return fractions
+
 # Attempt to retrieve the volume from the element's BaseQuantities
 def get_volume_from_basequantities(element):
-    for rel_def in getattr(element, 'IsDefinedBy', []):
+    for rel_def in element.IsDefinedBy:
         if rel_def.is_a("IfcRelDefinesByProperties"):
             prop_set = rel_def.RelatingPropertyDefinition
             if prop_set.is_a("IfcElementQuantity"):
@@ -135,7 +155,7 @@ def get_volume_from_basequantities(element):
                             return float(quantity.VolumeValue)
                         except (ValueError, AttributeError):
                             continue
-                    
+
                     # Handle length-based quantities which may represent volumes (e.g., NetVolume in IFCQUANTITYLENGTH)
                     if quantity.is_a("IfcQuantityLength") and (quantity.Name == "NetVolume" or quantity.Name == "GrossVolume"):
                         try:
@@ -172,21 +192,25 @@ def get_element_property(element, property_name):
     return ifcopenshell.util.element.get_pset(element, pset_name, property_name) or ifcopenshell.util.element.get_pset(element, "Pset_ElementCommon", property_name)
 
 # Process each IFC element to extract data (runs async)
-async def process_element(element, ifc_file, file_path, user_id, session_id, projectId):
+async def process_element(element, file_path, user_id, session_id, projectId):
     # Try to get volume from properties or BaseQuantities
     volume = get_volume_from_properties(element)
     if volume is None:
         volume = 0  # Use 0 for volume when none is found
 
     # Get material layers and volumes
-    material_layers_volumes, material_layers_names = get_layer_volumes_and_materials(element, volume, ifc_file)
+    material_layers_volumes, material_layers_names = get_layer_volumes_and_materials(element, volume)
 
-    # Build material info
-    materials_info = [{
-        "materialId": ObjectId(),
-        "name": name,
-        "volume": vol
-    } for name, vol in zip(material_layers_names, material_layers_volumes)]
+    # Build material info with fractions
+    materials_info = []
+    for name, vol in zip(material_layers_names, material_layers_volumes):
+        fraction = vol / volume if volume > 0 else 0
+        materials_info.append({
+            "materialId": ObjectId(),
+            "name": name,
+            "volume": vol,
+            "fraction": fraction
+        })
 
     if not materials_info:
         materials = ifcopenshell.util.element.get_materials(element, should_inherit=True)
@@ -194,7 +218,8 @@ async def process_element(element, ifc_file, file_path, user_id, session_id, pro
         materials_info.append({
             "materialId": ObjectId(),
             "name": material_name,
-            "volume": volume
+            "volume": volume,
+            "fraction": 1.0
         })
 
     # Build the element data dictionary for output
@@ -218,7 +243,7 @@ async def process_element(element, ifc_file, file_path, user_id, session_id, pro
 
 # Main function to process each batch of elements asynchronously
 async def process_batch(ifc_file, batch, file_path, user_id, session_id, projectId):
-    tasks = [process_element(element, ifc_file, file_path, user_id, session_id, projectId) for element in batch]
+    tasks = [process_element(element, file_path, user_id, session_id, projectId) for element in batch]
     return await asyncio.gather(*tasks)
 
 # Main function to process the entire IFC file
@@ -228,6 +253,9 @@ async def main(file_path, projectId):
     collection = db["building_elements"]
 
     ifc_file = open_ifc_file(file_path)
+
+    # Initialize fractions for all material constituents before processing elements
+    assign_global_constituent_fractions(ifc_file)
 
     # Mock data for user_id and session_id
     user_id = "example_user_id"   
@@ -245,7 +273,7 @@ async def main(file_path, projectId):
         # Append the processed elements to bulk operations
         bulk_ops.extend(processed_elements)
         batch_count += 1
-
+        
         # Insert the accumulated bulk operations into MongoDB every 5 batches
         if batch_count % 5 == 0 and bulk_ops:
             await collection.insert_many(bulk_ops)
@@ -254,6 +282,84 @@ async def main(file_path, projectId):
     # Insert any remaining operations after the loop ends
     if bulk_ops:
         await collection.insert_many(bulk_ops)
+
+def assign_global_constituent_fractions(model):
+    """
+    Assigns fractions to all IfcMaterialConstituentSets in the IFC model based on their widths.
+    This function modifies the IFC model in-memory.
+
+    Parameters:
+    - model: The opened IfcOpenShell IFC model.
+    """
+    # Calculate the unit scale for length units to millimeters
+    unit_scale_to_mm = calculate_unit_scale(model) * 1000.0
+
+    # Iterate through each IfcMaterialConstituentSet in the model
+    for constituent_set in model.by_type('IfcMaterialConstituentSet'):
+        constituents = constituent_set.MaterialConstituents or []
+        if not constituents:
+            continue  # Skip if no constituents found
+
+        # Find elements associated with this constituent set via IfcRelAssociatesMaterial
+        associated_relations = model.get_inverse(constituent_set)
+        associated_elements = [
+            rel.RelatedObjects[0] for rel in associated_relations
+            if rel.is_a('IfcRelAssociatesMaterial') and rel.RelatedObjects
+        ]
+        if not associated_elements:
+            continue  # Skip if no associated elements found
+
+        # Collect quantities associated with the elements
+        quantities = []
+        for element in associated_elements:
+            for rel in getattr(element, 'IsDefinedBy', []):
+                if rel.is_a('IfcRelDefinesByProperties'):
+                    prop_def = rel.RelatingPropertyDefinition
+                    if prop_def.is_a('IfcElementQuantity'):
+                        quantities.extend(prop_def.Quantities)
+
+        # Build a mapping of quantity names to quantities
+        quantity_name_map = {}
+        for q in quantities:
+            if q.is_a('IfcPhysicalComplexQuantity'):
+                q_name = (q.Name or '').strip().lower()
+                quantity_name_map.setdefault(q_name, []).append(q)
+
+        # Handle constituents with duplicate names by order of appearance
+        constituent_indices = {}
+        constituent_widths = {}
+        total_width_mm = 0.0
+
+        for constituent in constituents:
+            constituent_name = (constituent.Name or "Unnamed Constituent").strip().lower()
+            count = constituent_indices.get(constituent_name, 0)
+            constituent_indices[constituent_name] = count + 1
+
+            width_mm = 0.0
+            quantities_with_name = quantity_name_map.get(constituent_name, [])
+
+            if count < len(quantities_with_name):
+                matched_quantity = quantities_with_name[count]
+                # Extract 'Width' sub-quantity
+                for sub_q in matched_quantity.HasQuantities:
+                    if sub_q.is_a('IfcQuantityLength') and (sub_q.Name or '').strip().lower() == 'width':
+                        raw_length_value = sub_q.LengthValue or 0.0
+                        width_mm = raw_length_value * unit_scale_to_mm
+                        break
+
+            constituent_widths[constituent] = width_mm
+            total_width_mm += width_mm
+
+        if total_width_mm == 0.0:
+            # Assign equal fractions if total width is zero
+            fractions = [1.0 / len(constituents)] * len(constituents)
+        else:
+            fractions = [constituent_widths[constituent] / total_width_mm for constituent in constituents]
+
+        # Assign fractions to constituents
+        for constituent, fraction in zip(constituents, fractions):
+            constituent.Fraction = fraction
+            print(f"Constituent: {constituent.Name}, Fraction: {fraction:.4f}, Width: {constituent_widths.get(constituent, 0):.2f} mm")
 
 # Script entry point
 if __name__ == "__main__":
