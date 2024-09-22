@@ -12,6 +12,7 @@ from dotenv import load_dotenv
 from bson import ObjectId
 import multiprocessing
 
+
 load_dotenv()
 
 # Initialize ThreadPoolExecutor globally for concurrent shape creation
@@ -53,57 +54,14 @@ def get_layer_volumes_and_materials(element, total_volume):
                         material_layers_names.append(layer_name)
 
                 elif material.is_a('IfcMaterialConstituentSet') and hasattr(material, 'MaterialConstituents'):
-                    # Updated Logic: Use Fraction if available, else use Width to calculate volume
-                    total_thickness = 0.0
-                    constituent_thickness_map = {}
-
-                    # First, calculate total thickness using Fractions or Widths
-                    for constituent in material.MaterialConstituents:
-                        fraction = getattr(constituent, 'Fraction', None)
-                        if fraction is not None:
-                            constituent_thickness_map[constituent] = fraction
-                            total_thickness += fraction
-                        else:
-                            # Attempt to extract Width as Thickness
-                            width_mm = extract_thickness_from_quantity_based_on_constituent(ifcopenshell.file, constituent)
-                            constituent_thickness_map[constituent] = width_mm
-                            total_thickness += width_mm
-
-                    # Now, assign volumes based on Fraction or Width-derived thickness
-                    for constituent in material.MaterialConstituents:
-                        thickness = constituent_thickness_map.get(constituent, 0.0)
-                        if thickness and total_thickness > 0:
-                            layer_volume = total_volume * (thickness / total_thickness)
-                        else:
-                            layer_volume = 0.0
+                    # Assign total volume to the first constituent and set the rest to 0
+                    for i, constituent in enumerate(material.MaterialConstituents):
                         constituent_name = constituent.Name if constituent.Name else "Unnamed Material"
-                        material_layers_volumes.append(round(layer_volume, 5))
+                        material_volume = total_volume if i == 0 else 0  # First constituent gets the total volume, others get 0
+                        material_layers_volumes.append(round(material_volume, 5))
                         material_layers_names.append(constituent_name)
 
     return material_layers_volumes, material_layers_names
-
-# Function to extract thickness using Fraction or Width
-def extract_thickness_from_quantity_based_on_constituent(ifc_file, constituent):
-    """
-    Extract the thickness for a material constituent using Fraction or Width.
-    """
-    # Check if Fraction is present
-    fraction = getattr(constituent, 'Fraction', None)
-    if fraction is not None:
-        return fraction  # Assuming Fraction represents the proportional thickness
-
-    # If Fraction is not present, attempt to extract Width
-    for rel_def in constituent.IsDefinedBy:
-        if rel_def.is_a("IfcRelDefinesByProperties"):
-            prop_set = rel_def.RelatingPropertyDefinition
-            if prop_set.is_a("IfcElementQuantity"):
-                for quantity in prop_set.Quantities:
-                    if quantity.is_a("IfcQuantityLength") and quantity.Name.strip().lower() == "width":
-                        try:
-                            return float(quantity.LengthValue)  # Assuming Width represents thickness
-                        except (ValueError, AttributeError):
-                            continue
-    return 0.0  # Default thickness if neither Fraction nor Width is found
 
 # Attempt to retrieve the volume from the element's BaseQuantities
 def get_volume_from_basequantities(element):
@@ -126,6 +84,7 @@ def get_volume_from_basequantities(element):
                         except (ValueError, AttributeError):
                             continue
     return None
+
 
 # Attempt to retrieve the volume from the element's properties
 def get_volume_from_properties(element):
@@ -199,6 +158,7 @@ async def process_element(element, file_path, user_id, session_id, projectId):
 
     return element_data
 
+
 # Main function to process each batch of elements asynchronously
 async def process_batch(ifc_file, batch, file_path, user_id, session_id, projectId):
     tasks = [process_element(element, file_path, user_id, session_id, projectId) for element in batch]
@@ -228,7 +188,7 @@ async def main(file_path, projectId):
         # Append the processed elements to bulk operations
         bulk_ops.extend(processed_elements)
         batch_count += 1
-
+        
         # Insert the accumulated bulk operations into MongoDB every 5 batches
         if batch_count % 5 == 0 and bulk_ops:
             await collection.insert_many(bulk_ops)
@@ -237,6 +197,7 @@ async def main(file_path, projectId):
     # Insert any remaining operations after the loop ends
     if bulk_ops:
         await collection.insert_many(bulk_ops)
+
 
 # Script entry point
 if __name__ == "__main__":
