@@ -433,6 +433,7 @@ router.get(
       const project = await Project.findById(projectId);
 
       if (!project) {
+        console.log("Project not found:", projectId);
         return res.status(404).render("error", {
           message: "Project not found",
           error: {
@@ -443,7 +444,10 @@ router.get(
         });
       }
 
+      console.log("Project IFC file path:", project.ifc_file_path);
+
       if (!project.ifc_file_path) {
+        console.log("IFC file path not set for project:", projectId);
         return res.status(404).render("error", {
           message: "IFC file path not found",
           error: {
@@ -455,6 +459,7 @@ router.get(
       }
 
       if (!fs.existsSync(project.ifc_file_path)) {
+        console.log("IFC file not found at path:", project.ifc_file_path);
         return res.status(404).render("error", {
           message: "IFC file not found",
           error: {
@@ -488,8 +493,14 @@ router.get(
       const outputPath = path.join(
         workingDirectory,
         "temp",
-        `${project.user}_${projectId}_export.ifc`
+        `${projectId}_export.ifc`
       );
+
+      console.log("Executing Python script with args:", [
+        scriptPath,
+        project.ifc_file_path,
+        outputPath,
+      ]);
 
       // Execute the Python script and wait for it to complete
       await new Promise((resolve, reject) => {
@@ -500,14 +511,15 @@ router.get(
         });
 
         subprocess.stdout.on("data", (data) => {
-          console.log(`stdout: ${data}`);
+          console.log(`Python script stdout: ${data}`);
         });
 
         subprocess.stderr.on("data", (data) => {
-          console.error(`stderr: ${data}`);
+          console.error(`Python script stderr: ${data}`);
         });
 
         subprocess.on("close", (code) => {
+          console.log(`Python script exited with code ${code}`);
           if (code !== 0) {
             return reject(new Error(`Python script exited with code ${code}`));
           }
