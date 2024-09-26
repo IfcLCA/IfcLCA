@@ -88,8 +88,8 @@ app.use((req, res, next) => {
 // Authentication Routes
 app.use(authRoutes);
 
-// Mounting projectRoutes under '/api'
-app.use("/api", projectRoutes);
+// Project Routes
+app.use(projectRoutes);
 
 // Root path response
 app.get("/", (req, res) => {

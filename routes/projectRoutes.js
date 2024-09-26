@@ -20,6 +20,7 @@ const {
   formatProjectNameForDisplay,
 } = require("../utils/util");
 const { isNaN } = require("lodash");
+const { route } = require("./authRoutes");
 const cron = require("node-cron");
 
 const UPLOADS_DIR = path.resolve(__dirname, "../uploads"); // Define the safe root directory for uploads
@@ -241,7 +242,7 @@ const upload = multer({
 
 // POST endpoint for IFC file upload and initial material matching
 router.post(
-  "/projects/:projectId/upload",
+  "/api/projects/:projectId/upload",
   isAuthenticated,
   upload.single("ifcFile"),
   async (req, res) => {
@@ -301,7 +302,7 @@ router.post(
 
       // Execute the Python script and wait for it to complete
       await new Promise((resolve, reject) => {
-        const args = [scriptPath, newFilePath, projectId]; // Changed from filePath to newFilePath
+        const args = [scriptPath, newFilePath, projectId];
 
         const subprocess = spawn(pythonPath, args, {
           cwd: workingDirectory, // Dynamically set the working directory
@@ -424,7 +425,7 @@ router.post(
 
 // IFC export
 router.get(
-  "/projects/:projectId/export-ifc",
+  "/api/projects/:projectId/export-ifc",
   isAuthenticated,
   async (req, res) => {
     try {
@@ -502,28 +503,26 @@ router.get(
       ]);
 
       // Execute the Python script and wait for it to complete
-      await new Promise((resolve, reject) => {
-        const args = [scriptPath, project.ifc_file_path, outputPath];
+      const args = [scriptPath, project.ifc_file_path, outputPath];
 
-        const subprocess = spawn(pythonPath, args, {
-          cwd: workingDirectory,
-        });
+      const subprocess = spawn(pythonPath, args, {
+        cwd: workingDirectory,
+      });
 
-        subprocess.stdout.on("data", (data) => {
-          console.log(`Python script stdout: ${data}`);
-        });
+      subprocess.stdout.on("data", (data) => {
+        console.log(`Python script stdout: ${data}`);
+      });
 
-        subprocess.stderr.on("data", (data) => {
-          console.error(`Python script stderr: ${data}`);
-        });
+      subprocess.stderr.on("data", (data) => {
+        console.error(`Python script stderr: ${data}`);
+      });
 
-        subprocess.on("close", (code) => {
-          console.log(`Python script exited with code ${code}`);
-          if (code !== 0) {
-            return reject(new Error(`Python script exited with code ${code}`));
-          }
-          resolve();
-        });
+      subprocess.on("close", (code) => {
+        console.log(`Python script exited with code ${code}`);
+        if (code !== 0) {
+          return reject(new Error(`Python script exited with code ${code}`));
+        }
+        resolve();
       });
 
       res.download(outputPath, `${project.name}_export.ifc`, (err) => {
@@ -592,7 +591,7 @@ router.get("/dashboard", isAuthenticated, async (req, res) => {
 });
 
 // POST endpoint for creating a new project
-router.post("/projects", isAuthenticated, async (req, res) => {
+router.post("/api/projects", isAuthenticated, async (req, res) => {
   try {
     const {
       name,
@@ -678,7 +677,7 @@ router.get("/projects/:projectId", isAuthenticated, async (req, res) => {
 
 // POST endpoint for deleting a project
 router.post(
-  "/projects/:projectId/delete",
+  "/api/projects/:projectId/delete",
   isAuthenticated,
   async (req, res) => {
     try {
@@ -755,7 +754,7 @@ router.get("/projects/:projectId/add-row", isAuthenticated, (req, res) => {
 
 // POST endpoint to add a new building element row
 router.post(
-  "/projects/:projectId/building_elements/add",
+  "/api/projects/:projectId/building_elements/add",
   isAuthenticated,
   async (req, res) => {
     try {
@@ -802,7 +801,7 @@ router.post(
 );
 
 router.post(
-  "/projects/:projectId/building_elements/updateDensity",
+  "/api/projects/:projectId/building_elements/updateDensity",
   isAuthenticated,
   async (req, res) => {
     try {
@@ -860,7 +859,7 @@ router.post(
 
 // GET endpoint for building elements (no matching, just fetching from DB)
 router.get(
-  "/projects/:projectId/building_elements",
+  "/api/projects/:projectId/building_elements",
   isAuthenticated,
   async (req, res) => {
     try {
@@ -879,7 +878,7 @@ router.get(
 
 // POST endpoint to update building elements' materials based on user edits
 router.post(
-  "/projects/:projectId/building_elements/update",
+  "/api/projects/:projectId/building_elements/update",
   isAuthenticated,
   async (req, res) => {
     try {
@@ -947,7 +946,7 @@ router.post(
 
 // POST endpoint to delete specific materials from building elements
 router.post(
-  "/projects/:projectId/building_elements/materials/delete",
+  "/api/projects/:projectId/building_elements/materials/delete",
   isAuthenticated,
   async (req, res) => {
     try {
@@ -1005,7 +1004,7 @@ router.post(
 );
 
 // Endpoint to get material names for the dropdown
-router.get("/materials/names", async (req, res) => {
+router.get("/api/materials/names", async (req, res) => {
   try {
     const carbonMaterials = await CarbonMaterial.find({}).lean();
     allMaterialsFuse = new Fuse(carbonMaterials, {
@@ -1028,133 +1027,141 @@ router.get("/materials/names", async (req, res) => {
 });
 
 // Endpoint to get detailed properties of a material by name
-router.get("/materials/details/:name", isAuthenticated, async (req, res) => {
-  try {
-    const materialName = decodeURIComponent(req.params.name); // Decode the material name
-    const material = await CarbonMaterial.findOne({
-      BAUMATERIALIEN: materialName,
-    }).lean();
+router.get(
+  "/api/materials/details/:name",
+  isAuthenticated,
+  async (req, res) => {
+    try {
+      const materialName = decodeURIComponent(req.params.name); // Decode the material name
+      const material = await CarbonMaterial.findOne({
+        BAUMATERIALIEN: materialName,
+      }).lean();
 
-    if (!material) {
-      return res.status(404).json({ message: "Material not found" });
+      if (!material) {
+        return res.status(404).json({ message: "Material not found" });
+      }
+
+      const density = parseDensity(
+        material["Rohdichte/ Flächenmasse"],
+        materialName
+      );
+      const indicator = parseTreibhausgasemissionen(
+        material["Treibhausgasemissionen, Total [kg CO2-eq]"],
+        materialName
+      );
+
+      res.json({
+        density: density,
+        indicator: indicator,
+      });
+    } catch (error) {
+      console.error("Failed to fetch material details:", error);
+      res.status(500).send("Internal Server Error");
     }
-
-    const density = parseDensity(
-      material["Rohdichte/ Flächenmasse"],
-      materialName
-    );
-    const indicator = parseTreibhausgasemissionen(
-      material["Treibhausgasemissionen, Total [kg CO2-eq]"],
-      materialName
-    );
-
-    res.json({
-      density: density,
-      indicator: indicator,
-    });
-  } catch (error) {
-    console.error("Failed to fetch material details:", error);
-    res.status(500).send("Internal Server Error");
   }
-});
+);
 
 // ------------------------------------------
 // API Routes: Export functionality
 // ------------------------------------------
 
 // GET endpoint for exporting project data to Excel
-router.get("/projects/:projectId/export", isAuthenticated, async (req, res) => {
-  try {
-    const projectId = req.params.projectId;
-    const project = await Project.findById(projectId).lean();
-    const buildingElements = await BuildingElement.find({ projectId }).lean();
+router.get(
+  "/api/projects/:projectId/export",
+  isAuthenticated,
+  async (req, res) => {
+    try {
+      const projectId = req.params.projectId;
+      const project = await Project.findById(projectId).lean();
+      const buildingElements = await BuildingElement.find({ projectId }).lean();
 
-    if (!project || buildingElements.length === 0) {
-      return res
-        .status(404)
-        .send("Project not found or no building elements available");
-    }
+      if (!project || buildingElements.length === 0) {
+        return res
+          .status(404)
+          .send("Project not found or no building elements available");
+      }
 
-    // Create a new workbook and add the LCA worksheet
-    const workbook = new ExcelJS.Workbook();
-    const worksheetLCA = workbook.addWorksheet("LCA");
+      // Create a new workbook and add the LCA worksheet
+      const workbook = new ExcelJS.Workbook();
+      const worksheetLCA = workbook.addWorksheet("LCA");
 
-    const now = new Date();
-    const formattedDate = now.toLocaleString("de-CH"); // Formatting as per Swiss locale
-    const timestamp = now
-      .toISOString()
-      .split("T")[1]
-      .replace(/:/g, "-")
-      .split(".")[0]; // HH-MM-SS format
+      const now = new Date();
+      const formattedDate = now.toLocaleString("de-CH"); // Formatting as per Swiss locale
+      const timestamp = now
+        .toISOString()
+        .split("T")[1]
+        .replace(/:/g, "-")
+        .split(".")[0]; // HH-MM-SS format
 
-    // Add column headers in the LCA sheet (row 1)
-    worksheetLCA.columns = [
-      { header: "GUID", key: "guid", width: 20 },
-      { header: "IfcClass", key: "ifc_class", width: 15 },
-      { header: "Name", key: "instance_name", width: 30 },
-      { header: "Building-Storey", key: "building_storey", width: 20 },
-      { header: "Load-bearing", key: "is_loadbearing", width: 15 },
-      { header: "External", key: "is_external", width: 15 },
-      { header: "Volume", key: "volume", width: 15 },
-      { header: "Material", key: "name", width: 30 },
-      { header: "Matched Material", key: "matched_material", width: 30 },
-      { header: "Density (kg/m³)", key: "density", width: 20 },
-      { header: "Indicator (kg CO₂-eq/kg)", key: "indikator", width: 25 },
-      { header: "CO₂-eq (kg)", key: "total_co2", width: 20 },
-    ];
+      // Add column headers in the LCA sheet (row 1)
+      worksheetLCA.columns = [
+        { header: "GUID", key: "guid", width: 20 },
+        { header: "IfcClass", key: "ifc_class", width: 15 },
+        { header: "Name", key: "instance_name", width: 30 },
+        { header: "Building-Storey", key: "building_storey", width: 20 },
+        { header: "Load-bearing", key: "is_loadbearing", width: 15 },
+        { header: "External", key: "is_external", width: 15 },
+        { header: "Volume", key: "volume", width: 15 },
+        { header: "Material", key: "name", width: 30 },
+        { header: "Matched Material", key: "matched_material", width: 30 },
+        { header: "Density (kg/m³)", key: "density", width: 20 },
+        { header: "Indicator (kg CO₂-eq/kg)", key: "indikator", width: 25 },
+        { header: "CO₂-eq (kg)", key: "total_co2", width: 20 },
+      ];
 
-    // Add rows for each building element to the LCA sheet
-    buildingElements.forEach((element) => {
-      element.materials_info.forEach((material) => {
-        worksheetLCA.addRow({
-          guid: element.guid,
-          ifc_class: element.ifc_class,
-          instance_name: element.instance_name,
-          building_storey: element.building_storey,
-          is_loadbearing: element.is_loadbearing ? "Yes" : "No",
-          is_external: element.is_external ? "Yes" : "No",
-          volume: material.volume,
-          name: material.name,
-          matched_material: material.matched_material_name || "No Match",
-          density: material.density || 0,
-          indikator: material.indikator || 0,
-          total_co2: material.total_co2 || 0,
+      // Add rows for each building element to the LCA sheet
+      buildingElements.forEach((element) => {
+        element.materials_info.forEach((material) => {
+          worksheetLCA.addRow({
+            guid: element.guid,
+            ifc_class: element.ifc_class,
+            instance_name: element.instance_name,
+            building_storey: element.building_storey,
+            is_loadbearing: element.is_loadbearing ? "Yes" : "No",
+            is_external: element.is_external ? "Yes" : "No",
+            volume: material.volume,
+            name: material.name,
+            matched_material: material.matched_material_name || "No Match",
+            density: material.density || 0,
+            indikator: material.indikator || 0,
+            total_co2: material.total_co2 || 0,
+          });
         });
       });
-    });
 
-    // Create a second sheet called "Project Info" and add metadata
-    const worksheetProjectInfo = workbook.addWorksheet("Project Info");
+      // Create a second sheet called "Project Info" and add metadata
+      const worksheetProjectInfo = workbook.addWorksheet("Project Info");
 
-    worksheetProjectInfo.addRow([`Exported on: ${formattedDate}`]);
-    worksheetProjectInfo.addRow([
-      `Project Name: ${formatProjectNameForDisplay(project.name)}`,
-      `Project Description: ${project.description || "N/A"}`,
-      `Project Phase: ${project.phase || "N/A"}`,
-    ]);
+      worksheetProjectInfo.addRow([`Exported on: ${formattedDate}`]);
+      worksheetProjectInfo.addRow([
+        `Project Name: ${formatProjectNameForDisplay(project.name)}`,
+        `Project Description: ${project.description || "N/A"}`,
+        `Project Phase: ${project.phase || "N/A"}`,
+      ]);
 
-    worksheetProjectInfo.addRow([]); // Empty row for spacing, if needed
+      worksheetProjectInfo.addRow([]); // Empty row for spacing, if needed
 
-    // Set up the file name using the display name of the project and only the date
-    const fileNameDate = now.toISOString().split("T")[0]; // Only the date part
-    const fileName = `${formatProjectNameForDisplay(
-      project.name
-    )}_${fileNameDate}.xlsx`;
+      // Set up the file name using the display name of the project and only the date
+      const fileNameDate = now.toISOString().split("T")[0]; // Only the date part
+      const fileName = `${formatProjectNameForDisplay(
+        project.name
+      )}_${fileNameDate}.xlsx`;
 
-    res.setHeader("Content-Disposition", `attachment; filename=${fileName}`);
-    res.setHeader(
-      "Content-Type",
-      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-    );
+      res.setHeader("Content-Disposition", `attachment; filename=${fileName}`);
+      res.setHeader(
+        "Content-Type",
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+      );
 
-    // Write the workbook to the response
-    await workbook.xlsx.write(res);
-    res.end();
-  } catch (error) {
-    console.error("Error exporting project data:", error);
-    res.status(500).send("Error exporting project data");
+      // Write the workbook to the response
+      await workbook.xlsx.write(res);
+      res.end();
+    } catch (error) {
+      console.error("Error exporting project data:", error);
+      res.status(500).send("Error exporting project data");
+    }
   }
-});
+);
 
 // ------------------------------------------
 // API Routes: Graph data
@@ -1162,7 +1169,7 @@ router.get("/projects/:projectId/export", isAuthenticated, async (req, res) => {
 
 // Route to get CO₂-eq data per building storey
 router.get(
-  "/projects/:projectId/co2_per_storey",
+  "/api/projects/:projectId/co2_per_storey",
   isAuthenticated,
   async (req, res) => {
     try {
