@@ -447,35 +447,70 @@ router.get(
         });
       }
 
-      const scriptPath = path.join(__dirname, "..", "scripts", "export_ifc.py");
+      // Determine if this is production or preview based on environment variable
+      const environment = process.env.NODE_ENV || "production";
+
+      // Use different Python paths and script paths based on environment
+      const pythonPath = "/opt/miniconda3/bin/python";
+
+      // Set script path and working directory based on environment
+      const scriptPath =
+        environment === "production"
+          ? "/var/www/ifclca/IfcLCA/scripts/export_ifc.py"
+          : "/var/www/preview/scripts/export_ifc.py";
+
+      const workingDirectory =
+        environment === "production"
+          ? "/var/www/ifclca/IfcLCA"
+          : "/var/www/preview";
+
       const outputPath = path.join(
-        __dirname,
-        "..",
+        workingDirectory,
         "temp",
         `${project.name}_export.ifc`
       );
 
-      const pythonProcess = spawn("python", [
-        scriptPath,
-        projectId,
-        outputPath,
-      ]);
+      // Execute the Python script and wait for it to complete
+      await new Promise((resolve, reject) => {
+        const args = [scriptPath, projectId, outputPath];
 
-      pythonProcess.on("close", (code) => {
-        if (code !== 0) {
-          return res.status(500).send("Error exporting IFC file");
-        }
+        const subprocess = spawn(pythonPath, args, {
+          cwd: workingDirectory,
+        });
 
-        res.download(outputPath, `${project.name}_export.ifc`, (err) => {
-          if (err) {
-            console.error("Error sending file:", err);
+        subprocess.stdout.on("data", (data) => {
+          console.log(`stdout: ${data}`);
+        });
+
+        subprocess.stderr.on("data", (data) => {
+          console.error(`stderr: ${data}`);
+        });
+
+        subprocess.on("close", (code) => {
+          if (code !== 0) {
+            return reject(new Error(`Python script exited with code ${code}`));
           }
-          // Delete the temporary export file after sending
-          fs.unlink(outputPath, (unlinkErr) => {
-            if (unlinkErr) {
-              console.error("Error deleting temporary file:", unlinkErr);
-            }
+          resolve();
+        });
+      });
+
+      res.download(outputPath, `${project.name}_export.ifc`, (err) => {
+        if (err) {
+          console.error("Error sending file:", err);
+          return res.status(500).render("error", {
+            message: "Error sending IFC file",
+            error: {
+              status: 500,
+              stack: "An error occurred while sending the IFC file.",
+            },
+            projectId: projectId,
           });
+        }
+        // Delete the temporary export file after sending
+        fs.unlink(outputPath, (unlinkErr) => {
+          if (unlinkErr) {
+            console.error("Error deleting temporary file:", unlinkErr);
+          }
         });
       });
     } catch (error) {

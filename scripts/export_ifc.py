@@ -1,3 +1,5 @@
+#!/opt/miniconda3/bin/python
+
 import sys
 import ifcopenshell
 from pymongo import MongoClient
