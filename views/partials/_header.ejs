@@ -45,14 +45,37 @@
         <% if (typeof page !== 'undefined' && page === 'projectHome' && project)
         { %>
         <li class="nav-item me-2">
-          <a
-            href="/api/projects/<%= project._id %>/export"
-            class="btn btn-success"
-            data-bs-toggle="tooltip"
-            title="Download table as Excel file"
-          >
-            <strong>Export</strong>
-          </a>
+          <div class="dropdown">
+            <button
+              class="btn btn-success dropdown-toggle"
+              type="button"
+              id="exportDropdown"
+              data-bs-toggle="dropdown"
+              aria-expanded="false"
+            >
+              <strong>Export</strong>
+            </button>
+            <ul class="dropdown-menu" aria-labelledby="exportDropdown">
+              <li>
+                <a
+                  class="dropdown-item"
+                  href="/api/projects/<%= project._id %>/export"
+                  data-bs-toggle="tooltip"
+                  title="Download table as Excel file"
+                  >Excel</a
+                >
+              </li>
+              <li>
+                <a
+                  class="dropdown-item"
+                  href="/api/projects/<%= project._id %>/export-ifc"
+                  data-bs-toggle="tooltip"
+                  title="Export project as IFC file"
+                  >IFC</a
+                >
+              </li>
+            </ul>
+          </div>
         </li>
         <li class="nav-item">
           <button
@@ -101,3 +124,20 @@
     </div>
   </div>
 </nav>
+<!-- Bootstrap JS -->
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+
+<!-- Initialize Bootstrap components -->
+<script>
+  document.addEventListener("DOMContentLoaded", function () {
+    var dropdowns = document.querySelectorAll(".dropdown-toggle");
+    dropdowns.forEach(function (dropdown) {
+      new bootstrap.Dropdown(dropdown);
+    });
+
+    var tooltips = document.querySelectorAll('[data-bs-toggle="tooltip"]');
+    tooltips.forEach(function (tooltip) {
+      new bootstrap.Tooltip(tooltip);
+    });
+  });
+</script>

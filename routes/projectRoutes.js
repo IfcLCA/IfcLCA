@@ -21,8 +21,35 @@ const {
 } = require("../utils/util");
 const { isNaN } = require("lodash");
 const { route } = require("./authRoutes");
+const cron = require("node-cron");
 
 const UPLOADS_DIR = path.resolve(__dirname, "../uploads"); // Define the safe root directory for uploads
+
+// Deleting all uploaded Ifc after 24 hours
+async function cleanupOldIFCFiles() {
+  const uploadsDir = path.join(__dirname, "..", "uploads");
+  const now = Date.now();
+  const oneDay = 24 * 60 * 60 * 1000; // 24 hours in milliseconds
+
+  try {
+    const files = await fs.readdir(uploadsDir);
+    for (const file of files) {
+      const filePath = path.join(uploadsDir, file);
+      const stats = await fs.stat(filePath);
+      if (now - stats.mtime.getTime() > oneDay) {
+        await fs.unlink(filePath);
+        console.log(`Deleted old IFC file: ${file}`);
+      }
+    }
+  } catch (error) {
+    console.error("Error cleaning up old IFC files:", error);
+  }
+}
+
+// Schedule the cleanup task to run daily at midnight
+cron.schedule("0 0 * * *", () => {
+  cleanupOldIFCFiles();
+});
 
 // ------------------------------------------
 // Static Routes
@@ -227,8 +254,22 @@ router.post(
     }
 
     const filePath = req.file.path;
+    const userId = req.session.userId;
 
     try {
+      // Create a user-specific directory for IFC files
+      const userDir = path.join(__dirname, "..", "uploads", userId);
+      await fs.mkdir(userDir, { recursive: true });
+
+      // Move the uploaded file to the user-specific directory
+      const newFilePath = path.join(userDir, `${projectId}.ifc`);
+      await fs.rename(filePath, newFilePath);
+
+      // Update the project document with the new file path
+      await Project.findByIdAndUpdate(projectId, {
+        ifc_file_path: newFilePath,
+      });
+
       // Ensure no old elements for the project
       await BuildingElement.deleteMany({ projectId });
 
@@ -365,14 +406,89 @@ router.post(
 
       // Redirect to the project page or send a response to the client
       res.redirect(`/projects/${projectId}`);
-
-      // Remove the uploaded file after processing
-      await safeUnlink(filePath);
     } catch (error) {
-      // Remove the uploaded file if there's an error
-      await safeUnlink(filePath);
       console.error("Error handling IFC upload:", error);
       res.status(500).json({ error: error.message });
+    }
+  }
+);
+
+// IFC export
+router.get(
+  "/api/projects/:projectId/export-ifc",
+  isAuthenticated,
+  async (req, res) => {
+    try {
+      const projectId = req.params.projectId;
+      const project = await Project.findById(projectId);
+
+      if (!project) {
+        return res.status(404).render("error", {
+          message: "Project not found",
+          error: {
+            status: 404,
+            stack: "The requested project could not be found.",
+          },
+          projectId: projectId,
+        });
+      }
+
+      if (!project.ifc_file_path || !fs.existsSync(project.ifc_file_path)) {
+        return res.status(404).render("error", {
+          message: "IFC file not found",
+          error: {
+            status: 404,
+            stack:
+              "The original IFC file for this project is no longer available. " +
+              "Please note that we only retain uploaded IFC files for 24 hours during Beta. " +
+              "If you need to export the IFC file, please re-upload it to the project.",
+          },
+          projectId: projectId,
+        });
+      }
+
+      const scriptPath = path.join(__dirname, "..", "scripts", "export_ifc.py");
+      const outputPath = path.join(
+        __dirname,
+        "..",
+        "temp",
+        `${project.name}_export.ifc`
+      );
+
+      const pythonProcess = spawn("python", [
+        scriptPath,
+        projectId,
+        outputPath,
+      ]);
+
+      pythonProcess.on("close", (code) => {
+        if (code !== 0) {
+          return res.status(500).send("Error exporting IFC file");
+        }
+
+        res.download(outputPath, `${project.name}_export.ifc`, (err) => {
+          if (err) {
+            console.error("Error sending file:", err);
+          }
+          // Delete the temporary export file after sending
+          fs.unlink(outputPath, (unlinkErr) => {
+            if (unlinkErr) {
+              console.error("Error deleting temporary file:", unlinkErr);
+            }
+          });
+        });
+      });
+    } catch (error) {
+      console.error("Error exporting IFC data:", error);
+      res.status(500).render("error", {
+        message: "Error exporting IFC data",
+        error: {
+          status: 500,
+          stack:
+            "An unexpected error occurred. Please try again later or contact support if the problem persists.",
+        },
+        projectId: req.params.projectId,
+      });
     }
   }
 );
