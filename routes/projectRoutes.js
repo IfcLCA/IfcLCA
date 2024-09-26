@@ -257,18 +257,28 @@ router.post(
     const userId = req.session.userId;
 
     try {
-      // Create a user-specific directory for IFC files
-      const userDir = path.join(__dirname, "..", "uploads", userId);
-      await fs.mkdir(userDir, { recursive: true });
+      // Create a filename with user ID and project ID
+      const newFileName = `${userId}_${projectId}.ifc`;
+      const newFilePath = path.join(__dirname, "..", "uploads", newFileName);
 
-      // Move the uploaded file to the user-specific directory
-      const newFilePath = path.join(userDir, `${projectId}.ifc`);
+      // Move the uploaded file to the new location
       await fs.rename(filePath, newFilePath);
 
       // Update the project document with the new file path
-      await Project.findByIdAndUpdate(projectId, {
-        ifc_file_path: newFilePath,
-      });
+      const updatedProject = await Project.findByIdAndUpdate(
+        projectId,
+        { ifc_file_path: newFilePath },
+        { new: true }
+      );
+
+      if (!updatedProject) {
+        throw new Error("Failed to update project with IFC file path");
+      }
+
+      console.log(
+        "Updated project IFC file path:",
+        updatedProject.ifc_file_path
+      );
 
       // Ensure no old elements for the project
       await BuildingElement.deleteMany({ projectId });
@@ -457,6 +467,7 @@ router.get(
           projectId: projectId,
         });
       }
+
       // Determine if this is production or preview based on environment variable
       const environment = process.env.NODE_ENV || "production";
 
@@ -477,12 +488,12 @@ router.get(
       const outputPath = path.join(
         workingDirectory,
         "temp",
-        `${project.name}_export.ifc`
+        `${project.user}_${projectId}_export.ifc`
       );
 
       // Execute the Python script and wait for it to complete
       await new Promise((resolve, reject) => {
-        const args = [scriptPath, projectId, outputPath];
+        const args = [scriptPath, project.ifc_file_path, outputPath];
 
         const subprocess = spawn(pythonPath, args, {
           cwd: workingDirectory,
@@ -538,6 +549,7 @@ router.get(
     }
   }
 );
+
 // ------------------------------------------
 // API Routes: Project Management
 // ------------------------------------------
