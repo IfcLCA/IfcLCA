@@ -17,6 +17,7 @@ const projectSchema = new mongoose.Schema({
       ref: "BuildingElement",
     },
   ],
+  ifc_file_path: String,
 });
 
 projectSchema.pre("save", function (next) {

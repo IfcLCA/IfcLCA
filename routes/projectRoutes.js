@@ -433,20 +433,30 @@ router.get(
         });
       }
 
-      if (!project.ifc_file_path || !fs.existsSync(project.ifc_file_path)) {
+      if (!project.ifc_file_path) {
+        return res.status(404).render("error", {
+          message: "IFC file path not found",
+          error: {
+            status: 404,
+            stack: "The IFC file path is not set for this project.",
+          },
+          projectId: projectId,
+        });
+      }
+
+      if (!fs.existsSync(project.ifc_file_path)) {
         return res.status(404).render("error", {
           message: "IFC file not found",
           error: {
             status: 404,
             stack:
-              "The original IFC file for this project is no longer available. " +
+              `The IFC file does not exist at the specified path: ${project.ifc_file_path}. ` +
               "Please note that we only retain uploaded IFC files for 24 hours during Beta. " +
               "If you need to export the IFC file, please re-upload it to the project.",
           },
           projectId: projectId,
         });
       }
-
       // Determine if this is production or preview based on environment variable
       const environment = process.env.NODE_ENV || "production";
 
@@ -520,14 +530,14 @@ router.get(
         error: {
           status: 500,
           stack:
-            "An unexpected error occurred. Please try again later or contact support if the problem persists.",
+            `An unexpected error occurred: ${error.message}. ` +
+            "Please try again later or contact support if the problem persists.",
         },
         projectId: req.params.projectId,
       });
     }
   }
 );
-
 // ------------------------------------------
 // API Routes: Project Management
 // ------------------------------------------
@@ -635,6 +645,7 @@ router.get("/projects/:projectId", isAuthenticated, async (req, res) => {
       project: { ...project.toObject(), co2PerSquareMeter },
       materialsInfo,
       formatProjectNameForDisplay,
+      hasIFCFile: !!project.ifc_file_path,
     });
   } catch (error) {
     console.error("Error fetching project details:", error);
