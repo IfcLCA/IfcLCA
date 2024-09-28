@@ -6,10 +6,11 @@ import ifcopenshell.util.element
 import ifcopenshell.util.shape
 import os
 from concurrent.futures import ThreadPoolExecutor
-from pymongo import MongoClient
+from motor.motor_asyncio import AsyncIOMotorClient
 from dotenv import load_dotenv
 from bson import ObjectId
 import multiprocessing
+import asyncio
 
 from ifcopenshell.util.unit import calculate_unit_scale
 
@@ -259,8 +260,8 @@ def process_batch(model, batch, file_path, user_id, session_id, projectId, unit_
         return list(executor.map(lambda e: process_element(model, e, file_path, user_id, session_id, projectId, unit_scale_to_mm), batch))
 
 # Main function to process the entire IFC file
-def main(file_path, projectId):
-    client = MongoClient(os.getenv("DATABASE_URL"), maxPoolSize=500)
+async def main(file_path, projectId):
+    client = AsyncIOMotorClient(os.getenv("DATABASE_URL"), maxPoolSize=500)
     db = client["IfcLCAdata_01"]
     collection = db["building_elements"]
 
@@ -281,12 +282,12 @@ def main(file_path, projectId):
         batch_count += 1
 
         if batch_count % 5 == 0 and bulk_ops:
-            collection.insert_many(bulk_ops)
+            await collection.insert_many(bulk_ops)
             print(f"Inserted batch {batch_count} into MongoDB.")
             bulk_ops.clear()
 
     if bulk_ops:
-        collection.insert_many(bulk_ops)
+        await collection.insert_many(bulk_ops)
         print(f"Inserted final batch {batch_count} into MongoDB.")
 
     print("Processing complete.")
@@ -299,4 +300,4 @@ if __name__ == "__main__":
 
     file_path = sys.argv[1]
     projectId = sys.argv[2]
-    main(file_path, projectId)
+    asyncio.run(main(file_path, projectId))
