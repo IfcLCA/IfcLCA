@@ -32,40 +32,43 @@ def export_to_ifc(project_id, output_path):
     # Fetch building elements
     elements = db.building_elements.find({'projectId': ObjectId(project_id)})
 
-    # Create a property set for our custom data
-    pset_name = "Pset_IfcLCA_Results"
-    pset = ifc_file.createIfcPropertySet(
-        ifcopenshell.guid.new(),
-        pset_name,
-        None,
-        None,
-        []
-    )
-
     for element in elements:
         # Find the corresponding IFC element
         ifc_element = ifc_file.by_guid(element['guid'])
         if ifc_element:
-            # Create properties for each piece of data we want to add
+            # Create a property set for this element
+            pset_name = "Pset_IfcLCA_Results"
+            pset = ifc_file.createIfcPropertySet(
+                ifcopenshell.guid.new(),
+                None, pset_name, None, []
+            )
+
+            # Aggregate total CO2 per material name
+            materials = element.get('materials_info', [])
+            material_totals = {}
+            for material in materials:
+                name = material['name']
+                co2 = float(material.get('total_co2', 0))
+                material_totals[name] = material_totals.get(name, 0) + co2
+
             properties = []
-            for material in element.get('materials_info', []):
-                prop_name = f"Material_{material['name']}_CO2"
-                prop_value = material.get('total_co2', 0)
+            for material_name, total_co2 in material_totals.items():
+                prop_name = f"Material_{material_name}_CO2"
                 prop = ifc_file.createIfcPropertySingleValue(
                     prop_name, None, 
-                    ifc_file.create_entity("IfcReal", prop_value), None
+                    ifc_file.create_entity("IfcReal", total_co2), None
                 )
                 properties.append(prop)
 
             # Add total CO2 for the element
-            total_co2 = sum(m.get('total_co2', 0) for m in element.get('materials_info', []))
+            total_co2 = sum(material_totals.values())
             total_co2_prop = ifc_file.createIfcPropertySingleValue(
                 "Total_CO2", None, 
                 ifc_file.create_entity("IfcReal", total_co2), None
             )
             properties.append(total_co2_prop)
 
-            # Add properties to the property set
+            # Assign properties to the property set
             pset.HasProperties = properties
 
             # Assign the property set to the element
@@ -78,6 +81,7 @@ def export_to_ifc(project_id, output_path):
 
     # Write the updated IFC file
     ifc_file.write(output_path)
+
 
 if __name__ == "__main__":
     if len(sys.argv) != 3:

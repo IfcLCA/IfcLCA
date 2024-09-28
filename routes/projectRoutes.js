@@ -25,18 +25,18 @@ const cron = require("node-cron");
 
 const UPLOADS_DIR = path.resolve(__dirname, "../uploads"); // Define the safe root directory for uploads
 
-// Deleting all uploaded Ifc after 24 hours
+// Deleting all uploaded IFC after 1 hour
 async function cleanupOldIFCFiles() {
   const uploadsDir = path.join(__dirname, "..", "uploads");
   const now = Date.now();
-  const oneDay = 24 * 60 * 60 * 1000; // 24 hours in milliseconds
+  const oneHour = 60 * 60 * 1000; // 1 hour in milliseconds
 
   try {
     const files = await fs.readdir(uploadsDir);
     for (const file of files) {
       const filePath = path.join(uploadsDir, file);
       const stats = await fs.stat(filePath);
-      if (now - stats.mtime.getTime() > oneDay) {
+      if (now - stats.mtime.getTime() > oneHour) {
         await fs.unlink(filePath);
         console.log(`Deleted old IFC file: ${file}`);
       }
@@ -46,8 +46,8 @@ async function cleanupOldIFCFiles() {
   }
 }
 
-// Schedule the cleanup task to run daily at midnight
-cron.schedule("0 0 * * *", () => {
+// Schedule the cleanup task to run every 10 minutes
+cron.schedule("*/10 * * * *", () => {
   cleanupOldIFCFiles();
 });
 
@@ -424,6 +424,7 @@ router.post(
 );
 
 // IFC export
+// IFC export
 router.get(
   "/api/projects/:projectId/export-ifc",
   isAuthenticated,
@@ -466,7 +467,7 @@ router.get(
             status: 404,
             stack:
               `The IFC file does not exist at the specified path: ${project.ifc_file_path}. ` +
-              "Please note that we only retain uploaded IFC files for 24 hours during Beta. " +
+              "Please note that we only retain uploaded IFC files for 1 hour during Beta. " +
               "If you need to export the IFC file, please re-upload it to the project.",
           },
           projectId: projectId,
@@ -498,31 +499,33 @@ router.get(
 
       console.log("Executing Python script with args:", [
         scriptPath,
-        project.ifc_file_path,
+        projectId,
         outputPath,
       ]);
 
       // Execute the Python script and wait for it to complete
-      const args = [scriptPath, project.ifc_file_path, outputPath];
+      await new Promise((resolve, reject) => {
+        const args = [scriptPath, projectId, outputPath];
 
-      const subprocess = spawn(pythonPath, args, {
-        cwd: workingDirectory,
-      });
+        const subprocess = spawn(pythonPath, args, {
+          cwd: workingDirectory,
+        });
 
-      subprocess.stdout.on("data", (data) => {
-        console.log(`Python script stdout: ${data}`);
-      });
+        subprocess.stdout.on("data", (data) => {
+          console.log(`Python script stdout: ${data}`);
+        });
 
-      subprocess.stderr.on("data", (data) => {
-        console.error(`Python script stderr: ${data}`);
-      });
+        subprocess.stderr.on("data", (data) => {
+          console.error(`Python script stderr: ${data}`);
+        });
 
-      subprocess.on("close", (code) => {
-        console.log(`Python script exited with code ${code}`);
-        if (code !== 0) {
-          return reject(new Error(`Python script exited with code ${code}`));
-        }
-        resolve();
+        subprocess.on("close", (code) => {
+          console.log(`Python script exited with code ${code}`);
+          if (code !== 0) {
+            return reject(new Error(`Python script exited with code ${code}`));
+          }
+          resolve();
+        });
       });
 
       res.download(outputPath, `${project.name}_export.ifc`, (err) => {
