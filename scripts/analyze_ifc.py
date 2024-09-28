@@ -192,8 +192,8 @@ def get_layer_volumes_and_materials(model, element, total_volume, unit_scale_to_
 
     return material_layers_volumes, material_layers_names, material_layers_fractions
 
-# Process each IFC element to extract data (runs async)
-async def process_element(model, element, file_path, user_id, session_id, projectId, unit_scale_to_mm):
+# Process each IFC element to extract data 
+def process_element(model, element, file_path, user_id, session_id, projectId, unit_scale_to_mm):
     # Try to get volume from properties or BaseQuantities
     volume = get_volume_from_properties(element)
     if volume is None:
@@ -254,50 +254,32 @@ async def process_element(model, element, file_path, user_id, session_id, projec
 
     return element_data
 
-# Main function to process each batch of elements asynchronously
-async def process_batch(model, batch, file_path, user_id, session_id, projectId, unit_scale_to_mm):
-    tasks = [process_element(model, element, file_path, user_id, session_id, projectId, unit_scale_to_mm) for element in batch]
-    return await asyncio.gather(*tasks)
 
 # Main function to process the entire IFC file
-async def main(file_path, projectId):
+def main(file_path, projectId):
     client = AsyncIOMotorClient(os.getenv("DATABASE_URL"), maxPoolSize=500)
     db = client["IfcLCAdata_01"]
     collection = db["building_elements"]
 
     model = open_ifc_file(file_path)
 
-    # Calculate the unit scale for length units to millimeters
-    unit_scale_to_mm = calculate_unit_scale(model) * 1000.0
-
-    # Mock data for user_id and session_id
-    user_id = "example_user_id"
-    session_id = "example_session_id"
-
     # Initialize variables for batch processing
-    bulk_ops = []  # Initialize the list for bulk MongoDB operations
-    batch_count = 0  # Initialize the batch counter
+    batch_size = 500
+    bulk_ops = []
 
     # Process each batch of IFC elements
-    for batch in load_ifc_data_in_batches(model, batch_size=500):
-        # Process the elements in the batch asynchronously
-        processed_elements = await process_batch(model, batch, file_path, user_id, session_id, projectId, unit_scale_to_mm)
+    for batch in load_ifc_data_in_batches(model, batch_size=batch_size):
+        processed_elements = [process_element(model, element, file_path, projectId) for element in batch]
+        processed_elements = [elem for elem in processed_elements if elem is not None]
+        if processed_elements:
+            bulk_ops.extend(processed_elements)
 
-        # Append the processed elements to bulk operations
-        bulk_ops.extend(processed_elements)
-        batch_count += 1
-
-        # Insert the accumulated bulk operations into MongoDB every 5 batches
-        if batch_count % 5 == 0 and bulk_ops:
-            await collection.insert_many(bulk_ops)
-            print(f"Inserted batch {batch_count} into MongoDB.")
-            bulk_ops.clear()  # Clear the bulk operations after insertion
-
-    # Insert any remaining operations after the loop ends
+    # Insert all processed elements into MongoDB
     if bulk_ops:
-        await collection.insert_many(bulk_ops)
-        print(f"Inserted final batch {batch_count} into MongoDB.")
+        asyncio.run(collection.insert_many(bulk_ops))
+        print(f"Inserted {len(bulk_ops)} elements into MongoDB.")
 
+    client.close()
     print("Processing complete.")
 
 # Script entry point
@@ -308,4 +290,4 @@ if __name__ == "__main__":
 
     file_path = sys.argv[1]
     projectId = sys.argv[2]
-    asyncio.run(main(file_path, projectId))
+    main(file_path, projectId)
