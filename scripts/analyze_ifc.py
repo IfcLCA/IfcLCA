@@ -5,12 +5,12 @@ import ifcopenshell
 import ifcopenshell.util.element
 import ifcopenshell.util.shape
 import os
-import asyncio
 from concurrent.futures import ThreadPoolExecutor
 from motor.motor_asyncio import AsyncIOMotorClient
 from dotenv import load_dotenv
 from bson import ObjectId
 import multiprocessing
+import asyncio
 
 from ifcopenshell.util.unit import calculate_unit_scale
 
@@ -192,8 +192,8 @@ def get_layer_volumes_and_materials(model, element, total_volume, unit_scale_to_
 
     return material_layers_volumes, material_layers_names, material_layers_fractions
 
-# Process each IFC element to extract data (runs async)
-async def process_element(model, element, file_path, user_id, session_id, projectId, unit_scale_to_mm):
+# Process each IFC element to extract data
+def process_element(model, element, file_path, user_id, session_id, projectId, unit_scale_to_mm):
     # Try to get volume from properties or BaseQuantities
     volume = get_volume_from_properties(element)
     if volume is None:
@@ -254,10 +254,10 @@ async def process_element(model, element, file_path, user_id, session_id, projec
 
     return element_data
 
-# Main function to process each batch of elements asynchronously
-async def process_batch(model, batch, file_path, user_id, session_id, projectId, unit_scale_to_mm):
-    tasks = [process_element(model, element, file_path, user_id, session_id, projectId, unit_scale_to_mm) for element in batch]
-    return await asyncio.gather(*tasks)
+# Main function to process each batch of elements
+def process_batch(model, batch, file_path, user_id, session_id, projectId, unit_scale_to_mm):
+    with ThreadPoolExecutor(max_workers=multiprocessing.cpu_count()) as executor:
+        return list(executor.map(lambda e: process_element(model, e, file_path, user_id, session_id, projectId, unit_scale_to_mm), batch))
 
 # Main function to process the entire IFC file
 async def main(file_path, projectId):
@@ -267,33 +267,25 @@ async def main(file_path, projectId):
 
     model = open_ifc_file(file_path)
 
-    # Calculate the unit scale for length units to millimeters
     unit_scale_to_mm = calculate_unit_scale(model) * 1000.0
 
-    # Mock data for user_id and session_id
     user_id = "example_user_id"
     session_id = "example_session_id"
 
-    # Initialize variables for batch processing
-    bulk_ops = []  # Initialize the list for bulk MongoDB operations
-    batch_count = 0  # Initialize the batch counter
+    bulk_ops = []
+    batch_count = 0
 
-    # Process each batch of IFC elements
     for batch in load_ifc_data_in_batches(model, batch_size=500):
-        # Process the elements in the batch asynchronously
-        processed_elements = await process_batch(model, batch, file_path, user_id, session_id, projectId, unit_scale_to_mm)
+        processed_elements = process_batch(model, batch, file_path, user_id, session_id, projectId, unit_scale_to_mm)
 
-        # Append the processed elements to bulk operations
         bulk_ops.extend(processed_elements)
         batch_count += 1
 
-        # Insert the accumulated bulk operations into MongoDB every 5 batches
         if batch_count % 5 == 0 and bulk_ops:
             await collection.insert_many(bulk_ops)
             print(f"Inserted batch {batch_count} into MongoDB.")
-            bulk_ops.clear()  # Clear the bulk operations after insertion
+            bulk_ops.clear()
 
-    # Insert any remaining operations after the loop ends
     if bulk_ops:
         await collection.insert_many(bulk_ops)
         print(f"Inserted final batch {batch_count} into MongoDB.")
