@@ -22,169 +22,238 @@
   <body>
     <%- include('partials/_header.ejs', { hasProjects: false }) %>
     <main role="main" class="container mt-4">
-      <div class="project-container">
-        <div class="details-container">
-          <h2 id="project-name">
-            <%= formatProjectNameForDisplay(project.name) %>
-          </h2>
-          <p>Phase: <%= project.phase %></p>
-          <p>Description: <%= project.description %></p>
-          <p>
-            Carbon Footprint:
-            <span id="carbonFootprint"
-              ><%= formatNumber(Math.round(project.totalCarbonFootprint) / 1000,
-              1) %> tons</span
-            >
-          </p>
-          <p>
-            m²:
-            <strong id="ebfPerM2"
-              ><%= formatNumber(project.EBF, 0) %> m²</strong
-            >
-          </p>
-          <p>
-            CO₂-eq / m²:
-            <strong id="co2PerM2"
-              ><%= formatNumber(project.co2PerSquareMeter, 1) %> kg</strong
-            >
-          </p>
-          <div class="editbtn-container">
-            <a
-              href="/projects/<%= project._id %>/edit"
-              id="btn-edit-project"
-              class="btn btn-primary"
+      <ul class="nav nav-tabs" id="projectTabs" role="tablist">
+        <li class="nav-item" role="presentation">
+          <a
+            class="nav-link active"
+            id="erstellung-tab"
+            data-bs-toggle="tab"
+            href="#erstellung"
+            role="tab"
+            aria-controls="erstellung"
+            aria-selected="true"
+            >Erstellung</a
+          >
+        </li>
+        <li class="nav-item" role="presentation">
+          <a
+            class="nav-link"
+            id="betrieb-tab"
+            data-bs-toggle="tab"
+            href="#betrieb"
+            role="tab"
+            aria-controls="betrieb"
+            aria-selected="false"
+            >Betrieb</a
+          >
+        </li>
+        <li class="nav-item" role="presentation">
+          <a
+            class="nav-link"
+            id="mobilitat-tab"
+            data-bs-toggle="tab"
+            href="#mobilitat"
+            role="tab"
+            aria-controls="mobilitat"
+            aria-selected="false"
+            >Mobilität</a
+          >
+        </li>
+      </ul>
+      <div class="tab-content" id="projectTabsContent">
+        <div
+          class="tab-pane fade show active"
+          id="erstellung"
+          role="tabpanel"
+          aria-labelledby="erstellung-tab"
+        >
+          <div class="project-container">
+            <div class="details-container">
+              <h2 id="project-name">
+                <%= formatProjectNameForDisplay(project.name) %>
+              </h2>
+              <p>Phase: <%= project.phase %></p>
+              <p>Description: <%= project.description %></p>
+              <p>
+                Carbon Footprint:
+                <span id="carbonFootprint"
+                  ><%= formatNumber(Math.round(project.totalCarbonFootprint) / 1000,
+                  1) %> tons</span
+                >
+              </p>
+              <p>
+                m²:
+                <strong id="ebfPerM2"
+                  ><%= formatNumber(project.EBF, 0) %> m²</strong
+                >
+              </p>
+              <p>
+                CO₂-eq / m²:
+                <strong id="co2PerM2"
+                  ><%= formatNumber(project.co2PerSquareMeter, 1) %> kg</strong
+                >
+              </p>
+              <div class="editbtn-container">
+                <a
+                  href="/projects/<%= project._id %>/edit"
+                  id="btn-edit-project"
+                  class="btn btn-primary"
+                  data-toggle="tooltip"
+                  title="Change the project details"
+                  >Edit Project Details & Settings</a
+                >
+              </div>
+            </div>
+            <!-- Placing the bar chart next to the project details -->
+            <div class="chart-container">
+              <canvas id="co2Chart" width="auto"></canvas>
+            </div>
+          </div>
+
+          <!-- The bubble chart stays below -->
+          <div class="charts-container">
+            <div class="chart-container">
+              <canvas id="bubbleChart" width="auto"></canvas>
+            </div>
+          </div>
+          <div class="btn-container">
+            <button
+              id="btn-delete-material"
+              class="btn btn-secondary"
               data-toggle="tooltip"
-              title="Change the project details"
-              >Edit Project Details & Settings</a
+              title="Delete one or more rows from table"
             >
+              Delete
+            </button>
+            <a
+              href="/projects/<%= project._id %>/add-row"
+              id="btn-add-material"
+              class="btn btn-success"
+              data-toggle="tooltip"
+              title="Add new material from Eco-Database"
+              >Add Material</a
+            >
+            <!-- Added buttons for Apply Changes and Cancel with 10px gap -->
+            <div id="confirm-buttons" class="btn-row" style="display: none">
+              <button
+                id="btn-apply-delete"
+                class="btn btn-danger"
+                data-toggle="tooltip"
+                title="Apply the changes made"
+              >
+                Apply Changes
+              </button>
+              <button
+                id="btn-cancel"
+                class="btn btn-secondary"
+                data-toggle="tooltip"
+                title="Cancel the changes"
+                style="margin-left: 10px"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+
+          <div
+            id="elements-table-container"
+            style="position: relative; margin-bottom: 60px"
+          >
+            <div id="elements-table" class="mt-4"></div>
+            <div id="table-overlay" class="overlay">
+              <p>
+                Upload any <a href="#" id="upload-link">IFC file</a> to see data
+              </p>
+              <input
+                type="file"
+                id="hidden-file-input"
+                name="ifcFile"
+                style="display: none"
+                onchange="document.getElementById('ifcUploadForm').submit();"
+              />
+            </div>
+            <!-- Hidden file input and form shared with navbar -->
+            <form
+              id="ifcUploadForm"
+              action="/api/projects/<%= project._id %>/upload"
+              method="POST"
+              enctype="multipart/form-data"
+              style="display: none"
+            >
+              <input
+                type="file"
+                id="hiddenFileInput"
+                name="ifcFile"
+                onchange="this.form.submit();"
+                required
+              />
+            </form>
+          </div>
+          <!-- Notification for Invalid Densities -->
+          <div
+            id="invalid-density-notification"
+            style="
+              display: none;
+              position: fixed;
+              top: 50%;
+              left: 50%;
+              transform: translate(-50%, -50%);
+              background: #ffc;
+              border: 1px solid #ffa;
+              padding: 10px;
+              border-radius: 5px;
+              z-index: 1000;
+              box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+              font-size: 14px;
+              color: #a00;
+            "
+          >
+            <p>
+              Some density fields are invalid. Please check and enter valid values.
+            </p>
+          </div>
+          <div id="uploadMessage"></div>
+          <div
+            id="uploadProgressBar"
+            style="
+              display: none;
+              background: #e0e0e0;
+              height: 20px;
+              width: 100%;
+              position: relative;
+            "
+          >
+            <div style="background: #76c7c0; height: 100%; width: 100%"></div>
+          </div>
+          <div
+            id="uploadSpinner"
+            style="display: none; text-align: center; margin-top: 10px"
+          >
+            <i class="fa fa-spinner fa-spin" style="font-size: 24px"></i>
           </div>
         </div>
-        <!-- Placing the bar chart next to the project details -->
-        <div class="chart-container">
-          <canvas id="co2Chart" width="auto"></canvas>
-        </div>
-      </div>
-
-      <!-- The bubble chart stays below -->
-      <div class="charts-container">
-        <div class="chart-container">
-          <canvas id="bubbleChart" width="auto"></canvas>
-        </div>
-      </div>
-      <div class="btn-container">
-        <button
-          id="btn-delete-material"
-          class="btn btn-secondary"
-          data-toggle="tooltip"
-          title="Delete one or more rows from table"
+        <div
+          class="tab-pane fade"
+          id="betrieb"
+          role="tabpanel"
+          aria-labelledby="betrieb-tab"
         >
-          Delete
-        </button>
-        <a
-          href="/projects/<%= project._id %>/add-row"
-          id="btn-add-material"
-          class="btn btn-success"
-          data-toggle="tooltip"
-          title="Add new material from Eco-Database"
-          >Add Material</a
-        >
-        <!-- Added buttons for Apply Changes and Cancel with 10px gap -->
-        <div id="confirm-buttons" class="btn-row" style="display: none">
-          <button
-            id="btn-apply-delete"
-            class="btn btn-danger"
-            data-toggle="tooltip"
-            title="Apply the changes made"
-          >
-            Apply Changes
-          </button>
-          <button
-            id="btn-cancel"
-            class="btn btn-secondary"
-            data-toggle="tooltip"
-            title="Cancel the changes"
-            style="margin-left: 10px"
-          >
-            Cancel
-          </button>
+          <h3>Betrieb</h3>
+          <p>Zielwerte SIA: <%= project.zielwerteSIA %></p>
+          <p>Absolute Werte: <%= project.absoluteWerte %></p>
+          <!-- Add more content specific to Betrieb here -->
         </div>
-      </div>
-
-      <div
-        id="elements-table-container"
-        style="position: relative; margin-bottom: 60px"
-      >
-        <div id="elements-table" class="mt-4"></div>
-        <div id="table-overlay" class="overlay">
-          <p>
-            Upload any <a href="#" id="upload-link">IFC file</a> to see data
-          </p>
-          <input
-            type="file"
-            id="hidden-file-input"
-            name="ifcFile"
-            style="display: none"
-            onchange="document.getElementById('ifcUploadForm').submit();"
-          />
-        </div>
-        <!-- Hidden file input and form shared with navbar -->
-        <form
-          id="ifcUploadForm"
-          action="/api/projects/<%= project._id %>/upload"
-          method="POST"
-          enctype="multipart/form-data"
-          style="display: none"
+        <div
+          class="tab-pane fade"
+          id="mobilitat"
+          role="tabpanel"
+          aria-labelledby="mobilitat-tab"
         >
-          <input
-            type="file"
-            id="hiddenFileInput"
-            name="ifcFile"
-            onchange="this.form.submit();"
-            required
-          />
-        </form>
-      </div>
-      <!-- Notification for Invalid Densities -->
-      <div
-        id="invalid-density-notification"
-        style="
-          display: none;
-          position: fixed;
-          top: 50%;
-          left: 50%;
-          transform: translate(-50%, -50%);
-          background: #ffc;
-          border: 1px solid #ffa;
-          padding: 10px;
-          border-radius: 5px;
-          z-index: 1000;
-          box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
-          font-size: 14px;
-          color: #a00;
-        "
-      >
-        <p>
-          Some density fields are invalid. Please check and enter valid values.
-        </p>
-      </div>
-      <div id="uploadMessage"></div>
-      <div
-        id="uploadProgressBar"
-        style="
-          display: none;
-          background: #e0e0e0;
-          height: 20px;
-          width: 100%;
-          position: relative;
-        "
-      >
-        <div style="background: #76c7c0; height: 100%; width: 100%"></div>
-      </div>
-      <div
-        id="uploadSpinner"
-        style="display: none; text-align: center; margin-top: 10px"
-      >
-        <i class="fa fa-spinner fa-spin" style="font-size: 24px"></i>
+          <h3>Mobilität</h3>
+          <p>Zielwerte SIA: <%= project.zielwerteSIA %></p>
+          <p>Absolute Werte: <%= project.absoluteWerte %></p>
+          <!-- Add more content specific to Mobilität here -->
+        </div>
       </div>
     </main>
     <%- include('partials/_footer.ejs') %>
