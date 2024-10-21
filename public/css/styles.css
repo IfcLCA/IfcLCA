@@ -460,3 +460,8 @@ footer {
     flex-direction: column;
   }
 }
+
+/* P06ef */
+.tab-content {
+  padding: 20px;
+}
