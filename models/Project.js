@@ -74,6 +74,10 @@ projectSchema.methods.calculateTotalCarbonFootprint = async function () {
   }
 };
 
+projectSchema.methods.recalculateTotalCarbonFootprint = async function () {
+  await this.calculateTotalCarbonFootprint();
+};
+
 const Project = mongoose.model("Project", projectSchema);
 
 module.exports = Project;
