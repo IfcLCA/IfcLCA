@@ -5,7 +5,9 @@
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "build": "react-scripts build",
+    "start:react": "react-scripts start"
   },
   "keywords": [],
   "author": "",
@@ -31,6 +33,10 @@
     "moment": "^2.30.1",
     "mongoose": "^8.1.1",
     "multer": "^1.4.5-lts.1",
-    "nodemailer": "^6.9.13"
+    "nodemailer": "^6.9.13",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "react-router-dom": "^6.3.0",
+    "react-scripts": "5.0.1"
   }
 }
