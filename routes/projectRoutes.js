@@ -21,8 +21,9 @@ const {
 } = require("../utils/util");
 const { isNaN } = require("lodash");
 const { route } = require("./authRoutes");
-const Queue = require("bull");
-const ifcQueue = new Queue("ifc processing");
+const ifcQueue = require("../queue"); // Import the queue
+const redis = require("ioredis");
+const client = new redis();
 
 const UPLOADS_DIR = path.resolve(__dirname, "../uploads"); // Define the safe root directory for uploads
 
@@ -215,17 +216,6 @@ const upload = multer({
   },
 });
 
-// Process the queue
-ifcQueue.process(async (job) => {
-  const { filePath, projectId } = job.data;
-  await processIFCFile(filePath, projectId); // Your existing processing function
-});
-
-// Function to enqueue the task
-async function enqueueIFCTask(filePath, projectId) {
-  await ifcQueue.add({ filePath, projectId });
-}
-
 // POST endpoint for IFC file upload and initial material matching
 router.post(
   "/api/projects/:projectId/upload",
@@ -242,15 +232,13 @@ router.post(
     const filePath = req.file.path;
 
     try {
-      // Enqueue the task to process the IFC file
-      await enqueueIFCTask(filePath, projectId);
+      // Add the file processing task to the queue
+      await ifcQueue.add({ filePath, projectId });
 
-      // Respond to the user immediately
-      res.redirect(
-        `/projects/${projectId}?message=Processing started. You will be notified when complete.`
-      );
+      // Provide immediate feedback to the user
+      res.redirect(`/projects/${projectId}?status=processing`);
     } catch (error) {
-      console.error("Error handling IFC upload:", error);
+      console.error("Error adding job to queue:", error);
       res.status(500).json({ error: error.message });
     }
   }
@@ -902,6 +890,22 @@ router.get(
         message: "Error fetching CO₂-eq data per building storey",
         error: error.toString(),
       });
+    }
+  }
+);
+
+// GET endpoint for checking processing progress
+router.get(
+  "/api/projects/:projectId/progress",
+  isAuthenticated,
+  async (req, res) => {
+    const projectId = req.params.projectId;
+    try {
+      const progress = await client.get(`progress:${projectId}`);
+      res.json(progress || 0);
+    } catch (error) {
+      console.error("Error fetching progress:", error);
+      res.status(500).json({ error: "Error fetching progress" });
     }
   }
 );
