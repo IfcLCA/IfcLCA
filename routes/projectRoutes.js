@@ -21,6 +21,8 @@ const {
 } = require("../utils/util");
 const { isNaN } = require("lodash");
 const { route } = require("./authRoutes");
+const Queue = require("bull");
+const ifcQueue = new Queue("ifc processing");
 
 const UPLOADS_DIR = path.resolve(__dirname, "../uploads"); // Define the safe root directory for uploads
 
@@ -213,6 +215,17 @@ const upload = multer({
   },
 });
 
+// Process the queue
+ifcQueue.process(async (job) => {
+  const { filePath, projectId } = job.data;
+  await processIFCFile(filePath, projectId); // Your existing processing function
+});
+
+// Function to enqueue the task
+async function enqueueIFCTask(filePath, projectId) {
+  await ifcQueue.add({ filePath, projectId });
+}
+
 // POST endpoint for IFC file upload and initial material matching
 router.post(
   "/api/projects/:projectId/upload",
@@ -229,148 +242,14 @@ router.post(
     const filePath = req.file.path;
 
     try {
-      // Ensure no old elements for the project
-      await BuildingElement.deleteMany({ projectId });
+      // Enqueue the task to process the IFC file
+      await enqueueIFCTask(filePath, projectId);
 
-      // Determine if this is production or preview based on environment variable
-      const environment = process.env.NODE_ENV || "production"; // Fallback to production if NODE_ENV is not set
-
-      // Use different Python paths and script paths based on environment
-      const pythonPath = "/opt/miniconda3/bin/python"; // Assuming Python path stays the same for both
-
-      // Set script path and working directory based on environment
-      const scriptPath =
-        environment === "production"
-          ? "/var/www/ifclca/IfcLCA/scripts/analyze_ifc.py"
-          : "/var/www/preview/scripts/analyze_ifc.py"; // Update for preview path
-
-      const workingDirectory =
-        environment === "production"
-          ? "/var/www/ifclca/IfcLCA"
-          : "/var/www/preview"; // Update for preview working directory
-
-      // Execute the Python script and wait for it to complete
-      await new Promise((resolve, reject) => {
-        const args = [scriptPath, filePath, projectId];
-
-        const subprocess = spawn(pythonPath, args, {
-          cwd: workingDirectory, // Dynamically set the working directory
-        });
-
-        subprocess.stdout.on("data", (data) => {
-          console.log(`stdout: ${data}`);
-        });
-
-        subprocess.stderr.on("data", (data) => {
-          console.error(`stderr: ${data}`);
-        });
-
-        subprocess.on("close", (code) => {
-          if (code !== 0) {
-            return reject(new Error(`Python script exited with code ${code}`));
-          }
-          resolve(); // Resolve without passing stdoutData
-        });
-      });
-
-      // Fetch and process building elements
-      const buildingElements = await BuildingElement.find({ projectId }).lean();
-      const carbonMaterials = await CarbonMaterial.find({}).lean();
-      allMaterialsFuse = new Fuse(carbonMaterials, fuseOptions);
-
-      const bulkOps = []; // to collect bulk update operations
-
-      for (const element of buildingElements) {
-        if (!element.materials_info) {
-          console.warn(
-            `Building element ${element._id} has no materials_info. Initializing as empty array.`
-          );
-          element.materials_info = [];
-        }
-
-        for (const material of element.materials_info) {
-          material.buildingElementId = element._id;
-          const bestMatch = await findBestMatchForMaterial(
-            material,
-            carbonMaterials,
-            allMaterialsFuse
-          );
-          if (bestMatch) {
-            const density = parseDensity(
-              bestMatch["Rohdichte/ Flächenmasse"],
-              bestMatch.BAUMATERIALIEN
-            );
-            const indikator = parseTreibhausgasemissionen(
-              bestMatch["Treibhausgasemissionen, Total [kg CO2-eq]"],
-              bestMatch.BAUMATERIALIEN
-            );
-            const totalCO2eq = material.volume * density * indikator;
-
-            bulkOps.push({
-              updateOne: {
-                filter: {
-                  _id: element._id,
-                  "materials_info.materialId": material.materialId,
-                },
-                update: {
-                  $set: {
-                    "materials_info.$.matched_material_id": bestMatch._id,
-                    "materials_info.$.matched_material_name":
-                      bestMatch.BAUMATERIALIEN,
-                    "materials_info.$.density": density,
-                    "materials_info.$.indikator": indikator,
-                    "materials_info.$.total_co2": totalCO2eq.toFixed(3),
-                  },
-                },
-              },
-            });
-          } else {
-            bulkOps.push({
-              updateOne: {
-                filter: {
-                  _id: element._id,
-                  "materials_info.materialId": material.materialId,
-                },
-                update: {
-                  $set: {
-                    "materials_info.$.matched_material_name": "No Match",
-                  },
-                },
-              },
-            });
-          }
-        }
-      }
-
-      // Perform bulk update
-      if (bulkOps.length > 0) {
-        await BuildingElement.bulkWrite(bulkOps);
-      }
-
-      // Calculate total footprint for the project
-      const updatedElements = await BuildingElement.find({ projectId }).lean();
-      const totalFootprint = updatedElements.reduce((total, element) => {
-        if (!element.materials_info) return total; // Skip if no materials_info
-        return (
-          total +
-          element.materials_info.reduce((elementTotal, material) => {
-            return elementTotal + parseFloat(material.total_co2 || 0);
-          }, 0)
-        );
-      }, 0);
-
-      await Project.findByIdAndUpdate(projectId, {
-        totalCarbonFootprint: totalFootprint,
-      });
-
-      // Redirect to the project page or send a response to the client
-      res.redirect(`/projects/${projectId}`);
-
-      // Remove the uploaded file after processing
-      await safeUnlink(filePath);
+      // Respond to the user immediately
+      res.redirect(
+        `/projects/${projectId}?message=Processing started. You will be notified when complete.`
+      );
     } catch (error) {
-      // Remove the uploaded file if there's an error
-      await safeUnlink(filePath);
       console.error("Error handling IFC upload:", error);
       res.status(500).json({ error: error.message });
     }
