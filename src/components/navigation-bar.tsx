@@ -36,6 +36,7 @@ import {
 } from "@/components/ui/navigation-menu";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { Breadcrumbs } from "@/components/breadcrumbs";
+import Image from "next/image";
 
 interface Project {
   id: string;
@@ -60,6 +61,13 @@ interface NavBarProps {
   user: User;
   notifications: Notification[];
 }
+
+// Temporary solution while waiting for logo
+const LogoPlaceholder = () => (
+  <div className="h-8 w-8 rounded-full bg-primary flex items-center justify-center text-primary-foreground font-bold overflow-hidden">
+    L
+  </div>
+);
 
 export function NavigationBar({
   currentProject,
@@ -91,8 +99,17 @@ export function NavigationBar({
   return (
     <nav className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
       <div className="container flex h-14 items-center">
-        <div className="mr-4 hidden md:flex">
+        <div className="mr-4 hidden md:flex pl-4">
           <Link className="mr-6 flex items-center space-x-2" href="/">
+            <div className="rounded-full overflow-hidden">
+              <Image
+                src="/logo.png"
+                alt="IfcLCA Logo"
+                width={32}
+                height={32}
+                className="h-8 w-8"
+              />
+            </div>
             <span className="hidden font-bold sm:inline-block">IfcLCA</span>
           </Link>
           <NavigationMenu>
