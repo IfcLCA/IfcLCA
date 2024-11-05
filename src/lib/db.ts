@@ -19,7 +19,10 @@ const getPrisma = () => {
   });
 
   const adapter = new PrismaNeon(pool);
-  const prisma = new PrismaClient({ adapter });
+  const prisma = new PrismaClient({
+    adapter,
+    log: ["query", "error", "warn"],
+  });
 
   if (process.env.NODE_ENV !== "production") {
     globalThis.prisma = prisma;

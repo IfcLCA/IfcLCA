@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
-import { getPrisma } from "@/lib/db";
+import { PrismaClient } from "@prisma/client";
+import { PrismaNeon } from "@prisma/adapter-neon";
+import { Pool } from "@neondatabase/serverless";
 
 export const runtime = "edge";
 
@@ -41,7 +43,10 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
-  let prisma;
+  const pool = new Pool({ connectionString: process.env.POSTGRES_PRISMA_URL });
+  const adapter = new PrismaNeon(pool);
+  const prisma = new PrismaClient({ adapter });
+
   try {
     const { name, description } = await request.json();
 
@@ -52,7 +57,6 @@ export async function POST(request: Request) {
       );
     }
 
-    prisma = getPrisma();
     const project = await prisma.project.create({
       data: {
         name,
@@ -76,8 +80,7 @@ export async function POST(request: Request) {
       { status: 500 }
     );
   } finally {
-    if (prisma) {
-      await prisma.$disconnect();
-    }
+    await prisma.$disconnect();
+    await pool.end();
   }
 }
