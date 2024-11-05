@@ -1,0 +1,241 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 0 0% 100%;
+    --foreground: 222.2 84% 4.9%;
+
+    --muted: 210 40% 96.1%;
+    --muted-foreground: 215.4 16.3% 46.9%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 222.2 84% 4.9%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 222.2 84% 4.9%;
+
+    --border: 214.3 31.8% 91.4%;
+    --input: 214.3 31.8% 91.4%;
+
+    --primary: 222.2 47.4% 11.2%;
+    --primary-foreground: 210 40% 98%;
+
+    --secondary: 210 40% 96.1%;
+    --secondary-foreground: 222.2 47.4% 11.2%;
+
+    --accent: 210 40% 96.1%;
+    --accent-foreground: 222.2 47.4% 11.2%;
+
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 210 40% 98%;
+
+    --ring: 215 20.2% 65.1%;
+
+    --radius: 0.5rem;
+  }
+
+  .dark {
+    --background: 222.2 84% 4.9%;
+    --foreground: 210 40% 98%;
+
+    --muted: 217.2 32.6% 17.5%;
+    --muted-foreground: 215 20.2% 65.1%;
+
+    --popover: 222.2 84% 4.9%;
+    --popover-foreground: 210 40% 98%;
+
+    --card: 222.2 84% 4.9%;
+    --card-foreground: 210 40% 98%;
+
+    --border: 217.2 32.6% 17.5%;
+    --input: 217.2 32.6% 17.5%;
+
+    --primary: 210 40% 98%;
+    --primary-foreground: 222.2 47.4% 11.2%;
+
+    --secondary: 217.2 32.6% 17.5%;
+    --secondary-foreground: 210 40% 98%;
+
+    --accent: 217.2 32.6% 17.5%;
+    --accent-foreground: 210 40% 98%;
+
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 0 85.7% 97.3%;
+
+    --ring: 217.2 32.6% 17.5%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+}
+
+/* Custom styles for IfcLCA application */
+
+@layer components {
+  .sidebar-nav {
+    @apply w-64 bg-gray-100 dark:bg-gray-800 h-full overflow-y-auto;
+  }
+
+  .sidebar-nav-item {
+    @apply flex items-center px-4 py-2 text-gray-700 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-700;
+  }
+
+  .sidebar-nav-item.active {
+    @apply bg-gray-200 dark:bg-gray-700;
+  }
+
+  .main-content {
+    @apply flex-1 p-8 overflow-y-auto;
+  }
+
+  .dashboard-card {
+    @apply bg-white dark:bg-gray-800 rounded-lg shadow-md p-6;
+  }
+
+  .dashboard-stat {
+    @apply text-3xl font-bold text-blue-600 dark:text-blue-400;
+  }
+
+  .project-card {
+    @apply bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 hover:shadow-lg transition-shadow duration-300;
+  }
+
+  .data-table {
+    @apply w-full border-collapse;
+  }
+
+  .data-table th,
+  .data-table td {
+    @apply border px-4 py-2 text-left;
+  }
+
+  .data-table th {
+    @apply bg-gray-100 dark:bg-gray-700 font-semibold;
+  }
+
+  .data-table tr:nth-child(even) {
+    @apply bg-gray-50 dark:bg-gray-900;
+  }
+
+  .button-primary {
+    @apply bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded;
+  }
+
+  .button-secondary {
+    @apply bg-gray-300 hover:bg-gray-400 text-gray-800 font-bold py-2 px-4 rounded;
+  }
+
+  .input-field {
+    @apply w-full px-3 py-2 text-gray-700 border rounded-lg focus:outline-none focus:border-blue-500;
+  }
+
+  .label {
+    @apply block text-gray-700 text-sm font-bold mb-2;
+  }
+
+  .modal {
+    @apply fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center;
+  }
+
+  .modal-content {
+    @apply bg-white dark:bg-gray-800 rounded-lg p-8 max-w-md w-full;
+  }
+
+  .viewer-container {
+    @apply w-full h-[calc(100vh-4rem)] relative;
+  }
+
+  .viewer-controls {
+    @apply absolute top-4 right-4 space-x-2;
+  }
+
+  .upload-history-item {
+    @apply flex items-center justify-between py-2 border-b;
+  }
+
+  .upload-history-item:last-child {
+    @apply border-b-0;
+  }
+
+  .material-library-item {
+    @apply flex items-center justify-between py-2 border-b;
+  }
+
+  .material-library-item:last-child {
+    @apply border-b-0;
+  }
+
+  .report-item {
+    @apply flex items-center justify-between py-2 border-b;
+  }
+
+  .report-item:last-child {
+    @apply border-b-0;
+  }
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .sidebar-nav {
+    @apply w-full;
+  }
+
+  .main-content {
+    @apply p-4;
+  }
+
+  .dashboard-card,
+  .project-card {
+    @apply p-4;
+  }
+}
+
+/* Animations */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.fade-in {
+  animation: fadeIn 0.3s ease-in-out;
+}
+
+/* Accessibility */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border-width: 0;
+}
+
+/* Print styles */
+@media print {
+  .no-print {
+    display: none;
+  }
+
+  body {
+    font-size: 12pt;
+  }
+
+  .page-break {
+    page-break-before: always;
+  }
+}
