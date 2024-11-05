@@ -5,17 +5,21 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "./ui/dialog";
 import { useDropzone } from "react-dropzone";
 import { Loader2, Upload } from "lucide-react";
 
+interface UploadModalProps {
+  projectId: string;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onUploadComplete?: () => void;
+  trigger: React.ReactNode;
+}
+
 export function UploadModal({
   projectId,
   open,
   onOpenChange,
   onUploadComplete,
-}: {
-  projectId: string;
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  onUploadComplete?: () => void;
-}) {
+  trigger,
+}: UploadModalProps) {
   const [isUploading, setIsUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 

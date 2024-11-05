@@ -18,12 +18,13 @@ const columns = [
   {
     accessorKey: "createdAt",
     header: "Upload Date",
-    cell: ({ row }) => new Date(row.original.createdAt).toLocaleDateString(),
+    cell: ({ row }: { row: { original: { createdAt: string } } }) =>
+      new Date(row.original.createdAt).toLocaleDateString(),
   },
   {
     accessorKey: "actions",
     header: "Actions",
-    cell: ({ row }) => (
+    cell: ({ row }: { row: any }) => (
       <div className="flex gap-2">
         <Button variant="ghost" size="sm">
           <FileDown className="h-4 w-4" />

@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/db";
+import { prisma, type PrismaClient } from "@/lib/db";
 
 export const runtime = "edge";
 export const maxDuration = 300; // 5 minutes
@@ -59,7 +59,7 @@ export async function POST(
     const { elements } = await response.json();
 
     // Store elements and materials in database
-    await prisma.$transaction(async (tx) => {
+    await prisma.$transaction(async (tx: PrismaClient) => {
       for (const element of elements) {
         const storedElement = await tx.element.create({
           data: {

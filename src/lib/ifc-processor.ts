@@ -43,6 +43,10 @@ export async function processIFCFile(fileBuffer: Buffer): Promise<any> {
       });
     });
   } catch (error) {
-    throw new Error(`Failed to process IFC file: ${error.message}`);
+    throw new Error(
+      `Failed to process IFC file: ${
+        error instanceof Error ? error.message : "Unknown error"
+      }`
+    );
   }
 }

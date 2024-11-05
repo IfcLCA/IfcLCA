@@ -3,6 +3,12 @@ import { SidebarNavigation } from "@/components/sidebar-navigation";
 import { ThemeProvider } from "@/components/theme-provider";
 import "@/styles/globals.css";
 
+interface Notification {
+  id: string;
+  message: string;
+  // ... other notification properties
+}
+
 export const metadata = {
   title: "IfcLCA",
   description: "LCA Analysis for IFC Models",
@@ -20,7 +26,7 @@ export default function RootLayout({
     avatar: "/avatars/user.png",
   };
 
-  const notifications = [];
+  const notifications: never[] = [];
 
   return (
     <html lang="en" suppressHydrationWarning>

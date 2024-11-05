@@ -1,5 +1,4 @@
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/db";
 
 // This endpoint should NOT use edge runtime
 export const runtime = "nodejs";
@@ -12,6 +11,7 @@ export async function POST(request: Request) {
     const buffer = Buffer.from(file, "base64");
 
     // Call Python script using spawn
+    const elements: any[] = [];
     // ... your existing Python processing code ...
 
     return NextResponse.json({ elements });

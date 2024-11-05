@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getPrisma } from "@/lib/db";
+import { prisma } from "@/lib/db";
 
 export const runtime = "edge";
 
@@ -8,7 +8,6 @@ export async function GET(
   { params }: { params: { id: string } }
 ) {
   try {
-    const prisma = getPrisma();
     const project = await prisma.project.findUnique({
       where: { id: params.id },
       include: {
@@ -63,7 +62,11 @@ export async function PATCH(
   } catch (error) {
     console.error("Failed to update project:", error);
 
-    if (error.code === "P2002") {
+    if (
+      error instanceof Error &&
+      typeof (error as any).code === "string" &&
+      (error as any).code === "P2002"
+    ) {
       return NextResponse.json(
         { error: "A project with this name already exists" },
         { status: 409 }

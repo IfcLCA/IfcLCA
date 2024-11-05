@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Plus } from "lucide-react";
 import { prisma } from "@/lib/db";
 import { UploadModal } from "@/components/upload-modal";
+import type { Element } from "@prisma/client/edge";
 
 // Define the columns configuration
 const columns = [
@@ -17,7 +18,8 @@ const columns = [
   {
     accessorKey: "volume",
     header: "Volume",
-    cell: ({ row }) => row.original.volume.toFixed(2),
+    cell: ({ row }: { row: { original: { volume: number } } }) =>
+      row.original.volume.toFixed(2),
   },
   {
     accessorKey: "buildingStorey",
@@ -32,14 +34,16 @@ async function getBuildingElements(projectId: string) {
       include: { materials: true },
     });
 
-    return elements.map((element) => ({
-      id: element.id,
-      name: element.name,
-      type: element.type,
-      material: element.materials[0]?.name || "Unknown",
-      volume: element.volume,
-      buildingStorey: element.buildingStorey,
-    }));
+    return elements.map(
+      (element: Element & { materials: Array<{ name: string }> }) => ({
+        id: element.id,
+        name: element.name,
+        type: element.type,
+        material: element.materials[0]?.name || "Unknown",
+        volume: element.volume,
+        buildingStorey: element.buildingStorey,
+      })
+    );
   } catch (error) {
     console.error("Failed to fetch building elements:", error);
     return [];

@@ -4,7 +4,12 @@ export default function HomePage() {
   // Fetch data for the dashboard
   const dashboardData = {
     recentProjects: [],
-    statistics: {},
+    statistics: {
+      totalProjects: 0,
+      activeProjects: 0,
+      totalCO2Savings: 0,
+      recentActivities: 0,
+    },
     activities: [],
   };
 

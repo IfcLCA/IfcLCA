@@ -41,7 +41,9 @@ export default function ProjectPage() {
         const data = await response.json();
         setProject(data);
       } catch (err) {
-        setError(err.message);
+        setError(
+          err instanceof Error ? err.message : "An unknown error occurred"
+        );
       } finally {
         setIsLoading(false);
       }

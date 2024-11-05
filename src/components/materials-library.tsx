@@ -123,7 +123,7 @@ export function MaterialsLibrary() {
     ) {
       setMaterials([
         ...materials,
-        { id: Date.now().toString(), ...(newMaterial as Material) },
+        { ...newMaterial, id: Date.now().toString() } as Material,
       ]);
       setNewMaterial({});
       setIsAddDialogOpen(false);
