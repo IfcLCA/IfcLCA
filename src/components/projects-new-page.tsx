@@ -142,7 +142,8 @@ export function ProjectNewPage() {
       console.error("Failed to create project:", error);
       toast({
         title: "Error",
-        description: error.message || "Failed to create project",
+        description:
+          error instanceof Error ? error.message : "Failed to create project",
         variant: "destructive",
       });
     } finally {

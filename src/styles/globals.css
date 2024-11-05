@@ -5,66 +5,66 @@
 @layer base {
   :root {
     --background: 0 0% 100%;
-    --foreground: 222.2 84% 4.9%;
+    --foreground: 20 14.3% 4.1%;
 
-    --muted: 210 40% 96.1%;
-    --muted-foreground: 215.4 16.3% 46.9%;
+    --muted: 60 4.8% 95.9%;
+    --muted-foreground: 25 5.3% 44.7%;
 
     --popover: 0 0% 100%;
-    --popover-foreground: 222.2 84% 4.9%;
+    --popover-foreground: 20 14.3% 4.1%;
 
     --card: 0 0% 100%;
-    --card-foreground: 222.2 84% 4.9%;
+    --card-foreground: 20 14.3% 4.1%;
 
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
+    --border: 20 5.9% 90%;
+    --input: 20 5.9% 90%;
 
-    --primary: 222.2 47.4% 11.2%;
-    --primary-foreground: 210 40% 98%;
+    --primary: 24.6 95% 53.1%;
+    --primary-foreground: 60 9.1% 97.8%;
 
-    --secondary: 210 40% 96.1%;
-    --secondary-foreground: 222.2 47.4% 11.2%;
+    --secondary: 60 4.8% 95.9%;
+    --secondary-foreground: 24 9.8% 10%;
 
-    --accent: 210 40% 96.1%;
-    --accent-foreground: 222.2 47.4% 11.2%;
+    --accent: 24.6 95% 53.1%;
+    --accent-foreground: 60 9.1% 97.8%;
 
     --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 210 40% 98%;
+    --destructive-foreground: 60 9.1% 97.8%;
 
-    --ring: 215 20.2% 65.1%;
+    --ring: 24.6 95% 53.1%;
 
     --radius: 0.5rem;
   }
 
   .dark {
-    --background: 222.2 84% 4.9%;
-    --foreground: 210 40% 98%;
+    --background: 20 14.3% 4.1%;
+    --foreground: 60 9.1% 97.8%;
 
-    --muted: 217.2 32.6% 17.5%;
-    --muted-foreground: 215 20.2% 65.1%;
+    --muted: 12 6.5% 15.1%;
+    --muted-foreground: 24 5.4% 63.9%;
 
-    --popover: 222.2 84% 4.9%;
-    --popover-foreground: 210 40% 98%;
+    --popover: 20 14.3% 4.1%;
+    --popover-foreground: 60 9.1% 97.8%;
 
-    --card: 222.2 84% 4.9%;
-    --card-foreground: 210 40% 98%;
+    --card: 20 14.3% 4.1%;
+    --card-foreground: 60 9.1% 97.8%;
 
-    --border: 217.2 32.6% 17.5%;
-    --input: 217.2 32.6% 17.5%;
+    --border: 12 6.5% 15.1%;
+    --input: 12 6.5% 15.1%;
 
-    --primary: 210 40% 98%;
-    --primary-foreground: 222.2 47.4% 11.2%;
+    --primary: 20.5 90.2% 48.2%;
+    --primary-foreground: 60 9.1% 97.8%;
 
-    --secondary: 217.2 32.6% 17.5%;
-    --secondary-foreground: 210 40% 98%;
+    --secondary: 12 6.5% 15.1%;
+    --secondary-foreground: 60 9.1% 97.8%;
 
-    --accent: 217.2 32.6% 17.5%;
-    --accent-foreground: 210 40% 98%;
+    --accent: 20.5 90.2% 48.2%;
+    --accent-foreground: 60 9.1% 97.8%;
 
     --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 0 85.7% 97.3%;
+    --destructive-foreground: 60 9.1% 97.8%;
 
-    --ring: 217.2 32.6% 17.5%;
+    --ring: 20.5 90.2% 48.2%;
   }
 }
 
@@ -81,15 +81,15 @@
 
 @layer components {
   .sidebar-nav {
-    @apply w-64 bg-gray-100 dark:bg-gray-800 h-full overflow-y-auto;
+    @apply w-64 bg-secondary dark:bg-gray-800 h-full overflow-y-auto;
   }
 
   .sidebar-nav-item {
-    @apply flex items-center px-4 py-2 text-gray-700 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-700;
+    @apply flex items-center px-4 py-2 text-foreground dark:text-gray-200 hover:bg-accent hover:text-accent-foreground dark:hover:bg-orange-700;
   }
 
   .sidebar-nav-item.active {
-    @apply bg-gray-200 dark:bg-gray-700;
+    @apply bg-accent text-accent-foreground dark:bg-orange-700;
   }
 
   .main-content {
@@ -97,15 +97,15 @@
   }
 
   .dashboard-card {
-    @apply bg-white dark:bg-gray-800 rounded-lg shadow-md p-6;
+    @apply bg-card text-card-foreground dark:bg-gray-800 rounded-lg shadow-md p-6;
   }
 
   .dashboard-stat {
-    @apply text-3xl font-bold text-blue-600 dark:text-blue-400;
+    @apply text-3xl font-bold text-primary dark:text-orange-400;
   }
 
   .project-card {
-    @apply bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 hover:shadow-lg transition-shadow duration-300;
+    @apply bg-card text-card-foreground dark:bg-gray-800 rounded-lg shadow-md p-6 hover:shadow-lg transition-shadow duration-300;
   }
 
   .data-table {
@@ -118,27 +118,27 @@
   }
 
   .data-table th {
-    @apply bg-gray-100 dark:bg-gray-700 font-semibold;
+    @apply bg-muted dark:bg-gray-700 font-semibold;
   }
 
   .data-table tr:nth-child(even) {
-    @apply bg-gray-50 dark:bg-gray-900;
+    @apply bg-muted dark:bg-gray-900;
   }
 
   .button-primary {
-    @apply bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded;
+    @apply bg-primary hover:bg-primary/90 text-primary-foreground font-bold py-2 px-4 rounded;
   }
 
   .button-secondary {
-    @apply bg-gray-300 hover:bg-gray-400 text-gray-800 font-bold py-2 px-4 rounded;
+    @apply bg-secondary hover:bg-secondary/80 text-secondary-foreground font-bold py-2 px-4 rounded;
   }
 
   .input-field {
-    @apply w-full px-3 py-2 text-gray-700 border rounded-lg focus:outline-none focus:border-blue-500;
+    @apply w-full px-3 py-2 text-foreground bg-background border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary;
   }
 
   .label {
-    @apply block text-gray-700 text-sm font-bold mb-2;
+    @apply block text-foreground text-sm font-bold mb-2;
   }
 
   .modal {
@@ -146,7 +146,7 @@
   }
 
   .modal-content {
-    @apply bg-white dark:bg-gray-800 rounded-lg p-8 max-w-md w-full;
+    @apply bg-background dark:bg-gray-800 rounded-lg p-8 max-w-md w-full;
   }
 
   .viewer-container {

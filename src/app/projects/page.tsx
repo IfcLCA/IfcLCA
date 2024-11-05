@@ -10,17 +10,6 @@ export default function ProjectsPage() {
 
   return (
     <div>
-      <Button onClick={() => setIsUploadModalOpen(true)}>Upload IFC</Button>
-
-      <UploadModal
-        projectId="your-project-id"
-        open={isUploadModalOpen}
-        onOpenChange={setIsUploadModalOpen}
-        onUploadComplete={() => {
-          // Refresh project data or handle completion
-        }}
-      />
-
       <ProjectOverview />
     </div>
   );

@@ -113,12 +113,6 @@ export function SidebarNavigation({
       )}
     >
       <div className="flex h-[60px] items-center justify-between px-4">
-        <Link href="/" className="flex items-center space-x-2">
-          <BarChart3 className="h-6 w-6" />
-          {(!collapsed || mobile) && (
-            <span className="text-lg font-bold">IfcLCA</span>
-          )}
-        </Link>
         {mobile && (
           <Button variant="ghost" size="icon" onClick={() => setIsOpen(false)}>
             <X className="h-4 w-4" />
