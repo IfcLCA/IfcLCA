@@ -18,6 +18,8 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { Suspense } from "react";
+import { ErrorBoundary } from "react-error-boundary";
+import ErrorBoundaryComponent from "@/components/error-boundary";
 
 async function getProjectData(id: string) {
   // In a real application, you would fetch this data from your API

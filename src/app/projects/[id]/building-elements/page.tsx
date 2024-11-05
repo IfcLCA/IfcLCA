@@ -1,89 +1,50 @@
 import { DataTable } from "@/components/data-table";
 import { Button } from "@/components/ui/button";
 import { Plus } from "lucide-react";
+import { PrismaClient } from "@prisma/client";
+import { UploadModal } from "@/components/upload-modal";
 
-export default function BuildingElementsPage({
+async function getBuildingElements(projectId: string) {
+  const prisma = new PrismaClient();
+
+  const elements = await prisma.element.findMany({
+    where: { projectId },
+    include: { materials: true },
+  });
+
+  return elements.map((element) => ({
+    id: element.id,
+    name: element.name,
+    type: element.type,
+    material: element.materials[0]?.name || "Unknown",
+    volume: element.volume,
+    buildingStorey: element.buildingStorey,
+  }));
+}
+
+export default async function BuildingElementsPage({
   params,
 }: {
   params: { id: string };
 }) {
-  // In a real application, you would fetch this data from an API based on the project ID
-  const buildingElements = [
-    {
-      id: 1,
-      name: "External Wall",
-      type: "IfcWall",
-      material: "Concrete",
-      volume: 100,
-      unit: "m³",
-    },
-    {
-      id: 2,
-      name: "Internal Wall",
-      type: "IfcWall",
-      material: "Gypsum Board",
-      volume: 50,
-      unit: "m³",
-    },
-    {
-      id: 3,
-      name: "Floor Slab",
-      type: "IfcSlab",
-      material: "Reinforced Concrete",
-      volume: 200,
-      unit: "m³",
-    },
-    {
-      id: 4,
-      name: "Roof",
-      type: "IfcRoof",
-      material: "Steel",
-      volume: 75,
-      unit: "m³",
-    },
-    {
-      id: 5,
-      name: "Window",
-      type: "IfcWindow",
-      material: "Glass",
-      volume: 10,
-      unit: "m³",
-    },
-  ];
-
-  const columns = [
-    {
-      accessorKey: "name",
-      header: "Element Name",
-    },
-    {
-      accessorKey: "type",
-      header: "IFC Type",
-    },
-    {
-      accessorKey: "material",
-      header: "Material",
-    },
-    {
-      accessorKey: "volume",
-      header: "Volume",
-    },
-    {
-      accessorKey: "unit",
-      header: "Unit",
-    },
-  ];
+  const elements = await getBuildingElements(params.id);
 
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <h1 className="text-2xl font-bold">Building Elements</h1>
-        <Button>
-          <Plus className="mr-2 h-4 w-4" />
-          Add Custom Element
-        </Button>
+        <UploadModal
+          projectId={params.id}
+          onSuccess={() => {
+            // Refresh the page to show new elements
+            window.location.reload();
+          }}
+          onProgress={(progress) => {
+            console.log("Upload progress:", progress);
+          }}
+        />
       </div>
-      <DataTable columns={columns} data={buildingElements} />
+      <DataTable columns={columns} data={elements} />
       <div className="bg-muted p-4 rounded-lg">
         <h2 className="text-lg font-semibold mb-2">Element Information</h2>
         <p>

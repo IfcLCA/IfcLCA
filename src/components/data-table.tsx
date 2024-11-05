@@ -1,6 +1,6 @@
-"use client"
+"use client";
 
-import * as React from "react"
+import * as React from "react";
 import {
   ColumnDef,
   ColumnFiltersState,
@@ -12,11 +12,11 @@ import {
   getPaginationRowModel,
   getSortedRowModel,
   useReactTable,
-} from "@tanstack/react-table"
-import { ArrowUpDown, ChevronDown, MoreHorizontal } from "lucide-react"
+} from "@tanstack/react-table";
+import { ArrowUpDown, ChevronDown, MoreHorizontal } from "lucide-react";
 
-import { Button } from "@/components/ui/button"
-import { Checkbox } from "@/components/ui/checkbox"
+import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
@@ -25,8 +25,8 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
-import { Input } from "@/components/ui/input"
+} from "@/components/ui/dropdown-menu";
+import { Input } from "@/components/ui/input";
 import {
   Table,
   TableBody,
@@ -34,13 +34,13 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from "@/components/ui/table"
+} from "@/components/ui/table";
 
 interface DataTableProps<TData, TValue> {
-  columns: ColumnDef<TData, TValue>[]
-  data: TData[]
-  onRowSelectionChange?: (selectedRows: TData[]) => void
-  onExport?: () => void
+  columns: ColumnDef<TData, TValue>[];
+  data: TData[];
+  onRowSelectionChange?: (selectedRows: TData[]) => void;
+  onExport?: () => void;
 }
 
 export function DataTable<TData, TValue>({
@@ -49,10 +49,13 @@ export function DataTable<TData, TValue>({
   onRowSelectionChange,
   onExport,
 }: DataTableProps<TData, TValue>) {
-  const [sorting, setSorting] = React.useState<SortingState>([])
-  const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>([])
-  const [columnVisibility, setColumnVisibility] = React.useState<VisibilityState>({})
-  const [rowSelection, setRowSelection] = React.useState({})
+  const [sorting, setSorting] = React.useState<SortingState>([]);
+  const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>(
+    []
+  );
+  const [columnVisibility, setColumnVisibility] =
+    React.useState<VisibilityState>({});
+  const [rowSelection, setRowSelection] = React.useState({});
 
   const table = useReactTable({
     data,
@@ -71,14 +74,16 @@ export function DataTable<TData, TValue>({
       columnVisibility,
       rowSelection,
     },
-  })
+  });
 
   React.useEffect(() => {
     if (onRowSelectionChange) {
-      const selectedRows = table.getFilteredSelectedRowModel().rows.map(row => row.original)
-      onRowSelectionChange(selectedRows)
+      const selectedRows = table
+        .getFilteredSelectedRowModel()
+        .rows.map((row) => row.original);
+      onRowSelectionChange(selectedRows);
     }
-  }, [rowSelection, onRowSelectionChange, table])
+  }, [rowSelection, onRowSelectionChange, table]);
 
   return (
     <div className="w-full">
@@ -107,11 +112,13 @@ export function DataTable<TData, TValue>({
                     key={column.id}
                     className="capitalize"
                     checked={column.getIsVisible()}
-                    onCheckedChange={(value) => column.toggleVisibility(!!value)}
+                    onCheckedChange={(value) =>
+                      column.toggleVisibility(!!value)
+                    }
                   >
                     {column.id}
                   </DropdownMenuCheckboxItem>
-                )
+                );
               })}
           </DropdownMenuContent>
         </DropdownMenu>
@@ -136,7 +143,7 @@ export function DataTable<TData, TValue>({
                             header.getContext()
                           )}
                     </TableHead>
-                  )
+                  );
                 })}
               </TableRow>
             ))}
@@ -151,14 +158,20 @@ export function DataTable<TData, TValue>({
                 >
                   {row.getVisibleCells().map((cell) => (
                     <TableCell key={cell.id}>
-                      {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                      {flexRender(
+                        cell.column.columnDef.cell,
+                        cell.getContext()
+                      )}
                     </TableCell>
                   ))}
                 </TableRow>
               ))
             ) : (
               <TableRow>
-                <TableCell colSpan={columns.length} className="h-24 text-center">
+                <TableCell
+                  colSpan={columns.length}
+                  className="h-24 text-center"
+                >
                   No results.
                 </TableCell>
               </TableRow>
@@ -191,7 +204,7 @@ export function DataTable<TData, TValue>({
         </div>
       </div>
     </div>
-  )
+  );
 }
 
 // Example usage
@@ -227,14 +240,18 @@ export function DataTableExample() {
             Name
             <ArrowUpDown className="ml-2 h-4 w-4" />
           </Button>
-        )
+        );
       },
-      cell: ({ row }) => <div className="lowercase">{row.getValue("name")}</div>,
+      cell: ({ row }) => (
+        <div className="lowercase">{row.getValue("name")}</div>
+      ),
     },
     {
       accessorKey: "type",
       header: "Type",
-      cell: ({ row }) => <div className="capitalize">{row.getValue("type")}</div>,
+      cell: ({ row }) => (
+        <div className="capitalize">{row.getValue("type")}</div>
+      ),
     },
     {
       accessorKey: "status",
@@ -247,7 +264,7 @@ export function DataTableExample() {
       id: "actions",
       enableHiding: false,
       cell: ({ row }) => {
-        const item = row.original
+        const item = row.original;
 
         return (
           <DropdownMenu>
@@ -269,26 +286,26 @@ export function DataTableExample() {
               <DropdownMenuItem>Edit</DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
-        )
+        );
       },
     },
-  ]
+  ];
 
   const data = [
     { id: "1", name: "Element 1", type: "Wall", status: "Active" },
     { id: "2", name: "Element 2", type: "Floor", status: "Inactive" },
     { id: "3", name: "Element 3", type: "Roof", status: "Active" },
     // Add more data as needed
-  ]
+  ];
 
   const handleRowSelectionChange = (selectedRows: any[]) => {
-    console.log("Selected rows:", selectedRows)
-  }
+    console.log("Selected rows:", selectedRows);
+  };
 
   const handleExport = () => {
-    console.log("Exporting data...")
+    console.log("Exporting data...");
     // Implement export logic here
-  }
+  };
 
   return (
     <DataTable
@@ -297,5 +314,5 @@ export function DataTableExample() {
       onRowSelectionChange={handleRowSelectionChange}
       onExport={handleExport}
     />
-  )
+  );
 }

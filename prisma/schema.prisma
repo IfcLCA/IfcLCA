@@ -1,0 +1,54 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url = env("POSTGRES_PRISMA_URL")
+  directUrl = env("POSTGRES_URL_NON_POOLING") // uses a direct connection
+}
+
+model Project {
+  id          String    @id @default(cuid())
+  name        String
+  description String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  uploads     Upload[]
+  elements    Element[]
+}
+
+model Upload {
+  id           String    @id @default(cuid())
+  filename     String
+  status       String    // "Processing" | "Completed" | "Failed"
+  error        String?
+  elementCount Int       @default(0)
+  projectId    String
+  project      Project   @relation(fields: [projectId], references: [id])
+  elements     Element[]
+  createdAt    DateTime  @default(now())
+}
+
+model Element {
+  id             String     @id @default(cuid())
+  guid           String     @unique
+  name           String
+  type           String     // IFC type (e.g., "IfcWall", "IfcSlab")
+  volume         Float
+  buildingStorey String?
+  materials      Material[]
+  projectId      String
+  project        Project    @relation(fields: [projectId], references: [id])
+  uploadId       String
+  upload         Upload     @relation(fields: [uploadId], references: [id])
+}
+
+model Material {
+  id        String   @id @default(cuid())
+  name      String
+  volume    Float
+  fraction  Float
+  elementId String
+  element   Element  @relation(fields: [elementId], references: [id])
+} 

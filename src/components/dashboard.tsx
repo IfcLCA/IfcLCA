@@ -14,6 +14,7 @@ import { Progress } from "@/components/ui/progress";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { BarChart, Building, FileText, Users, BarChart2 } from "lucide-react";
+import { UploadModal } from "@/components/upload-modal";
 
 interface Project {
   id: string;
@@ -52,6 +53,14 @@ export function Dashboard({
   statistics,
   activities,
 }: DashboardProps) {
+  const handleUploadSuccess = (upload: any) => {
+    console.log("Upload successful:", upload);
+  };
+
+  const handleUploadProgress = (progress: number) => {
+    console.log("Upload progress:", progress);
+  };
+
   return (
     <div className="container mx-auto p-4 space-y-8">
       <section className="space-y-4">
@@ -60,7 +69,12 @@ export function Dashboard({
         </h1>
         <div className="flex flex-wrap gap-4">
           <Button>Create New Project</Button>
-          <Button variant="outline">Import IFC File</Button>
+          <UploadModal
+            projectId="default-project"
+            onSuccess={handleUploadSuccess}
+            onProgress={handleUploadProgress}
+            trigger={<Button variant="outline">Import IFC File</Button>}
+          />
           <Button variant="outline">Generate Report</Button>
         </div>
       </section>
