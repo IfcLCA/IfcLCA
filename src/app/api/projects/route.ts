@@ -5,10 +5,19 @@ import { Pool } from "@neondatabase/serverless";
 
 export const runtime = "edge";
 
+async function getPrismaClient() {
+  const pool = new Pool({
+    connectionString: process.env.POSTGRES_PRISMA_URL,
+    connectionTimeoutMillis: 5000,
+  });
+  const adapter = new PrismaNeon(pool);
+  return new PrismaClient({ adapter });
+}
+
 export async function GET() {
-  let prisma;
+  const prisma = await getPrismaClient();
+
   try {
-    prisma = getPrisma();
     const projects = await prisma.project.findMany({
       orderBy: {
         createdAt: "desc",
@@ -36,16 +45,12 @@ export async function GET() {
       { status: 500 }
     );
   } finally {
-    if (prisma) {
-      await prisma.$disconnect();
-    }
+    await prisma.$disconnect();
   }
 }
 
 export async function POST(request: Request) {
-  const pool = new Pool({ connectionString: process.env.POSTGRES_PRISMA_URL });
-  const adapter = new PrismaNeon(pool);
-  const prisma = new PrismaClient({ adapter });
+  const prisma = await getPrismaClient();
 
   try {
     const { name, description } = await request.json();
@@ -81,6 +86,5 @@ export async function POST(request: Request) {
     );
   } finally {
     await prisma.$disconnect();
-    await pool.end();
   }
 }
