@@ -1,17 +1,19 @@
 generator client {
-  provider = "prisma-client-js"
+  provider        = "prisma-client-js"
+  previewFeatures = ["driverAdapters"]
 }
 
 datasource db {
-  provider = "postgresql"
-  url = env("POSTGRES_PRISMA_URL")
-  directUrl = env("POSTGRES_URL_NON_POOLING") // uses a direct connection
+  provider  = "postgresql"
+  url       = env("POSTGRES_PRISMA_URL")
+  directUrl = env("POSTGRES_URL_NON_POOLING")
 }
 
 model Project {
   id          String    @id @default(cuid())
-  name        String
+  name        String    @unique
   description String?
+  phase       String?
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
   uploads     Upload[]

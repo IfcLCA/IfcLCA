@@ -1,57 +1,110 @@
-import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
-import { IfcProcessingService } from "@/services/ifcProcessingService";
-import path from "path";
-import { writeFile } from "fs/promises";
-import { mkdir } from "fs/promises";
+import { NextResponse } from "next/server";
+import { prisma } from "@/lib/db";
 
-const ifcProcessor = new IfcProcessingService();
+export const runtime = "edge";
+export const maxDuration = 300; // 5 minutes
 
 export async function POST(
-  request: NextRequest,
+  request: Request,
   { params }: { params: { id: string } }
 ) {
   try {
-    const data = await request.formData();
-    const file: File | null = data.get("file") as unknown as File;
+    // First verify the project exists
+    const project = await prisma.project.findUnique({
+      where: { id: params.id },
+    });
 
-    if (!file) {
-      return NextResponse.json({ error: "No file uploaded" }, { status: 400 });
+    if (!project) {
+      return NextResponse.json({ error: "Project not found" }, { status: 404 });
     }
 
-    // Create upload record
+    // Get the file data from the request
+    const formData = await request.formData();
+    const file = formData.get("file") as File;
+
+    if (!file) {
+      return NextResponse.json({ error: "No file provided" }, { status: 400 });
+    }
+
+    // Create the upload record
     const upload = await prisma.upload.create({
       data: {
         filename: file.name,
         status: "Processing",
+        elementCount: 0,
         projectId: params.id,
       },
     });
 
-    // Ensure uploads directory exists
-    const uploadsDir = path.join(process.cwd(), "uploads/temp");
-    await mkdir(uploadsDir, { recursive: true });
+    // Send file to processing API
+    const buffer = await file.arrayBuffer();
+    const base64 = Buffer.from(buffer).toString("base64");
 
-    // Save file
-    const bytes = await file.arrayBuffer();
-    const buffer = Buffer.from(bytes);
-    const filePath = path.join(uploadsDir, `${upload.id}.ifc`);
-    await writeFile(filePath, buffer);
+    const response = await fetch(process.env.IFC_PROCESSING_API_URL!, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        file: base64,
+        uploadId: upload.id,
+        projectId: params.id,
+      }),
+    });
 
-    // Process IFC file asynchronously
-    ifcProcessor
-      .processIfc(filePath, upload.id, params.id)
-      .catch(async (error) => {
-        console.error("Processing error:", error);
-        await prisma.upload.update({
-          where: { id: upload.id },
-          data: { status: "Failed", error: error.message },
+    if (!response.ok) {
+      throw new Error("Failed to process IFC file");
+    }
+
+    const { elements } = await response.json();
+
+    // Store elements and materials in database
+    await prisma.$transaction(async (tx) => {
+      for (const element of elements) {
+        const storedElement = await tx.element.create({
+          data: {
+            guid: element.guid,
+            name: element.name,
+            type: element.type,
+            volume: element.volume,
+            buildingStorey: element.buildingStorey,
+            projectId: params.id,
+            uploadId: upload.id,
+          },
         });
-      });
 
-    return NextResponse.json(upload);
+        if (element.materials?.length) {
+          await Promise.all(
+            element.materials.map((material: any) =>
+              tx.material.create({
+                data: {
+                  name: material.name,
+                  volume: material.volume,
+                  fraction: material.fraction,
+                  elementId: storedElement.id,
+                },
+              })
+            )
+          );
+        }
+      }
+
+      // Update upload status
+      await tx.upload.update({
+        where: { id: upload.id },
+        data: {
+          status: "Completed",
+          elementCount: elements.length,
+        },
+      });
+    });
+
+    return NextResponse.json({ success: true, uploadId: upload.id });
   } catch (error) {
     console.error("Upload error:", error);
-    return NextResponse.json({ error: "Upload failed" }, { status: 500 });
+    return NextResponse.json(
+      { error: "Failed to process upload" },
+      { status: 500 }
+    );
   }
 }

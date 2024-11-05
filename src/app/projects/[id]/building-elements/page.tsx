@@ -1,25 +1,49 @@
 import { DataTable } from "@/components/data-table";
 import { Button } from "@/components/ui/button";
 import { Plus } from "lucide-react";
-import { PrismaClient } from "@prisma/client";
+import { prisma } from "@/lib/db";
 import { UploadModal } from "@/components/upload-modal";
 
+// Define the columns configuration
+const columns = [
+  {
+    accessorKey: "name",
+    header: "Name",
+  },
+  {
+    accessorKey: "type",
+    header: "Type",
+  },
+  {
+    accessorKey: "volume",
+    header: "Volume",
+    cell: ({ row }) => row.original.volume.toFixed(2),
+  },
+  {
+    accessorKey: "buildingStorey",
+    header: "Level",
+  },
+];
+
 async function getBuildingElements(projectId: string) {
-  const prisma = new PrismaClient();
+  try {
+    const elements = await prisma.element.findMany({
+      where: { projectId },
+      include: { materials: true },
+    });
 
-  const elements = await prisma.element.findMany({
-    where: { projectId },
-    include: { materials: true },
-  });
-
-  return elements.map((element) => ({
-    id: element.id,
-    name: element.name,
-    type: element.type,
-    material: element.materials[0]?.name || "Unknown",
-    volume: element.volume,
-    buildingStorey: element.buildingStorey,
-  }));
+    return elements.map((element) => ({
+      id: element.id,
+      name: element.name,
+      type: element.type,
+      material: element.materials[0]?.name || "Unknown",
+      volume: element.volume,
+      buildingStorey: element.buildingStorey,
+    }));
+  } catch (error) {
+    console.error("Failed to fetch building elements:", error);
+    return [];
+  }
 }
 
 export default async function BuildingElementsPage({
@@ -35,12 +59,8 @@ export default async function BuildingElementsPage({
         <h1 className="text-2xl font-bold">Building Elements</h1>
         <UploadModal
           projectId={params.id}
-          onSuccess={() => {
-            // Refresh the page to show new elements
-            window.location.reload();
-          }}
-          onProgress={(progress) => {
-            console.log("Upload progress:", progress);
+          onUploadComplete={() => {
+            // Use server actions or client-side refresh logic
           }}
         />
       </div>
