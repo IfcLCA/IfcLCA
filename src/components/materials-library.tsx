@@ -1,16 +1,9 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Button } from "@/components/ui/button";
+import { usePathname, useSearchParams, useRouter } from "next/navigation";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import {
   Select,
   SelectContent,
@@ -19,141 +12,167 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import { Search } from "lucide-react";
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { PaginationWithNumbers } from "@/components/ui/pagination-with-numbers";
 
 type Material = {
   id: string;
   name: string;
   volume: number;
-  fraction: number;
+  category?: string;
 };
 
-type Project = {
-  id: string;
-  name: string;
-};
+const PAGE_SIZES = [10, 20, 50];
 
 export function MaterialsLibrary({
   initialProjects,
   initialMaterials,
 }: {
-  initialProjects: Project[];
+  initialProjects: any[];
   initialMaterials: Material[];
 }) {
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const { replace } = useRouter();
+  const currentPage = Number(searchParams.get("page")) || 1;
+  const pageSize = Number(searchParams.get("pageSize")) || 10;
+
   const [materials, setMaterials] = useState<Material[]>(initialMaterials);
-  const [projects, setProjects] = useState<Project[]>(initialProjects);
-  const [selectedProject, setSelectedProject] = useState<string>("all");
+  const [projects] = useState(initialProjects);
+  const [selectedProject, setSelectedProject] = useState<string>(
+    projects[0]?.id
+  );
   const [searchTerm, setSearchTerm] = useState("");
   const [loading, setLoading] = useState(false);
 
-  // Only fetch when project selection changes
-  useEffect(() => {
-    if (selectedProject === "all") {
-      setMaterials(initialMaterials);
-      return;
-    }
+  const createPageURL = (pageNumber: number | string) => {
+    const params = new URLSearchParams(searchParams);
+    params.set("page", pageNumber.toString());
+    return `${pathname}?${params.toString()}`;
+  };
 
-    const fetchMaterials = async () => {
+  useEffect(() => {
+    async function fetchMaterials() {
       setLoading(true);
       try {
-        const response = await fetch(`/api/projects/${selectedProject}`);
-        if (!response.ok) throw new Error("Failed to fetch materials");
+        const response = await fetch(
+          `/api/materials?projectId=${selectedProject}`
+        );
         const data = await response.json();
-        setMaterials(data.materials || []);
+        setMaterials(data);
       } catch (error) {
         console.error("Failed to fetch materials:", error);
-        setMaterials([]);
-      } finally {
-        setLoading(false);
       }
-    };
+      setLoading(false);
+    }
 
     fetchMaterials();
-  }, [selectedProject, initialMaterials]);
+  }, [selectedProject]);
 
   const filteredMaterials = materials.filter((material) =>
     material.name.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  const totalPages = Math.ceil(filteredMaterials.length / pageSize);
+  const startIndex = (currentPage - 1) * pageSize;
+  const paginatedMaterials = filteredMaterials.slice(
+    startIndex,
+    startIndex + pageSize
   );
 
   return (
     <Card className="w-full">
       <CardHeader>
         <CardTitle>Materials Library</CardTitle>
-        <CardDescription>
-          View all materials used across your projects.
-        </CardDescription>
       </CardHeader>
       <CardContent>
-        <div className="flex gap-4 mb-4">
-          <div className="relative flex-1">
-            <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+        <div className="space-y-4">
+          <div className="flex items-center gap-4">
+            <Select value={selectedProject} onValueChange={setSelectedProject}>
+              <SelectTrigger className="w-[200px]">
+                <SelectValue placeholder="Select project" />
+              </SelectTrigger>
+              <SelectContent>
+                {projects.map((project) => (
+                  <SelectItem key={project.id} value={project.id}>
+                    {project.name}
+                  </SelectItem>
+                ))}
+                <SelectItem value="all">All Projects</SelectItem>
+              </SelectContent>
+            </Select>
             <Input
               placeholder="Search materials..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-8"
+              className="max-w-sm"
             />
+            <Select
+              value={pageSize.toString()}
+              onValueChange={(value) => {
+                setPageSize(Number(value));
+                setCurrentPage(1);
+              }}
+            >
+              <SelectTrigger className="w-[70px]">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {PAGE_SIZES.map((size) => (
+                  <SelectItem key={size} value={size.toString()}>
+                    {size}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
-          <Select value={selectedProject} onValueChange={setSelectedProject}>
-            <SelectTrigger className="w-[200px]">
-              <SelectValue placeholder="Select project" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Projects</SelectItem>
-              {projects.map((project) => (
-                <SelectItem key={project.id} value={project.id}>
-                  {project.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Name</TableHead>
-              <TableHead>Volume (m³)</TableHead>
-              <TableHead>Fraction (%)</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {loading ? (
+          <Table>
+            <TableHeader>
               <TableRow>
-                <TableCell colSpan={3} className="text-center">
-                  Loading...
-                </TableCell>
+                <TableHead>Name</TableHead>
+                <TableHead>Volume (m³)</TableHead>
+                <TableHead>Category</TableHead>
               </TableRow>
-            ) : filteredMaterials.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={3} className="text-center">
-                  No materials found
-                </TableCell>
-              </TableRow>
-            ) : (
-              filteredMaterials.map((material) => (
-                <TableRow key={material.id}>
-                  <TableCell>{material.name}</TableCell>
-                  <TableCell>{material.volume.toFixed(2)}</TableCell>
-                  <TableCell>{(material.fraction * 100).toFixed(1)}%</TableCell>
+            </TableHeader>
+            <TableBody>
+              {loading ? (
+                <TableRow>
+                  <TableCell colSpan={3} className="text-center">
+                    Loading...
+                  </TableCell>
                 </TableRow>
-              ))
-            )}
-          </TableBody>
-        </Table>
+              ) : paginatedMaterials.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={3} className="text-center">
+                    No materials found
+                  </TableCell>
+                </TableRow>
+              ) : (
+                paginatedMaterials.map((material) => (
+                  <TableRow key={material.id}>
+                    <TableCell>{material.name}</TableCell>
+                    <TableCell>{material.volume.toFixed(2)}</TableCell>
+                    <TableCell>{material.category || "-"}</TableCell>
+                  </TableRow>
+                ))
+              )}
+            </TableBody>
+          </Table>
+          <PaginationWithNumbers
+            totalPages={totalPages}
+            showingText={`Showing ${startIndex + 1}-${Math.min(
+              startIndex + pageSize,
+              filteredMaterials.length
+            )} of ${filteredMaterials.length}`}
+          />
+        </div>
       </CardContent>
-      <CardFooter>
-        <p className="text-sm text-muted-foreground">
-          Showing {filteredMaterials.length} materials
-        </p>
-      </CardFooter>
     </Card>
   );
 }

@@ -1,51 +1,13 @@
-import { prisma } from "@/lib/db";
 import { NextResponse } from "next/server";
+import { getMaterialsByProject } from "@/components/materials-table-server";
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
-    const projects = await prisma.project.findMany({
-      include: {
-        elements: {
-          include: {
-            materials: {
-              select: {
-                id: true,
-                name: true,
-                volume: true,
-                fraction: true,
-              },
-            },
-          },
-        },
-      },
-    });
+    const { searchParams } = new URL(request.url);
+    const projectId = searchParams.get("projectId");
 
-    // Get unique materials across all projects
-    const materialsMap = new Map();
-    projects.forEach((project) => {
-      project.elements.forEach((element) => {
-        element.materials.forEach((material) => {
-          const existingMaterial = materialsMap.get(material.name);
-          if (!existingMaterial) {
-            materialsMap.set(material.name, {
-              id: material.id,
-              name: material.name,
-              volume: material.volume,
-              fraction: material.fraction,
-            });
-          } else {
-            // Sum up volumes for same materials
-            materialsMap.set(material.name, {
-              ...existingMaterial,
-              volume: existingMaterial.volume + material.volume,
-            });
-          }
-        });
-      });
-    });
-
-    const uniqueMaterials = Array.from(materialsMap.values());
-    return NextResponse.json(uniqueMaterials);
+    const materials = await getMaterialsByProject(projectId || undefined);
+    return NextResponse.json(materials);
   } catch (error) {
     console.error("Failed to fetch materials:", error);
     return NextResponse.json(
