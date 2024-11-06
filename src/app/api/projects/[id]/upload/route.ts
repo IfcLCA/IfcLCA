@@ -54,17 +54,12 @@ export async function POST(
         project.id
       );
 
-      // Return a properly structured response
-      return NextResponse.json({
-        success: true,
-        upload: {
-          id: upload.id,
-          filename: file.name,
-          status: "Completed",
-        },
-        projectId: project.id,
-        ...result,
-      });
+      if (result.error) {
+        console.error("IFC processing error:", result.error);
+        return NextResponse.json({ error: result.error }, { status: 500 });
+      }
+
+      return NextResponse.json(result);
     } catch (processingError) {
       await prisma.upload.update({
         where: { id: upload.id },
@@ -89,11 +84,9 @@ export async function POST(
       );
     }
   } catch (error) {
+    console.error("Upload error:", error);
     return NextResponse.json(
-      {
-        success: false,
-        error: "Server error occurred",
-      },
+      { error: "Failed to process upload" },
       { status: 500 }
     );
   }

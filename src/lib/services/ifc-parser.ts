@@ -25,40 +25,66 @@ export class IFCParserService {
   private static async parseWithPython(
     filePath: string
   ): Promise<IFCParseResult> {
-    const pythonProcess = spawn("python", [
-      path.join(process.cwd(), "scripts/process_ifc.py"),
-      filePath,
-    ]);
+    try {
+      // Try python3 first, fall back to python if not found
+      const pythonCommand =
+        process.env.NODE_ENV === "production" ? "python3" : "python";
 
-    return new Promise((resolve, reject) => {
-      let outputData = "";
-      let errorData = "";
+      const pythonProcess = spawn(pythonCommand, [
+        path.join(process.cwd(), "scripts/process_ifc.py"),
+        filePath,
+      ]);
 
-      pythonProcess.stdout.on("data", (data) => {
-        outputData += data.toString();
-      });
+      return new Promise((resolve, reject) => {
+        let outputData = "";
+        let errorData = "";
 
-      pythonProcess.stderr.on("data", (data) => {
-        errorData += data.toString();
-      });
+        pythonProcess.stdout.on("data", (data) => {
+          outputData += data.toString();
+        });
 
-      pythonProcess.on("close", (code) => {
-        if (code !== 0) {
-          resolve({ elements: [], error: errorData });
-          return;
-        }
+        pythonProcess.stderr.on("data", (data) => {
+          errorData += data.toString();
+          console.error("Python stderr:", errorData);
+        });
 
-        try {
-          const result = JSON.parse(outputData);
-          resolve({ elements: result.elements });
-        } catch (error) {
+        pythonProcess.on("error", (error) => {
+          console.error("Python process error:", error);
           resolve({
             elements: [],
-            error: "Failed to parse Python output",
+            error: `Failed to start Python process: ${error.message}`,
           });
-        }
+        });
+
+        pythonProcess.on("close", (code) => {
+          if (code !== 0) {
+            console.error(`Python process exited with code ${code}`);
+            resolve({
+              elements: [],
+              error: errorData || "Python process failed",
+            });
+            return;
+          }
+
+          try {
+            const result = JSON.parse(outputData);
+            resolve({ elements: result.elements });
+          } catch (error) {
+            console.error("Failed to parse Python output:", error);
+            resolve({
+              elements: [],
+              error: "Failed to parse Python output",
+            });
+          }
+        });
       });
-    });
+    } catch (error) {
+      console.error("parseWithPython error:", error);
+      return {
+        elements: [],
+        error: `IFC parsing failed: ${error.message}`,
+      };
+    }
   }
 
   static async processIFCFile(

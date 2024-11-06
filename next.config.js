@@ -7,6 +7,13 @@ const nextConfig = {
     // !! WARN !!
     ignoreBuildErrors: true,
   },
+  // Add this section to copy Python scripts
+  experimental: {
+    outputFileTracingIncludes: {
+      "/api/**/*": ["./scripts/**/*"],
+    },
+  },
+  output: "standalone",
 };
 
 module.exports = nextConfig;
