@@ -33,24 +33,25 @@ model Upload {
 }
 
 model Element {
-  id             String     @id @default(cuid())
-  guid           String     @unique
-  name           String
-  type           String     // IFC type (e.g., "IfcWall", "IfcSlab")
-  volume         Float
+  id            String     @id @default(cuid())
+  name          String
+  type          String?
+  volume        Float
   buildingStorey String?
-  materials      Material[]
-  projectId      String
-  project        Project    @relation(fields: [projectId], references: [id])
-  uploadId       String
-  upload         Upload     @relation(fields: [uploadId], references: [id])
+  project       Project    @relation(fields: [projectId], references: [id])
+  projectId     String
+  upload        Upload     @relation(fields: [uploadId], references: [id])
+  uploadId      String
+  materials     Material[] // Relation to materials
 }
 
 model Material {
-  id        String   @id @default(cuid())
-  name      String
-  volume    Float
-  fraction  Float
-  elementId String
-  element   Element  @relation(fields: [elementId], references: [id])
+  id       String    @id @default(cuid())
+  name     String
+  category String?
+  density  Float?
+  gwp      Float?
+  penr     Float?
+  ubp      Float?
+  elements Element[] // Many-to-many relation with elements
 } 

@@ -13,15 +13,24 @@ export class IFCParserService {
     return tmpFile;
   }
 
+  private static async cleanup(filePath: string) {
+    try {
+      await fs.unlink(filePath);
+      await fs.rmdir(path.dirname(filePath));
+    } catch (error) {
+      console.error("Failed to clean up temporary file:", error);
+    }
+  }
+
   private static async parseWithPython(
     filePath: string
   ): Promise<IFCParseResult> {
-    return new Promise((resolve, reject) => {
-      const pythonProcess = spawn("python", [
-        path.join(process.cwd(), "scripts/process_ifc.py"),
-        filePath,
-      ]);
+    const pythonProcess = spawn("python", [
+      path.join(process.cwd(), "scripts/process_ifc.py"),
+      filePath,
+    ]);
 
+    return new Promise((resolve, reject) => {
       let outputData = "";
       let errorData = "";
 
@@ -31,26 +40,22 @@ export class IFCParserService {
 
       pythonProcess.stderr.on("data", (data) => {
         errorData += data.toString();
-        console.error("Python error:", errorData);
       });
 
       pythonProcess.on("close", (code) => {
         if (code !== 0) {
-          console.error("Python process failed with code:", code);
           resolve({ elements: [], error: errorData });
           return;
         }
 
         try {
           const result = JSON.parse(outputData);
-          if (result.error) {
-            resolve({ elements: [], error: result.error });
-          } else {
-            resolve({ elements: result.elements });
-          }
+          resolve({ elements: result.elements });
         } catch (error) {
-          console.error("Failed to parse Python output:", error);
-          resolve({ elements: [], error: "Failed to parse Python output" });
+          resolve({
+            elements: [],
+            error: "Failed to parse Python output",
+          });
         }
       });
     });
@@ -65,13 +70,9 @@ export class IFCParserService {
 
     try {
       tmpFile = await this.createTempFile(file);
-      console.log("Created temp file:", tmpFile);
-
       const { elements, error } = await this.parseWithPython(tmpFile);
-      console.log("Parsed elements count:", elements.length);
 
       if (error || elements.length === 0) {
-        console.error("IFC parsing error:", error);
         await prisma.upload.update({
           where: { id: uploadId },
           data: { status: "Failed", error },
@@ -79,78 +80,90 @@ export class IFCParserService {
         return { id: uploadId, status: "Failed", elementCount: 0, error };
       }
 
-      // Process elements in batches of 100
-      const batchSize = 100;
+      const batchSize = 2000;
+      let processedCount = 0;
+
       for (let i = 0; i < elements.length; i += batchSize) {
         const batch = elements.slice(i, i + batchSize);
-        console.log(
-          `Processing batch ${i / batchSize + 1} of ${Math.ceil(
-            elements.length / batchSize
-          )}`
-        );
 
         await prisma.$transaction(
           async (tx) => {
-            for (const element of batch) {
-              // Try to find existing element
-              const existingElement = await tx.element.findUnique({
-                where: { guid: element.guid },
-                include: { materials: true },
-              });
+            // First insert elements
+            const elementValues = batch
+              .map(
+                (e) =>
+                  `(gen_random_uuid(), '${e.guid}', '${
+                    e.name?.replace(/'/g, "''") || ""
+                  }', '${e.type}', ${e.volume || 0}, '${
+                    e.buildingStorey || ""
+                  }', '${projectId}', '${uploadId}')`
+              )
+              .join(",");
 
-              if (existingElement) {
-                // Update existing element
-                await tx.element.update({
-                  where: { guid: element.guid },
-                  data: {
-                    name: element.name,
-                    type: element.type,
-                    volume: element.volume,
-                    buildingStorey: element.buildingStorey,
-                    projectId,
-                    uploadId,
-                    materials: {
-                      // Delete existing materials
-                      deleteMany: {},
-                      // Create new materials
-                      create: element.materials.map((material) => ({
-                        name: material.name,
-                        volume: material.volume,
-                        fraction: material.fraction,
-                      })),
-                    },
-                  },
-                });
-              } else {
-                // Create new element
-                await tx.element.create({
-                  data: {
-                    guid: element.guid,
-                    name: element.name,
-                    type: element.type,
-                    volume: element.volume,
-                    buildingStorey: element.buildingStorey,
-                    projectId,
-                    uploadId,
-                    materials: {
-                      create: element.materials.map((material) => ({
-                        name: material.name,
-                        volume: material.volume,
-                        fraction: material.fraction,
-                      })),
-                    },
-                  },
-                });
-              }
+            await tx.$executeRawUnsafe(`
+              INSERT INTO "Element" ("id", "guid", "name", "type", "volume", "buildingStorey", "projectId", "uploadId")
+              VALUES ${elementValues}
+              ON CONFLICT ("guid") 
+              DO UPDATE SET 
+                "name" = EXCLUDED."name",
+                "type" = EXCLUDED."type",
+                "volume" = EXCLUDED."volume",
+                "buildingStorey" = EXCLUDED."buildingStorey"
+              RETURNING id, guid
+            `);
+
+            // Create materials with null checks
+            const materialsData = batch
+              .flatMap((element) =>
+                (element.materials || []).map((m) => ({
+                  name: (m.name || "")?.replace(/'/g, "''"),
+                  volume: m.volume || 0,
+                  fraction: m.fraction || 0,
+                  elementGuid: element.guid,
+                }))
+              )
+              .filter((m) => m.name && m.elementGuid); // Filter out invalid materials
+
+            if (materialsData.length > 0) {
+              const materialValues = materialsData
+                .map(
+                  (m) =>
+                    `(gen_random_uuid(), '${m.name}', ${m.volume}, ${m.fraction}, (
+                      SELECT id FROM "Element" 
+                      WHERE guid = '${m.elementGuid}' 
+                      AND "uploadId" = '${uploadId}'
+                      LIMIT 1
+                    ))`
+                )
+                .join(",");
+
+              await tx.$executeRawUnsafe(`
+                INSERT INTO "Material" ("id", "name", "volume", "fraction", "elementId")
+                SELECT m.id, m.name, m.volume, m.fraction, m.elementId
+                FROM (
+                  VALUES ${materialValues}
+                ) AS m(id, name, volume, fraction, elementId)
+                WHERE m.elementId IS NOT NULL
+                ON CONFLICT DO NOTHING
+              `);
             }
+
+            processedCount += batch.length;
           },
           {
-            timeout: 30000, // 30 second timeout per batch
+            timeout: 120000,
+            maxWait: 20000,
           }
         );
+
+        if (processedCount % 10000 === 0) {
+          await prisma.upload.update({
+            where: { id: uploadId },
+            data: { elementCount: processedCount },
+          });
+        }
       }
 
-      // Update upload status
       await prisma.upload.update({
         where: { id: uploadId },
         data: {
@@ -176,12 +189,7 @@ export class IFCParserService {
       throw error;
     } finally {
       if (tmpFile) {
-        try {
-          await fs.unlink(tmpFile);
-          await fs.rmdir(path.dirname(tmpFile));
-        } catch (error) {
-          console.error("Failed to clean up temporary file:", error);
-        }
+        await IFCParserService.cleanup(tmpFile);
       }
     }
   }

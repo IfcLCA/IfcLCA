@@ -9,20 +9,26 @@ export async function GET(
 ) {
   try {
     const project = await prisma.project.findUnique({
-      where: { id: params.id },
+      where: {
+        id: params.id,
+      },
       include: {
-        uploads: {
-          orderBy: { createdAt: "desc" },
-          select: {
-            id: true,
-            filename: true,
-            status: true,
-            elementCount: true,
-            createdAt: true,
+        uploads: true,
+        elements: {
+          include: {
+            materials: {
+              select: {
+                id: true,
+                name: true,
+                volume: true,
+                fraction: true,
+              },
+            },
           },
         },
         _count: {
           select: {
+            uploads: true,
             elements: true,
           },
         },
@@ -33,7 +39,31 @@ export async function GET(
       return NextResponse.json({ error: "Project not found" }, { status: 404 });
     }
 
-    return NextResponse.json(project);
+    // Get unique materials using a Map to keep only unique names
+    const materialsMap = new Map();
+    project.elements.forEach((element) => {
+      element.materials.forEach((material) => {
+        if (!materialsMap.has(material.name)) {
+          materialsMap.set(material.name, {
+            id: material.id,
+            name: material.name,
+            volume: material.volume,
+            fraction: material.fraction,
+          });
+        }
+      });
+    });
+
+    const uniqueMaterials = Array.from(materialsMap.values());
+
+    return NextResponse.json({
+      ...project,
+      materials: uniqueMaterials,
+      _count: {
+        ...project._count,
+        materials: uniqueMaterials.length,
+      },
+    });
   } catch (error) {
     console.error("Failed to fetch project:", error);
     return NextResponse.json(
@@ -85,11 +115,31 @@ export async function DELETE(
   { params }: { params: { id: string } }
 ) {
   try {
-    await prisma.project.delete({
-      where: { id: params.id },
-    });
+    // Delete all related records first
+    await prisma.$transaction([
+      // Delete all elements associated with uploads in this project
+      prisma.element.deleteMany({
+        where: {
+          upload: {
+            projectId: params.id,
+          },
+        },
+      }),
+      // Delete all uploads associated with this project
+      prisma.upload.deleteMany({
+        where: {
+          projectId: params.id,
+        },
+      }),
+      // Finally delete the project
+      prisma.project.delete({
+        where: {
+          id: params.id,
+        },
+      }),
+    ]);
 
-    return new NextResponse(null, { status: 204 });
+    return NextResponse.json({ success: true });
   } catch (error) {
     console.error("Failed to delete project:", error);
     return NextResponse.json(

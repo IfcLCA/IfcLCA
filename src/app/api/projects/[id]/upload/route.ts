@@ -9,6 +9,8 @@ export async function POST(
   request: Request,
   { params }: { params: { id: string } }
 ) {
+  console.log("Upload request received for project:", params.id);
+
   try {
     const formData = await request.formData();
     const file = formData.get("file") as File;
@@ -17,26 +19,28 @@ export async function POST(
       return NextResponse.json({ error: "File is required" }, { status: 400 });
     }
 
-    console.log("Processing file:", file.name, "size:", file.size);
+    console.log(
+      "Processing file:",
+      file.name,
+      "size:",
+      file.size,
+      "for project:",
+      params.id
+    );
 
-    // Check if project exists, if not create it
-    let project = await prisma.project.findUnique({
+    // Verify project exists
+    const project = await prisma.project.findUnique({
       where: { id: params.id },
+      include: { _count: { select: { uploads: true } } },
     });
 
     if (!project) {
-      console.log("Creating new project with ID:", params.id);
-      project = await prisma.project.create({
-        data: {
-          id: params.id,
-          name: `Project_${params.id}_${Date.now()}`,
-          description: "Automatically created from IFC upload",
-        },
-      });
+      console.error("Project not found:", params.id);
+      return NextResponse.json({ error: "Project not found" }, { status: 404 });
     }
 
     // Create upload record
-    console.log("Creating upload record");
+    console.log("Creating upload record for project:", project.id);
     const upload = await prisma.upload.create({
       data: {
         filename: file.name,
@@ -46,27 +50,28 @@ export async function POST(
     });
 
     try {
-      // Process file
-      console.log("Converting file to buffer");
       const buffer = Buffer.from(await file.arrayBuffer());
+      console.log("Processing IFC file for upload:", upload.id);
 
-      console.log("Processing IFC file");
       const result = await IFCParserService.processIFCFile(
         buffer,
         upload.id,
         project.id
       );
 
-      console.log("Processing complete");
+      console.log("Processing complete for upload:", upload.id);
       return NextResponse.json({
         ...result,
-        projectCreated: !project,
+        uploadId: upload.id,
         projectId: project.id,
       });
     } catch (processingError) {
-      console.error("IFC processing error:", processingError);
+      console.error(
+        "IFC processing error for upload:",
+        upload.id,
+        processingError
+      );
 
-      // Update upload status to failed
       await prisma.upload.update({
         where: { id: upload.id },
         data: {
@@ -81,13 +86,9 @@ export async function POST(
       throw processingError;
     }
   } catch (error) {
-    console.error("Upload route error:", error);
+    console.error("Upload handler error:", error);
     return NextResponse.json(
-      {
-        error:
-          error instanceof Error ? error.message : "Failed to process IFC file",
-        details: error instanceof Error ? error.stack : undefined,
-      },
+      { error: "Failed to process upload" },
       { status: 500 }
     );
   }

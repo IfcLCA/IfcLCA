@@ -1,9 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import {
   Table,
   TableBody,
@@ -12,15 +11,6 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
 import {
   Select,
   SelectContent,
@@ -36,435 +26,137 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Search, Plus, Edit, Trash2 } from "lucide-react";
+import { Search } from "lucide-react";
 
 type Material = {
   id: string;
   name: string;
-  category: string;
-  density: number;
-  embodiedCarbon: number;
-  cost: number;
+  volume: number;
+  fraction: number;
 };
 
-const initialMaterials: Material[] = [
-  {
-    id: "1",
-    name: "Concrete",
-    category: "Structural",
-    density: 2400,
-    embodiedCarbon: 0.1,
-    cost: 100,
-  },
-  {
-    id: "2",
-    name: "Steel",
-    category: "Structural",
-    density: 7850,
-    embodiedCarbon: 1.46,
-    cost: 500,
-  },
-  {
-    id: "3",
-    name: "Glass",
-    category: "Finishes",
-    density: 2500,
-    embodiedCarbon: 0.85,
-    cost: 300,
-  },
-  {
-    id: "4",
-    name: "Wood",
-    category: "Structural",
-    density: 700,
-    embodiedCarbon: 0.31,
-    cost: 200,
-  },
-  {
-    id: "5",
-    name: "Insulation",
-    category: "Thermal",
-    density: 30,
-    embodiedCarbon: 1.86,
-    cost: 50,
-  },
-];
+type Project = {
+  id: string;
+  name: string;
+};
 
 export function MaterialsLibrary() {
-  const [materials, setMaterials] = useState<Material[]>(initialMaterials);
+  const [materials, setMaterials] = useState<Material[]>([]);
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [selectedProject, setSelectedProject] = useState<string>("all");
   const [searchTerm, setSearchTerm] = useState("");
-  const [categoryFilter, setCategoryFilter] = useState("All");
-  const [currentPage, setCurrentPage] = useState(1);
-  const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
-  const [newMaterial, setNewMaterial] = useState<Partial<Material>>({});
-  const [editingMaterial, setEditingMaterial] = useState<Material | null>(null);
+  const [loading, setLoading] = useState(true);
 
-  const itemsPerPage = 5;
-  const categories = ["All", ...new Set(materials.map((m) => m.category))];
+  useEffect(() => {
+    fetchProjects();
+  }, []);
 
-  const filteredMaterials = materials.filter(
-    (material) =>
-      material.name.toLowerCase().includes(searchTerm.toLowerCase()) &&
-      (categoryFilter === "All" || material.category === categoryFilter)
-  );
+  useEffect(() => {
+    fetchMaterials();
+  }, [selectedProject]);
 
-  const paginatedMaterials = filteredMaterials.slice(
-    (currentPage - 1) * itemsPerPage,
-    currentPage * itemsPerPage
-  );
-
-  const handleAddMaterial = () => {
-    if (
-      newMaterial.name &&
-      newMaterial.category &&
-      newMaterial.density &&
-      newMaterial.embodiedCarbon &&
-      newMaterial.cost
-    ) {
-      setMaterials([
-        ...materials,
-        { ...newMaterial, id: Date.now().toString() } as Material,
-      ]);
-      setNewMaterial({});
-      setIsAddDialogOpen(false);
+  const fetchProjects = async () => {
+    try {
+      const response = await fetch("/api/projects");
+      const data = await response.json();
+      setProjects(data);
+    } catch (error) {
+      console.error("Failed to fetch projects:", error);
     }
   };
 
-  const handleEditMaterial = () => {
-    if (editingMaterial) {
-      setMaterials(
-        materials.map((m) =>
-          m.id === editingMaterial.id ? editingMaterial : m
-        )
-      );
-      setEditingMaterial(null);
+  const fetchMaterials = async () => {
+    setLoading(true);
+    try {
+      const url =
+        selectedProject === "all"
+          ? "/api/materials"
+          : `/api/projects/${selectedProject}`;
+      const response = await fetch(url);
+      const data = await response.json();
+      setMaterials(selectedProject === "all" ? data : data.materials);
+    } catch (error) {
+      console.error("Failed to fetch materials:", error);
+      setMaterials([]);
+    } finally {
+      setLoading(false);
     }
   };
 
-  const handleDeleteMaterial = (id: string) => {
-    setMaterials(materials.filter((m) => m.id !== id));
-  };
+  const filteredMaterials = materials.filter((material) =>
+    material.name.toLowerCase().includes(searchTerm.toLowerCase())
+  );
 
   return (
     <Card className="w-full">
       <CardHeader>
         <CardTitle>Materials Library</CardTitle>
         <CardDescription>
-          Manage and view all materials used in your projects.
+          View all materials used across your projects.
         </CardDescription>
       </CardHeader>
       <CardContent>
-        <div className="flex justify-between mb-4">
-          <div className="flex gap-2">
-            <div className="relative">
-              <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Search materials..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-8"
-              />
-            </div>
-            <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-              <SelectTrigger className="w-[180px]">
-                <SelectValue placeholder="Select category" />
-              </SelectTrigger>
-              <SelectContent>
-                {categories.map((category) => (
-                  <SelectItem key={category} value={category}>
-                    {category}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+        <div className="flex gap-4 mb-4">
+          <div className="relative flex-1">
+            <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Search materials..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="pl-8"
+            />
           </div>
-          <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
-            <DialogTrigger asChild>
-              <Button>
-                <Plus className="mr-2 h-4 w-4" /> Add Material
-              </Button>
-            </DialogTrigger>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>Add New Material</DialogTitle>
-                <DialogDescription>
-                  Enter the details of the new material.
-                </DialogDescription>
-              </DialogHeader>
-              <div className="grid gap-4 py-4">
-                <div className="grid grid-cols-4 items-center gap-4">
-                  <Label htmlFor="name" className="text-right">
-                    Name
-                  </Label>
-                  <Input
-                    id="name"
-                    value={newMaterial.name || ""}
-                    onChange={(e) =>
-                      setNewMaterial({ ...newMaterial, name: e.target.value })
-                    }
-                    className="col-span-3"
-                  />
-                </div>
-                <div className="grid grid-cols-4 items-center gap-4">
-                  <Label htmlFor="category" className="text-right">
-                    Category
-                  </Label>
-                  <Input
-                    id="category"
-                    value={newMaterial.category || ""}
-                    onChange={(e) =>
-                      setNewMaterial({
-                        ...newMaterial,
-                        category: e.target.value,
-                      })
-                    }
-                    className="col-span-3"
-                  />
-                </div>
-                <div className="grid grid-cols-4 items-center gap-4">
-                  <Label htmlFor="density" className="text-right">
-                    Density (kg/m³)
-                  </Label>
-                  <Input
-                    id="density"
-                    type="number"
-                    value={newMaterial.density || ""}
-                    onChange={(e) =>
-                      setNewMaterial({
-                        ...newMaterial,
-                        density: parseFloat(e.target.value),
-                      })
-                    }
-                    className="col-span-3"
-                  />
-                </div>
-                <div className="grid grid-cols-4 items-center gap-4">
-                  <Label htmlFor="embodiedCarbon" className="text-right">
-                    Embodied Carbon (kgCO2e/kg)
-                  </Label>
-                  <Input
-                    id="embodiedCarbon"
-                    type="number"
-                    value={newMaterial.embodiedCarbon || ""}
-                    onChange={(e) =>
-                      setNewMaterial({
-                        ...newMaterial,
-                        embodiedCarbon: parseFloat(e.target.value),
-                      })
-                    }
-                    className="col-span-3"
-                  />
-                </div>
-                <div className="grid grid-cols-4 items-center gap-4">
-                  <Label htmlFor="cost" className="text-right">
-                    Cost ($/m³)
-                  </Label>
-                  <Input
-                    id="cost"
-                    type="number"
-                    value={newMaterial.cost || ""}
-                    onChange={(e) =>
-                      setNewMaterial({
-                        ...newMaterial,
-                        cost: parseFloat(e.target.value),
-                      })
-                    }
-                    className="col-span-3"
-                  />
-                </div>
-              </div>
-              <DialogFooter>
-                <Button onClick={handleAddMaterial}>Add Material</Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
+          <Select value={selectedProject} onValueChange={setSelectedProject}>
+            <SelectTrigger className="w-[200px]">
+              <SelectValue placeholder="Select project" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Projects</SelectItem>
+              {projects.map((project) => (
+                <SelectItem key={project.id} value={project.id}>
+                  {project.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
+
         <Table>
           <TableHeader>
             <TableRow>
               <TableHead>Name</TableHead>
-              <TableHead>Category</TableHead>
-              <TableHead>Density (kg/m³)</TableHead>
-              <TableHead>Embodied Carbon (kgCO2e/kg)</TableHead>
-              <TableHead>Cost ($/m³)</TableHead>
-              <TableHead>Actions</TableHead>
+              <TableHead>Volume (m³)</TableHead>
+              <TableHead>Fraction (%)</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
-            {paginatedMaterials.map((material) => (
-              <TableRow key={material.id}>
-                <TableCell>{material.name}</TableCell>
-                <TableCell>{material.category}</TableCell>
-                <TableCell>{material.density}</TableCell>
-                <TableCell>{material.embodiedCarbon}</TableCell>
-                <TableCell>{material.cost}</TableCell>
-                <TableCell>
-                  <div className="flex gap-2">
-                    <Dialog>
-                      <DialogTrigger asChild>
-                        <Button
-                          variant="outline"
-                          size="icon"
-                          onClick={() => setEditingMaterial(material)}
-                        >
-                          <Edit className="h-4 w-4" />
-                        </Button>
-                      </DialogTrigger>
-                      <DialogContent>
-                        <DialogHeader>
-                          <DialogTitle>Edit Material</DialogTitle>
-                          <DialogDescription>
-                            Edit the details of the material.
-                          </DialogDescription>
-                        </DialogHeader>
-                        {editingMaterial && (
-                          <div className="grid gap-4 py-4">
-                            <div className="grid grid-cols-4 items-center gap-4">
-                              <Label htmlFor="edit-name" className="text-right">
-                                Name
-                              </Label>
-                              <Input
-                                id="edit-name"
-                                value={editingMaterial.name}
-                                onChange={(e) =>
-                                  setEditingMaterial({
-                                    ...editingMaterial,
-                                    name: e.target.value,
-                                  })
-                                }
-                                className="col-span-3"
-                              />
-                            </div>
-                            <div className="grid grid-cols-4 items-center gap-4">
-                              <Label
-                                htmlFor="edit-category"
-                                className="text-right"
-                              >
-                                Category
-                              </Label>
-                              <Input
-                                id="edit-category"
-                                value={editingMaterial.category}
-                                onChange={(e) =>
-                                  setEditingMaterial({
-                                    ...editingMaterial,
-                                    category: e.target.value,
-                                  })
-                                }
-                                className="col-span-3"
-                              />
-                            </div>
-                            <div className="grid grid-cols-4 items-center gap-4">
-                              <Label
-                                htmlFor="edit-density"
-                                className="text-right"
-                              >
-                                Density (kg/m³)
-                              </Label>
-                              <Input
-                                id="edit-density"
-                                type="number"
-                                value={editingMaterial.density}
-                                onChange={(e) =>
-                                  setEditingMaterial({
-                                    ...editingMaterial,
-                                    density: parseFloat(e.target.value),
-                                  })
-                                }
-                                className="col-span-3"
-                              />
-                            </div>
-                            <div className="grid grid-cols-4 items-center gap-4">
-                              <Label
-                                htmlFor="edit-embodiedCarbon"
-                                className="text-right"
-                              >
-                                Embodied Carbon (kgCO2e/kg)
-                              </Label>
-                              <Input
-                                id="edit-embodiedCarbon"
-                                type="number"
-                                value={editingMaterial.embodiedCarbon}
-                                onChange={(e) =>
-                                  setEditingMaterial({
-                                    ...editingMaterial,
-                                    embodiedCarbon: parseFloat(e.target.value),
-                                  })
-                                }
-                                className="col-span-3"
-                              />
-                            </div>
-                            <div className="grid grid-cols-4 items-center gap-4">
-                              <Label htmlFor="edit-cost" className="text-right">
-                                Cost ($/m³)
-                              </Label>
-                              <Input
-                                id="edit-cost"
-                                type="number"
-                                value={editingMaterial.cost}
-                                onChange={(e) =>
-                                  setEditingMaterial({
-                                    ...editingMaterial,
-                                    cost: parseFloat(e.target.value),
-                                  })
-                                }
-                                className="col-span-3"
-                              />
-                            </div>
-                          </div>
-                        )}
-                        <DialogFooter>
-                          <Button onClick={handleEditMaterial}>
-                            Save Changes
-                          </Button>
-                        </DialogFooter>
-                      </DialogContent>
-                    </Dialog>
-                    <Button
-                      variant="outline"
-                      size="icon"
-                      onClick={() => handleDeleteMaterial(material.id)}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  </div>
+            {loading ? (
+              <TableRow>
+                <TableCell colSpan={3} className="text-center">
+                  Loading...
                 </TableCell>
               </TableRow>
-            ))}
+            ) : filteredMaterials.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={3} className="text-center">
+                  No materials found
+                </TableCell>
+              </TableRow>
+            ) : (
+              filteredMaterials.map((material) => (
+                <TableRow key={material.id}>
+                  <TableCell>{material.name}</TableCell>
+                  <TableCell>{material.volume.toFixed(2)}</TableCell>
+                  <TableCell>{(material.fraction * 100).toFixed(1)}%</TableCell>
+                </TableRow>
+              ))
+            )}
           </TableBody>
         </Table>
-        <div className="flex items-center justify-end space-x-2 py-4">
-          <div className="flex items-center gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setCurrentPage(currentPage - 1)}
-              disabled={currentPage === 1}
-            >
-              Previous
-            </Button>
-            <div className="text-sm">
-              Page {currentPage} of{" "}
-              {Math.ceil(filteredMaterials.length / itemsPerPage)}
-            </div>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setCurrentPage(currentPage + 1)}
-              disabled={
-                currentPage >=
-                Math.ceil(filteredMaterials.length / itemsPerPage)
-              }
-            >
-              Next
-            </Button>
-          </div>
-        </div>
       </CardContent>
       <CardFooter>
         <p className="text-sm text-muted-foreground">
-          Showing {paginatedMaterials.length} of {filteredMaterials.length}{" "}
-          materials
+          Showing {filteredMaterials.length} materials
         </p>
       </CardFooter>
     </Card>
