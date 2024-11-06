@@ -5,13 +5,5 @@
       "src": "package.json",
       "use": "@vercel/next"
     }
-  ],
-  "functions": {
-    "api/**/*": {
-      "runtime": "nodejs18.x"
-    }
-  },
-  "env": {
-    "PYTHON_VERSION": "3.9"
-  }
+  ]
 }
