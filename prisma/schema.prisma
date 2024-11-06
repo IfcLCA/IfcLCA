@@ -34,7 +34,7 @@ model Upload {
 
 model Element {
   id            String     @id @default(cuid())
-  guid          String     // Keep this
+  guid          String     @unique
   name          String
   type          String?
   volume        Float?
@@ -43,15 +43,15 @@ model Element {
   uploadId      String?
   project       Project    @relation(fields: [projectId], references: [id])
   upload        Upload?    @relation(fields: [uploadId], references: [id])
-  materials     Material[] // This creates the many-to-many relationship
+  materials     Material[] @relation("ElementToMaterial")
 }
 
 model Material {
   id         String    @id @default(cuid())
   name       String
   category   String?
-  elementId  String    // Keep this
-  volume     Float?    // Keep this
-  fraction   Float?    // Keep this
-  elements   Element[] // This creates the many-to-many relationship
+  elementId  String
+  volume     Float?
+  fraction   Float?
+  elements   Element[] @relation("ElementToMaterial")
 } 
