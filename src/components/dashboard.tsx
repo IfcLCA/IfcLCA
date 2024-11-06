@@ -75,34 +75,54 @@ export function Dashboard({
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(
     null
   );
-  const [projects, setProjects] = useState<{ id: string; name: string }[]>([]);
+  const [projects, setProjects] = useState<Project[]>([]);
   const { toast } = useToast();
   const router = useRouter();
 
   useEffect(() => {
-    const fetchProjects = async () => {
-      try {
-        const response = await fetch("/api/projects");
-        const data = await response.json();
-        setProjects(data);
-      } catch (error) {
-        console.error("Failed to fetch projects:", error);
-      }
-    };
-    fetchProjects();
-  }, []);
+    if (showProjectSelect) {
+      fetchProjects();
+    }
+  }, [showProjectSelect]);
 
-  const handleUploadClick = () => {
-    if (projects.length === 0) {
+  const fetchProjects = async () => {
+    try {
+      const response = await fetch("/api/projects");
+      const data = await response.json();
+      setProjects(data);
+    } catch (error) {
+      console.error("Failed to fetch projects:", error);
       toast({
-        title: "No Projects Available",
-        description:
-          "Please create a project first before uploading IFC files.",
+        title: "Error",
+        description: "Failed to load projects. Please try again.",
         variant: "destructive",
       });
-      return;
     }
-    setShowProjectSelect(true);
+  };
+
+  const handleUploadClick = async () => {
+    try {
+      const response = await fetch("/api/projects");
+      const projects = await response.json();
+
+      if (!projects?.length) {
+        toast({
+          title: "No Projects Available",
+          description:
+            "Please create a project first before uploading IFC files.",
+          variant: "destructive",
+        });
+        return;
+      }
+      setShowProjectSelect(true);
+    } catch (error) {
+      console.error("Failed to check projects:", error);
+      toast({
+        title: "Error",
+        description: "Failed to check projects. Please try again.",
+        variant: "destructive",
+      });
+    }
   };
 
   console.log("Current state:", {
@@ -116,8 +136,11 @@ export function Dashboard({
       <section className="space-y-4">
         <h1 className="text-3xl font-bold tracking-tight">Home</h1>
         <div className="flex flex-wrap gap-4">
-          <Button className="bg-[#FF5722] hover:bg-[#F4511E]">
-            Create New Project
+          <Button asChild className="bg-[#FF5722] hover:bg-[#F4511E]">
+            <Link href="/projects/new">
+              <PlusCircle className="mr-2 h-4 w-4" />
+              Create New Project
+            </Link>
           </Button>
           <Button variant="outline" onClick={handleUploadClick}>
             <Upload className="mr-2 h-4 w-4" />
@@ -265,7 +288,7 @@ export function Dashboard({
           <DialogHeader>
             <DialogTitle>Select Project</DialogTitle>
             <DialogDescription>
-              Choose a project to upload the IFC file to, or create a new one
+              Choose a project to upload the IFC file to
             </DialogDescription>
           </DialogHeader>
           <div className="grid gap-4">
@@ -279,16 +302,9 @@ export function Dashboard({
                   setShowProjectSelect(false);
                 }}
               >
-                <Building className="mr-2 h-4 w-4" />
                 {project.name}
               </Button>
             ))}
-            <Button asChild variant="default" className="w-full">
-              <Link href="/projects/new">
-                <PlusCircle className="mr-2 h-4 w-4" />
-                Create New Project
-              </Link>
-            </Button>
           </div>
         </DialogContent>
       </Dialog>
@@ -298,9 +314,11 @@ export function Dashboard({
           projectId={selectedProjectId}
           open={true}
           onOpenChange={(open) => {
-            if (!open) setSelectedProjectId(null);
+            if (!open) {
+              setSelectedProjectId(null);
+            }
           }}
-          onSuccess={async (upload) => {
+          onSuccess={(upload) => {
             toast({
               title: "Upload Successful",
               description: "Your IFC file has been uploaded and processed.",

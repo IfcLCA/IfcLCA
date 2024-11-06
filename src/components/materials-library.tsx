@@ -40,48 +40,43 @@ type Project = {
   name: string;
 };
 
-export function MaterialsLibrary() {
-  const [materials, setMaterials] = useState<Material[]>([]);
-  const [projects, setProjects] = useState<Project[]>([]);
+export function MaterialsLibrary({
+  initialProjects,
+  initialMaterials,
+}: {
+  initialProjects: Project[];
+  initialMaterials: Material[];
+}) {
+  const [materials, setMaterials] = useState<Material[]>(initialMaterials);
+  const [projects, setProjects] = useState<Project[]>(initialProjects);
   const [selectedProject, setSelectedProject] = useState<string>("all");
   const [searchTerm, setSearchTerm] = useState("");
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
 
+  // Only fetch when project selection changes
   useEffect(() => {
-    fetchProjects();
-  }, []);
+    if (selectedProject === "all") {
+      setMaterials(initialMaterials);
+      return;
+    }
 
-  useEffect(() => {
+    const fetchMaterials = async () => {
+      setLoading(true);
+      try {
+        const response = await fetch(`/api/projects/${selectedProject}`);
+        if (!response.ok) throw new Error("Failed to fetch materials");
+        const data = await response.json();
+        setMaterials(data.materials || []);
+      } catch (error) {
+        console.error("Failed to fetch materials:", error);
+        setMaterials([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+
     fetchMaterials();
-  }, [selectedProject]);
-
-  const fetchProjects = async () => {
-    try {
-      const response = await fetch("/api/projects");
-      const data = await response.json();
-      setProjects(data);
-    } catch (error) {
-      console.error("Failed to fetch projects:", error);
-    }
-  };
-
-  const fetchMaterials = async () => {
-    setLoading(true);
-    try {
-      const url =
-        selectedProject === "all"
-          ? "/api/materials"
-          : `/api/projects/${selectedProject}`;
-      const response = await fetch(url);
-      const data = await response.json();
-      setMaterials(selectedProject === "all" ? data : data.materials);
-    } catch (error) {
-      console.error("Failed to fetch materials:", error);
-      setMaterials([]);
-    } finally {
-      setLoading(false);
-    }
-  };
+  }, [selectedProject, initialMaterials]);
 
   const filteredMaterials = materials.filter((material) =>
     material.name.toLowerCase().includes(searchTerm.toLowerCase())
