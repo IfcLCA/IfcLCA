@@ -48,7 +48,11 @@ export class IFCParserService {
       }
 
       if (!pythonProcess) {
-        throw new Error(`Failed to start Python process: ${error?.message}`);
+        throw new Error(
+          `Failed to start Python process: ${
+            error instanceof Error ? error.message : String(error)
+          }`
+        );
       }
 
       return new Promise((resolve, reject) => {
@@ -100,7 +104,9 @@ export class IFCParserService {
             console.error("Raw output:", outputData);
             resolve({
               elements: [],
-              error: `Failed to parse Python output: ${error.message}`,
+              error: `Failed to parse Python output: ${
+                error instanceof Error ? error.message : String(error)
+              }`,
             });
           }
         });
@@ -117,7 +123,9 @@ export class IFCParserService {
       console.error("parseWithPython error:", error);
       return {
         elements: [],
-        error: `IFC parsing failed: ${error.message}`,
+        error: `IFC parsing failed: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
       };
     }
   }
