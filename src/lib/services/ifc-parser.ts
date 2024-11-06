@@ -26,34 +26,50 @@ export class IFCParserService {
     filePath: string
   ): Promise<IFCParseResult> {
     try {
-      // Try python3 first, fall back to python if not found
-      const pythonCommand =
-        process.env.NODE_ENV === "production" ? "python3" : "python";
+      const pythonCommands =
+        process.platform === "win32"
+          ? ["py", "python3", "python"]
+          : ["python3", "python"];
 
-      const pythonProcess = spawn(pythonCommand, [
-        path.join(process.cwd(), "scripts/process_ifc.py"),
-        filePath,
-      ]);
+      let pythonProcess = null;
+      let error = null;
+
+      for (const cmd of pythonCommands) {
+        try {
+          pythonProcess = spawn(cmd, [
+            path.join(process.cwd(), "scripts/process_ifc.py"),
+            filePath,
+          ]);
+          break;
+        } catch (e) {
+          error = e;
+          continue;
+        }
+      }
+
+      if (!pythonProcess) {
+        throw new Error(`Failed to start Python process: ${error?.message}`);
+      }
 
       return new Promise((resolve, reject) => {
         let outputData = "";
         let errorData = "";
 
         pythonProcess.stdout.on("data", (data) => {
-          outputData += data.toString();
+          try {
+            outputData += data.toString();
+          } catch (e) {
+            console.error("Error reading stdout:", e);
+          }
         });
 
         pythonProcess.stderr.on("data", (data) => {
-          errorData += data.toString();
-          console.error("Python stderr:", errorData);
-        });
-
-        pythonProcess.on("error", (error) => {
-          console.error("Python process error:", error);
-          resolve({
-            elements: [],
-            error: `Failed to start Python process: ${error.message}`,
-          });
+          try {
+            errorData += data.toString();
+            console.error("Python stderr:", errorData);
+          } catch (e) {
+            console.error("Error reading stderr:", e);
+          }
         });
 
         pythonProcess.on("close", (code) => {
@@ -67,15 +83,34 @@ export class IFCParserService {
           }
 
           try {
-            const result = JSON.parse(outputData);
+            // Trim the output and verify it starts with {
+            const cleanOutput = outputData.trim();
+            if (!cleanOutput.startsWith("{")) {
+              throw new Error("Invalid JSON output from Python script");
+            }
+
+            const result = JSON.parse(cleanOutput);
+            if (!result || !Array.isArray(result.elements)) {
+              throw new Error("Invalid data structure from Python script");
+            }
+
             resolve({ elements: result.elements });
           } catch (error) {
             console.error("Failed to parse Python output:", error);
+            console.error("Raw output:", outputData);
             resolve({
               elements: [],
-              error: "Failed to parse Python output",
+              error: `Failed to parse Python output: ${error.message}`,
             });
           }
+        });
+
+        pythonProcess.on("error", (error) => {
+          console.error("Python process error:", error);
+          resolve({
+            elements: [],
+            error: `Failed to start Python process: ${error.message}`,
+          });
         });
       });
     } catch (error) {

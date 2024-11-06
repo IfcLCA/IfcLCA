@@ -6,7 +6,7 @@
     "dev": "next dev",
     "build": "prisma generate && next build",
     "vercel-build": "prisma generate && next build",
-    "start": "next start",
+    "start": "node .next/standalone/server.js",
     "lint": "next lint",
     "db:seed": "prisma db seed",
     "postinstall": "prisma generate",
