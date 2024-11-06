@@ -20,14 +20,23 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { toast } from "@/hooks/use-toast";
-import type { Project, Upload, Element, Material } from "@prisma/client";
+import type {
+  Project,
+  Upload as PrismaUpload,
+  Element,
+  Material,
+} from "@prisma/client";
 import { columns } from "@/components/columns";
 import { ReloadIcon } from "@radix-ui/react-icons";
 import { materialsColumns } from "@/components/materials-columns";
 
+type ElementWithMaterials = Element & {
+  materials: Material[];
+};
+
 interface ExtendedProject extends Project {
-  uploads: Upload[];
-  elements: Element[];
+  uploads: PrismaUpload[];
+  elements: ElementWithMaterials[];
   materials: Material[];
   _count: {
     elements: number;

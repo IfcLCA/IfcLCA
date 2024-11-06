@@ -116,8 +116,10 @@ export function MaterialsLibrary({
             <Select
               value={pageSize.toString()}
               onValueChange={(value) => {
-                setPageSize(Number(value));
-                setCurrentPage(1);
+                const params = new URLSearchParams(searchParams);
+                params.set("pageSize", value);
+                params.set("page", "1");
+                replace(`${pathname}?${params.toString()}`);
               }}
             >
               <SelectTrigger className="w-[70px]">
