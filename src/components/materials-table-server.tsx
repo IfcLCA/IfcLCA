@@ -1,50 +1,42 @@
 import { prisma } from "@/lib/db";
 
 export async function getMaterialsByProject(projectId?: string) {
-  const query = {
-    where: projectId && projectId !== "all" ? { id: projectId } : undefined,
-    include: {
-      elements: {
-        include: {
-          materials: {
-            select: {
-              id: true,
-              name: true,
-              category: true,
-              volume: true,
-              fraction: true,
-            },
+  try {
+    // First get all materials with their relationships
+    const materials = await prisma.material.findMany({
+      include: {
+        elements: {
+          where: projectId
+            ? {
+                projectId: projectId,
+              }
+            : undefined,
+          select: {
+            volume: true,
+            projectId: true,
           },
         },
       },
-    },
-  };
-
-  const projects = await prisma.project.findMany(query);
-
-  // Get unique materials using a Map
-  const materialsMap = new Map();
-  projects.forEach((project) => {
-    project.elements.forEach((element) => {
-      element.materials.forEach((material) => {
-        const volume = material.volume || 0;
-        if (!materialsMap.has(material.name)) {
-          materialsMap.set(material.name, {
-            id: material.id,
-            name: material.name,
-            volume: volume,
-            category: material.category,
-          });
-        } else {
-          const existingMaterial = materialsMap.get(material.name);
-          materialsMap.set(material.name, {
-            ...existingMaterial,
-            volume: existingMaterial.volume + volume,
-          });
-        }
-      });
     });
-  });
 
-  return Array.from(materialsMap.values());
+    // Process the materials to aggregate volumes by project
+    const processedMaterials = materials
+      .filter(
+        (m) => !projectId || m.elements.some((e) => e.projectId === projectId)
+      )
+      .map((material) => ({
+        id: material.id,
+        name: material.name,
+        category: material.category,
+        volume: material.elements.reduce(
+          (sum, elem) => sum + (elem.volume || 0),
+          0
+        ),
+      }));
+
+    return processedMaterials;
+  } catch (error) {
+    console.error("Error fetching materials:", error);
+    return [];
+  }
 }

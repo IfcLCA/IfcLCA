@@ -125,27 +125,7 @@ export class IFCParserService {
               .filter((m) => m.name && m.elementGuid); // Filter out invalid materials
 
             if (materialsData.length > 0) {
-              const materialValues = materialsData
-                .map(
-                  (m) =>
-                    `(gen_random_uuid(), '${m.name}', ${m.volume}, ${m.fraction}, (
-                      SELECT id FROM "Element" 
-                      WHERE guid = '${m.elementGuid}' 
-                      AND "uploadId" = '${uploadId}'
-                      LIMIT 1
-                    ))`
-                )
-                .join(",");
-
-              await tx.$executeRawUnsafe(`
-                INSERT INTO "Material" ("id", "name", "volume", "fraction", "elementId")
-                SELECT m.id, m.name, m.volume, m.fraction, m.elementId
-                FROM (
-                  VALUES ${materialValues}
-                ) AS m(id, name, volume, fraction, elementId)
-                WHERE m.elementId IS NOT NULL
-                ON CONFLICT DO NOTHING
-              `);
+              await this.insertMaterials(tx, materialsData, uploadId);
             }
 
             processedCount += batch.length;
@@ -192,5 +172,69 @@ export class IFCParserService {
         await IFCParserService.cleanup(tmpFile);
       }
     }
+  }
+
+  private static async insertMaterials(
+    tx: any,
+    materials: any[],
+    uploadId: string
+  ) {
+    if (materials.length === 0) return;
+
+    // First, deduplicate materials by name
+    const uniqueMaterials = Array.from(
+      new Map(materials.map((m) => [m.name, m])).values()
+    );
+
+    // Insert materials with a more robust upsert
+    const materialValues = uniqueMaterials
+      .map((m) => `('${m.name}', ${m.volume || 0}, ${m.fraction || 0})`)
+      .join(",");
+
+    const materialQuery = `
+      WITH new_materials AS (
+        SELECT m.name, m.volume, m.fraction
+        FROM (VALUES ${materialValues}) AS m(name, volume, fraction)
+      ),
+      upserted AS (
+        INSERT INTO "Material" ("id", "name", "volume", "fraction")
+        SELECT 
+          gen_random_uuid(),
+          new_materials.name,
+          new_materials.volume,
+          new_materials.fraction
+        FROM new_materials
+        ON CONFLICT ("name") DO UPDATE SET
+          volume = EXCLUDED.volume,
+          fraction = EXCLUDED.fraction
+        RETURNING id, name
+      )
+      SELECT * FROM upserted;
+    `;
+
+    const materialResults = await tx.$executeRawUnsafe(materialQuery);
+
+    // Create element-material relationships
+    const elementQuery = `
+      WITH material_ids AS (
+        SELECT id, name FROM "Material"
+        WHERE name IN (${uniqueMaterials.map((m) => `'${m.name}'`).join(",")})
+      )
+      INSERT INTO "_ElementToMaterial" ("A", "B")
+      SELECT DISTINCT e.id, m.id
+      FROM "Element" e
+      CROSS JOIN material_ids m
+      WHERE e."uploadId" = '${uploadId}'
+      AND EXISTS (
+        SELECT 1 FROM (VALUES ${materials
+          .map((m) => `('${m.elementGuid}', '${m.name}')`)
+          .join(",")}) 
+        AS mat(guid, name)
+        WHERE mat.guid = e.guid AND mat.name = m.name
+      )
+      ON CONFLICT DO NOTHING;
+    `;
+
+    await tx.$executeRawUnsafe(elementQuery);
   }
 }

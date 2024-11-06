@@ -33,25 +33,30 @@ model Upload {
 }
 
 model Element {
-  id            String     @id @default(cuid())
-  guid          String     @unique
-  name          String
-  type          String?
-  volume        Float?
+  id             String     @id @default(cuid())
+  guid           String     @unique
+  name           String
+  type           String?
+  volume         Float?
   buildingStorey String?
-  projectId     String
-  uploadId      String?
-  project       Project    @relation(fields: [projectId], references: [id])
-  upload        Upload?    @relation(fields: [uploadId], references: [id])
-  materials     Material[] @relation("ElementToMaterial")
+  projectId      String
+  uploadId       String?
+  project        Project    @relation(fields: [projectId], references: [id])
+  upload         Upload?    @relation(fields: [uploadId], references: [id])
+  materials      Material[] @relation("ElementToMaterial")
+
+  @@index([guid])
+  @@index([projectId])
+  @@index([uploadId])
 }
 
 model Material {
   id         String    @id @default(cuid())
-  name       String
+  name       String    @unique
   category   String?
-  elementId  String
   volume     Float?
   fraction   Float?
   elements   Element[] @relation("ElementToMaterial")
+
+  @@index([name])
 } 

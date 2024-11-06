@@ -8,7 +8,12 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
     const projectId = searchParams.get("projectId");
 
+    console.log("Fetching materials for project:", projectId);
+
     const materials = await getMaterialsByProject(projectId || undefined);
+
+    console.log("Found materials:", materials.length);
+
     return NextResponse.json(materials);
   } catch (error) {
     console.error("Failed to fetch materials:", error);

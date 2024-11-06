@@ -75,6 +75,10 @@ export function MaterialsLibrary({
     fetchMaterials();
   }, [selectedProject]);
 
+  useEffect(() => {
+    console.log("Initial materials:", initialMaterials);
+  }, [initialMaterials]);
+
   const filteredMaterials = materials.filter((material) =>
     material.name.toLowerCase().includes(searchTerm.toLowerCase())
   );
