@@ -34,24 +34,24 @@ model Upload {
 
 model Element {
   id            String     @id @default(cuid())
+  guid          String     // Keep this
   name          String
   type          String?
-  volume        Float
+  volume        Float?
   buildingStorey String?
-  project       Project    @relation(fields: [projectId], references: [id])
   projectId     String
-  upload        Upload     @relation(fields: [uploadId], references: [id])
-  uploadId      String
-  materials     Material[] // Relation to materials
+  uploadId      String?
+  project       Project    @relation(fields: [projectId], references: [id])
+  upload        Upload?    @relation(fields: [uploadId], references: [id])
+  materials     Material[] // This creates the many-to-many relationship
 }
 
 model Material {
-  id       String    @id @default(cuid())
-  name     String
-  category String?
-  density  Float?
-  gwp      Float?
-  penr     Float?
-  ubp      Float?
-  elements Element[] // Many-to-many relation with elements
+  id         String    @id @default(cuid())
+  name       String
+  category   String?
+  elementId  String    // Keep this
+  volume     Float?    // Keep this
+  fraction   Float?    // Keep this
+  elements   Element[] // This creates the many-to-many relationship
 } 

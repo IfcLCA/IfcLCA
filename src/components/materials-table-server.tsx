@@ -1,27 +1,24 @@
 import { prisma } from "@/lib/db";
 
 export async function getMaterialsByProject(projectId?: string) {
-  const query =
-    projectId && projectId !== "all"
-      ? {
-          where: { id: projectId },
-          include: {
-            elements: {
-              include: {
-                materials: true,
-              },
+  const query = {
+    where: projectId && projectId !== "all" ? { id: projectId } : undefined,
+    include: {
+      elements: {
+        include: {
+          materials: {
+            select: {
+              id: true,
+              name: true,
+              category: true,
+              volume: true,
+              fraction: true,
             },
           },
-        }
-      : {
-          include: {
-            elements: {
-              include: {
-                materials: true,
-              },
-            },
-          },
-        };
+        },
+      },
+    },
+  };
 
   const projects = await prisma.project.findMany(query);
 
@@ -30,18 +27,19 @@ export async function getMaterialsByProject(projectId?: string) {
   projects.forEach((project) => {
     project.elements.forEach((element) => {
       element.materials.forEach((material) => {
+        const volume = material.volume || 0;
         if (!materialsMap.has(material.name)) {
           materialsMap.set(material.name, {
             id: material.id,
             name: material.name,
-            volume: element.volume || 0,
+            volume: volume,
             category: material.category,
           });
         } else {
           const existingMaterial = materialsMap.get(material.name);
           materialsMap.set(material.name, {
             ...existingMaterial,
-            volume: existingMaterial.volume + (element.volume || 0),
+            volume: existingMaterial.volume + volume,
           });
         }
       });
