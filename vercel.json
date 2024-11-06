@@ -1,13 +1,17 @@
 {
-  "buildCommand": "npm run build",
-  "installCommand": "npm install",
-  "framework": "nextjs",
-  "buildEnvironment": {
-    "PYTHON_VERSION": "3.9"
-  },
+  "version": 2,
+  "builds": [
+    {
+      "src": "package.json",
+      "use": "@vercel/next"
+    }
+  ],
   "functions": {
     "api/**/*": {
       "runtime": "nodejs18.x"
     }
+  },
+  "env": {
+    "PYTHON_VERSION": "3.9"
   }
 }

@@ -1,13 +1,9 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   typescript: {
-    // !! WARN !!
-    // Dangerously allow production builds to successfully complete even if
-    // your project has type errors.
-    // !! WARN !!
+    // Allow production builds to complete even with type errors
     ignoreBuildErrors: true,
   },
-  // Add this section to copy Python scripts
   experimental: {
     outputFileTracingIncludes: {
       "/api/**/*": ["./scripts/**/*"],
