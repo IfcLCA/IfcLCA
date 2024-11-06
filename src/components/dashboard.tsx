@@ -13,8 +13,24 @@ import {
 import { Progress } from "@/components/ui/progress";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
-import { BarChart, Building, FileText, Users, BarChart2 } from "lucide-react";
+import {
+  BarChart,
+  Building,
+  FileText,
+  Users,
+  BarChart2,
+  Upload,
+} from "lucide-react";
 import { UploadModal } from "@/components/upload-modal";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { useToast } from "@/hooks/use-toast";
+import { useState } from "react";
 
 interface Project {
   id: string;
@@ -53,13 +69,39 @@ export function Dashboard({
   statistics,
   activities,
 }: DashboardProps) {
-  const handleUploadSuccess = (upload: any) => {
-    console.log("Upload successful:", upload);
+  const [showProjectSelect, setShowProjectSelect] = useState(false);
+  const [selectedProjectId, setSelectedProjectId] = useState<string | null>(
+    null
+  );
+  const { toast } = useToast();
+
+  const handleUploadClick = () => {
+    console.log("Upload button clicked");
+    if (recentProjects.length === 0) {
+      console.log("No projects available");
+      toast({
+        title: "No Projects Available",
+        description:
+          "Please create a project first before uploading IFC files.",
+        variant: "destructive",
+      });
+      return;
+    }
+    console.log("Opening project select dialog");
+    setShowProjectSelect(true);
   };
 
-  const handleUploadProgress = (progress: number) => {
-    console.log("Upload progress:", progress);
+  const handleProjectSelect = (projectId: string) => {
+    console.log("Project selected:", projectId);
+    setSelectedProjectId(projectId);
+    setShowProjectSelect(false);
   };
+
+  console.log("Current state:", {
+    showProjectSelect,
+    selectedProjectId,
+    recentProjects,
+  });
 
   return (
     <div className="container mx-auto p-4 space-y-8">
@@ -68,13 +110,13 @@ export function Dashboard({
           Welcome to IfcLCA Dashboard
         </h1>
         <div className="flex flex-wrap gap-4">
-          <Button>Create New Project</Button>
-          <UploadModal
-            projectId="default-project"
-            onSuccess={handleUploadSuccess}
-            onProgress={handleUploadProgress}
-            trigger={<Button variant="outline">Import IFC File</Button>}
-          />
+          <Button className="bg-[#FF5722] hover:bg-[#F4511E]">
+            Create New Project
+          </Button>
+          <Button variant="outline" onClick={handleUploadClick}>
+            <Upload className="mr-2 h-4 w-4" />
+            Upload IFC
+          </Button>
           <Button variant="outline">Generate Report</Button>
         </div>
       </section>
@@ -211,6 +253,58 @@ export function Dashboard({
           </Button>
         </div>
       </section>
+
+      <Dialog
+        open={showProjectSelect}
+        onOpenChange={(open) => {
+          console.log("Dialog onOpenChange:", open);
+          setShowProjectSelect(open);
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Select Project</DialogTitle>
+            <DialogDescription>
+              Choose a project to upload the IFC file to
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4">
+            {recentProjects.map((project) => (
+              <Button
+                key={project.id}
+                variant="outline"
+                className="w-full justify-start"
+                onClick={() => handleProjectSelect(project.id)}
+              >
+                <Building className="mr-2 h-4 w-4" />
+                {project.name}
+              </Button>
+            ))}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {selectedProjectId && (
+        <UploadModal
+          projectId={selectedProjectId}
+          open={true}
+          onOpenChange={(open) => {
+            console.log("Upload modal onOpenChange:", open);
+            if (!open) setSelectedProjectId(null);
+          }}
+          onSuccess={(upload) => {
+            console.log("Upload success:", upload);
+            toast({
+              title: "Upload Successful",
+              description: "Your IFC file has been uploaded and processed.",
+            });
+            setSelectedProjectId(null);
+          }}
+          onProgress={(progress) => {
+            console.log("Upload progress:", progress);
+          }}
+        />
+      )}
     </div>
   );
 }

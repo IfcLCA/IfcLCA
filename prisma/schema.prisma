@@ -11,7 +11,7 @@ datasource db {
 
 model Project {
   id          String    @id @default(cuid())
-  name        String    @unique
+  name        String
   description String?
   phase       String?
   createdAt   DateTime  @default(now())

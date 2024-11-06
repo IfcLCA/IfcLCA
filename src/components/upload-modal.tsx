@@ -4,24 +4,47 @@ import { useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "./ui/dialog";
 import { useDropzone } from "react-dropzone";
 import { Loader2, Upload } from "lucide-react";
-
+import { useToast } from "@/hooks/use-toast";
 interface UploadModalProps {
   projectId: string;
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  onUploadComplete?: () => void;
-  trigger: React.ReactNode;
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
+  onSuccess?: (upload: any) => void;
+  onProgress?: (progress: number) => void;
 }
 
 export function UploadModal({
   projectId,
   open,
   onOpenChange,
-  onUploadComplete,
-  trigger,
+  onSuccess,
+  onProgress,
 }: UploadModalProps) {
   const [isUploading, setIsUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const { toast } = useToast();
+
+  const handleUpload = async (file: File) => {
+    const formData = new FormData();
+    formData.append("file", file);
+    formData.append("projectId", projectId);
+
+    try {
+      const response = await fetch("/api/ifc/process", {
+        method: "POST",
+        body: formData,
+      });
+
+      if (!response.ok) {
+        throw new Error("Upload failed");
+      }
+
+      const result = await response.json();
+      // Handle successful upload
+    } catch (error) {
+      // Handle error
+    }
+  };
 
   const onDrop = async (acceptedFiles: File[]) => {
     const file = acceptedFiles[0];
@@ -39,17 +62,28 @@ export function UploadModal({
         body: formData,
       });
 
+      const data = await response.json();
+
       if (!response.ok) {
-        throw new Error("Upload failed");
+        throw new Error(data.error || "Upload failed");
       }
 
-      if (onUploadComplete) {
-        onUploadComplete();
+      if (onSuccess) {
+        onSuccess(data);
       }
-      onOpenChange(false);
+
+      onOpenChange?.(false);
     } catch (error) {
       console.error("Upload failed:", error);
-      setError("Failed to upload file");
+      const errorMessage =
+        error instanceof Error ? error.message : "Failed to upload file";
+      setError(errorMessage);
+
+      toast({
+        title: "Upload Failed",
+        description: errorMessage,
+        variant: "destructive",
+      });
     } finally {
       setIsUploading(false);
     }
