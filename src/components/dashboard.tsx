@@ -76,7 +76,6 @@ export function Dashboard({
     null
   );
   const [projects, setProjects] = useState<Project[]>([]);
-  const { toast } = useToast();
   const router = useRouter();
 
   useEffect(() => {
@@ -92,11 +91,6 @@ export function Dashboard({
       setProjects(data);
     } catch (error) {
       console.error("Failed to fetch projects:", error);
-      toast({
-        title: "Error",
-        description: "Failed to load projects. Please try again.",
-        variant: "destructive",
-      });
     }
   };
 
@@ -106,22 +100,11 @@ export function Dashboard({
       const projects = await response.json();
 
       if (!projects?.length) {
-        toast({
-          title: "No Projects Available",
-          description:
-            "Please create a project first before uploading IFC files.",
-          variant: "destructive",
-        });
         return;
       }
       setShowProjectSelect(true);
     } catch (error) {
       console.error("Failed to check projects:", error);
-      toast({
-        title: "Error",
-        description: "Failed to check projects. Please try again.",
-        variant: "destructive",
-      });
     }
   };
 
@@ -319,10 +302,6 @@ export function Dashboard({
             }
           }}
           onSuccess={(upload) => {
-            toast({
-              title: "Upload Successful",
-              description: "Your IFC file has been uploaded and processed.",
-            });
             setSelectedProjectId(null);
             router.push(`/projects/${selectedProjectId}`);
           }}

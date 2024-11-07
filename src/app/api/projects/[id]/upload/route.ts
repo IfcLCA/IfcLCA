@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
-import { IFCParserService } from "@/lib/services/ifc-parser";
+import { IFCParser } from "@/lib/services/ifc-parser-new";
 
 export const runtime = "nodejs";
 export const maxDuration = 300;
@@ -48,18 +48,40 @@ export async function POST(
 
     try {
       const buffer = Buffer.from(await file.arrayBuffer());
-      const result = await IFCParserService.processIFCFile(
-        buffer,
-        upload.id,
-        project.id
-      );
+      const content = buffer.toString("utf-8");
+      const parser = new IFCParser();
+      const elements = parser.parseContent(content);
 
-      if (result.error) {
-        console.error("IFC processing error:", result.error);
-        return NextResponse.json({ error: result.error }, { status: 500 });
+      // Use upsert to handle duplicates
+      for (const element of elements) {
+        await prisma.element.upsert({
+          where: { guid: element.globalId },
+          update: {
+            name: element.name,
+            type: element.type,
+            volume: element.netVolume,
+            buildingStorey: element.spatialContainer,
+            projectId: project.id,
+            uploadId: upload.id,
+          },
+          create: {
+            guid: element.globalId,
+            name: element.name,
+            type: element.type,
+            volume: element.netVolume,
+            buildingStorey: element.spatialContainer,
+            projectId: project.id,
+            uploadId: upload.id,
+          },
+        });
       }
 
-      return NextResponse.json(result);
+      await prisma.upload.update({
+        where: { id: upload.id },
+        data: { status: "Completed", elementCount: elements.length },
+      });
+
+      return NextResponse.json({ success: true, elements });
     } catch (processingError) {
       await prisma.upload.update({
         where: { id: upload.id },
@@ -84,9 +106,11 @@ export async function POST(
       );
     }
   } catch (error) {
-    console.error("Upload error:", error);
     return NextResponse.json(
-      { error: "Failed to process upload" },
+      {
+        success: false,
+        error: "An unexpected error occurred",
+      },
       { status: 500 }
     );
   }
