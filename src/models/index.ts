@@ -39,23 +39,76 @@ const uploadSchema = new mongoose.Schema({
   createdAt: { type: Date, default: Date.now },
 });
 
-const elementSchema = new mongoose.Schema({
-  guid: { type: String, unique: true },
-  name: { type: String, required: true },
-  type: String,
-  volume: Number,
-  buildingStorey: String,
-  projectId: { type: mongoose.Schema.Types.ObjectId, ref: "Project" },
-  uploadId: { type: mongoose.Schema.Types.ObjectId, ref: "Upload" },
-  materials: [{ type: mongoose.Schema.Types.ObjectId, ref: "Material" }],
-});
+const materialSchema = new mongoose.Schema(
+  {
+    name: { type: String, required: true },
+    category: String,
+    volume: Number,
+    fraction: Number,
+  },
+  {
+    timestamps: true,
+  }
+);
 
-const materialSchema = new mongoose.Schema({
-  name: { type: String, unique: true },
-  category: String,
-  volume: Number,
-  fraction: Number,
-});
+const materialUsageSchema = new mongoose.Schema(
+  {
+    materialId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Material",
+      required: true,
+    },
+    projectId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Project",
+      required: true,
+    },
+    volume: Number,
+  },
+  {
+    timestamps: true,
+    indexes: [{ materialId: 1, projectId: 1, unique: true }],
+  }
+);
+
+const elementSchema = new mongoose.Schema(
+  {
+    guid: {
+      type: String,
+      sparse: true,
+    },
+    name: { type: String, required: true },
+    type: String,
+    volume: Number,
+    buildingStorey: String,
+    projectId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Project",
+      required: true,
+    },
+    uploadId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Upload",
+      required: true,
+    },
+    materials: [{ type: mongoose.Schema.Types.ObjectId, ref: "Material" }],
+    materialLayers: {
+      layerSetName: String,
+      layers: [
+        {
+          layerId: String,
+          layerName: String,
+          thickness: Number,
+          materialName: String,
+        },
+      ],
+    },
+  },
+  {
+    timestamps: true,
+    indexes: [{ guid: 1, projectId: 1, unique: true, sparse: true }],
+  }
+);
 
 // Export models with type checking
 export const Project =
@@ -66,3 +119,6 @@ export const Element =
   mongoose.models.Element || mongoose.model("Element", elementSchema);
 export const Material =
   mongoose.models.Material || mongoose.model("Material", materialSchema);
+export const MaterialUsage =
+  mongoose.models.MaterialUsage ||
+  mongoose.model("MaterialUsage", materialUsageSchema);

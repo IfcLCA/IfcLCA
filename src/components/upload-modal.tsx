@@ -24,26 +24,24 @@ export function UploadModal({
   const [error, setError] = useState<string | null>(null);
   const { toast } = useToast();
 
-  const handleUpload = async (file: File) => {
-    const formData = new FormData();
-    formData.append("file", file);
-    formData.append("projectId", projectId);
+  const processFile = async (uploadId: string, file: File) => {
+    const content = await file.text();
+    const response = await fetch(`/api/projects/${projectId}/upload/process`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        uploadId,
+        content,
+      }),
+    });
 
-    try {
-      const response = await fetch("/api/ifc/process", {
-        method: "POST",
-        body: formData,
-      });
-
-      if (!response.ok) {
-        throw new Error("Upload failed");
-      }
-
-      const result = await response.json();
-      // Handle successful upload
-    } catch (error) {
-      // Handle error
+    if (!response.ok) {
+      throw new Error("Failed to process IFC file");
     }
+
+    return response.json();
   };
 
   const onDrop = async (acceptedFiles: File[]) => {
@@ -54,25 +52,34 @@ export function UploadModal({
     setError(null);
 
     try {
+      // First create upload record
       const formData = new FormData();
       formData.append("file", file);
 
-      const response = await fetch(`/api/projects/${projectId}/upload`, {
+      const uploadResponse = await fetch(`/api/projects/${projectId}/upload`, {
         method: "POST",
         body: formData,
       });
 
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || "Upload failed");
+      if (!uploadResponse.ok) {
+        throw new Error("Failed to create upload record");
       }
 
+      const upload = await uploadResponse.json();
+
+      // Process the file
+      await processFile(upload.id, file);
+
       if (onSuccess) {
-        onSuccess(data);
+        onSuccess(upload);
       }
 
       onOpenChange?.(false);
+
+      toast({
+        title: "Upload Successful",
+        description: "Your IFC file has been uploaded and processed.",
+      });
     } catch (error) {
       console.error("Upload failed:", error);
       const errorMessage =

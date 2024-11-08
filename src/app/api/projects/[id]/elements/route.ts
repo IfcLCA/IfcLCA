@@ -19,14 +19,23 @@ export async function GET(
       );
     }
 
-    const elements = await Element.find({ projectId: params.id }).lean();
+    const elements = await Element.find({ projectId: params.id })
+      .populate("materials")
+      .lean();
 
     const formattedElements = elements.map((element) => ({
       id: element._id.toString(),
       name: element.name,
-      type: element.type,
-      volume: element.volume,
-      buildingStorey: element.buildingStorey,
+      type: element.type || "Unknown",
+      volume: element.volume?.toFixed(2) || "0.00",
+      buildingStorey: element.buildingStorey || "-",
+      materials:
+        element.materials?.map((material: any) => ({
+          id: material._id.toString(),
+          name: material.name,
+          volume: material.volume?.toFixed(2) || "0.00",
+          fraction: material.fraction?.toFixed(2) || "0.00",
+        })) || [],
     }));
 
     return NextResponse.json(formattedElements);
