@@ -5,6 +5,23 @@ import mongoose from "mongoose";
 
 export const runtime = "nodejs";
 
+// Update interfaces to be plain object types (for lean queries)
+interface IProject {
+  _id: mongoose.Types.ObjectId;
+  name: string;
+  description: string;
+  phase: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+interface IUpload {
+  _id: mongoose.Types.ObjectId;
+  projectId: mongoose.Types.ObjectId;
+  // other upload fields
+  __v: number;
+}
+
 export async function GET(
   request: Request,
   { params }: { params: { id: string } }
@@ -19,15 +36,19 @@ export async function GET(
       );
     }
 
-    const project = await Project.findById(params.id).lean();
+    const project = (await Project.findById(params.id)
+      .lean()
+      .exec()) as unknown as IProject;
 
     if (!project) {
       return NextResponse.json({ error: "Project not found" }, { status: 404 });
     }
 
-    // Get uploads and counts
+    // Get uploads and counts with proper typing
     const [uploads, uploadsCount, elementsCount] = await Promise.all([
-      Upload.find({ projectId: project._id }).lean(),
+      Upload.find({ projectId: project._id })
+        .lean()
+        .exec() as unknown as IUpload[],
       Upload.countDocuments({ projectId: project._id }),
       Element.countDocuments({ projectId: project._id }),
     ]);
@@ -66,31 +87,25 @@ export async function PATCH(
   { params }: { params: { id: string } }
 ) {
   try {
+    await connectToDatabase();
     const { name, description } = await request.json();
 
-    const project = await prisma.project.update({
-      where: { id: params.id },
-      data: {
+    const project = await Project.findByIdAndUpdate(
+      params.id,
+      {
         ...(name && { name }),
         ...(description !== undefined && { description }),
       },
-    });
+      { new: true }
+    );
+
+    if (!project) {
+      return NextResponse.json({ error: "Project not found" }, { status: 404 });
+    }
 
     return NextResponse.json(project);
   } catch (error) {
     console.error("Failed to update project:", error);
-
-    if (
-      error instanceof Error &&
-      typeof (error as any).code === "string" &&
-      (error as any).code === "P2002"
-    ) {
-      return NextResponse.json(
-        { error: "A project with this name already exists" },
-        { status: 409 }
-      );
-    }
-
     return NextResponse.json(
       { error: "Failed to update project" },
       { status: 500 }
@@ -103,28 +118,12 @@ export async function DELETE(
   { params }: { params: { id: string } }
 ) {
   try {
-    // Delete all related records first
-    await prisma.$transaction([
-      // Delete all elements associated with uploads in this project
-      prisma.element.deleteMany({
-        where: {
-          upload: {
-            projectId: params.id,
-          },
-        },
-      }),
-      // Delete all uploads associated with this project
-      prisma.upload.deleteMany({
-        where: {
-          projectId: params.id,
-        },
-      }),
-      // Finally delete the project
-      prisma.project.delete({
-        where: {
-          id: params.id,
-        },
-      }),
+    await connectToDatabase();
+
+    await Promise.all([
+      Element.deleteMany({ projectId: params.id }),
+      Upload.deleteMany({ projectId: params.id }),
+      Project.findByIdAndDelete(params.id),
     ]);
 
     return NextResponse.json({ success: true });

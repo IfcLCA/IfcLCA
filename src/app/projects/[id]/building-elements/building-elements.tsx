@@ -1,6 +1,6 @@
-"use client"
+"use client";
 
-import * as React from "react"
+import * as React from "react";
 import {
   ColumnDef,
   ColumnFiltersState,
@@ -12,11 +12,11 @@ import {
   getPaginationRowModel,
   getSortedRowModel,
   useReactTable,
-} from "@tanstack/react-table"
-import { ArrowUpDown, ChevronDown, MoreHorizontal } from "lucide-react"
+} from "@tanstack/react-table";
+import { ArrowUpDown, ChevronDown, MoreHorizontal } from "lucide-react";
 
-import { Button } from "@/components/ui/button"
-import { Checkbox } from "@/components/ui/checkbox"
+import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
@@ -25,8 +25,8 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
-import { Input } from "@/components/ui/input"
+} from "@/components/ui/dropdown-menu";
+import { Input } from "@/components/ui/input";
 import {
   Table,
   TableBody,
@@ -34,53 +34,61 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from "@/components/ui/table"
+} from "@/components/ui/table";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select"
+} from "@/components/ui/select";
 
 interface BuildingElement {
-  id: string
-  name: string
-  type: string
-  material: string
-  level: string
-  volume: number
-  co2Impact: number
+  id: string;
+  name: string;
+  type: string;
+  material: string;
+  level: string;
+  volume: number;
+  co2Impact: number;
 }
 
 interface Material {
-  id: string
-  name: string
+  id: string;
+  name: string;
 }
 
 interface FilterState {
-  type: string[]
-  material: string[]
-  level: string[]
+  type: string[];
+  material: string[];
+  level: string[];
 }
 
 interface SortState {
-  id: string
-  desc: boolean
+  id: string;
+  desc: boolean;
 }
 
 interface BuildingElementsProps {
-  elements: BuildingElement[]
-  materials: Material[]
-  filters: FilterState
-  sorting: SortState
+  elements: BuildingElement[];
+  materials: Material[];
+  filters: FilterState;
+  sorting: SortState[];
 }
 
-export function BuildingElements({ elements, materials, filters, sorting }: BuildingElementsProps) {
-  const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>([])
-  const [columnVisibility, setColumnVisibility] = React.useState<VisibilityState>({})
-  const [rowSelection, setRowSelection] = React.useState({})
-  const [sorting, setSorting] = React.useState<SortingState>([])
+export function BuildingElements({
+  elements,
+  materials,
+  filters,
+  sorting: initialSorting,
+}: BuildingElementsProps) {
+  const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>(
+    []
+  );
+  const [columnVisibility, setColumnVisibility] =
+    React.useState<VisibilityState>({});
+  const [rowSelection, setRowSelection] = React.useState({});
+  const [sorting, setSorting] = React.useState<SortState[]>(initialSorting);
 
   const columns: ColumnDef<BuildingElement>[] = [
     {
@@ -105,22 +113,30 @@ export function BuildingElements({ elements, materials, filters, sorting }: Buil
     {
       accessorKey: "name",
       header: "Name",
-      cell: ({ row }) => <div className="capitalize">{row.getValue("name")}</div>,
+      cell: ({ row }) => (
+        <div className="capitalize">{row.getValue("name")}</div>
+      ),
     },
     {
       accessorKey: "type",
       header: "Type",
-      cell: ({ row }) => <div className="capitalize">{row.getValue("type")}</div>,
+      cell: ({ row }) => (
+        <div className="capitalize">{row.getValue("type")}</div>
+      ),
     },
     {
       accessorKey: "material",
       header: "Material",
-      cell: ({ row }) => <div className="capitalize">{row.getValue("material")}</div>,
+      cell: ({ row }) => (
+        <div className="capitalize">{row.getValue("material")}</div>
+      ),
     },
     {
       accessorKey: "level",
       header: "Level",
-      cell: ({ row }) => <div className="capitalize">{row.getValue("level")}</div>,
+      cell: ({ row }) => (
+        <div className="capitalize">{row.getValue("level")}</div>
+      ),
     },
     {
       accessorKey: "volume",
@@ -133,9 +149,11 @@ export function BuildingElements({ elements, materials, filters, sorting }: Buil
             Volume
             <ArrowUpDown className="ml-2 h-4 w-4" />
           </Button>
-        )
+        );
       },
-      cell: ({ row }) => <div className="text-right">{row.getValue("volume")} m³</div>,
+      cell: ({ row }) => (
+        <div className="text-right">{row.getValue("volume")} m³</div>
+      ),
     },
     {
       accessorKey: "co2Impact",
@@ -148,15 +166,17 @@ export function BuildingElements({ elements, materials, filters, sorting }: Buil
             CO2 Impact
             <ArrowUpDown className="ml-2 h-4 w-4" />
           </Button>
-        )
+        );
       },
-      cell: ({ row }) => <div className="text-right">{row.getValue("co2Impact")} kg</div>,
+      cell: ({ row }) => (
+        <div className="text-right">{row.getValue("co2Impact")} kg</div>
+      ),
     },
     {
       id: "actions",
       enableHiding: false,
       cell: ({ row }) => {
-        const element = row.original
+        const element = row.original;
 
         return (
           <DropdownMenu>
@@ -168,7 +188,9 @@ export function BuildingElements({ elements, materials, filters, sorting }: Buil
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
               <DropdownMenuLabel>Actions</DropdownMenuLabel>
-              <DropdownMenuItem onClick={() => navigator.clipboard.writeText(element.id)}>
+              <DropdownMenuItem
+                onClick={() => navigator.clipboard.writeText(element.id)}
+              >
                 Copy element ID
               </DropdownMenuItem>
               <DropdownMenuSeparator />
@@ -176,10 +198,10 @@ export function BuildingElements({ elements, materials, filters, sorting }: Buil
               <DropdownMenuItem>Edit element</DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
-        )
+        );
       },
     },
-  ]
+  ];
 
   const table = useReactTable({
     data: elements,
@@ -191,14 +213,14 @@ export function BuildingElements({ elements, materials, filters, sorting }: Buil
     getFilteredRowModel: getFilteredRowModel(),
     onColumnVisibilityChange: setColumnVisibility,
     onRowSelectionChange: setRowSelection,
-    onSortingChange: setSorting,
+    onSortingChange: setSorting as any,
     state: {
-      sorting,
+      sorting: sorting as any,
       columnFilters,
       columnVisibility,
       rowSelection,
     },
-  })
+  });
 
   return (
     <div className="space-y-4">
@@ -228,11 +250,13 @@ export function BuildingElements({ elements, materials, filters, sorting }: Buil
                       key={column.id}
                       className="capitalize"
                       checked={column.getIsVisible()}
-                      onCheckedChange={(value) => column.toggleVisibility(!!value)}
+                      onCheckedChange={(value) =>
+                        column.toggleVisibility(!!value)
+                      }
                     >
                       {column.id}
                     </DropdownMenuCheckboxItem>
-                  )
+                  );
                 })}
             </DropdownMenuContent>
           </DropdownMenu>
@@ -266,7 +290,7 @@ export function BuildingElements({ elements, materials, filters, sorting }: Buil
                             header.getContext()
                           )}
                     </TableHead>
-                  )
+                  );
                 })}
               </TableRow>
             ))}
@@ -280,14 +304,20 @@ export function BuildingElements({ elements, materials, filters, sorting }: Buil
                 >
                   {row.getVisibleCells().map((cell) => (
                     <TableCell key={cell.id}>
-                      {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                      {flexRender(
+                        cell.column.columnDef.cell,
+                        cell.getContext()
+                      )}
                     </TableCell>
                   ))}
                 </TableRow>
               ))
             ) : (
               <TableRow>
-                <TableCell colSpan={columns.length} className="h-24 text-center">
+                <TableCell
+                  colSpan={columns.length}
+                  className="h-24 text-center"
+                >
                   No results.
                 </TableCell>
               </TableRow>
@@ -320,5 +350,5 @@ export function BuildingElements({ elements, materials, filters, sorting }: Buil
         </div>
       </div>
     </div>
-  )
+  );
 }

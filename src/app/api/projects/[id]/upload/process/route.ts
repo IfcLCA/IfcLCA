@@ -7,6 +7,37 @@ import { IFCParser } from "@/lib/services/ifc-parser-new";
 export const runtime = "nodejs";
 export const maxDuration = 300;
 
+// Add this interface near the top of the file
+interface IFCElement {
+  materialLayers?: {
+    layers?: Array<{
+      materialName?: string;
+      thickness?: number;
+      layerId?: string;
+      layerName?: string;
+    }>;
+    layerSetName?: string;
+  };
+  globalId: string;
+  name: string;
+  type: string;
+  netVolume?: number;
+  spatialContainer?: string;
+}
+
+// Add interfaces for type safety
+interface MaterialLayer {
+  materialName?: string;
+  thickness?: number;
+  layerId?: string;
+  layerName?: string;
+}
+
+interface SavedMaterial {
+  _id: mongoose.Types.ObjectId;
+  name: string;
+}
+
 export async function POST(
   request: Request,
   { params }: { params: { id: string } }
@@ -36,21 +67,19 @@ export async function POST(
     console.log("Processing elements:", JSON.stringify(elements, null, 2));
 
     // Process materials from layers
-    const materialPromises = elements.flatMap((element) => {
-      if (
-        !element.materialLayers?.layers ||
-        !Array.isArray(element.materialLayers.layers)
-      ) {
+    const materialPromises = elements.flatMap((element: IFCElement) => {
+      const layers = element.materialLayers?.layers;
+      if (!layers || !Array.isArray(layers)) {
         return [];
       }
 
       // Extract unique materials from layers
       const uniqueMaterials = new Map();
-      element.materialLayers.layers.forEach((layer) => {
+      layers.forEach((layer) => {
         if (layer.materialName) {
           uniqueMaterials.set(layer.materialName, {
             name: layer.materialName,
-            category: element.materialLayers.layerSetName,
+            category: element.materialLayers?.layerSetName,
             // Sum up volumes for same materials
             volume:
               (uniqueMaterials.get(layer.materialName)?.volume || 0) +
@@ -99,11 +128,11 @@ export async function POST(
       Boolean
     );
     const materialNameToId = new Map(
-      savedMaterials.map((m) => [m.name, m._id])
+      savedMaterials.map((m: SavedMaterial) => [m.name, m._id])
     );
 
     // Save elements with material references
-    const elementPromises = elements.map(async (element) => {
+    const elementPromises = elements.map(async (element: IFCElement) => {
       // Get material IDs from layers
       const materialIds =
         element.materialLayers?.layers
@@ -123,12 +152,14 @@ export async function POST(
         materialLayers: element.materialLayers
           ? {
               layerSetName: element.materialLayers.layerSetName,
-              layers: element.materialLayers.layers.map((layer) => ({
-                layerId: layer.layerId,
-                layerName: layer.layerName,
-                thickness: layer.thickness,
-                materialName: layer.materialName,
-              })),
+              layers: element.materialLayers.layers.map(
+                (layer: MaterialLayer) => ({
+                  layerId: layer.layerId,
+                  layerName: layer.layerName,
+                  thickness: layer.thickness,
+                  materialName: layer.materialName,
+                })
+              ),
             }
           : undefined,
       };
@@ -168,8 +199,8 @@ export async function POST(
   } catch (error) {
     console.error("Failed to process IFC:", error);
 
-    if (request.body?.uploadId) {
-      await Upload.findByIdAndUpdate(request.body.uploadId, {
+    if (uploadId) {
+      await Upload.findByIdAndUpdate(uploadId, {
         status: "Failed",
         error: error instanceof Error ? error.message : "Unknown error",
       });

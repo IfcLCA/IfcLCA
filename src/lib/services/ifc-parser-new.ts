@@ -1,4 +1,21 @@
+interface IFCEntity {
+  type: string;
+  attributes: any[];
+}
+
+interface IFCRelationship {
+  spatialContainer?: { ref: string };
+  material?: { ref: string };
+  propertySets?: { ref: string }[];
+}
+
 export class IFCParser {
+  private entities: Record<string, IFCEntity>;
+  private elements: any[];
+  private relationships: Record<string, IFCRelationship>;
+  private quantities: Record<string, number>;
+  private materialLayers: Record<string, any>;
+
   constructor() {
     this.entities = {};
     this.elements = [];
@@ -7,7 +24,7 @@ export class IFCParser {
     this.materialLayers = {};
   }
 
-  parseContent(content) {
+  parseContent(content: string) {
     const dataSectionMatch = content.match(/DATA;([\s\S]*?)ENDSEC;/);
     if (!dataSectionMatch) {
       throw new Error("Invalid IFC file: DATA section not found");
@@ -29,7 +46,7 @@ export class IFCParser {
     return this.elements;
   }
 
-  _parseLine(line) {
+  private _parseLine(line: string) {
     line = line.endsWith(";") ? line.slice(0, -1) : line;
     const [idPart, content] = line.split("=", 2);
     if (!idPart || !content) {
@@ -45,7 +62,7 @@ export class IFCParser {
     };
   }
 
-  _parseEntity(content) {
+  private _parseEntity(content: string): [string, any[]] {
     const entityType = content.substring(0, content.indexOf("(")).trim();
     const attributesStr = content.substring(
       content.indexOf("(") + 1,
@@ -55,7 +72,7 @@ export class IFCParser {
     return [entityType, attributes];
   }
 
-  _parseAttributes(attributesStr) {
+  private _parseAttributes(attributesStr: string): any[] {
     const attributes = [];
     let currentAttr = "";
     let nestLevel = 0;
@@ -84,7 +101,7 @@ export class IFCParser {
     return attributes;
   }
 
-  _cleanAttribute(attr) {
+  private _cleanAttribute(attr: string): any {
     attr = attr.trim();
     if (attr === "$" || attr === "*") return null;
     if (attr.startsWith("'") && attr.endsWith("'")) return attr.slice(1, -1);
@@ -97,7 +114,7 @@ export class IFCParser {
     return attr;
   }
 
-  _processRelationships() {
+  private _processRelationships() {
     Object.entries(this.entities).forEach(([id, entity]) => {
       if (entity.type === "IFCRELCONTAINEDINSPATIALSTRUCTURE") {
         const relatedElements = entity.attributes[4];
@@ -147,7 +164,7 @@ export class IFCParser {
     });
   }
 
-  _collectNetVolumes() {
+  private _collectNetVolumes() {
     Object.entries(this.entities).forEach(([id, entity]) => {
       if (entity.type === "IFCRELDEFINESBYPROPERTIES") {
         const relatedObjects = entity.attributes[4];
@@ -186,7 +203,7 @@ export class IFCParser {
     });
   }
 
-  _findElementForQuantity(quantityId) {
+  private _findElementForQuantity(quantityId: string): string | null {
     for (const [relId, relationship] of Object.entries(this.entities)) {
       if (
         relationship.type === "IFCRELDEFINESBYPROPERTIES" &&
@@ -201,7 +218,7 @@ export class IFCParser {
     return null;
   }
 
-  _collectMaterialLayers() {
+  private _collectMaterialLayers() {
     Object.entries(this.entities).forEach(([id, entity]) => {
       if (entity.type === "IFCMATERIALLAYERSET") {
         const materialLayerRefs = entity.attributes[0];
@@ -244,7 +261,7 @@ export class IFCParser {
     });
   }
 
-  _processElements() {
+  private _processElements() {
     Object.entries(this.entities).forEach(([id, entity]) => {
       if (entity.type === "IFCWALL" || entity.type === "IFCSLAB") {
         const globalId = entity.attributes[0] || `No GlobalId`;
@@ -281,14 +298,17 @@ export class IFCParser {
     });
   }
 
-  _getEntityName(ref) {
+  private _getEntityName(ref: { ref: string } | undefined): string {
     if (ref && ref.ref && this.entities[ref.ref]) {
       return this.entities[ref.ref].attributes[2] || "Unnamed";
     }
     return "Unknown";
   }
 
-  _getMaterialInfo(materialRef, elementId) {
+  private _getMaterialInfo(
+    materialRef: { ref: string } | undefined,
+    elementId: string
+  ): string[] {
     if (!materialRef || !materialRef.ref) {
       return ["Unknown"];
     }

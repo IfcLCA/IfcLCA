@@ -45,6 +45,7 @@ interface ExtendedProject extends Project {
 }
 
 export default function ProjectsIdPage() {
+  const router = useRouter();
   const params = useParams();
   const projectId = params.id as string;
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
@@ -96,6 +97,16 @@ export default function ProjectsIdPage() {
       });
     }
   };
+
+  const handleRowSelectionChange = (rows: Record<string, boolean>) => {
+    console.log("Selected:", rows);
+  };
+
+  const materialsWithFraction =
+    project?.materials?.map((m) => ({
+      ...m,
+      fraction: 0,
+    })) || [];
 
   if (isLoading) {
     return (
@@ -249,7 +260,7 @@ export default function ProjectsIdPage() {
           <DataTable
             columns={columns}
             data={project.elements}
-            onRowSelectionChange={(rows) => console.log("Selected:", rows)}
+            onRowSelectionChange={handleRowSelectionChange}
           />
         </TabsContent>
 
@@ -257,7 +268,7 @@ export default function ProjectsIdPage() {
           {project?.materials && project.materials.length > 0 ? (
             <DataTable
               columns={materialsColumns}
-              data={project.materials}
+              data={materialsWithFraction}
               onRowSelectionChange={(rows) =>
                 console.log("Selected materials:", rows)
               }
@@ -274,7 +285,7 @@ export default function ProjectsIdPage() {
       </Tabs>
 
       <UploadModal
-        projectId={params.id}
+        projectId={projectId}
         open={isUploadModalOpen}
         onOpenChange={setIsUploadModalOpen}
         onSuccess={async (upload) => {

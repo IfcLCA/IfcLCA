@@ -3,16 +3,24 @@ import mongoose from "mongoose";
 const projectSchema = new mongoose.Schema(
   {
     name: { type: String, required: true },
-    description: String,
-    phase: String,
-    createdAt: { type: Date, default: Date.now },
-    updatedAt: { type: Date, default: Date.now },
+    description: { type: String },
+    phase: { type: String },
   },
   {
     timestamps: true,
-    toJSON: { virtuals: true },
-    toObject: { virtuals: true },
   }
+);
+
+const uploadSchema = new mongoose.Schema(
+  {
+    projectId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Project",
+      required: true,
+    },
+    // other upload fields
+  },
+  { timestamps: true }
 );
 
 // Add virtual fields for counts
@@ -24,19 +32,6 @@ projectSchema.virtual("_count", {
       materials: 0, // Will be populated by API
     };
   },
-});
-
-const uploadSchema = new mongoose.Schema({
-  filename: { type: String, required: true },
-  status: String,
-  error: String,
-  elementCount: { type: Number, default: 0 },
-  projectId: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: "Project",
-    required: true,
-  },
-  createdAt: { type: Date, default: Date.now },
 });
 
 const materialSchema = new mongoose.Schema(

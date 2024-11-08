@@ -5,6 +5,15 @@ import mongoose from "mongoose";
 
 export const runtime = "nodejs";
 
+interface ElementDoc {
+  _id: mongoose.Types.ObjectId;
+  name: string;
+  type?: string;
+  volume?: number;
+  buildingStorey?: string;
+  materials?: any[];
+}
+
 export async function GET(
   request: Request,
   { params }: { params: { id: string } }
@@ -19,9 +28,10 @@ export async function GET(
       );
     }
 
-    const elements = await Element.find({ projectId: params.id })
+    const elements = (await Element.find({ projectId: params.id })
       .populate("materials")
-      .lean();
+      .lean()
+      .exec()) as unknown as ElementDoc[];
 
     const formattedElements = elements.map((element) => ({
       id: element._id.toString(),
