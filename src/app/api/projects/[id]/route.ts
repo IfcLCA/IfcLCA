@@ -1,69 +1,57 @@
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/db";
+import { connectToDatabase } from "@/lib/mongodb";
+import { Project, Upload, Element } from "@/models";
+import mongoose from "mongoose";
 
-export const runtime = "edge";
+export const runtime = "nodejs";
 
 export async function GET(
   request: Request,
   { params }: { params: { id: string } }
 ) {
   try {
-    const project = await prisma.project.findUnique({
-      where: {
-        id: params.id,
-      },
-      include: {
-        uploads: true,
-        elements: {
-          include: {
-            materials: {
-              select: {
-                id: true,
-                name: true,
-                volume: true,
-                fraction: true,
-              },
-            },
-          },
-        },
-        _count: {
-          select: {
-            uploads: true,
-            elements: true,
-          },
-        },
-      },
-    });
+    await connectToDatabase();
+
+    if (!mongoose.Types.ObjectId.isValid(params.id)) {
+      return NextResponse.json(
+        { error: "Invalid project ID format" },
+        { status: 400 }
+      );
+    }
+
+    const project = await Project.findById(params.id).lean();
 
     if (!project) {
       return NextResponse.json({ error: "Project not found" }, { status: 404 });
     }
 
-    // Get unique materials using a Map to keep only unique names
-    const materialsMap = new Map();
-    project.elements.forEach((element) => {
-      element.materials.forEach((material) => {
-        if (!materialsMap.has(material.name)) {
-          materialsMap.set(material.name, {
-            id: material.id,
-            name: material.name,
-            volume: material.volume,
-            fraction: material.fraction,
-          });
-        }
-      });
-    });
+    // Get uploads and counts
+    const [uploads, uploadsCount, elementsCount] = await Promise.all([
+      Upload.find({ projectId: project._id }).lean(),
+      Upload.countDocuments({ projectId: project._id }),
+      Element.countDocuments({ projectId: project._id }),
+    ]);
 
-    const uniqueMaterials = Array.from(materialsMap.values());
-
-    return NextResponse.json({
-      ...project,
-      materials: uniqueMaterials,
+    // Format response
+    const formattedProject = {
+      id: project._id.toString(),
+      name: project.name,
+      description: project.description,
+      phase: project.phase,
+      createdAt: project.createdAt,
+      updatedAt: project.updatedAt,
+      uploads: uploads.map((upload) => ({
+        ...upload,
+        id: upload._id.toString(),
+        projectId: upload.projectId.toString(),
+      })),
       _count: {
-        ...project._count,
-        materials: uniqueMaterials.length,
+        uploads: uploadsCount,
+        elements: elementsCount,
       },
-    });
+    };
+
+    return NextResponse.json(formattedProject);
   } catch (error) {
     console.error("Failed to fetch project:", error);
     return NextResponse.json(

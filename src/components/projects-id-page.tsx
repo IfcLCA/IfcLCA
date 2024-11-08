@@ -1,10 +1,9 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { UploadModal } from "@/components/upload-modal";
-import { useParams } from "next/navigation";
 import { Trash2, Upload, AlertTriangle } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -45,8 +44,7 @@ interface ExtendedProject extends Project {
   };
 }
 
-export function Page() {
-  const router = useRouter();
+export default function ProjectsIdPage() {
   const params = useParams();
   const projectId = params.id as string;
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
@@ -276,7 +274,7 @@ export function Page() {
       </Tabs>
 
       <UploadModal
-        projectId={projectId}
+        projectId={params.id}
         open={isUploadModalOpen}
         onOpenChange={setIsUploadModalOpen}
         onSuccess={async (upload) => {

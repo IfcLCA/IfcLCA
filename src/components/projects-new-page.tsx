@@ -90,7 +90,7 @@ const teamMembers = [
   },
 ];
 
-export function ProjectNewPage() {
+export default function ProjectsNewPage() {
   const router = useRouter();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [selectedTeamMembers, setSelectedTeamMembers] = useState<string[]>([]);

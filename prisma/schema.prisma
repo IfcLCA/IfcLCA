@@ -26,10 +26,10 @@ model Upload {
   status       String    // "Processing" | "Completed" | "Failed"
   error        String?
   elementCount Int       @default(0)
-  projectId    String
   project      Project   @relation(fields: [projectId], references: [id])
-  elements     Element[]
+  projectId    String
   createdAt    DateTime  @default(now())
+  deleted      Boolean   @default(false)
 }
 
 model Element {

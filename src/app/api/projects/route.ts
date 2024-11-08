@@ -1,59 +1,55 @@
 import { NextResponse } from "next/server";
-import { PrismaClient } from "@prisma/client";
-import { PrismaNeon } from "@prisma/adapter-neon";
-import { Pool } from "@neondatabase/serverless";
+import { connectToDatabase } from "@/lib/mongodb";
+import { Project } from "@/models";
+import mongoose from "mongoose";
 
-export const runtime = "edge";
-
-async function getPrismaClient() {
-  const pool = new Pool({
-    connectionString: process.env.POSTGRES_PRISMA_URL,
-    connectionTimeoutMillis: 5000,
-  });
-  const adapter = new PrismaNeon(pool);
-  return new PrismaClient({ adapter });
-}
+export const runtime = "nodejs";
 
 export async function GET() {
-  const prisma = await getPrismaClient();
-
   try {
-    const projects = await prisma.project.findMany({
-      orderBy: {
-        createdAt: "desc",
-      },
-      select: {
-        id: true,
-        name: true,
-        description: true,
-        createdAt: true,
-        updatedAt: true,
-        _count: {
-          select: {
-            uploads: true,
-            elements: true,
-          },
-        },
-      },
-    });
+    await connectToDatabase();
 
-    return NextResponse.json(projects);
+    const projects = await Project.find().lean();
+
+    const projectsWithCounts = await Promise.all(
+      projects.map(async (project) => {
+        const uploadsCount = await mongoose.models.Upload.countDocuments({
+          projectId: project._id,
+        });
+        const elementsCount = await mongoose.models.Element.countDocuments({
+          projectId: project._id,
+        });
+
+        return {
+          id: project._id.toString(),
+          name: project.name,
+          description: project.description,
+          phase: project.phase,
+          createdAt: project.createdAt,
+          updatedAt: project.updatedAt,
+          _count: {
+            uploads: uploadsCount,
+            elements: elementsCount,
+          },
+        };
+      })
+    );
+
+    return NextResponse.json(projectsWithCounts);
   } catch (error) {
     console.error("Failed to fetch projects:", error);
     return NextResponse.json(
       { error: "Failed to fetch projects" },
       { status: 500 }
     );
-  } finally {
-    await prisma.$disconnect();
   }
 }
 
 export async function POST(request: Request) {
-  const prisma = await getPrismaClient();
-
   try {
-    const { name, description } = await request.json();
+    await connectToDatabase();
+    const body = await request.json();
+    const { name, description } = body;
 
     if (!name) {
       return NextResponse.json(
@@ -62,29 +58,17 @@ export async function POST(request: Request) {
       );
     }
 
-    const project = await prisma.project.create({
-      data: {
-        name,
-        description,
-      },
+    const project = await Project.create({
+      name,
+      description,
     });
 
     return NextResponse.json(project, { status: 201 });
-  } catch (error: any) {
+  } catch (error) {
     console.error("Failed to create project:", error);
-
-    if (error.code === "P2002") {
-      return NextResponse.json(
-        { error: "A project with this name already exists" },
-        { status: 409 }
-      );
-    }
-
     return NextResponse.json(
       { error: "Failed to create project" },
       { status: 500 }
     );
-  } finally {
-    await prisma.$disconnect();
   }
 }

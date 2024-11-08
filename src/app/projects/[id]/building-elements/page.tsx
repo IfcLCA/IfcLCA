@@ -1,11 +1,11 @@
+"use client";
+
+import { useState, useEffect } from "react";
 import { DataTable } from "@/components/data-table";
 import { Button } from "@/components/ui/button";
 import { Plus } from "lucide-react";
-import { prisma } from "@/lib/db";
 import { UploadModal } from "@/components/upload-modal";
-import type { Element } from "@prisma/client/edge";
 
-// Define the columns configuration
 const columns = [
   {
     accessorKey: "name",
@@ -19,7 +19,7 @@ const columns = [
     accessorKey: "volume",
     header: "Volume",
     cell: ({ row }: { row: { original: { volume: number } } }) =>
-      row.original.volume.toFixed(2),
+      row.original.volume?.toFixed(2) ?? "N/A",
   },
   {
     accessorKey: "buildingStorey",
@@ -27,57 +27,37 @@ const columns = [
   },
 ];
 
-async function getBuildingElements(projectId: string) {
-  try {
-    const elements = await prisma.element.findMany({
-      where: { projectId },
-      include: { materials: true },
-    });
-
-    return elements.map(
-      (element: Element & { materials: Array<{ name: string }> }) => ({
-        id: element.id,
-        name: element.name,
-        type: element.type,
-        material: element.materials[0]?.name || "Unknown",
-        volume: element.volume,
-        buildingStorey: element.buildingStorey,
-      })
-    );
-  } catch (error) {
-    console.error("Failed to fetch building elements:", error);
-    return [];
-  }
-}
-
-export default async function BuildingElementsPage({
+export default function BuildingElementsPage({
   params,
 }: {
   params: { id: string };
 }) {
-  const elements = await getBuildingElements(params.id);
+  const [elements, setElements] = useState<any[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    async function fetchElements() {
+      try {
+        const response = await fetch(`/api/projects/${params.id}/elements`);
+        const data = await response.json();
+        setElements(data);
+      } catch (error) {
+        console.error("Failed to fetch elements:", error);
+      } finally {
+        setIsLoading(false);
+      }
+    }
+
+    fetchElements();
+  }, [params.id]);
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       <div className="flex justify-between items-center">
         <h1 className="text-2xl font-bold">Building Elements</h1>
-        <UploadModal
-          projectId={params.id}
-          onUploadComplete={() => {
-            // Use server actions or client-side refresh logic
-          }}
-        />
+        <UploadModal projectId={params.id} />
       </div>
-      <DataTable columns={columns} data={elements} />
-      <div className="bg-muted p-4 rounded-lg">
-        <h2 className="text-lg font-semibold mb-2">Element Information</h2>
-        <p>
-          This table displays all building elements extracted from the IFC
-          model. Each element is associated with its material and volume, which
-          are used in the LCA calculations. You can add custom elements or
-          modify existing ones to refine your analysis.
-        </p>
-      </div>
+      <DataTable columns={columns} data={elements} isLoading={isLoading} />
     </div>
   );
 }

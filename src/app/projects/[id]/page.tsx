@@ -1,5 +1,7 @@
-import { Page } from "@/components/projects-id-page";
+"use client";
+
+import ProjectsIdPage from "@/components/projects-id-page";
 
 export default function ProjectPage() {
-  return <Page />;
+  return <ProjectsIdPage />;
 }
