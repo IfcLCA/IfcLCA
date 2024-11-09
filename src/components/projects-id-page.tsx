@@ -12,6 +12,7 @@ import {
   Box,
   Layers,
   UploadCloud,
+  Edit,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -31,6 +32,7 @@ import { columns } from "@/components/columns";
 import { ReloadIcon } from "@radix-ui/react-icons";
 import { materialsColumns } from "@/components/materials-columns";
 import { Badge } from "@/components/ui/badge";
+import { Breadcrumbs } from "@/components/breadcrumbs";
 
 type ElementWithMaterials = {
   id: string;
@@ -167,6 +169,10 @@ export default function ProjectDetailsPage() {
       ).length,
     })) || [];
 
+  const handleEditProject = () => {
+    router.push(`/projects/${projectId}/edit`);
+  };
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -203,8 +209,14 @@ export default function ProjectDetailsPage() {
     );
   }
 
+  const breadcrumbItems = [
+    { label: "Projects", href: "/projects" },
+    { label: project?.name || "Loading...", href: undefined },
+  ];
+
   return (
     <div className="container mx-auto p-6 space-y-8">
+      <Breadcrumbs items={breadcrumbItems} />
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
           <h1 className="text-3xl font-bold text-primary">{project.name}</h1>
@@ -220,12 +232,9 @@ export default function ProjectDetailsPage() {
             <Upload className="mr-2 h-4 w-4" />
             Upload IFC
           </Button>
-          <Button
-            variant="destructive"
-            onClick={() => setIsDeleteDialogOpen(true)}
-          >
-            <Trash2 className="mr-2 h-4 w-4" />
-            Delete Project
+          <Button variant="outline" onClick={handleEditProject}>
+            <Edit className="mr-2 h-4 w-4" />
+            Edit Project
           </Button>
         </div>
       </div>
