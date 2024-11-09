@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { connectToDatabase, formatDocuments } from "@/lib/mongodb";
 import { Material } from "@/models";
 import mongoose from "mongoose";
+import type { Document } from "mongoose";
 
 export const dynamic = "force-dynamic";
 
@@ -25,16 +26,20 @@ export async function GET(request: Request) {
       })
       .lean();
 
-    const processedMaterials = materials.map((material) => ({
-      id: material._id.toString(),
-      name: material.name,
-      category: material.category,
-      volume:
-        material.projects?.reduce(
-          (sum: number, proj: any) => sum + (proj.volume || 0),
-          0
-        ) || 0,
-    }));
+    const processedMaterials = materials.map(
+      (
+        material: Document & {
+          name: string;
+          category?: string;
+          volume?: number;
+        }
+      ) => ({
+        id: material._id.toString(),
+        name: material.name,
+        category: material.category,
+        volume: material.volume,
+      })
+    );
 
     return NextResponse.json(processedMaterials);
   } catch (error) {
