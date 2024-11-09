@@ -9,7 +9,14 @@ export async function GET() {
   try {
     await connectToDatabase();
 
-    const projects = await Project.find().lean();
+    const projects = (await Project.find().lean()) as Array<{
+      _id: mongoose.Types.ObjectId;
+      name: string;
+      description: string;
+      phase: string;
+      createdAt: Date;
+      updatedAt: Date;
+    }>;
 
     const projectsWithCounts = await Promise.all(
       projects.map(async (project) => {

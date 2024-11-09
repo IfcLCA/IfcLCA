@@ -36,6 +36,7 @@ import { Breadcrumbs } from "@/components/breadcrumbs";
 
 type ElementWithMaterials = {
   id: string;
+  _id: string;
   guid: string;
   name: string;
   type?: string;

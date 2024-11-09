@@ -5,7 +5,14 @@ import { materialsColumns } from "@/components/materials-columns";
 
 export const dynamic = "force-dynamic";
 
-async function getMaterials() {
+type MaterialTableItem = {
+  id: string;
+  name: string;
+  category: string;
+  volume: number;
+};
+
+async function getMaterials(): Promise<MaterialTableItem[]> {
   try {
     await connectToDatabase();
 
@@ -36,7 +43,10 @@ export default async function MaterialsLibrary() {
   return (
     <div className="container mx-auto py-10">
       <h1 className="text-2xl font-bold mb-6">Materials Library</h1>
-      <DataTable columns={materialsColumns} data={materials} />
+      <DataTable<MaterialTableItem>
+        columns={materialsColumns}
+        data={materials}
+      />
     </div>
   );
 }

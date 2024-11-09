@@ -12,7 +12,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Element, Material } from "@/models";
+import type { Element, Material } from "@/models";
 
 export type ElementWithMaterials = {
   _id: string;
@@ -20,7 +20,7 @@ export type ElementWithMaterials = {
   name: string;
   type?: string;
   volume?: number;
-  materials: Material[];
+  materials: (typeof Material)[];
 };
 
 export const columns: ColumnDef<ElementWithMaterials>[] = [

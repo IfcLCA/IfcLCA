@@ -42,9 +42,11 @@ export async function POST(
   request: Request,
   { params }: { params: { id: string } }
 ) {
+  let uploadId: string | undefined;
   try {
     await connectToDatabase();
-    const { uploadId, content } = await request.json();
+    const { uploadId: reqUploadId, content } = await request.json();
+    uploadId = reqUploadId;
 
     if (!mongoose.Types.ObjectId.isValid(params.id)) {
       return NextResponse.json(
@@ -136,32 +138,36 @@ export async function POST(
       // Get material IDs from layers
       const materialIds =
         element.materialLayers?.layers
-          ?.filter((layer) => layer.materialName)
+          ?.filter(
+            (layer): layer is MaterialLayer & { materialName: string } =>
+              layer.materialName !== undefined
+          )
           .map((layer) => materialNameToId.get(layer.materialName))
           .filter(Boolean) || [];
 
       const elementData = {
         guid: element.globalId,
-        name: element.name,
+        name: element.name || "",
         type: element.type,
         volume: element.netVolume,
         buildingStorey: element.spatialContainer,
         projectId: projectId,
         uploadId: upload._id,
         materials: materialIds,
-        materialLayers: element.materialLayers
-          ? {
-              layerSetName: element.materialLayers.layerSetName,
-              layers: element.materialLayers.layers.map(
-                (layer: MaterialLayer) => ({
-                  layerId: layer.layerId,
-                  layerName: layer.layerName,
-                  thickness: layer.thickness,
-                  materialName: layer.materialName,
-                })
-              ),
-            }
-          : undefined,
+        materialLayers:
+          element.materialLayers && element.materialLayers.layers
+            ? {
+                layerSetName: element.materialLayers.layerSetName,
+                layers: element.materialLayers.layers.map(
+                  (layer: MaterialLayer) => ({
+                    layerId: layer.layerId,
+                    layerName: layer.layerName,
+                    thickness: layer.thickness,
+                    materialName: layer.materialName,
+                  })
+                ),
+              }
+            : undefined,
       };
 
       try {
@@ -199,7 +205,7 @@ export async function POST(
   } catch (error) {
     console.error("Failed to process IFC:", error);
 
-    if (uploadId) {
+    if (typeof uploadId !== "undefined") {
       await Upload.findByIdAndUpdate(uploadId, {
         status: "Failed",
         error: error instanceof Error ? error.message : "Unknown error",

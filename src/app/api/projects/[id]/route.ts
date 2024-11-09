@@ -46,7 +46,9 @@ export async function GET(
   try {
     await connectToDatabase();
 
-    const project = (await Project.findById(params.id).lean()) as ProjectDoc;
+    const project = (await Project.findById(
+      params.id
+    ).lean()) as unknown as ProjectDoc;
     if (!project) {
       return NextResponse.json({ error: "Project not found" }, { status: 404 });
     }
