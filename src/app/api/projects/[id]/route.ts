@@ -3,6 +3,40 @@ import { connectToDatabase } from "@/lib/mongodb";
 import { Project, Upload, Element, Material } from "@/models";
 import mongoose from "mongoose";
 
+interface ProjectDoc {
+  _id: mongoose.Types.ObjectId;
+  name: string;
+  description?: string;
+  phase?: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+interface UploadDoc {
+  _id: mongoose.Types.ObjectId;
+  filename: string;
+  status: string;
+  elementCount: number;
+  createdAt: Date;
+}
+
+interface ElementDoc {
+  _id: mongoose.Types.ObjectId;
+  guid: string;
+  name: string;
+  type?: string;
+  volume?: number;
+  buildingStorey?: string;
+}
+
+interface MaterialDoc {
+  _id: mongoose.Types.ObjectId;
+  name: string;
+  category?: string;
+  volume?: number;
+  fraction?: number;
+}
+
 export const runtime = "nodejs";
 
 export async function GET(
@@ -12,53 +46,46 @@ export async function GET(
   try {
     await connectToDatabase();
 
-    if (!mongoose.Types.ObjectId.isValid(params.id)) {
-      return NextResponse.json(
-        { error: "Invalid project ID format" },
-        { status: 400 }
-      );
-    }
-
-    const project = await Project.findById(params.id).lean();
-
+    const project = (await Project.findById(params.id).lean()) as ProjectDoc;
     if (!project) {
       return NextResponse.json({ error: "Project not found" }, { status: 404 });
     }
 
-    // First fetch elements
-    const elements = await Element.find({ projectId: project._id })
-      .populate("materials")
-      .lean();
+    const uploads = (await Upload.find({
+      projectId: new mongoose.Types.ObjectId(params.id),
+      deleted: false,
+    }).lean()) as UploadDoc[];
 
-    // Then fetch materials and uploads using the elements data
-    const [uploads, materials] = await Promise.all([
-      Upload.find({
-        projectId: project._id,
-        deleted: { $ne: true },
-      })
-        .select("filename status elementCount createdAt")
-        .lean(),
-      Material.find({
-        _id: {
-          $in: elements.flatMap((e) => e.materials?.map((m) => m._id) || []),
+    const elements = (await Element.find({
+      projectId: new mongoose.Types.ObjectId(params.id),
+    }).lean()) as ElementDoc[];
+
+    const materials = (await Material.aggregate([
+      {
+        $match: {
+          projects: new mongoose.Types.ObjectId(params.id),
         },
-      }).lean(),
-    ]);
+      },
+      {
+        $project: {
+          _id: 1,
+          name: 1,
+          category: 1,
+          volume: 1,
+          fraction: 1,
+        },
+      },
+    ])) as MaterialDoc[];
 
-    console.log("Found uploads:", uploads.length);
-    console.log("Sample upload:", uploads[0]);
-    console.log("Found materials:", materials.length);
-    console.log("Sample material with volume:", materials[0]);
+    const processedMaterials = materials.map((m: MaterialDoc) => ({
+      id: m._id.toString(),
+      name: m.name,
+      category: m.category,
+      volume: m.volume,
+      fraction: m.fraction,
+    }));
 
-    // Get counts
-    const counts = {
-      uploads: uploads.length,
-      elements: elements.length,
-      materials: materials.length,
-    };
-
-    // Format response
-    const formattedProject = {
+    return NextResponse.json({
       id: project._id.toString(),
       name: project.name,
       description: project.description,
@@ -68,8 +95,8 @@ export async function GET(
       uploads: uploads.map((upload) => ({
         id: upload._id.toString(),
         filename: upload.filename,
-        status: upload.status || "Unknown",
-        elementCount: upload.elementCount || 0,
+        status: upload.status,
+        elementCount: upload.elementCount,
         createdAt: upload.createdAt,
       })),
       elements: elements.map((element) => ({
@@ -79,22 +106,14 @@ export async function GET(
         type: element.type,
         volume: element.volume,
         buildingStorey: element.buildingStorey,
-        materials:
-          element.materials?.map((m: any) => ({
-            id: m._id.toString(),
-            name: m.name,
-            category: m.category,
-          })) || [],
       })),
-      materials: materials.map((material) => ({
-        id: material._id.toString(),
-        name: material.name,
-        category: material.category,
-      })),
-      _count: counts,
-    };
-
-    return NextResponse.json(formattedProject);
+      materials: processedMaterials,
+      _count: {
+        uploads: uploads.length,
+        elements: elements.length,
+        materials: materials.length,
+      },
+    });
   } catch (error) {
     console.error("Failed to fetch project:", error);
     return NextResponse.json(

@@ -9,6 +9,10 @@ interface IFCRelationship {
   propertySets?: { ref: string }[];
 }
 
+interface IFCLayer {
+  ref: string;
+}
+
 export class IFCParser {
   private entities: Record<string, IFCEntity>;
   private elements: any[];
@@ -309,11 +313,16 @@ export class IFCParser {
     materialRef: { ref: string } | undefined,
     elementId: string
   ): string[] {
-    if (!materialRef || !materialRef.ref) {
+    if (!materialRef?.ref) {
       return ["Unknown"];
     }
 
-    const materials = [];
+    const index = parseInt(materialRef.ref, 10);
+    if (isNaN(index)) {
+      return ["Unknown"];
+    }
+
+    const layers: IFCLayer[] = [];
     const queue = [materialRef];
     const visited = new Set();
 
@@ -332,7 +341,7 @@ export class IFCParser {
       switch (entity.type) {
         case "IFCMATERIAL":
           const materialName = entity.attributes[0] || "Unnamed Material";
-          materials.push(materialName);
+          layers.push({ ref: currentRef.ref });
           break;
 
         case "IFCMATERIALLAYERSET":
@@ -380,6 +389,6 @@ export class IFCParser {
       }
     }
 
-    return materials.length > 0 ? materials : ["No materials found"];
+    return layers.map((layer) => layer.ref);
   }
 }

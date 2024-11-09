@@ -1,10 +1,19 @@
 import { NextResponse } from "next/server";
-import { connectToDatabase, formatDocuments } from "@/lib/mongodb";
+import { connectToDatabase } from "@/lib/mongodb";
 import { Material } from "@/models";
 import mongoose from "mongoose";
-import type { Document } from "mongoose";
 
 export const dynamic = "force-dynamic";
+
+interface MaterialDoc {
+  _id: mongoose.Types.ObjectId;
+  name: string;
+  category?: string;
+  volume?: number;
+  projects?: Array<{
+    volume?: number;
+  }>;
+}
 
 export async function GET(request: Request) {
   try {
@@ -19,27 +28,19 @@ export async function GET(request: Request) {
       };
     }
 
-    const materials = await Material.find(query)
+    const materials = (await Material.find(query)
       .populate({
         path: "projects",
         select: "volume",
       })
-      .lean();
+      .lean()) as MaterialDoc[];
 
-    const processedMaterials = materials.map(
-      (
-        material: Document & {
-          name: string;
-          category?: string;
-          volume?: number;
-        }
-      ) => ({
-        id: material._id.toString(),
-        name: material.name,
-        category: material.category,
-        volume: material.volume,
-      })
-    );
+    const processedMaterials = materials.map((material) => ({
+      id: material._id.toString(),
+      name: material.name,
+      category: material.category,
+      volume: material.volume,
+    }));
 
     return NextResponse.json(processedMaterials);
   } catch (error) {
