@@ -158,10 +158,13 @@ export default function ProjectDetailsPage() {
     console.log("Selected:", rows);
   };
 
-  const materialsWithFraction =
+  const materialsWithCount =
     project?.materials?.map((m) => ({
-      ...m,
-      fraction: 0,
+      id: m.id,
+      name: m.name,
+      count: project.elements.filter((element) =>
+        element.materials.some((material) => material.name === m.name)
+      ).length,
     })) || [];
 
   if (isLoading) {
@@ -390,7 +393,7 @@ export default function ProjectDetailsPage() {
               <CardContent className="p-0">
                 <DataTable
                   columns={materialsColumns}
-                  data={materialsWithFraction}
+                  data={materialsWithCount}
                   onRowSelectionChange={(rows) =>
                     console.log("Selected materials:", rows)
                   }

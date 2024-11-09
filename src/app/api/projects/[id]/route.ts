@@ -84,30 +84,13 @@ export async function GET(
             id: m._id.toString(),
             name: m.name,
             category: m.category,
-            volume: m.volume,
           })) || [],
       })),
-      materials: materials.map((material) => {
-        // Calculate total volume for this material across all elements
-        const totalVolume = elements.reduce((sum, element) => {
-          const materialInElement = element.materials?.find(
-            (m: any) => m._id.toString() === material._id.toString()
-          );
-          return sum + (materialInElement?.volume || 0);
-        }, 0);
-
-        return {
-          id: material._id.toString(),
-          name: material.name,
-          category: material.category,
-          volume: totalVolume,
-          fraction:
-            totalVolume > 0
-              ? totalVolume /
-                elements.reduce((sum, e) => sum + (e.volume || 0), 0)
-              : 0,
-        };
-      }),
+      materials: materials.map((material) => ({
+        id: material._id.toString(),
+        name: material.name,
+        category: material.category,
+      })),
       _count: counts,
     };
 
