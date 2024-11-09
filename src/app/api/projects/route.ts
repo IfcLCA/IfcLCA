@@ -63,7 +63,16 @@ export async function POST(request: Request) {
       description,
     });
 
-    return NextResponse.json(project, { status: 201 });
+    return NextResponse.json(
+      {
+        id: project._id.toString(),
+        name: project.name,
+        description: project.description,
+        createdAt: project.createdAt,
+        updatedAt: project.updatedAt,
+      },
+      { status: 201 }
+    );
   } catch (error) {
     console.error("Failed to create project:", error);
     return NextResponse.json(

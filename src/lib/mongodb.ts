@@ -20,6 +20,9 @@ export async function connectToDatabase() {
   if (!cached.promise) {
     const opts = {
       bufferCommands: false,
+      maxPoolSize: 10,
+      serverSelectionTimeoutMS: 5000,
+      socketTimeoutMS: 45000,
     };
 
     cached.promise = mongoose.connect(MONGODB_URI, opts);
@@ -32,4 +35,19 @@ export async function connectToDatabase() {
     cached.promise = null;
     throw e;
   }
+}
+
+// Helper function to format MongoDB documents
+export function formatDocument(doc: any) {
+  const formatted = doc.toObject ? doc.toObject() : doc;
+  return {
+    ...formatted,
+    id: formatted._id.toString(),
+    _id: undefined,
+  };
+}
+
+// Helper function to format multiple documents
+export function formatDocuments(docs: any[]) {
+  return docs.map(formatDocument);
 }
