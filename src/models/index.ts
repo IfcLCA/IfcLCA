@@ -68,10 +68,7 @@ const materialUsageSchema = new mongoose.Schema(
 
 const elementSchema = new mongoose.Schema(
   {
-    guid: {
-      type: String,
-      sparse: true,
-    },
+    guid: { type: String, required: true },
     name: { type: String, required: true },
     type: String,
     volume: Number,
@@ -84,26 +81,29 @@ const elementSchema = new mongoose.Schema(
     uploadId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Upload",
-      required: true,
     },
     materials: [{ type: mongoose.Schema.Types.ObjectId, ref: "Material" }],
     materialLayers: {
       layerSetName: String,
       layers: [
         {
+          materialName: String,
+          thickness: Number,
           layerId: String,
           layerName: String,
-          thickness: Number,
-          materialName: String,
         },
       ],
     },
   },
   {
     timestamps: true,
-    indexes: [{ guid: 1, projectId: 1, unique: true, sparse: true }],
   }
 );
+
+// Remove any existing indexes
+elementSchema.index({ guid: 1 }, { unique: false });
+// Add compound unique index for guid + projectId
+elementSchema.index({ guid: 1, projectId: 1 }, { unique: true });
 
 // Export models with type checking
 export const Project =
