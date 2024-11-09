@@ -1,17 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
-import { PrismaClient } from "@prisma/client";
-
-const prisma = new PrismaClient();
+import { connectToDatabase } from "@/lib/mongodb";
+import { Upload } from "@/models";
 
 export async function GET(
   request: NextRequest,
   { params }: { params: { id: string } }
 ) {
   try {
-    const upload = await prisma.upload.findUnique({
-      where: { id: params.id },
-      include: { elements: true },
-    });
+    await connectToDatabase();
+
+    const upload = await Upload.findById(params.id).populate("elements");
 
     if (!upload) {
       return NextResponse.json({ error: "Upload not found" }, { status: 404 });

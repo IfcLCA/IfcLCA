@@ -12,9 +12,14 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Element, Material } from "@prisma/client";
+import { Element, Material } from "@/models";
 
-export type ElementWithMaterials = Element & {
+export type ElementWithMaterials = {
+  _id: string;
+  guid: string;
+  name: string;
+  type?: string;
+  volume?: number;
   materials: Material[];
 };
 
