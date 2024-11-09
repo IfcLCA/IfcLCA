@@ -9,9 +9,14 @@ async function getMaterials() {
   try {
     await connectToDatabase();
 
-    const materials = await Material.find()
+    const materials = (await Material.find()
       .select("name category volume")
-      .lean();
+      .lean()) as unknown as Array<{
+      _id: { toString: () => string };
+      name: string;
+      category?: string;
+      volume?: number;
+    }>;
 
     return materials.map((material) => ({
       id: material._id.toString(),
