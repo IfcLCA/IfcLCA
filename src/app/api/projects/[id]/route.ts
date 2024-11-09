@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { connectToDatabase } from "@/lib/mongodb";
-import { Project, Upload, Element, Material } from "@/models";
+import { Project, Upload, Element, Material, MaterialUsage } from "@/models";
 import mongoose from "mongoose";
 
 interface ProjectDoc {
@@ -58,26 +58,73 @@ export async function GET(
       deleted: false,
     }).lean()) as UploadDoc[];
 
-    const elements = (await Element.find({
+    const elements = await Element.find({
       projectId: new mongoose.Types.ObjectId(params.id),
-    }).lean()) as ElementDoc[];
+    }).lean();
 
-    const materials = (await Material.aggregate([
+    const processedElements = elements.map((element) => ({
+      id: element._id.toString(),
+      guid: element.guid,
+      name: element.name,
+      type: element.type,
+      volume: element.volume,
+      buildingStorey: element.buildingStorey,
+      materials:
+        element.materialLayers?.layers?.map((layer) => ({
+          name: layer.materialName,
+          thickness: layer.thickness,
+        })) || [],
+    }));
+
+    // First get total volume
+    const totalVolume = await MaterialUsage.aggregate([
       {
         $match: {
-          projects: new mongoose.Types.ObjectId(params.id),
+          projectId: new mongoose.Types.ObjectId(params.id),
         },
+      },
+      {
+        $group: {
+          _id: null,
+          total: { $sum: "$volume" },
+        },
+      },
+    ]).then((result) => result[0]?.total || 0);
+
+    // Then get materials with fractions
+    const materials = await MaterialUsage.aggregate([
+      {
+        $match: {
+          projectId: new mongoose.Types.ObjectId(params.id),
+        },
+      },
+      {
+        $lookup: {
+          from: "materials",
+          localField: "materialId",
+          foreignField: "_id",
+          as: "material",
+        },
+      },
+      {
+        $unwind: "$material",
       },
       {
         $project: {
-          _id: 1,
-          name: 1,
-          category: 1,
-          volume: 1,
-          fraction: 1,
+          _id: "$material._id",
+          name: "$material.name",
+          category: "$material.category",
+          volume: "$volume",
+          fraction: {
+            $cond: {
+              if: { $eq: [totalVolume, 0] },
+              then: 0,
+              else: { $divide: ["$volume", totalVolume] },
+            },
+          },
         },
       },
-    ])) as MaterialDoc[];
+    ]);
 
     const processedMaterials = materials.map((m: MaterialDoc) => ({
       id: m._id.toString(),
@@ -101,19 +148,12 @@ export async function GET(
         elementCount: upload.elementCount,
         createdAt: upload.createdAt,
       })),
-      elements: elements.map((element) => ({
-        id: element._id.toString(),
-        guid: element.guid,
-        name: element.name,
-        type: element.type,
-        volume: element.volume,
-        buildingStorey: element.buildingStorey,
-      })),
+      elements: processedElements,
       materials: processedMaterials,
       _count: {
         uploads: uploads.length,
         elements: elements.length,
-        materials: materials.length,
+        materials: materials?.length || 0,
       },
     });
   } catch (error) {
