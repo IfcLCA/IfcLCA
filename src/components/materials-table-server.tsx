@@ -1,40 +1,35 @@
-import { prisma } from "@/lib/db";
+import { connectToDatabase } from "@/lib/mongodb";
+import { Material } from "@/models";
 
 export async function getMaterialsByProject(projectId?: string) {
   try {
-    // First get all materials with their relationships
-    const materials = await prisma.material.findMany({
-      include: {
-        elements: {
-          where: projectId
-            ? {
-                projectId: projectId,
-              }
-            : undefined,
-          select: {
-            volume: true,
-            projectId: true,
+    await connectToDatabase();
+
+    const query = projectId ? { "elements.projectId": projectId } : {};
+
+    const materials = await Material.aggregate([
+      { $match: query },
+      {
+        $lookup: {
+          from: "elements",
+          localField: "_id",
+          foreignField: "materials",
+          as: "elements",
+        },
+      },
+      {
+        $project: {
+          id: "$_id",
+          name: 1,
+          category: 1,
+          volume: {
+            $sum: "$elements.volume",
           },
         },
       },
-    });
+    ]);
 
-    // Process the materials to aggregate volumes by project
-    const processedMaterials = materials
-      .filter(
-        (m) => !projectId || m.elements.some((e) => e.projectId === projectId)
-      )
-      .map((material) => ({
-        id: material.id,
-        name: material.name,
-        category: material.category,
-        volume: material.elements.reduce(
-          (sum, elem) => sum + (elem.volume || 0),
-          0
-        ),
-      }));
-
-    return processedMaterials;
+    return materials;
   } catch (error) {
     console.error("Error fetching materials:", error);
     return [];
