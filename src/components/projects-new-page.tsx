@@ -15,18 +15,18 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import {
   Form,
   FormControl,
-  FormDescription,
   FormField,
   FormItem,
   FormLabel,
   FormMessage,
 } from "@/components/ui/form";
 import { toast } from "@/hooks/use-toast";
+import { Loader2, PlusCircle, ArrowLeft } from "lucide-react";
+import { Breadcrumbs } from "@/components/breadcrumbs";
 
 const formSchema = z.object({
   name: z.string().min(2, {
@@ -83,17 +83,26 @@ export default function ProjectsNewPage() {
     }
   }
 
+  const breadcrumbItems = [
+    { label: "Projects", href: "/projects" },
+    { label: "New Project", href: undefined },
+  ];
+
   return (
-    <div className="container max-w-2xl py-6">
-      <Card>
+    <div className="container mx-auto p-6 space-y-8">
+      <Breadcrumbs items={breadcrumbItems} />
+      <Card className="max-w-2xl mx-auto">
         <CardHeader>
-          <CardTitle>Create New Project</CardTitle>
+          <CardTitle className="text-2xl font-bold flex items-center gap-2">
+            <PlusCircle className="h-6 w-6 text-primary" />
+            Create New Project
+          </CardTitle>
           <CardDescription>
-            Get started by creating a new project.
+            Get started by creating a new project. Fill in the details below.
           </CardDescription>
         </CardHeader>
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)}>
+          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
             <CardContent className="space-y-6">
               <FormField
                 control={form.control}
@@ -102,7 +111,11 @@ export default function ProjectsNewPage() {
                   <FormItem>
                     <FormLabel>Project Name</FormLabel>
                     <FormControl>
-                      <Input placeholder="Enter project name" {...field} />
+                      <Input
+                        placeholder="Enter project name"
+                        {...field}
+                        className="w-full"
+                      />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -118,6 +131,8 @@ export default function ProjectsNewPage() {
                       <Textarea
                         placeholder="Enter project description"
                         {...field}
+                        className="w-full resize-none"
+                        rows={4}
                       />
                     </FormControl>
                     <FormMessage />
@@ -125,9 +140,28 @@ export default function ProjectsNewPage() {
                 )}
               />
             </CardContent>
-            <CardFooter>
+            <CardFooter className="flex justify-between">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => router.back()}
+                disabled={isSubmitting}
+              >
+                <ArrowLeft className="mr-2 h-4 w-4" />
+                Cancel
+              </Button>
               <Button type="submit" disabled={isSubmitting}>
-                {isSubmitting ? "Creating..." : "Create Project"}
+                {isSubmitting ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Creating...
+                  </>
+                ) : (
+                  <>
+                    <PlusCircle className="mr-2 h-4 w-4" />
+                    Create Project
+                  </>
+                )}
               </Button>
             </CardFooter>
           </form>
