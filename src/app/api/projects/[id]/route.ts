@@ -1,26 +1,9 @@
 import { NextResponse } from "next/server";
 import { connectToDatabase } from "@/lib/mongodb";
-import { Project, Upload, Element } from "@/models";
+import { Project, Upload, Element, Material } from "@/models";
 import mongoose from "mongoose";
 
 export const runtime = "nodejs";
-
-// Update interfaces to be plain object types (for lean queries)
-interface IProject {
-  _id: mongoose.Types.ObjectId;
-  name: string;
-  description: string;
-  phase: string;
-  createdAt: Date;
-  updatedAt: Date;
-}
-
-interface IUpload {
-  _id: mongoose.Types.ObjectId;
-  projectId: mongoose.Types.ObjectId;
-  // other upload fields
-  __v: number;
-}
 
 export async function GET(
   request: Request,
@@ -36,22 +19,43 @@ export async function GET(
       );
     }
 
-    const project = (await Project.findById(params.id)
-      .lean()
-      .exec()) as unknown as IProject;
+    const project = await Project.findById(params.id).lean();
 
     if (!project) {
       return NextResponse.json({ error: "Project not found" }, { status: 404 });
     }
 
-    // Get uploads and counts with proper typing
-    const [uploads, uploadsCount, elementsCount] = await Promise.all([
-      Upload.find({ projectId: project._id })
-        .lean()
-        .exec() as unknown as IUpload[],
-      Upload.countDocuments({ projectId: project._id }),
-      Element.countDocuments({ projectId: project._id }),
+    // First fetch elements
+    const elements = await Element.find({ projectId: project._id })
+      .populate("materials")
+      .lean();
+
+    // Then fetch materials and uploads using the elements data
+    const [uploads, materials] = await Promise.all([
+      Upload.find({
+        projectId: project._id,
+        deleted: { $ne: true },
+      })
+        .select("filename status elementCount createdAt")
+        .lean(),
+      Material.find({
+        _id: {
+          $in: elements.flatMap((e) => e.materials?.map((m) => m._id) || []),
+        },
+      }).lean(),
     ]);
+
+    console.log("Found uploads:", uploads.length);
+    console.log("Sample upload:", uploads[0]);
+    console.log("Found materials:", materials.length);
+    console.log("Sample material with volume:", materials[0]);
+
+    // Get counts
+    const counts = {
+      uploads: uploads.length,
+      elements: elements.length,
+      materials: materials.length,
+    };
 
     // Format response
     const formattedProject = {
@@ -62,14 +66,49 @@ export async function GET(
       createdAt: project.createdAt,
       updatedAt: project.updatedAt,
       uploads: uploads.map((upload) => ({
-        ...upload,
         id: upload._id.toString(),
-        projectId: upload.projectId.toString(),
+        filename: upload.filename,
+        status: upload.status || "Unknown",
+        elementCount: upload.elementCount || 0,
+        createdAt: upload.createdAt,
       })),
-      _count: {
-        uploads: uploadsCount,
-        elements: elementsCount,
-      },
+      elements: elements.map((element) => ({
+        id: element._id.toString(),
+        guid: element.guid,
+        name: element.name,
+        type: element.type,
+        volume: element.volume,
+        buildingStorey: element.buildingStorey,
+        materials:
+          element.materials?.map((m: any) => ({
+            id: m._id.toString(),
+            name: m.name,
+            category: m.category,
+            volume: m.volume,
+          })) || [],
+      })),
+      materials: materials.map((material) => {
+        // Calculate total volume for this material across all elements
+        const totalVolume = elements.reduce((sum, element) => {
+          const materialInElement = element.materials?.find(
+            (m: any) => m._id.toString() === material._id.toString()
+          );
+          return sum + (materialInElement?.volume || 0);
+        }, 0);
+
+        return {
+          id: material._id.toString(),
+          name: material.name,
+          category: material.category,
+          volume: totalVolume,
+          fraction:
+            totalVolume > 0
+              ? totalVolume /
+                elements.reduce((sum, e) => sum + (e.volume || 0), 0)
+              : 0,
+        };
+      }),
+      _count: counts,
     };
 
     return NextResponse.json(formattedProject);

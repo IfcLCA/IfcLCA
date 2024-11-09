@@ -18,10 +18,22 @@ const uploadSchema = new mongoose.Schema(
       ref: "Project",
       required: true,
     },
-    // other upload fields
+    filename: { type: String, required: true },
+    status: {
+      type: String,
+      required: true,
+      default: "Processing",
+      enum: ["Processing", "Completed", "Failed"],
+    },
+    elementCount: { type: Number, default: 0 },
+    deleted: { type: Boolean, default: false },
+    error: String,
   },
   { timestamps: true }
 );
+
+// Add index for better query performance
+uploadSchema.index({ projectId: 1, deleted: 1 });
 
 // Add virtual fields for counts
 projectSchema.virtual("_count", {

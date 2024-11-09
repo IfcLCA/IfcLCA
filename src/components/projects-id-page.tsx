@@ -33,10 +33,41 @@ type ElementWithMaterials = Element & {
   materials: Material[];
 };
 
-interface ExtendedProject extends Project {
-  uploads: PrismaUpload[];
-  elements: ElementWithMaterials[];
-  materials: Material[];
+interface ExtendedProject {
+  id: string;
+  name: string;
+  description?: string;
+  phase?: string;
+  createdAt: Date;
+  updatedAt: Date;
+  uploads: {
+    id: string;
+    filename: string;
+    status: string;
+    elementCount: number;
+    createdAt: Date;
+  }[];
+  elements: {
+    id: string;
+    guid: string;
+    name: string;
+    type?: string;
+    volume?: number;
+    buildingStorey?: string;
+    materials: {
+      id: string;
+      name: string;
+      category?: string;
+      volume?: number;
+    }[];
+  }[];
+  materials: {
+    id: string;
+    name: string;
+    category?: string;
+    volume?: number;
+    fraction: number;
+  }[];
   _count: {
     elements: number;
     uploads: number;
@@ -62,8 +93,17 @@ export default function ProjectsIdPage() {
         throw new Error("Failed to fetch project");
       }
       const data = await response.json();
+      console.log("Fetched project data:", data);
+      console.log("Uploads:", data.uploads);
+      data.createdAt = new Date(data.createdAt);
+      data.updatedAt = new Date(data.updatedAt);
+      data.uploads = data.uploads.map((upload: any) => ({
+        ...upload,
+        createdAt: new Date(upload.createdAt),
+      }));
       setProject(data);
     } catch (err) {
+      console.error("Error fetching project:", err);
       setError(
         err instanceof Error ? err.message : "An unknown error occurred"
       );
@@ -73,7 +113,9 @@ export default function ProjectsIdPage() {
   };
 
   useEffect(() => {
-    fetchProject();
+    if (projectId) {
+      fetchProject();
+    }
   }, [projectId]);
 
   const handleDeleteProject = async () => {
@@ -218,41 +260,53 @@ export default function ProjectsIdPage() {
         </TabsList>
 
         <TabsContent value="uploads" className="space-y-4">
-          {project.uploads.length === 0 ? (
+          <div className="flex justify-between items-center mb-4">
+            <h2 className="text-xl font-semibold">
+              Uploads ({project?.uploads?.length || 0})
+            </h2>
+            <Button onClick={() => setIsUploadModalOpen(true)}>
+              <Upload className="h-4 w-4 mr-2" />
+              Upload IFC
+            </Button>
+          </div>
+
+          {!project?.uploads || project.uploads.length === 0 ? (
             <div className="text-center p-8 bg-muted rounded-lg">
               <p className="text-muted-foreground">
                 No uploads yet. Start by uploading an IFC file.
               </p>
             </div>
           ) : (
-            project.uploads.map((upload) => (
-              <Card key={upload.id}>
-                <CardContent className="flex justify-between items-center p-4">
-                  <div>
-                    <p className="font-medium">{upload.filename}</p>
-                    <p className="text-sm text-muted-foreground">
-                      {new Date(upload.createdAt).toLocaleString()}
-                    </p>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-sm font-medium">
-                      {upload.elementCount} elements
-                    </p>
-                    <p
-                      className={`text-sm font-semibold ${
-                        upload.status === "Completed"
-                          ? "text-green-600"
-                          : upload.status === "Failed"
-                          ? "text-red-600"
-                          : "text-yellow-600"
-                      }`}
-                    >
-                      {upload.status}
-                    </p>
-                  </div>
-                </CardContent>
-              </Card>
-            ))
+            <div className="grid gap-4">
+              {project.uploads.map((upload) => (
+                <Card key={upload.id}>
+                  <CardContent className="flex justify-between items-center p-4">
+                    <div>
+                      <p className="font-medium">{upload.filename}</p>
+                      <p className="text-sm text-muted-foreground">
+                        {new Date(upload.createdAt).toLocaleString()}
+                      </p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-sm font-medium">
+                        {upload.elementCount} elements
+                      </p>
+                      <p
+                        className={`text-sm font-semibold ${
+                          upload.status === "Completed"
+                            ? "text-green-600"
+                            : upload.status === "Failed"
+                            ? "text-red-600"
+                            : "text-yellow-600"
+                        }`}
+                      >
+                        {upload.status}
+                      </p>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
           )}
         </TabsContent>
 
