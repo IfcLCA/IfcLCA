@@ -1,25 +1,37 @@
-import { Suspense } from "react";
-import { MaterialsLibrary } from "@/components/materials-library";
-import { getMaterialsByProject } from "@/components/materials-table-server";
-import { prisma } from "@/lib/db";
+import { connectToDatabase } from "@/lib/mongodb";
+import { Material } from "@/models";
+import { DataTable } from "@/components/data-table";
+import { materialsColumns } from "@/components/materials-columns";
 
 export const dynamic = "force-dynamic";
 
-export default async function MaterialsLibraryPage() {
-  const materials = await getMaterialsByProject();
-  const projects = await prisma.project.findMany({
-    select: {
-      id: true,
-      name: true,
-    },
-  });
+async function getMaterials() {
+  try {
+    await connectToDatabase();
+
+    const materials = await Material.find()
+      .select("name category volume")
+      .lean();
+
+    return materials.map((material) => ({
+      id: material._id.toString(),
+      name: material.name,
+      category: material.category || "",
+      volume: material.volume || 0,
+    }));
+  } catch (error) {
+    console.error("Failed to fetch materials:", error);
+    return [];
+  }
+}
+
+export default async function MaterialsLibrary() {
+  const materials = await getMaterials();
 
   return (
-    <div className="container py-6">
-      <MaterialsLibrary
-        initialProjects={projects}
-        initialMaterials={materials}
-      />
+    <div className="container mx-auto py-10">
+      <h1 className="text-2xl font-bold mb-6">Materials Library</h1>
+      <DataTable columns={materialsColumns} data={materials} />
     </div>
   );
 }
