@@ -4,7 +4,15 @@ import { useState, useEffect } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { UploadModal } from "@/components/upload-modal";
-import { Trash2, Upload, AlertTriangle } from "lucide-react";
+import {
+  Trash2,
+  Upload,
+  AlertTriangle,
+  FileText,
+  Box,
+  Layers,
+  UploadCloud,
+} from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { DataTable } from "@/components/data-table";
@@ -19,18 +27,24 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { toast } from "@/hooks/use-toast";
-import type {
-  Project,
-  Upload as PrismaUpload,
-  Element,
-  Material,
-} from "@prisma/client";
 import { columns } from "@/components/columns";
 import { ReloadIcon } from "@radix-ui/react-icons";
 import { materialsColumns } from "@/components/materials-columns";
+import { Badge } from "@/components/ui/badge";
 
-type ElementWithMaterials = Element & {
-  materials: Material[];
+type ElementWithMaterials = {
+  id: string;
+  guid: string;
+  name: string;
+  type?: string;
+  volume?: number;
+  buildingStorey?: string;
+  materials: {
+    id: string;
+    name: string;
+    category?: string;
+    volume?: number;
+  }[];
 };
 
 interface ExtendedProject {
@@ -41,26 +55,13 @@ interface ExtendedProject {
   createdAt: Date;
   updatedAt: Date;
   uploads: {
-    id: string;
+    _id: string;
     filename: string;
     status: string;
     elementCount: number;
     createdAt: Date;
   }[];
-  elements: {
-    id: string;
-    guid: string;
-    name: string;
-    type?: string;
-    volume?: number;
-    buildingStorey?: string;
-    materials: {
-      id: string;
-      name: string;
-      category?: string;
-      volume?: number;
-    }[];
-  }[];
+  elements: ElementWithMaterials[];
   materials: {
     id: string;
     name: string;
@@ -75,7 +76,7 @@ interface ExtendedProject {
   };
 }
 
-export default function ProjectsIdPage() {
+export default function ProjectDetailsPage() {
   const router = useRouter();
   const params = useParams();
   const projectId = params.id as string;
@@ -93,15 +94,28 @@ export default function ProjectsIdPage() {
         throw new Error("Failed to fetch project");
       }
       const data = await response.json();
-      console.log("Fetched project data:", data);
-      console.log("Uploads:", data.uploads);
-      data.createdAt = new Date(data.createdAt);
-      data.updatedAt = new Date(data.updatedAt);
-      data.uploads = data.uploads.map((upload: any) => ({
-        ...upload,
-        createdAt: new Date(upload.createdAt),
-      }));
-      setProject(data);
+
+      const transformedData = {
+        ...data,
+        createdAt: new Date(data.createdAt),
+        updatedAt: new Date(data.updatedAt),
+        uploads: data.uploads.map((upload: any) => {
+          const uploadElementCount =
+            data.elements?.filter(
+              (element: any) => element.uploadId === upload._id
+            ).length || 0;
+
+          return {
+            ...upload,
+            _id: upload._id,
+            createdAt: new Date(upload.createdAt),
+            elementCount: uploadElementCount,
+            status: uploadElementCount > 0 ? "Completed" : "Processing",
+          };
+        }),
+      };
+
+      setProject(transformedData);
     } catch (err) {
       console.error("Error fetching project:", err);
       setError(
@@ -162,7 +176,7 @@ export default function ProjectsIdPage() {
     return (
       <div className="container mx-auto p-6">
         <div
-          className="bg-red-100 border-l-4 border-red-500 text-red-700 p-4 rounded"
+          className="bg-destructive/15 border-l-4 border-destructive text-destructive p-4 rounded"
           role="alert"
         >
           <p className="font-bold">Error</p>
@@ -176,7 +190,7 @@ export default function ProjectsIdPage() {
     return (
       <div className="container mx-auto p-6">
         <div
-          className="bg-yellow-100 border-l-4 border-yellow-500 text-yellow-700 p-4 rounded"
+          className="bg-warning/15 border-l-4 border-warning text-warning-foreground p-4 rounded"
           role="alert"
         >
           <p className="font-bold">Project not found</p>
@@ -188,14 +202,14 @@ export default function ProjectsIdPage() {
 
   return (
     <div className="container mx-auto p-6 space-y-8">
-      <div className="flex justify-between items-center">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
           <h1 className="text-3xl font-bold text-primary">{project.name}</h1>
           {project.description && (
             <p className="text-muted-foreground mt-1">{project.description}</p>
           )}
         </div>
-        <div className="flex space-x-4">
+        <div className="flex flex-col sm:flex-row gap-4">
           <Button
             onClick={() => setIsUploadModalOpen(true)}
             className="bg-primary text-primary-foreground"
@@ -213,95 +227,127 @@ export default function ProjectsIdPage() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
         <Card className="bg-primary text-primary-foreground">
-          <CardHeader>
-            <CardTitle>Total Elements</CardTitle>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">
+              Total Elements
+            </CardTitle>
+            <Box className="h-4 w-4 text-primary-foreground" />
           </CardHeader>
           <CardContent>
-            <p className="text-4xl font-bold">{project._count.elements}</p>
+            <div className="text-2xl font-bold">{project._count.elements}</div>
           </CardContent>
         </Card>
         <Card>
-          <CardHeader>
-            <CardTitle>Uploads</CardTitle>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Uploads</CardTitle>
+            <FileText className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <p className="text-4xl font-bold">{project._count.uploads}</p>
+            <div className="text-2xl font-bold">{project._count.uploads}</div>
           </CardContent>
         </Card>
         <Card>
-          <CardHeader>
-            <CardTitle>Materials</CardTitle>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Materials</CardTitle>
+            <Layers className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <p className="text-4xl font-bold">{project._count.materials}</p>
+            <div className="text-2xl font-bold">{project._count.materials}</div>
           </CardContent>
         </Card>
         <Card>
-          <CardHeader>
-            <CardTitle>Last Updated</CardTitle>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Last Updated</CardTitle>
+            <AlertTriangle className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <p className="text-4xl font-bold">
+            <div className="text-2xl font-bold">
               {new Date(project.updatedAt).toLocaleDateString()}
-            </p>
+            </div>
           </CardContent>
         </Card>
       </div>
 
-      <Tabs defaultValue="uploads" className="space-y-4">
-        <TabsList className="bg-muted">
-          <TabsTrigger value="uploads">Uploads</TabsTrigger>
-          <TabsTrigger value="elements">Elements</TabsTrigger>
-          <TabsTrigger value="materials">
-            Materials ({project?._count.materials || 0})
+      <Tabs defaultValue="uploads" className="space-y-6">
+        <TabsList className="bg-muted p-1 rounded-lg">
+          <TabsTrigger
+            value="uploads"
+            className="rounded-md px-4 py-2 data-[state=active]:bg-background data-[state=active]:shadow-sm transition-all"
+          >
+            Uploads
+          </TabsTrigger>
+          <TabsTrigger
+            value="elements"
+            className="rounded-md px-4 py-2 data-[state=active]:bg-background data-[state=active]:shadow-sm transition-all"
+          >
+            Elements
+          </TabsTrigger>
+          <TabsTrigger
+            value="materials"
+            className="rounded-md px-4 py-2 data-[state=active]:bg-background data-[state=active]:shadow-sm transition-all"
+          >
+            Materials
           </TabsTrigger>
         </TabsList>
 
         <TabsContent value="uploads" className="space-y-4">
           <div className="flex justify-between items-center mb-4">
-            <h2 className="text-xl font-semibold">
-              Uploads ({project?.uploads?.length || 0})
+            <h2 className="text-2xl font-semibold">
+              Uploads{" "}
+              <Badge variant="secondary" className="ml-2">
+                {project?.uploads?.length || 0}
+              </Badge>
             </h2>
-            <Button onClick={() => setIsUploadModalOpen(true)}>
-              <Upload className="h-4 w-4 mr-2" />
+            <Button
+              onClick={() => setIsUploadModalOpen(true)}
+              variant="outline"
+            >
+              <UploadCloud className="h-4 w-4 mr-2" />
               Upload IFC
             </Button>
           </div>
 
           {!project?.uploads || project.uploads.length === 0 ? (
-            <div className="text-center p-8 bg-muted rounded-lg">
-              <p className="text-muted-foreground">
-                No uploads yet. Start by uploading an IFC file.
-              </p>
-            </div>
+            <Card>
+              <CardContent className="flex flex-col items-center justify-center h-64">
+                <UploadCloud className="h-16 w-16 text-muted-foreground mb-4" />
+                <p className="text-muted-foreground text-center">
+                  No uploads yet. Start by uploading an IFC file.
+                </p>
+                <Button
+                  onClick={() => setIsUploadModalOpen(true)}
+                  className="mt-4"
+                >
+                  Upload IFC
+                </Button>
+              </CardContent>
+            </Card>
           ) : (
             <div className="grid gap-4">
               {project.uploads.map((upload) => (
-                <Card key={upload.id}>
-                  <CardContent className="flex justify-between items-center p-4">
-                    <div>
-                      <p className="font-medium">{upload.filename}</p>
+                <Card key={upload._id}>
+                  <CardContent className="flex flex-col sm:flex-row justify-between items-start sm:items-center p-6 gap-4">
+                    <div className="space-y-1">
+                      <p className="font-medium text-lg">{upload.filename}</p>
                       <p className="text-sm text-muted-foreground">
+                        Uploaded on{" "}
                         {new Date(upload.createdAt).toLocaleString()}
                       </p>
                     </div>
-                    <div className="text-right">
-                      <p className="text-sm font-medium">
-                        {upload.elementCount} elements
-                      </p>
-                      <p
-                        className={`text-sm font-semibold ${
-                          upload.status === "Completed"
-                            ? "text-green-600"
-                            : upload.status === "Failed"
-                            ? "text-red-600"
-                            : "text-yellow-600"
-                        }`}
+                    <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm font-medium">Elements:</span>
+                        <Badge variant="secondary">{upload.elementCount}</Badge>
+                      </div>
+                      <Badge
+                        variant={
+                          upload.elementCount > 0 ? "success" : "warning"
+                        }
                       >
-                        {upload.status}
-                      </p>
+                        {upload.elementCount > 0 ? "Completed" : "Processing"}
+                      </Badge>
                     </div>
                   </CardContent>
                 </Card>
@@ -311,29 +357,62 @@ export default function ProjectsIdPage() {
         </TabsContent>
 
         <TabsContent value="elements" className="space-y-4">
-          <DataTable
-            columns={columns}
-            data={project.elements}
-            onRowSelectionChange={handleRowSelectionChange}
-          />
+          <div className="flex justify-between items-center mb-4">
+            <h2 className="text-2xl font-semibold">
+              Elements{" "}
+              <Badge variant="secondary" className="ml-2">
+                {project?._count.elements || 0}
+              </Badge>
+            </h2>
+          </div>
+          <Card>
+            <CardContent className="p-0">
+              <DataTable
+                columns={columns}
+                data={project.elements}
+                onRowSelectionChange={handleRowSelectionChange}
+              />
+            </CardContent>
+          </Card>
         </TabsContent>
 
         <TabsContent value="materials" className="space-y-4">
+          <div className="flex justify-between items-center mb-4">
+            <h2 className="text-2xl font-semibold">
+              Materials{" "}
+              <Badge variant="secondary" className="ml-2">
+                {project?._count.materials || 0}
+              </Badge>
+            </h2>
+          </div>
           {project?.materials && project.materials.length > 0 ? (
-            <DataTable
-              columns={materialsColumns}
-              data={materialsWithFraction}
-              onRowSelectionChange={(rows) =>
-                console.log("Selected materials:", rows)
-              }
-            />
+            <Card>
+              <CardContent className="p-0">
+                <DataTable
+                  columns={materialsColumns}
+                  data={materialsWithFraction}
+                  onRowSelectionChange={(rows) =>
+                    console.log("Selected materials:", rows)
+                  }
+                />
+              </CardContent>
+            </Card>
           ) : (
-            <div className="text-center p-8 bg-muted rounded-lg">
-              <p className="text-muted-foreground">
-                No materials found. Materials will be extracted from IFC files
-                when uploaded.
-              </p>
-            </div>
+            <Card>
+              <CardContent className="flex flex-col items-center justify-center h-64">
+                <Layers className="h-16 w-16 text-muted-foreground mb-4" />
+                <p className="text-muted-foreground text-center">
+                  No materials found. Materials will be extracted from IFC files
+                  when uploaded.
+                </p>
+                <Button
+                  onClick={() => setIsUploadModalOpen(true)}
+                  className="mt-4"
+                >
+                  Upload IFC
+                </Button>
+              </CardContent>
+            </Card>
           )}
         </TabsContent>
       </Tabs>
@@ -370,7 +449,7 @@ export default function ProjectsIdPage() {
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction
               onClick={handleDeleteProject}
-              className="bg-red-600 hover:bg-red-700"
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
               Delete Project
             </AlertDialogAction>

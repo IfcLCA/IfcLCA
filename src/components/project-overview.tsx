@@ -110,7 +110,10 @@ export function ProjectOverview() {
       const response = await fetch(`/api/projects/${projectId}`, {
         method: "DELETE",
       });
-      if (!response.ok) throw new Error("Failed to delete project");
+
+      if (!response.ok) {
+        throw new Error("Failed to delete project");
+      }
 
       toast({
         title: "Project deleted",
@@ -245,28 +248,39 @@ export function ProjectOverview() {
               >
                 {project._count.uploads} uploads
               </Badge>
-              <div className="absolute right-4 top-4">
+              <div
+                className="absolute right-4 top-4"
+                onClick={(e) => e.stopPropagation()}
+              >
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <Button
                       variant="ghost"
                       size="icon"
                       className="h-8 w-8 text-muted-foreground hover:text-primary transition-colors duration-200"
-                      onClick={(e) => e.stopPropagation()}
                     >
                       <MoreVertical className="h-4 w-4" />
                     </Button>
                   </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end">
-                    <DropdownMenuItem asChild>
-                      <Link href={`/projects/${project.id}`}>
-                        <Pencil className="mr-2 h-4 w-4" />
-                        Edit
-                      </Link>
+                  <DropdownMenuContent
+                    align="end"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <DropdownMenuItem
+                      onClick={(e) => {
+                        e.preventDefault();
+                        router.push(`/projects/${project.id}`);
+                      }}
+                    >
+                      <Pencil className="mr-2 h-4 w-4" />
+                      Edit
                     </DropdownMenuItem>
                     <DropdownMenuSeparator />
                     <DropdownMenuItem
-                      onClick={() => setDeleteProjectId(project.id)}
+                      onClick={(e) => {
+                        e.preventDefault();
+                        setDeleteProjectId(project.id);
+                      }}
                       className="text-red-600"
                     >
                       <Trash2 className="mr-2 h-4 w-4" />
