@@ -83,3 +83,68 @@
   background-repeat: no-repeat;
   animation: float 20s ease-in-out infinite;
 }
+
+@keyframes float-slow {
+  0%,
+  100% {
+    transform: translate(0, 0);
+  }
+  50% {
+    transform: translate(15px, -30px);
+  }
+}
+
+.animate-float-slow {
+  animation-name: float-slow;
+  animation-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  animation-iteration-count: infinite;
+}
+
+@keyframes pulse-slow {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.7;
+  }
+}
+
+.animate-pulse-slow {
+  animation: pulse-slow 10s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+@keyframes gradient {
+  0% {
+    transform: translate(0, 0) rotate(0deg);
+  }
+  50% {
+    transform: translate(-1%, 1%) rotate(0.5deg);
+  }
+  100% {
+    transform: translate(0, 0) rotate(0deg);
+  }
+}
+
+.animate-gradient {
+  animation: gradient 15s ease infinite;
+}
+
+.bg-grid-pattern {
+  background-size: 50px 50px;
+  background-image: linear-gradient(
+      to right,
+      rgb(0 0 0 / 0.05) 1px,
+      transparent 1px
+    ),
+    linear-gradient(to bottom, rgb(0 0 0 / 0.05) 1px, transparent 1px);
+}
+
+.dark .bg-grid-pattern {
+  background-image: linear-gradient(
+      to right,
+      rgb(255 255 255 / 0.05) 1px,
+      transparent 1px
+    ),
+    linear-gradient(to bottom, rgb(255 255 255 / 0.05) 1px, transparent 1px);
+}

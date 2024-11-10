@@ -1,7 +1,16 @@
+import { auth } from "@clerk/nextjs/server";
+import LandingPage from "@/components/landing-page";
 import { Dashboard } from "@/components/dashboard";
 
-export default function HomePage() {
-  // Add mock data for testing
+export default async function HomePage() {
+  const { userId } = await auth();
+
+  // If user is not authenticated, show landing page
+  if (!userId) {
+    return <LandingPage />;
+  }
+
+  // Mock data for authenticated dashboard view
   const dashboardData = {
     recentProjects: [
       {
@@ -25,19 +34,9 @@ export default function HomePage() {
       totalCO2Savings: 1000,
       recentActivities: 5,
     },
-    activities: [
-      {
-        id: "1",
-        user: {
-          name: "John Doe",
-          avatar: "/placeholder-avatar.jpg",
-        },
-        action: "uploaded an IFC file",
-        project: "Test Project 1",
-        timestamp: "2 hours ago",
-      },
-    ],
+    activities: [],
   };
 
+  // If user is authenticated, show dashboard
   return <Dashboard {...dashboardData} />;
 }

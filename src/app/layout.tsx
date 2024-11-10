@@ -1,8 +1,7 @@
 import { ClerkProvider } from "@clerk/nextjs";
-import { NavigationBar } from "@/components/navigation-bar";
-import { SidebarNavigation } from "@/components/sidebar-navigation";
 import { ThemeProvider } from "@/components/theme-provider";
 import "@/styles/globals.css";
+import AuthenticatedLayout from "@/components/authenticated-layout";
 
 export const metadata = {
   title: "IfcLCA",
@@ -15,7 +14,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <ClerkProvider>
+    <ClerkProvider appearance={{ baseTheme: undefined }} dynamic>
       <html lang="en" suppressHydrationWarning>
         <body>
           <ThemeProvider
@@ -24,13 +23,7 @@ export default function RootLayout({
             enableSystem
             disableTransitionOnChange
           >
-            <div className="relative flex min-h-screen flex-col">
-              <NavigationBar />
-              <div className="flex flex-1">
-                <SidebarNavigation currentPage="" collapsed={false} />
-                <main className="flex-1 p-6">{children}</main>
-              </div>
-            </div>
+            <AuthenticatedLayout>{children}</AuthenticatedLayout>
           </ThemeProvider>
         </body>
       </html>

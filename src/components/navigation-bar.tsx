@@ -53,13 +53,13 @@ export function NavigationBar({ currentProject, notifications }: NavBarProps) {
       <div className="flex h-14 items-center px-4 md:px-6">
         <div className="mr-4 hidden md:flex">
           <Link className="mr-6 flex items-center space-x-2" href="/">
-            <div className="rounded-full overflow-hidden">
+            <div className="overflow-hidden">
               <Image
                 src="/logo.png"
                 alt="IfcLCA Logo"
                 width={32}
                 height={32}
-                className="h-8 w-8"
+                className="h-8 w-8 rounded-lg"
               />
             </div>
             <span className="hidden font-bold sm:inline-block">IfcLCA</span>
