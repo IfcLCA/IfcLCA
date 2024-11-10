@@ -1,41 +1,8 @@
 import { NextResponse } from "next/server";
 import { connectToDatabase } from "@/lib/mongodb";
-import { Project, Upload, Element, Material, MaterialUsage } from "@/models";
+import { Project, Upload, Element } from "@/models";
 import mongoose from "mongoose";
-
-interface ProjectDoc {
-  _id: mongoose.Types.ObjectId;
-  name: string;
-  description?: string;
-  phase?: string;
-  createdAt: Date;
-  updatedAt: Date;
-}
-
-interface UploadDoc {
-  _id: mongoose.Types.ObjectId;
-  filename: string;
-  status: string;
-  elementCount: number;
-  createdAt: Date;
-}
-
-interface ElementDoc {
-  _id: mongoose.Types.ObjectId;
-  guid: string;
-  name: string;
-  type?: string;
-  volume?: number;
-  buildingStorey?: string;
-}
-
-interface MaterialDoc {
-  _id: mongoose.Types.ObjectId;
-  name: string;
-  category?: string;
-  volume?: number;
-  fraction?: number;
-}
+import { auth } from "@clerk/nextjs/server";
 
 export const runtime = "nodejs";
 
@@ -44,97 +11,36 @@ export async function GET(
   { params }: { params: { id: string } }
 ) {
   try {
-    await connectToDatabase();
+    const { userId } = await auth();
 
-    const project = (await Project.findById(
-      params.id
-    ).lean()) as unknown as ProjectDoc;
-    if (!project) {
-      return NextResponse.json({ error: "Project not found" }, { status: 404 });
+    if (!userId) {
+      return new Response("Unauthorized", { status: 401 });
     }
 
-    const uploads = (await Upload.find({
-      projectId: new mongoose.Types.ObjectId(params.id),
-      deleted: false,
-    }).lean()) as UploadDoc[];
+    await connectToDatabase();
 
-    const elements = await Element.find({
-      projectId: new mongoose.Types.ObjectId(params.id),
+    // Verify project ownership and get project data
+    const project = await Project.findOne({
+      _id: params.id,
+      userId,
     }).lean();
 
-    const processedElements = elements.map((element) => ({
-      id: element._id.toString(),
-      guid: element.guid,
-      name: element.name,
-      type: element.type,
-      volume: element.volume,
-      buildingStorey: element.buildingStorey,
-      materials:
-        element.materialLayers?.layers?.map((layer) => ({
-          name: layer.materialName,
-          thickness: layer.thickness,
-        })) || [],
-    }));
+    if (!project) {
+      return new Response("Project not found", { status: 404 });
+    }
 
-    // First get total volume
-    const totalVolume = await MaterialUsage.aggregate([
-      {
-        $match: {
-          projectId: new mongoose.Types.ObjectId(params.id),
-        },
-      },
-      {
-        $group: {
-          _id: null,
-          total: { $sum: "$volume" },
-        },
-      },
-    ]).then((result) => result[0]?.total || 0);
+    // Get uploads for this project
+    const uploads = await Upload.find({
+      projectId: project._id,
+    }).lean();
 
-    // Then get materials with fractions
-    const materials = await MaterialUsage.aggregate([
-      {
-        $match: {
-          projectId: new mongoose.Types.ObjectId(params.id),
-        },
-      },
-      {
-        $lookup: {
-          from: "materials",
-          localField: "materialId",
-          foreignField: "_id",
-          as: "material",
-        },
-      },
-      {
-        $unwind: "$material",
-      },
-      {
-        $project: {
-          _id: "$material._id",
-          name: "$material.name",
-          category: "$material.category",
-          volume: "$volume",
-          fraction: {
-            $cond: {
-              if: { $eq: [totalVolume, 0] },
-              then: 0,
-              else: { $divide: ["$volume", totalVolume] },
-            },
-          },
-        },
-      },
-    ]);
+    // Get elements for this project
+    const elements = await Element.find({
+      projectId: project._id,
+    }).lean();
 
-    const processedMaterials = materials.map((m: MaterialDoc) => ({
-      id: m._id.toString(),
-      name: m.name,
-      category: m.category,
-      volume: m.volume,
-      fraction: m.fraction,
-    }));
-
-    return NextResponse.json({
+    // Format the response
+    const projectData = {
       id: project._id.toString(),
       name: project.name,
       description: project.description,
@@ -148,51 +54,56 @@ export async function GET(
         elementCount: upload.elementCount,
         createdAt: upload.createdAt,
       })),
-      elements: processedElements,
-      materials: processedMaterials,
+      elements: elements.map((element) => ({
+        id: element._id.toString(),
+        guid: element.guid,
+        name: element.name,
+        type: element.type,
+        volume: element.volume,
+        buildingStorey: element.buildingStorey,
+      })),
       _count: {
         uploads: uploads.length,
         elements: elements.length,
-        materials: materials?.length || 0,
       },
-    });
+    };
+
+    return NextResponse.json(projectData);
   } catch (error) {
     console.error("Failed to fetch project:", error);
-    return NextResponse.json(
-      { error: "Failed to fetch project" },
-      { status: 500 }
-    );
+    return new Response("Internal Server Error", { status: 500 });
   }
 }
 
-export async function PATCH(
+export async function PUT(
   request: Request,
   { params }: { params: { id: string } }
 ) {
   try {
-    await connectToDatabase();
-    const { name, description } = await request.json();
+    const { userId } = await auth();
 
-    const project = await Project.findByIdAndUpdate(
-      params.id,
-      {
-        ...(name && { name }),
-        ...(description !== undefined && { description }),
-      },
+    if (!userId) {
+      return new Response("Unauthorized", { status: 401 });
+    }
+
+    const body = await request.json();
+    await connectToDatabase();
+
+    // Verify project ownership before update
+    const project = await Project.findOneAndUpdate(
+      { _id: params.id, userId },
+      body,
       { new: true }
-    );
+    ).lean();
 
     if (!project) {
-      return NextResponse.json({ error: "Project not found" }, { status: 404 });
+      return new Response("Project not found", { status: 404 });
     }
 
     return NextResponse.json(project);
   } catch (error) {
     console.error("Failed to update project:", error);
-    return NextResponse.json(
-      { error: "Failed to update project" },
-      { status: 500 }
-    );
+    return new Response("Internal Server Error", { status: 500 });
   }
 }
 
@@ -201,20 +112,27 @@ export async function DELETE(
   { params }: { params: { id: string } }
 ) {
   try {
+    const { userId } = await auth();
+
+    if (!userId) {
+      return new Response("Unauthorized", { status: 401 });
+    }
+
     await connectToDatabase();
 
-    await Promise.all([
-      Element.deleteMany({ projectId: params.id }),
-      Upload.deleteMany({ projectId: params.id }),
-      Project.findByIdAndDelete(params.id),
-    ]);
+    // Verify project ownership before deletion
+    const project = await Project.findOneAndDelete({
+      _id: params.id,
+      userId,
+    });
 
-    return NextResponse.json({ success: true });
+    if (!project) {
+      return new Response("Project not found", { status: 404 });
+    }
+
+    return new Response(null, { status: 204 });
   } catch (error) {
     console.error("Failed to delete project:", error);
-    return NextResponse.json(
-      { error: "Failed to delete project" },
-      { status: 500 }
-    );
+    return new Response("Internal Server Error", { status: 500 });
   }
 }

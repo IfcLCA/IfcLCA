@@ -2,21 +2,21 @@ import { NextResponse } from "next/server";
 import { connectToDatabase } from "@/lib/mongodb";
 import { Project } from "@/models";
 import mongoose from "mongoose";
+import { auth } from "@clerk/nextjs/server";
 
 export const runtime = "nodejs";
 
 export async function GET() {
   try {
+    const { userId } = await auth();
+
+    if (!userId) {
+      return new Response("Unauthorized", { status: 401 });
+    }
+
     await connectToDatabase();
 
-    const projects = (await Project.find().lean()) as Array<{
-      _id: mongoose.Types.ObjectId;
-      name: string;
-      description: string;
-      phase: string;
-      createdAt: Date;
-      updatedAt: Date;
-    }>;
+    const projects = await Project.find({ userId }).lean();
 
     const projectsWithCounts = await Promise.all(
       projects.map(async (project) => {
@@ -45,41 +45,27 @@ export async function GET() {
     return NextResponse.json(projectsWithCounts);
   } catch (error) {
     console.error("Failed to fetch projects:", error);
-    return NextResponse.json(
-      { error: "Failed to fetch projects" },
-      { status: 500 }
-    );
+    return new Response("Internal Server Error", { status: 500 });
   }
 }
 
 export async function POST(request: Request) {
   try {
-    await connectToDatabase();
-    const body = await request.json();
-    const { name, description } = body;
+    const { userId } = await auth();
 
-    if (!name) {
-      return NextResponse.json(
-        { error: "Project name is required" },
-        { status: 400 }
-      );
+    if (!userId) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
+    const body = await request.json();
+    await connectToDatabase();
+
     const project = await Project.create({
-      name,
-      description,
+      ...body,
+      userId,
     });
 
-    return NextResponse.json(
-      {
-        id: project._id.toString(),
-        name: project.name,
-        description: project.description,
-        createdAt: project.createdAt,
-        updatedAt: project.updatedAt,
-      },
-      { status: 201 }
-    );
+    return NextResponse.json(project);
   } catch (error) {
     console.error("Failed to create project:", error);
     return NextResponse.json(

@@ -16,6 +16,13 @@ export default clerkMiddleware(async (auth, req) => {
     // Add custom logic to run before redirecting
     return redirectToSignIn();
   }
+
+  // For project-specific routes, check ownership
+  const projectIdMatch = req.url.match(/\/projects\/([^\/]+)/);
+  if (projectIdMatch && userId) {
+    const projectId = projectIdMatch[1];
+    // You could add additional validation here if needed
+  }
 });
 
 export const config = {

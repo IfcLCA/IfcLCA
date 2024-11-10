@@ -5,6 +5,7 @@ const projectSchema = new mongoose.Schema(
     name: { type: String, required: true },
     description: { type: String },
     phase: { type: String },
+    userId: { type: String, required: true },
   },
   {
     timestamps: true,
@@ -116,6 +117,9 @@ const elementSchema = new mongoose.Schema(
 elementSchema.index({ guid: 1 }, { unique: false });
 // Add compound unique index for guid + projectId
 elementSchema.index({ guid: 1, projectId: 1 }, { unique: true });
+
+// Add index for better query performance
+projectSchema.index({ userId: 1 });
 
 // Export models with type checking
 export const Project =
