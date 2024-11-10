@@ -3,7 +3,6 @@
 import * as React from "react";
 import {
   Bell,
-  ChevronDown,
   HelpCircle,
   Menu,
   Search,
@@ -14,17 +13,8 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Badge } from "@/components/ui/badge";
+import { UserButton, SignedIn, SignedOut, SignInButton } from "@clerk/nextjs";
 import { Button } from "@/components/ui/button";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import {
   NavigationMenu,
@@ -35,18 +25,11 @@ import {
   NavigationMenuTrigger,
 } from "@/components/ui/navigation-menu";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
-import { Breadcrumbs } from "@/components/breadcrumbs";
 import Image from "next/image";
 
 interface Project {
   id: string;
   name: string;
-}
-
-interface User {
-  name: string;
-  email: string;
-  avatar: string;
 }
 
 interface Notification {
@@ -58,48 +41,17 @@ interface Notification {
 
 interface NavBarProps {
   currentProject?: Project;
-  user: User;
   notifications: Notification[];
 }
 
-// Temporary solution while waiting for logo
-const LogoPlaceholder = () => (
-  <div className="h-8 w-8 rounded-full bg-primary flex items-center justify-center text-primary-foreground font-bold overflow-hidden">
-    L
-  </div>
-);
-
-export function NavigationBar({
-  currentProject,
-  user,
-  notifications,
-}: NavBarProps) {
+export function NavigationBar({ currentProject, notifications }: NavBarProps) {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = React.useState(false);
   const pathname = usePathname();
 
-  const unreadNotifications =
-    notifications?.filter((notification) => !notification.read) || [];
-
-  // Generate breadcrumb items from the current path
-  const pathSegments = pathname.split("/").filter(Boolean);
-  const breadcrumbItems = pathSegments.map((segment, index) => {
-    const href = "/" + pathSegments.slice(0, index + 1).join("/");
-    return {
-      label:
-        segment.charAt(0).toUpperCase() + segment.slice(1).replace(/-/g, " "),
-      href,
-    };
-  });
-
-  // Add Home as the first item if we're not on the homepage
-  if (pathname !== "/") {
-    breadcrumbItems.unshift({ label: "Home", href: "/" });
-  }
-
   return (
     <nav className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-      <div className="container flex h-14 items-center">
-        <div className="mr-4 hidden md:flex pl-4">
+      <div className="flex h-14 items-center px-4 md:px-6">
+        <div className="mr-4 hidden md:flex">
           <Link className="mr-6 flex items-center space-x-2" href="/">
             <div className="rounded-full overflow-hidden">
               <Image
@@ -323,6 +275,7 @@ export function NavigationBar({
             </NavigationMenuList>
           </NavigationMenu>
         </div>
+
         <Sheet open={isMobileMenuOpen} onOpenChange={setIsMobileMenuOpen}>
           <SheetTrigger asChild>
             <Button
@@ -343,6 +296,7 @@ export function NavigationBar({
             </NavigationMenu>
           </SheetContent>
         </Sheet>
+
         <div className="flex flex-1 items-center justify-between space-x-2 md:justify-end">
           <div className="w-full flex-1 md:w-auto md:flex-none">
             <Input
@@ -352,60 +306,35 @@ export function NavigationBar({
             />
           </div>
           <nav className="flex items-center space-x-2">
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button
-                  variant="ghost"
-                  className="relative h-8 w-8 rounded-full"
-                >
-                  <Avatar className="h-8 w-8">
-                    {user ? (
-                      <AvatarImage src={user.avatar} alt={user.name} />
-                    ) : (
-                      <AvatarFallback>?</AvatarFallback>
-                    )}
-                    {user && (
-                      <AvatarFallback>{user.name.charAt(0)}</AvatarFallback>
-                    )}
-                  </Avatar>
-                  {unreadNotifications.length > 0 && (
-                    <Badge
-                      variant="destructive"
-                      className="absolute -right-1 -top-1 h-5 w-5 rounded-full p-0 text-xs"
-                    >
-                      {unreadNotifications.length}
-                    </Badge>
-                  )}
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                {user ? (
-                  <>
-                    <DropdownMenuLabel>My Account</DropdownMenuLabel>
-                    <DropdownMenuSeparator />
-                    <DropdownMenuItem>Profile</DropdownMenuItem>
-                    <DropdownMenuItem>Settings</DropdownMenuItem>
-                    <DropdownMenuItem>Notifications</DropdownMenuItem>
-                    <DropdownMenuSeparator />
-                    <DropdownMenuItem>Log out</DropdownMenuItem>
-                  </>
-                ) : (
-                  <DropdownMenuItem>Log in</DropdownMenuItem>
-                )}
-              </DropdownMenuContent>
-            </DropdownMenu>
             <Button variant="ghost" size="icon" className="h-8 w-8">
               <HelpCircle className="h-4 w-4" />
               <span className="sr-only">Help</span>
             </Button>
+
+            <SignedIn>
+              <UserButton
+                afterSignOutUrl="/"
+                appearance={{
+                  elements: {
+                    avatarBox: "h-8 w-8",
+                    userButtonPopover: "w-48",
+                  },
+                  layout: {
+                    shimmer: true,
+                  },
+                }}
+              />
+            </SignedIn>
+            <SignedOut>
+              <SignInButton mode="modal">
+                <Button variant="outline" size="sm">
+                  Sign in
+                </Button>
+              </SignInButton>
+            </SignedOut>
           </nav>
         </div>
       </div>
-      {breadcrumbItems.length > 0 && (
-        <div className="container border-t py-2">
-          <Breadcrumbs items={breadcrumbItems} />
-        </div>
-      )}
     </nav>
   );
 }

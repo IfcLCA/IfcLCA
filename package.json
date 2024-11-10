@@ -9,6 +9,7 @@
     "lint": "next lint"
   },
   "dependencies": {
+    "@clerk/nextjs": "^6.3.0",
     "@hookform/resolvers": "^3.9.1",
     "@neondatabase/serverless": "^0.10.2",
     "@radix-ui/react-alert-dialog": "^1.1.2",
