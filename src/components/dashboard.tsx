@@ -61,15 +61,15 @@ interface Activity {
 }
 
 interface DashboardProps {
-  recentProjects: Project[];
-  statistics: DashboardStatistics;
-  activities: Activity[];
+  recentProjects?: any[];
+  statistics?: any;
+  activities?: any[];
 }
 
 export function Dashboard({
-  recentProjects,
-  statistics,
-  activities,
+  recentProjects = [],
+  statistics = {},
+  activities = [],
 }: DashboardProps) {
   const [showProjectSelect, setShowProjectSelect] = useState(false);
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(
