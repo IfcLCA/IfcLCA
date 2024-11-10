@@ -13,6 +13,7 @@ import {
   Layers,
   UploadCloud,
   Edit,
+  ImageIcon,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -33,6 +34,8 @@ import { ReloadIcon } from "@radix-ui/react-icons";
 import { materialsColumns } from "@/components/materials-columns";
 import { Badge } from "@/components/ui/badge";
 import { Breadcrumbs } from "@/components/breadcrumbs";
+import Image from "next/image";
+import { Input } from "@/components/ui/input";
 
 type ElementWithMaterials = {
   id: string;
@@ -77,6 +80,7 @@ interface ExtendedProject {
     uploads: number;
     materials: number;
   };
+  imageUrl?: string;
 }
 
 export default function ProjectDetailsPage() {
@@ -174,6 +178,20 @@ export default function ProjectDetailsPage() {
     router.push(`/projects/${projectId}/edit`);
   };
 
+  const handleImageUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        const imageUrl = reader.result as string;
+        setProject((prevProject) =>
+          prevProject ? { ...prevProject, imageUrl } : null
+        );
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -240,7 +258,49 @@ export default function ProjectDetailsPage() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-6">
+        <Card className="col-span-1 sm:col-span-2 lg:col-span-2">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Project Image</CardTitle>
+            <ImageIcon className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent className="pt-4">
+            {project.imageUrl ? (
+              <div className="relative aspect-video w-full overflow-hidden rounded-lg">
+                <Image
+                  src={project.imageUrl}
+                  alt={project.name}
+                  fill
+                  className="object-cover"
+                  sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+                />
+              </div>
+            ) : (
+              <div className="flex flex-col items-center justify-center aspect-video w-full border-2 border-dashed rounded-lg p-4">
+                <ImageIcon className="h-8 w-8 text-muted-foreground mb-2" />
+                <p className="text-sm text-muted-foreground text-center">
+                  No project image uploaded
+                </p>
+                <label htmlFor="image-upload" className="cursor-pointer mt-2">
+                  <Input
+                    id="image-upload"
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={handleImageUpload}
+                  />
+                  <Button variant="outline" size="sm" asChild>
+                    <span>
+                      <Upload className="h-4 w-4 mr-2" />
+                      Upload Image
+                    </span>
+                  </Button>
+                </label>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
         <Card className="bg-primary text-primary-foreground">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">
