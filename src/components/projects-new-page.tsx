@@ -50,32 +50,39 @@ export default function ProjectsNewPage() {
   });
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
-    setIsSubmitting(true);
     try {
+      setIsSubmitting(true);
+
       const response = await fetch("/api/projects", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
         body: JSON.stringify(values),
+        credentials: "same-origin",
       });
-
-      if (!response.ok) {
-        throw new Error("Failed to create project");
-      }
 
       const data = await response.json();
 
+      if (!response.ok) {
+        throw new Error(data.error || "Failed to create project");
+      }
+
       toast({
         title: "Success",
-        description: "Project created successfully",
+        description: "Project created successfully.",
       });
 
-      router.push(`/projects/${data.id}`);
+      router.push(`/projects/${data._id}`);
+      router.refresh();
     } catch (error) {
+      console.error("Error creating project:", error);
       toast({
         title: "Error",
-        description: "Failed to create project. Please try again.",
+        description:
+          error instanceof Error
+            ? error.message
+            : "Failed to create project. Please try again.",
         variant: "destructive",
       });
     } finally {
@@ -92,17 +99,17 @@ export default function ProjectsNewPage() {
     <div className="container mx-auto p-6 space-y-8">
       <Breadcrumbs items={breadcrumbItems} />
       <Card className="max-w-2xl mx-auto">
-        <CardHeader>
-          <CardTitle className="text-2xl font-bold flex items-center gap-2">
-            <PlusCircle className="h-6 w-6 text-primary" />
-            Create New Project
-          </CardTitle>
-          <CardDescription>
-            Get started by creating a new project. Fill in the details below.
-          </CardDescription>
-        </CardHeader>
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+          <form onSubmit={form.handleSubmit(onSubmit)}>
+            <CardHeader>
+              <CardTitle className="text-2xl font-bold flex items-center gap-2">
+                <PlusCircle className="h-6 w-6 text-muted-foreground" />
+                New Project
+              </CardTitle>
+              <CardDescription>
+                Create a new project to start your LCA analysis
+              </CardDescription>
+            </CardHeader>
             <CardContent className="space-y-6">
               <FormField
                 control={form.control}
@@ -111,11 +118,7 @@ export default function ProjectsNewPage() {
                   <FormItem>
                     <FormLabel>Project Name</FormLabel>
                     <FormControl>
-                      <Input
-                        placeholder="Enter project name"
-                        {...field}
-                        className="w-full"
-                      />
+                      <Input placeholder="Enter project name" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -131,8 +134,6 @@ export default function ProjectsNewPage() {
                       <Textarea
                         placeholder="Enter project description"
                         {...field}
-                        className="w-full resize-none"
-                        rows={4}
                       />
                     </FormControl>
                     <FormMessage />

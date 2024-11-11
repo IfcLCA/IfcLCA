@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { connectToDatabase } from "@/lib/mongodb";
 import { Project, Upload, Element, Material, MaterialUsage } from "@/models";
 import mongoose from "mongoose";
-import { IFCParser } from "@/lib/services/ifc-parser-new";
+import { IFCParser } from "@/lib/services/ifc-parser";
 
 export const runtime = "nodejs";
 export const maxDuration = 300;

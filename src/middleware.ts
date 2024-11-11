@@ -1,6 +1,7 @@
 import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
+import { NextResponse } from "next/server";
 
-const isProtectedRoute = createRouteMatcher([
+const protectedRoutes = createRouteMatcher([
   "/dashboard(.*)",
   "/forum(.*)",
   "/projects(.*)",
@@ -10,18 +11,21 @@ const isProtectedRoute = createRouteMatcher([
 ]);
 
 export default clerkMiddleware(async (auth, req) => {
-  const { userId, redirectToSignIn } = await auth();
+  const { userId } = await auth();
 
-  if (!userId && isProtectedRoute(req)) {
-    // Add custom logic to run before redirecting
-    return redirectToSignIn();
+  if (userId) {
+    const hasAcceptedTerms = req.cookies.get("terms_accepted");
+    const isProtected = protectedRoutes(req);
+
+    if (!hasAcceptedTerms && isProtected) {
+      const url = new URL("/", req.url);
+      url.searchParams.set("redirect", req.url);
+      return NextResponse.redirect(url);
+    }
   }
 
-  // For project-specific routes, check ownership
-  const projectIdMatch = req.url.match(/\/projects\/([^\/]+)/);
-  if (projectIdMatch && userId) {
-    const projectId = projectIdMatch[1];
-    // You could add additional validation here if needed
+  if (!userId && protectedRoutes(req)) {
+    return auth.redirectToSignIn({ returnBackUrl: req.url });
   }
 });
 
