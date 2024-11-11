@@ -38,6 +38,14 @@ import { columns } from "@/components/columns";
 import { materialsColumns } from "@/components/materials-columns";
 import { GraphPageComponent } from "@/components/graph-page";
 import { DashboardCards } from "@/components/dashboard-cards";
+import {
+  Pagination,
+  PaginationContent,
+  PaginationItem,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious,
+} from "@/components/ui/pagination";
 
 type ElementWithMaterials = {
   id: string;
@@ -379,36 +387,89 @@ const UploadsTab = ({
 }: {
   project: ExtendedProject;
   onUpload: () => void;
-}) => (
-  <>
-    <div className="flex justify-between items-center mb-4">
-      <h2 className="text-2xl font-semibold">
-        Uploads{" "}
-        <Badge variant="secondary" className="ml-2">
-          {project?.uploads?.length || 0}
-        </Badge>
-      </h2>
-      <Button onClick={onUpload} variant="outline">
-        <UploadCloud className="h-4 w-4 mr-2" />
-        Upload IFC
-      </Button>
-    </div>
-    {!project?.uploads || project.uploads.length === 0 ? (
-      <EmptyState
-        icon={UploadCloud}
-        title="No uploads yet"
-        description="Start by uploading an IFC file."
-        action={<Button onClick={onUpload}>Upload IFC</Button>}
-      />
-    ) : (
-      <div className="grid gap-4">
-        {project.uploads.map((upload) => (
-          <UploadCard key={upload._id} upload={upload} />
-        ))}
+}) => {
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 5;
+
+  // Sort uploads by createdAt in descending order (newest first)
+  const sortedUploads = [...(project?.uploads || [])].sort(
+    (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+  );
+
+  // Calculate pagination
+  const totalPages = Math.ceil((sortedUploads?.length || 0) / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const endIndex = startIndex + itemsPerPage;
+  const currentUploads = sortedUploads.slice(startIndex, endIndex);
+
+  return (
+    <>
+      <div className="flex justify-between items-center mb-4">
+        <h2 className="text-2xl font-semibold">
+          Uploads{" "}
+          <Badge variant="secondary" className="ml-2">
+            {project?.uploads?.length || 0}
+          </Badge>
+        </h2>
+        <Button onClick={onUpload} variant="outline">
+          <UploadCloud className="h-4 w-4 mr-2" />
+          Upload IFC
+        </Button>
       </div>
-    )}
-  </>
-);
+      {!project?.uploads || project.uploads.length === 0 ? (
+        <EmptyState
+          icon={UploadCloud}
+          title="No uploads yet"
+          description="Start by uploading an IFC file."
+          action={<Button onClick={onUpload}>Upload IFC</Button>}
+        />
+      ) : (
+        <div className="space-y-4">
+          <div className="grid gap-4">
+            {currentUploads.map((upload) => (
+              <UploadCard key={upload._id} upload={upload} />
+            ))}
+          </div>
+
+          {totalPages > 1 && (
+            <Pagination className="mt-4">
+              <PaginationContent>
+                <PaginationItem>
+                  <PaginationPrevious
+                    onClick={() =>
+                      setCurrentPage((prev) => Math.max(prev - 1, 1))
+                    }
+                    disabled={currentPage === 1}
+                  />
+                </PaginationItem>
+                {Array.from({ length: totalPages }, (_, i) => i + 1).map(
+                  (page) => (
+                    <PaginationItem key={page}>
+                      <PaginationLink
+                        onClick={() => setCurrentPage(page)}
+                        isActive={currentPage === page}
+                      >
+                        {page}
+                      </PaginationLink>
+                    </PaginationItem>
+                  )
+                )}
+                <PaginationItem>
+                  <PaginationNext
+                    onClick={() =>
+                      setCurrentPage((prev) => Math.min(prev + 1, totalPages))
+                    }
+                    disabled={currentPage === totalPages}
+                  />
+                </PaginationItem>
+              </PaginationContent>
+            </Pagination>
+          )}
+        </div>
+      )}
+    </>
+  );
+};
 
 const UploadCard = ({ upload }: { upload: ExtendedProject["uploads"][0] }) => (
   <Card>
