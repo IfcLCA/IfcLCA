@@ -39,8 +39,14 @@ interface Project {
   id: string;
   name: string;
   description: string;
-  progress: number;
+  elements: number;
   thumbnail: string;
+  updatedAt: string;
+  _count: {
+    elements: number;
+    uploads: number;
+    materials: number;
+  };
 }
 
 interface DashboardStatistics {
@@ -62,9 +68,9 @@ interface Activity {
 }
 
 interface DashboardProps {
-  recentProjects?: any[];
+  initialRecentProjects?: Project[];
   statistics?: any;
-  activities?: any[];
+  activities?: Activity[];
 }
 
 // Define the icon components explicitly
@@ -83,7 +89,7 @@ interface Metric {
 }
 
 export function Dashboard({
-  recentProjects = [],
+  initialRecentProjects = [],
   statistics: initialStatistics = {},
   activities = [],
 }: DashboardProps) {
@@ -99,6 +105,10 @@ export function Dashboard({
     totalMaterials: 0,
     recentActivities: 0,
   });
+  const [recentProjects, setRecentProjects] = useState<Project[]>(
+    initialRecentProjects
+  );
+  const [maxElements, setMaxElements] = useState(0);
 
   useEffect(() => {
     if (showProjectSelect) {
@@ -125,6 +135,29 @@ export function Dashboard({
       const response = await fetch("/api/projects");
       const projects = await response.json();
 
+      // Sort projects by creation date (most recent first)
+      const sortedProjects = projects.sort(
+        (a: any, b: any) =>
+          new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+      );
+
+      // Find the maximum number of elements across all projects
+      const maxProjectElements = Math.max(
+        ...projects.map((project: any) => project._count?.elements || 0)
+      );
+      setMaxElements(maxProjectElements);
+
+      // Take only the 3 most recent projects
+      const recentProjects = sortedProjects.slice(0, 3).map((project: any) => ({
+        id: project.id,
+        name: project.name,
+        description: project.description,
+        elements: project._count?.elements || 0,
+        thumbnail: "/placeholder-image.jpg",
+        updatedAt: project.updatedAt,
+        _count: project._count,
+      }));
+
       const totalElements = projects.reduce(
         (acc: number, project: any) => acc + (project._count?.elements || 0),
         0
@@ -141,6 +174,9 @@ export function Dashboard({
         totalElements,
         totalMaterials,
       }));
+
+      // Update recent projects state
+      setRecentProjects(recentProjects);
     } catch (error) {
       console.error("Failed to fetch statistics:", error);
     }
@@ -232,7 +268,21 @@ export function Dashboard({
         <h2 className="text-2xl font-bold mb-4">Recent Projects</h2>
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
           {recentProjects.map((project) => (
-            <Card key={project.id}>
+            <Card
+              key={project.id}
+              className="group relative transition-all hover:shadow-lg border-2 border-muted overflow-hidden cursor-pointer"
+              tabIndex={0}
+              role="article"
+              aria-labelledby={`project-title-${project.id}`}
+              onClick={() => router.push(`/projects/${project.id}`)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault();
+                  router.push(`/projects/${project.id}`);
+                }
+              }}
+            >
+              <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-primary/10 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
               <CardHeader>
                 <CardTitle>{project.name}</CardTitle>
                 <CardDescription>{project.description}</CardDescription>
@@ -245,13 +295,22 @@ export function Dashboard({
                     className="object-cover w-full h-full"
                   />
                 </div>
-                <div className="flex items-center justify-between">
-                  <div className="space-y-1">
-                    <p className="text-sm font-medium">Progress</p>
-                    <Progress value={project.progress} className="w-[60%]" />
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <div className="space-y-1">
+                      <p className="text-sm font-medium">Elements</p>
+                      <Progress
+                        value={(project.elements / maxElements) * 100}
+                        className="w-[60%]"
+                      />
+                    </div>
+                    <div className="text-sm text-muted-foreground">
+                      {project.elements} elements
+                    </div>
                   </div>
                   <div className="text-sm text-muted-foreground">
-                    {project.progress}%
+                    Last upload:{" "}
+                    {new Date(project.updatedAt).toLocaleDateString()}
                   </div>
                 </div>
               </CardContent>
