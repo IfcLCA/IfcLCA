@@ -10,13 +10,9 @@ export async function POST(
   { params }: { params: { id: string } }
 ) {
   try {
-    console.log("Upload request received:", { projectId: params.id });
-
     const { userId } = await auth();
-    console.log("Auth check:", { userId });
 
     if (!userId) {
-      console.log("Unauthorized request - no userId");
       return NextResponse.json(
         { error: "Unauthorized - Please sign in" },
         { status: 401 }
@@ -26,7 +22,6 @@ export async function POST(
     const body = await request.json();
     const filename = body.filename || "Unnamed File";
 
-    console.log("Creating upload record...");
     await connectToDatabase();
 
     const upload = await Upload.create({
@@ -37,11 +32,6 @@ export async function POST(
       elementCount: 0,
     });
 
-    console.log("Upload record created:", {
-      uploadId: upload._id.toString(),
-      filename: upload.filename,
-    });
-
     const response = {
       success: true,
       uploadId: upload._id.toString(),
@@ -49,7 +39,6 @@ export async function POST(
       filename,
     };
 
-    console.log("Sending response:", response);
     return NextResponse.json(response);
   } catch (error) {
     console.error("Upload creation failed:", error);

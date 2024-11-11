@@ -117,14 +117,9 @@ export default function ProjectDetailsPage() {
   const fetchProject = async () => {
     try {
       setIsLoading(true);
-      console.log("Fetching project data...");
       const response = await fetch(`/api/projects/${projectId}`);
-      console.log("Project response status:", response.status);
       const data = await response.json();
-      console.log("Project data received:", data);
-
       const transformed = transformProjectData(data);
-      console.log("Transformed project data:", transformed);
       setProject(transformed);
     } catch (err) {
       console.error("Error fetching project:", err);
@@ -196,10 +191,8 @@ export default function ProjectDetailsPage() {
   };
 
   const handleUploadComplete = async () => {
-    console.log("Upload complete, refreshing project data...");
     try {
       await fetchProject();
-      console.log("Project data refreshed successfully");
     } catch (error) {
       console.error("Failed to refresh project data:", error);
     }
@@ -508,7 +501,7 @@ const ElementsTab = ({ project }: { project: ExtendedProject }) => (
         <DataTable
           columns={columns}
           data={project.elements}
-          onRowSelectionChange={(rows) => console.log("Selected:", rows)}
+          onRowSelectionChange={() => {}}
         />
       </CardContent>
     </Card>
@@ -539,9 +532,7 @@ const MaterialsTab = ({
           <DataTable
             columns={materialsColumns}
             data={materialsWithCount}
-            onRowSelectionChange={(rows) =>
-              console.log("Selected materials:", rows)
-            }
+            onRowSelectionChange={() => {}}
           />
         </CardContent>
       </Card>
