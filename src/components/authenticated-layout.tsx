@@ -4,6 +4,7 @@ import { useAuth } from "@clerk/nextjs";
 import { NavigationBar } from "@/components/navigation-bar";
 import { SidebarNavigation } from "@/components/sidebar-navigation";
 import { useEffect, useState } from "react";
+import { Footer } from "@/components/footer";
 
 export default function AuthenticatedLayout({
   children,
@@ -36,6 +37,7 @@ export default function AuthenticatedLayout({
             <SidebarNavigation currentPage="" collapsed={false} />
             <main className="flex-1 p-6">{children}</main>
           </div>
+          <Footer />
         </>
       ) : (
         children

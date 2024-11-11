@@ -42,7 +42,7 @@ export default async function MaterialsLibrary() {
 
   return (
     <div className="container mx-auto py-10">
-      <h1 className="text-2xl font-bold mb-6">Materials Library</h1>
+      <h1 className="text-2xl font-bold mb-6">Materials</h1>
       <DataTable<MaterialTableItem>
         columns={materialsColumns}
         data={materials}

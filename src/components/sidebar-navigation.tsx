@@ -46,7 +46,7 @@ const primaryItems: SidebarItem[] = [
     href: "/projects",
   },
   {
-    title: "Materials Library",
+    title: "Materials",
     icon: <Library className="h-4 w-4" />,
     href: "/materials-library",
   },

@@ -93,7 +93,7 @@ export function MaterialsLibrary({
   return (
     <Card className="w-full">
       <CardHeader>
-        <CardTitle>Materials Library</CardTitle>
+        <CardTitle>Materials</CardTitle>
       </CardHeader>
       <CardContent>
         <div className="space-y-4">
