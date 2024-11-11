@@ -1,51 +1,52 @@
-import { NextResponse } from "next/server";
-import { connectToDatabase } from "@/lib/mongodb";
-import { Project, Upload, Element, Material } from "@/models";
-import mongoose from "mongoose";
-import { auth } from "@clerk/nextjs/server";
+"use server";
 
-export async function POST(
-  request: Request,
-  { params }: { params: { id: string } }
+import { auth } from "@clerk/nextjs/server";
+import { connectToDatabase } from "@/lib/mongodb";
+import { Element, Upload } from "@/models";
+import { z } from "zod";
+
+// Validation schema
+const elementSchema = z.object({
+  globalId: z.string(),
+  name: z.string(),
+  type: z.string(),
+  netVolume: z.number().optional(),
+  spatialContainer: z.string().optional(),
+});
+
+const inputSchema = z.object({
+  elements: z.array(elementSchema),
+  uploadId: z.string(),
+});
+
+export async function saveElements(
+  projectId: string,
+  data: { elements: any[]; uploadId: string }
 ) {
   try {
-    const { userId } = await auth();
+    // Use auth() from server package
+    const { userId } = auth();
     if (!userId) {
-      return new Response("Unauthorized", { status: 401 });
+      throw new Error("Unauthorized");
     }
 
-    const { elements, uploadId } = await request.json();
-    console.log("Processing elements for upload:", {
-      projectId: params.id,
-      uploadId,
-      elementCount: elements.length,
-      firstElement: elements[0],
-    });
+    // Validate input
+    const validatedData = inputSchema.parse(data);
 
-    // Verify database connection
-    console.log("Connecting to database...");
     await connectToDatabase();
-    console.log("Database connected");
 
-    // Process elements in smaller batches
+    // Process elements in batches
     const batchSize = 100;
     let savedCount = 0;
 
-    for (let i = 0; i < elements.length; i += batchSize) {
-      const batch = elements.slice(i, i + batchSize);
-      console.log(
-        `Processing batch ${i / batchSize + 1} of ${Math.ceil(
-          elements.length / batchSize
-        )}`
-      );
+    for (let i = 0; i < validatedData.elements.length; i += batchSize) {
+      const batch = validatedData.elements.slice(i, i + batchSize);
 
-      // Process each element in the batch
       const elementPromises = batch.map(async (element) => {
         try {
-          // Create element
           const elementData = {
-            projectId: params.id,
-            uploadId: uploadId,
+            projectId,
+            uploadId: validatedData.uploadId,
             guid: element.globalId,
             name: element.name,
             type: element.type,
@@ -53,59 +54,34 @@ export async function POST(
             buildingStorey: element.spatialContainer,
           };
 
-          console.log("Creating element:", elementData);
-
           const savedElement = await Element.create(elementData);
-          console.log("Element saved:", {
-            id: savedElement._id,
-            name: savedElement.name,
-          });
-
           savedCount++;
           return savedElement;
         } catch (error) {
-          console.error("Failed to save element:", {
-            error,
-            element: element.name,
-          });
+          console.error("Failed to save element:", error);
           return null;
         }
       });
 
-      const results = await Promise.all(elementPromises);
-      console.log(
-        `Batch complete. Saved ${results.filter(Boolean).length} elements`
-      );
+      await Promise.all(elementPromises);
     }
 
     // Update upload status
-    console.log("Updating upload status...");
-    const updatedUpload = await Upload.findByIdAndUpdate(
-      uploadId,
+    await Upload.findByIdAndUpdate(
+      validatedData.uploadId,
       {
         status: "Completed",
         elementCount: savedCount,
       },
       { new: true }
     );
-    console.log("Upload status updated:", {
-      uploadId,
-      status: updatedUpload?.status,
-      elementCount: updatedUpload?.elementCount,
-    });
 
-    return NextResponse.json({
+    return {
       success: true,
       elementCount: savedCount,
-    });
+    };
   } catch (error) {
     console.error("Failed to save elements:", error);
-    return NextResponse.json(
-      {
-        error: "Failed to save elements",
-        details: error instanceof Error ? error.message : "Unknown error",
-      },
-      { status: 500 }
-    );
+    throw error;
   }
 }

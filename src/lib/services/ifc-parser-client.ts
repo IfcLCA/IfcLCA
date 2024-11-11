@@ -1,5 +1,6 @@
 import { IFCParser } from "./ifc-parser";
 import { IFCParseResult } from "../types/ifc";
+import { saveElements } from "@/app/actions/save-elements";
 
 export async function parseIFCFile(
   file: File,
@@ -24,29 +25,15 @@ export async function parseIFCFile(
     const parser = new IFCParser();
     const parseResult = await parser.parseContent(content);
 
-    const elementsResponse = await fetch(
-      `/api/projects/${projectId}/upload/elements`,
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          elements: parseResult,
-          uploadId: responseData.uploadId,
-        }),
-      }
-    );
-
-    if (!elementsResponse.ok) {
-      const error = await elementsResponse.json();
-      throw new Error(error.message || "Failed to save elements");
-    }
+    const result = await saveElements(projectId, {
+      elements: parseResult,
+      uploadId: responseData.uploadId,
+    });
 
     return {
       uploadId: responseData.uploadId,
       elements: parseResult,
-      elementCount: parseResult.length,
+      elementCount: result.elementCount,
     };
   } catch (error) {
     console.error("IFC parsing failed:", error);

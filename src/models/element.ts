@@ -1,5 +1,18 @@
 import mongoose from "mongoose";
 
+const elementMaterialSchema = new mongoose.Schema(
+  {
+    material: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Material",
+      required: true,
+    },
+    volume: Number,
+    fraction: Number,
+  },
+  { _id: false }
+);
+
 const elementSchema = new mongoose.Schema(
   {
     projectId: {
@@ -23,26 +36,17 @@ const elementSchema = new mongoose.Schema(
     type: String,
     volume: Number,
     buildingStorey: String,
-    materials: [
-      {
-        material: {
-          type: mongoose.Schema.Types.ObjectId,
-          ref: "Material",
-        },
-        volume: Number,
-        fraction: Number,
-      },
-    ],
+    materials: [elementMaterialSchema],
   },
   {
     timestamps: true,
   }
 );
 
-// Add indexes for better query performance
-elementSchema.index({ projectId: 1 });
-elementSchema.index({ uploadId: 1 });
-elementSchema.index({ guid: 1 });
+// Single compound index definition - no need to remove existing indexes first
+elementSchema.index({ guid: 1, projectId: 1 }, { unique: true });
 
-export const Element =
+const Element =
   mongoose.models.Element || mongoose.model("Element", elementSchema);
+
+export { Element };
