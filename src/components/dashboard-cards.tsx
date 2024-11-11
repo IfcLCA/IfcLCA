@@ -10,7 +10,11 @@ import {
   ActivityIcon,
 } from "lucide-react";
 
-export function DashboardCards() {
+interface DashboardCardsProps {
+  materials: number;
+}
+
+export function DashboardCards({ materials = 0 }: DashboardCardsProps) {
   return (
     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
       {/* Project Image Column */}
@@ -76,7 +80,7 @@ export function DashboardCards() {
             <LayersIcon className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <p className="text-2xl font-bold">0</p>
+            <p className="text-2xl font-bold">{materials}</p>
           </CardContent>
         </Card>
       </div>
