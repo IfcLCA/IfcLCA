@@ -19,33 +19,22 @@ export async function GET(
   { params }: { params: { id: string } }
 ) {
   try {
+    console.log("Fetching elements for project:", params.id);
     await connectToDatabase();
 
-    if (!mongoose.Types.ObjectId.isValid(params.id)) {
-      return NextResponse.json(
-        { error: "Invalid project ID format" },
-        { status: 400 }
-      );
-    }
+    const elements = await Element.find({ projectId: params.id }).lean().exec();
 
-    const elements = (await Element.find({ projectId: params.id })
-      .populate("materials")
-      .lean()
-      .exec()) as unknown as ElementDoc[];
+    console.log("Found elements:", {
+      count: elements.length,
+      firstElement: elements[0],
+    });
 
     const formattedElements = elements.map((element) => ({
       id: element._id.toString(),
       name: element.name,
       type: element.type || "Unknown",
-      volume: element.volume?.toFixed(2) || "0.00",
+      volume: element.volume || 0,
       buildingStorey: element.buildingStorey || "-",
-      materials:
-        element.materials?.map((material: any) => ({
-          id: material._id.toString(),
-          name: material.name,
-          volume: material.volume?.toFixed(2) || "0.00",
-          fraction: material.fraction?.toFixed(2) || "0.00",
-        })) || [],
     }));
 
     return NextResponse.json(formattedElements);

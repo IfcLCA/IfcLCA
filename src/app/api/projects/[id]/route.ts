@@ -41,26 +41,27 @@ export async function GET(
 
     // Format the response
     const projectData = {
-      id: project._id.toString(),
+      _id: project._id.toString(),
       name: project.name,
       description: project.description,
       phase: project.phase,
       createdAt: project.createdAt,
       updatedAt: project.updatedAt,
       uploads: uploads.map((upload) => ({
-        id: upload._id.toString(),
+        _id: upload._id.toString(),
         filename: upload.filename,
         status: upload.status,
         elementCount: upload.elementCount,
         createdAt: upload.createdAt,
       })),
       elements: elements.map((element) => ({
-        id: element._id.toString(),
+        _id: element._id.toString(),
         guid: element.guid,
         name: element.name,
         type: element.type,
         volume: element.volume,
         buildingStorey: element.buildingStorey,
+        uploadId: element.uploadId?.toString(),
       })),
       _count: {
         uploads: uploads.length,

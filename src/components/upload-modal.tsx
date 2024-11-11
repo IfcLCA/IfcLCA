@@ -1,109 +1,73 @@
 "use client";
 
-import { useState } from "react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "./ui/dialog";
+import { useState, useCallback } from "react";
 import { useDropzone } from "react-dropzone";
-import { Loader2, Upload } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { UploadCloud } from "lucide-react";
+import { parseIFCFile } from "@/lib/services/ifc-parser-client";
 import { useToast } from "@/hooks/use-toast";
 interface UploadModalProps {
   projectId: string;
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
-  onSuccess?: (upload: any) => void;
-  onProgress?: (progress: number) => void;
+  onUploadComplete?: () => void;
 }
 
 export function UploadModal({
   projectId,
   open,
   onOpenChange,
-  onSuccess,
-  onProgress,
+  onUploadComplete,
 }: UploadModalProps) {
   const [isUploading, setIsUploading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const { toast } = useToast();
 
-  const processFile = async (uploadId: string, file: File) => {
-    const content = await file.text();
-    const response = await fetch(`/api/projects/${projectId}/upload/process`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        uploadId,
-        content,
-      }),
-    });
+  const onDrop = useCallback(
+    async (acceptedFiles: File[]) => {
+      try {
+        setIsUploading(true);
+        const file = acceptedFiles[0];
+        const result = await parseIFCFile(file, projectId);
 
-    if (!response.ok) {
-      throw new Error("Failed to process IFC file");
-    }
+        // Close modal first
+        onOpenChange?.(false);
 
-    return response.json();
-  };
+        // Show success toast
+        toast({
+          title: "Success",
+          description: `Uploaded ${result.elementCount} elements`,
+        });
 
-  const onDrop = async (acceptedFiles: File[]) => {
-    const file = acceptedFiles[0];
-    if (!file) return;
-
-    setIsUploading(true);
-    setError(null);
-
-    try {
-      // First create upload record
-      const formData = new FormData();
-      formData.append("file", file);
-
-      const uploadResponse = await fetch(`/api/projects/${projectId}/upload`, {
-        method: "POST",
-        body: formData,
-      });
-
-      if (!uploadResponse.ok) {
-        throw new Error("Failed to create upload record");
+        // Finally, refresh the data
+        await onUploadComplete?.();
+      } catch (error) {
+        toast({
+          title: "Error",
+          description:
+            error instanceof Error ? error.message : "Failed to upload file",
+          variant: "destructive",
+        });
+      } finally {
+        setIsUploading(false);
       }
+    },
+    [projectId, onUploadComplete, onOpenChange, toast]
+  );
 
-      const upload = await uploadResponse.json();
-
-      // Process the file
-      await processFile(upload.id, file);
-
-      if (onSuccess) {
-        onSuccess(upload);
-      }
-
-      onOpenChange?.(false);
-
-      toast({
-        title: "Upload Successful",
-        description: "Your IFC file has been uploaded and processed.",
-      });
-    } catch (error) {
-      console.error("Upload failed:", error);
-      const errorMessage =
-        error instanceof Error ? error.message : "Failed to upload file";
-      setError(errorMessage);
-
-      toast({
-        title: "Upload Failed",
-        description: errorMessage,
-        variant: "destructive",
-      });
-    } finally {
-      setIsUploading(false);
-    }
-  };
-
-  const { getRootProps, getInputProps } = useDropzone({
+  const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
+    maxFiles: 1,
     accept: {
       "application/ifc": [".ifc"],
-      "application/step": [".stp", ".step"],
-      "text/plain": [".ifc"], // Some systems identify IFC as text
+      "application/x-step": [".ifc"],
     },
-    maxFiles: 1,
+    disabled: isUploading,
   });
 
   return (
@@ -114,22 +78,22 @@ export function UploadModal({
         </DialogHeader>
         <div
           {...getRootProps()}
-          className="border-2 border-dashed rounded-lg p-8 text-center cursor-pointer"
+          className={`
+            border-2 border-dashed rounded-lg p-8 text-center cursor-pointer
+            ${isDragActive ? "border-primary bg-primary/10" : "border-border"}
+            ${isUploading ? "opacity-50 cursor-not-allowed" : ""}
+          `}
         >
           <input {...getInputProps()} />
-          {isUploading ? (
-            <div className="flex items-center justify-center gap-2">
-              <Loader2 className="h-4 w-4 animate-spin" />
-              <p>Processing IFC file...</p>
-            </div>
-          ) : (
-            <div>
-              <Upload className="mx-auto h-8 w-8 mb-4" />
-              <p>Drag and drop an IFC file here, or click to select</p>
-            </div>
-          )}
+          <UploadCloud className="mx-auto h-12 w-12 text-muted-foreground" />
+          <p className="mt-2 text-sm text-muted-foreground">
+            {isDragActive
+              ? "Drop the file here"
+              : isUploading
+              ? "Uploading..."
+              : "Drag and drop an IFC file, or click to select"}
+          </p>
         </div>
-        {error && <p className="text-red-500 text-sm mt-2">{error}</p>}
       </DialogContent>
     </Dialog>
   );

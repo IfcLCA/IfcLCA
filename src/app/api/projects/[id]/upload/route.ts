@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { connectToDatabase } from "@/lib/mongodb";
-import { Project, Upload } from "@/models";
-import mongoose from "mongoose";
+import { Upload } from "@/models";
+import { auth } from "@clerk/nextjs/server";
 
 export const runtime = "nodejs";
 
@@ -10,41 +10,70 @@ export async function POST(
   { params }: { params: { id: string } }
 ) {
   try {
-    await connectToDatabase();
+    console.log("Upload request received:", { projectId: params.id });
 
-    if (!mongoose.Types.ObjectId.isValid(params.id)) {
+    const { userId } = await auth();
+    console.log("Auth check:", { userId });
+
+    if (!userId) {
+      console.log("Unauthorized request - no userId");
       return NextResponse.json(
-        { error: "Invalid project ID format" },
+        { error: "Unauthorized - Please sign in" },
+        { status: 401 }
+      );
+    }
+
+    const formData = await request.formData();
+    const file = formData.get("file");
+    console.log("File received:", {
+      fileName: file instanceof File ? file.name : "not a file",
+      fileType: file instanceof File ? file.type : typeof file,
+    });
+
+    if (!file || !(file instanceof File)) {
+      console.log("Invalid file provided");
+      return NextResponse.json(
+        { error: "Invalid file provided" },
         { status: 400 }
       );
     }
 
-    const projectId = new mongoose.Types.ObjectId(params.id);
-    const formData = await request.formData();
-    const file = formData.get("file") as File;
+    console.log("Connecting to database...");
+    await connectToDatabase();
 
-    if (!file) {
-      return NextResponse.json({ error: "No file provided" }, { status: 400 });
-    }
-
+    console.log("Creating upload record...");
     const upload = await Upload.create({
+      projectId: params.id,
+      userId,
       filename: file.name,
       status: "Processing",
       elementCount: 0,
-      projectId: projectId,
+    });
+    console.log("Upload record created:", {
+      uploadId: upload._id.toString(),
+      filename: upload.filename,
     });
 
-    return NextResponse.json({
-      id: upload._id.toString(),
-      filename: upload.filename,
-      status: upload.status,
-      projectId: upload.projectId.toString(),
-      createdAt: upload.createdAt,
-    });
+    const response = {
+      success: true,
+      uploadId: upload._id.toString(),
+      status: "Processing",
+      filename: file.name,
+    };
+    console.log("Sending response:", response);
+
+    return NextResponse.json(response);
   } catch (error) {
-    console.error("Upload failed:", error);
+    console.error("Upload creation failed:", {
+      error,
+      stack: error instanceof Error ? error.stack : undefined,
+    });
     return NextResponse.json(
-      { error: "Failed to process upload" },
+      {
+        success: false,
+        error: "Failed to create upload record",
+        details: error instanceof Error ? error.message : "Unknown error",
+      },
       { status: 500 }
     );
   }

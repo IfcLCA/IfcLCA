@@ -109,10 +109,15 @@ export default function ProjectDetailsPage() {
   const fetchProject = async () => {
     try {
       setIsLoading(true);
+      console.log("Fetching project data...");
       const response = await fetch(`/api/projects/${projectId}`);
-      if (!response.ok) throw new Error("Failed to fetch project");
+      console.log("Project response status:", response.status);
       const data = await response.json();
-      setProject(transformProjectData(data));
+      console.log("Project data received:", data);
+
+      const transformed = transformProjectData(data);
+      console.log("Transformed project data:", transformed);
+      setProject(transformed);
     } catch (err) {
       console.error("Error fetching project:", err);
       setError(
@@ -130,16 +135,20 @@ export default function ProjectDetailsPage() {
     uploads: data.uploads.map((upload: any) => ({
       ...upload,
       _id: upload._id,
+      filename: upload.filename,
+      status: upload.status,
+      elementCount: upload.elementCount,
       createdAt: new Date(upload.createdAt),
-      elementCount:
-        data.elements?.filter((element: any) => element.uploadId === upload._id)
-          .length || 0,
-      status:
-        data.elements?.filter((element: any) => element.uploadId === upload._id)
-          .length > 0
-          ? "Completed"
-          : "Processing",
     })),
+    elements: data.elements.map((element: any) => ({
+      ...element,
+      _id: element._id,
+      materials: element.materials || [],
+    })),
+    _count: data._count || {
+      uploads: data.uploads?.length || 0,
+      elements: data.elements?.length || 0,
+    },
   });
 
   const handleDeleteProject = async () => {
@@ -175,6 +184,16 @@ export default function ProjectDetailsPage() {
         );
       };
       reader.readAsDataURL(file);
+    }
+  };
+
+  const handleUploadComplete = async () => {
+    console.log("Upload complete, refreshing project data...");
+    try {
+      await fetchProject();
+      console.log("Project data refreshed successfully");
+    } catch (error) {
+      console.error("Failed to refresh project data:", error);
     }
   };
 
@@ -214,14 +233,7 @@ export default function ProjectDetailsPage() {
         projectId={projectId}
         open={isUploadModalOpen}
         onOpenChange={setIsUploadModalOpen}
-        onSuccess={async () => {
-          toast({
-            title: "Upload Successful",
-            description: "Your IFC file has been uploaded and processed.",
-          });
-          await fetchProject();
-        }}
-        onProgress={(progress) => console.log("Upload progress:", progress)}
+        onUploadComplete={handleUploadComplete}
       />
       <DeleteProjectDialog
         isOpen={isDeleteDialogOpen}
@@ -412,8 +424,8 @@ const UploadCard = ({ upload }: { upload: ExtendedProject["uploads"][0] }) => (
           <span className="text-sm font-medium">Elements:</span>
           <Badge variant="secondary">{upload.elementCount}</Badge>
         </div>
-        <Badge variant={upload.elementCount > 0 ? "success" : "warning"}>
-          {upload.elementCount > 0 ? "Completed" : "Processing"}
+        <Badge variant={upload.status === "Completed" ? "success" : "warning"}>
+          {upload.status}
         </Badge>
       </div>
     </CardContent>
