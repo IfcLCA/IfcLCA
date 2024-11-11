@@ -6,25 +6,27 @@ export async function GET() {
   try {
     await connectToDatabase();
 
-    // Simple find query with basic population
     const materials = await Material.find({})
       .select("name category volume kbobMatchId")
+      .populate("kbobMatchId")
       .lean();
 
-    // Transform the data to match the expected format
     const transformedMaterials = materials.map((material) => ({
       id: material._id.toString(),
       name: material.name,
       category: material.category,
       volume: material.volume,
-      kbobMatchId: material.kbobMatchId?.toString(),
+      kbobMatchId: material.kbobMatchId?._id.toString(),
+      kbobMatch: material.kbobMatchId
+        ? {
+            id: material.kbobMatchId._id.toString(),
+            Name: material.kbobMatchId.Name,
+            GWP: material.kbobMatchId.GWP,
+            UBP: material.kbobMatchId.UBP,
+            PENRE: material.kbobMatchId.PENRE,
+          }
+        : undefined,
     }));
-
-    console.log(
-      "API Response materials:",
-      transformedMaterials.length,
-      transformedMaterials[0]
-    ); // Debug log
 
     return NextResponse.json(transformedMaterials);
   } catch (error) {

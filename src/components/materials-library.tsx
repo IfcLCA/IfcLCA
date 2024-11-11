@@ -61,6 +61,13 @@ interface Material {
   category?: string;
   volume?: number;
   kbobMatchId?: string;
+  kbobMatch?: {
+    id: string;
+    Name: string;
+    GWP: number;
+    UBP: number;
+    PENRE: number;
+  };
   projects?: string[];
 }
 
@@ -138,6 +145,16 @@ export function MaterialLibraryComponent() {
 
     fetchKbobMaterials();
   }, []);
+
+  useEffect(() => {
+    const initialMatches: { [key: string]: string } = {};
+    materials.forEach((material) => {
+      if (material.kbobMatch) {
+        initialMatches[material.id] = material.kbobMatch.Name;
+      }
+    });
+    setMatchedMaterials(initialMatches);
+  }, [materials]);
 
   const filteredAndSortedMaterials = useMemo(() => {
     console.log("Filtering materials:", materials.length);
@@ -219,14 +236,28 @@ export function MaterialLibraryComponent() {
           throw new Error("Failed to match materials");
         }
 
-        const newMatches = { ...matchedMaterials };
-        selectedMaterials.forEach((materialId) => {
-          newMatches[materialId] =
-            kbobMaterials.find((m) => m._id === kbobValue)?.Name || "";
-        });
-        setMatchedMaterials(newMatches);
+        // Update local state with the matched material name
+        const matchedKbobMaterial = kbobMaterials.find(
+          (m) => m._id === kbobValue
+        );
+        if (matchedKbobMaterial) {
+          const newMatches = { ...matchedMaterials };
+          selectedMaterials.forEach((materialId) => {
+            newMatches[materialId] = matchedKbobMaterial.Name;
+          });
+          setMatchedMaterials(newMatches);
+        }
+
+        // Reset selection state
         setKbobValue("");
         setSelectedMaterials([]);
+
+        // Refresh materials list to show updated matches
+        const materialsResponse = await fetch("/api/materials");
+        if (materialsResponse.ok) {
+          const updatedMaterials = await materialsResponse.json();
+          setMaterials(updatedMaterials);
+        }
       } catch (error) {
         console.error("Failed to match materials:", error);
       }
@@ -331,10 +362,8 @@ export function MaterialLibraryComponent() {
                   <TableCell>{material.category || "N/A"}</TableCell>
                   <TableCell>{material.volume?.toFixed(2) || "N/A"}</TableCell>
                   <TableCell>
-                    {matchedMaterials[material.id] ? (
-                      <Badge variant="outline">
-                        {matchedMaterials[material.id]}
-                      </Badge>
+                    {material.kbobMatch ? (
+                      <Badge variant="outline">{material.kbobMatch.Name}</Badge>
                     ) : (
                       "Not matched"
                     )}

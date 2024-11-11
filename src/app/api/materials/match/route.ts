@@ -11,13 +11,24 @@ export async function POST(request: Request) {
     const objectIds = materialIds.map(
       (id: string) => new mongoose.Types.ObjectId(id)
     );
+    const kbobObjectId = new mongoose.Types.ObjectId(kbobMaterialId);
 
-    await Material.updateMany(
+    // Update materials with KBOB match
+    const result = await Material.updateMany(
       { _id: { $in: objectIds } },
-      { $set: { kbobMatchId: kbobMaterialId } }
+      { $set: { kbobMatchId: kbobObjectId } }
     );
 
-    return NextResponse.json({ success: true });
+    // Fetch updated materials with KBOB data
+    const updatedMaterials = await Material.find({ _id: { $in: objectIds } })
+      .populate("kbobMatchId")
+      .lean();
+
+    return NextResponse.json({
+      success: true,
+      matchedCount: result.modifiedCount,
+      materials: updatedMaterials,
+    });
   } catch (error) {
     console.error("Error matching materials:", error);
     return NextResponse.json(
