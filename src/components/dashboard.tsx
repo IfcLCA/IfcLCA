@@ -34,6 +34,7 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { ActivityFeed } from "@/components/activity-feed";
 
 interface Project {
   id: string;
@@ -69,8 +70,8 @@ interface Activity {
 
 interface DashboardProps {
   initialRecentProjects?: Project[];
-  statistics?: any;
-  activities?: Activity[];
+  statistics?: DashboardStatistics;
+  initialActivities?: Activity[];
 }
 
 // Define the icon components explicitly
@@ -91,7 +92,7 @@ interface Metric {
 export function Dashboard({
   initialRecentProjects = [],
   statistics: initialStatistics = {},
-  activities = [],
+  initialActivities = [],
 }: DashboardProps) {
   const [showProjectSelect, setShowProjectSelect] = useState(false);
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(
@@ -109,6 +110,11 @@ export function Dashboard({
     initialRecentProjects
   );
   const [maxElements, setMaxElements] = useState(0);
+  const [activities, setActivities] = useState(initialActivities);
+  const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(true);
+  const [isLoadingActivities, setIsLoadingActivities] = useState(false);
+  const ITEMS_PER_PAGE = 10;
 
   useEffect(() => {
     if (showProjectSelect) {
@@ -118,6 +124,19 @@ export function Dashboard({
 
   useEffect(() => {
     fetchStatistics();
+  }, []);
+
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        console.log("Fetching activities...");
+        await fetchActivities();
+        console.log("Activities fetched successfully");
+      } catch (error) {
+        console.error("Error in fetchData:", error);
+      }
+    };
+    fetchData();
   }, []);
 
   const fetchProjects = async () => {
@@ -181,6 +200,44 @@ export function Dashboard({
       console.error("Failed to fetch statistics:", error);
     }
   };
+
+  const fetchActivities = async (pageNum: number) => {
+    try {
+      setIsLoadingActivities(true);
+      const response = await fetch(
+        `/api/activities?page=${pageNum}&limit=${ITEMS_PER_PAGE}`
+      );
+
+      if (!response.ok) {
+        throw new Error("Failed to fetch activities");
+      }
+
+      const data = await response.json();
+
+      if (pageNum === 1) {
+        setActivities(data.activities);
+      } else {
+        setActivities((prev) => [...prev, ...data.activities]);
+      }
+
+      setHasMore(data.hasMore);
+    } catch (error) {
+      console.error("Failed to fetch activities:", error);
+    } finally {
+      setIsLoadingActivities(false);
+    }
+  };
+
+  const handleLoadMore = () => {
+    const nextPage = page + 1;
+    setPage(nextPage);
+    fetchActivities(nextPage);
+  };
+
+  // Initial fetch
+  useEffect(() => {
+    fetchActivities(1);
+  }, []);
 
   const handleUploadClick = async () => {
     try {
@@ -320,40 +377,15 @@ export function Dashboard({
       </section>
 
       <section>
-        <h2 className="text-2xl font-bold mb-4">Activity Feed</h2>
-        <Card>
-          <CardContent className="p-0">
-            {activities.map((activity, index) => (
-              <div
-                key={activity.id}
-                className={`flex items-center p-4 ${
-                  index !== activities.length - 1 ? "border-b" : ""
-                }`}
-              >
-                <Avatar className="h-9 w-9">
-                  <AvatarImage
-                    src={activity.user.avatar}
-                    alt={activity.user.name}
-                  />
-                  <AvatarFallback>
-                    {activity.user.name.charAt(0)}
-                  </AvatarFallback>
-                </Avatar>
-                <div className="ml-4 space-y-1">
-                  <p className="text-sm font-medium leading-none">
-                    {activity.user.name}
-                  </p>
-                  <p className="text-sm text-muted-foreground">
-                    {activity.action} on {activity.project}
-                  </p>
-                </div>
-                <div className="ml-auto font-medium text-sm text-muted-foreground">
-                  {activity.timestamp}
-                </div>
-              </div>
-            ))}
-          </CardContent>
-        </Card>
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-2xl font-bold">Activity Feed</h2>
+        </div>
+        <ActivityFeed
+          activities={activities}
+          isLoading={isLoadingActivities}
+          hasMore={hasMore}
+          onLoadMore={handleLoadMore}
+        />
       </section>
 
       <section>
