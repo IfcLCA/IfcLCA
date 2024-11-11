@@ -34,11 +34,12 @@ export async function GET() {
           // Project the fields we want to return
           {
             $project: {
-              _id: 0,
-              id: { $toString: "$id" },
-              name: "$_id",
-              kbobId: 1,
-              indicators: 1,
+              _id: "$id",
+              KBOB_ID: "$kbobId",
+              Name: "$name",
+              GWP: "$indicators.gwp",
+              UBP: "$indicators.ubp",
+              PENRE: "$indicators.penre",
             },
           },
         ])
