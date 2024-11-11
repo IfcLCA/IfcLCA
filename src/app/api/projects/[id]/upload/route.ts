@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
+import { auth } from "@clerk/nextjs/server";
 import { connectToDatabase } from "@/lib/mongodb";
 import { Upload } from "@/models";
-import { auth } from "@clerk/nextjs/server";
 
 export const runtime = "nodejs";
 
@@ -23,32 +23,20 @@ export async function POST(
       );
     }
 
-    const formData = await request.formData();
-    const file = formData.get("file");
-    console.log("File received:", {
-      fileName: file instanceof File ? file.name : "not a file",
-      fileType: file instanceof File ? file.type : typeof file,
-    });
-
-    if (!file || !(file instanceof File)) {
-      console.log("Invalid file provided");
-      return NextResponse.json(
-        { error: "Invalid file provided" },
-        { status: 400 }
-      );
-    }
-
-    console.log("Connecting to database...");
-    await connectToDatabase();
+    const body = await request.json();
+    const filename = body.filename || "Unnamed File";
 
     console.log("Creating upload record...");
+    await connectToDatabase();
+
     const upload = await Upload.create({
       projectId: params.id,
       userId,
-      filename: file.name,
+      filename,
       status: "Processing",
       elementCount: 0,
     });
+
     console.log("Upload record created:", {
       uploadId: upload._id.toString(),
       filename: upload.filename,
@@ -58,22 +46,15 @@ export async function POST(
       success: true,
       uploadId: upload._id.toString(),
       status: "Processing",
-      filename: file.name,
+      filename,
     };
-    console.log("Sending response:", response);
 
+    console.log("Sending response:", response);
     return NextResponse.json(response);
   } catch (error) {
-    console.error("Upload creation failed:", {
-      error,
-      stack: error instanceof Error ? error.stack : undefined,
-    });
+    console.error("Upload creation failed:", error);
     return NextResponse.json(
-      {
-        success: false,
-        error: "Failed to create upload record",
-        details: error instanceof Error ? error.message : "Unknown error",
-      },
+      { error: "Failed to create upload record" },
       { status: 500 }
     );
   }

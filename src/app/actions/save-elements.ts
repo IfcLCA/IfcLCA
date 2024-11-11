@@ -2,9 +2,8 @@
 
 import { auth } from "@clerk/nextjs/server";
 import mongoose from "mongoose";
-import { Element, Material, MaterialUsage, Upload } from "@/models";
+import { Element, Material, Upload } from "@/models";
 import { z } from "zod";
-import { revalidatePath } from "next/cache";
 import { connectToDatabase } from "../../lib/mongoose";
 
 // Validation schemas
@@ -34,24 +33,6 @@ const inputSchema = z.object({
   uploadId: z.string(),
 });
 
-const BATCH_SIZE = 25; // Smaller batch size for serverless
-
-async function withRetry(fn: () => Promise<any>, retries = 3) {
-  for (let i = 0; i < retries; i++) {
-    try {
-      return await fn();
-    } catch (error) {
-      if (error.name === "MongooseServerSelectionError" && i < retries - 1) {
-        console.log(`Retrying operation, attempt ${i + 1}`);
-        await new Promise((resolve) => setTimeout(resolve, 1000 * (i + 1)));
-        await connectToDatabase(); // Reconnect
-        continue;
-      }
-      throw error;
-    }
-  }
-}
-
 export async function saveElements(
   projectId: string,
   data: { elements: any[]; uploadId: string }
@@ -63,12 +44,6 @@ export async function saveElements(
       throw new Error("No elements provided");
     }
 
-    // Log the first element for debugging
-    console.log(
-      "First element sample:",
-      JSON.stringify(data.elements[0], null, 2)
-    );
-
     const { userId } = await auth();
     if (!userId) {
       throw new Error("Unauthorized");
@@ -76,76 +51,54 @@ export async function saveElements(
 
     await connectToDatabase();
 
-    // Validate project and upload IDs
     const projectObjectId = new mongoose.Types.ObjectId(projectId);
     const uploadObjectId = new mongoose.Types.ObjectId(data.uploadId);
 
-    // Process in smaller batches with error tracking
-    const batchSize = 25;
     let savedCount = 0;
     let errors = [];
 
+    // Process elements in smaller batches
+    const batchSize = 20;
     for (let i = 0; i < data.elements.length; i += batchSize) {
       const batch = data.elements.slice(i, i + batchSize);
 
       try {
-        await Promise.all(
-          batch.map(async (element) => {
-            try {
-              // Validate element data
-              if (!element.globalId || !element.name) {
-                throw new Error(
-                  `Invalid element data: ${JSON.stringify(element)}`
-                );
-              }
-
-              // Process materials
-              const processedMaterials = await processMaterials(
-                element,
-                projectObjectId
-              );
-
-              // Save element
-              const result = await Element.findOneAndUpdate(
-                {
-                  guid: element.globalId,
-                  projectId: projectObjectId,
-                },
-                {
-                  $set: {
-                    projectId: projectObjectId,
-                    uploadId: uploadObjectId,
-                    guid: element.globalId,
-                    name: element.name,
-                    type: element.type,
-                    volume:
-                      element.netVolume === "Unknown"
-                        ? 0
-                        : Number(element.netVolume) || 0,
-                    buildingStorey: element.spatialContainer,
-                    materials: processedMaterials,
-                  },
-                },
-                {
-                  upsert: true,
-                  new: true,
-                  runValidators: true,
-                }
-              );
-
-              if (result) savedCount++;
-            } catch (elementError) {
-              errors.push({
-                element: element.globalId,
-                error: elementError.message,
-              });
-              console.error("Element processing error:", {
-                guid: element.globalId,
-                error: elementError.message,
-              });
-            }
-          })
+        // Process materials for the entire batch first
+        const processedBatch = await Promise.all(
+          batch.map(async (element) => ({
+            element,
+            materials: await processMaterials(element, projectObjectId),
+          }))
         );
+
+        // Create operations using processed materials
+        const operations = processedBatch.map(({ element, materials }) => ({
+          updateOne: {
+            filter: {
+              guid: element.globalId,
+              projectId: projectObjectId,
+            },
+            update: {
+              $set: {
+                projectId: projectObjectId,
+                uploadId: uploadObjectId,
+                guid: element.globalId,
+                name: element.name,
+                type: element.type,
+                volume:
+                  element.netVolume === "Unknown"
+                    ? 0
+                    : Number(element.netVolume) || 0,
+                buildingStorey: element.spatialContainer,
+                materials,
+              },
+            },
+            upsert: true,
+          },
+        }));
+
+        const result = await Element.bulkWrite(operations, { ordered: false });
+        savedCount += result.upsertedCount + result.modifiedCount;
       } catch (batchError) {
         console.error("Batch processing error:", batchError);
         errors.push({
@@ -155,14 +108,13 @@ export async function saveElements(
       }
     }
 
-    // Update upload status with error information
+    // Update upload status
     await Upload.findByIdAndUpdate(uploadObjectId, {
       status: errors.length > 0 ? "Completed with errors" : "Completed",
       elementCount: savedCount,
       errors: errors.length > 0 ? errors : undefined,
     });
 
-    // Return detailed response
     return {
       success: true,
       savedCount,
@@ -173,12 +125,8 @@ export async function saveElements(
       }`,
     };
   } catch (error) {
-    console.error("Fatal error in saveElements:", {
-      error: error.message,
-      stack: error.stack,
-    });
+    console.error("Fatal error in saveElements:", error);
 
-    // Update upload status on fatal error
     if (data?.uploadId) {
       try {
         await Upload.findByIdAndUpdate(data.uploadId, {
