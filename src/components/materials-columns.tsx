@@ -1,14 +1,12 @@
 "use client";
 
 import { ColumnDef } from "@tanstack/react-table";
-import { MaterialDocument } from "@/types/mongodb";
 
 export interface MaterialTableItem {
   id: string;
   name: string;
   category: string;
   volume: number;
-  count: number;
 }
 
 export const materialsColumns: ColumnDef<MaterialTableItem>[] = [
@@ -17,11 +15,19 @@ export const materialsColumns: ColumnDef<MaterialTableItem>[] = [
     header: "Name",
   },
   {
-    accessorKey: "count",
-    header: "Occurrences",
+    accessorKey: "category",
+    header: "Category",
     cell: ({ row }) => {
-      const count = row.getValue("count");
-      return count || 0;
+      const category = row.getValue("category");
+      return category || "N/A";
+    },
+  },
+  {
+    accessorKey: "volume",
+    header: "Volume",
+    cell: ({ row }) => {
+      const volume = row.getValue("volume") as number;
+      return volume ? `${volume.toFixed(2)} m³` : "0 m³";
     },
   },
 ];

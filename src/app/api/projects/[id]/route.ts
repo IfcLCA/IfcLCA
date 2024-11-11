@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { connectToDatabase } from "@/lib/mongodb";
-import { Project, Upload, Element } from "@/models";
+import { Project, Upload, Element, Material } from "@/models";
 import mongoose from "mongoose";
 import { auth } from "@clerk/nextjs/server";
 
@@ -32,16 +32,22 @@ export async function GET(
     // Get uploads for this project
     const uploads = await Upload.find({
       projectId: project._id,
-    }).lean();
+      deleted: { $ne: true },
+    }).sort({ createdAt: -1 });
 
     // Get elements for this project
     const elements = await Element.find({
       projectId: project._id,
     }).lean();
 
+    // Get materials for this project
+    const materials = await Material.find({
+      projectId: project._id,
+    }).lean();
+
     // Format the response
     const projectData = {
-      _id: project._id.toString(),
+      id: project._id.toString(),
       name: project.name,
       description: project.description,
       phase: project.phase,
@@ -55,17 +61,26 @@ export async function GET(
         createdAt: upload.createdAt,
       })),
       elements: elements.map((element) => ({
+        id: element._id.toString(),
         _id: element._id.toString(),
         guid: element.guid,
         name: element.name,
         type: element.type,
         volume: element.volume,
         buildingStorey: element.buildingStorey,
-        uploadId: element.uploadId?.toString(),
+        materials: element.materials || [],
+      })),
+      materials: materials.map((material) => ({
+        id: material._id.toString(),
+        name: material.name,
+        category: material.category,
+        volume: material.volume || 0,
+        fraction: 0, // Calculate this if needed
       })),
       _count: {
         uploads: uploads.length,
         elements: elements.length,
+        materials: materials.length,
       },
     };
 

@@ -133,6 +133,7 @@ export default function ProjectDetailsPage() {
 
   const transformProjectData = (data: any): ExtendedProject => ({
     ...data,
+    id: data.id || data._id,
     createdAt: new Date(data.createdAt),
     updatedAt: new Date(data.updatedAt),
     uploads: data.uploads.map((upload: any) => ({
@@ -145,12 +146,22 @@ export default function ProjectDetailsPage() {
     })),
     elements: data.elements.map((element: any) => ({
       ...element,
+      id: element.id || element._id,
       _id: element._id,
       materials: element.materials || [],
     })),
-    _count: data._count || {
+    materials:
+      data.materials?.map((material: any) => ({
+        id: material.id || material._id,
+        name: material.name,
+        category: material.category,
+        volume: material.volume || 0,
+        fraction: material.fraction || 0,
+      })) || [],
+    _count: {
       uploads: data.uploads?.length || 0,
       elements: data.elements?.length || 0,
+      materials: data.materials?.length || 0,
     },
   });
 
@@ -211,9 +222,8 @@ export default function ProjectDetailsPage() {
     project.materials?.map((m) => ({
       id: m.id,
       name: m.name,
-      count: project.elements.filter((element) =>
-        element.materials.some((material) => material.name === m.name)
-      ).length,
+      category: m.category,
+      volume: m.volume,
     })) || [];
 
   return (
