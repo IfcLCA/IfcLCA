@@ -1,52 +1,11 @@
-import { connectToDatabase } from "@/lib/mongodb";
-import { Material } from "@/models";
-import { DataTable } from "@/components/data-table";
-import { materialsColumns } from "@/components/materials-columns";
+"use client";
 
-export const dynamic = "force-dynamic";
+import { MaterialLibraryComponent } from "@/components/materials-library";
 
-type MaterialTableItem = {
-  id: string;
-  name: string;
-  category: string;
-  volume: number;
-};
-
-async function getMaterials(): Promise<MaterialTableItem[]> {
-  try {
-    await connectToDatabase();
-
-    const materials = (await Material.find()
-      .select("name category volume")
-      .lean()) as unknown as Array<{
-      _id: { toString: () => string };
-      name: string;
-      category?: string;
-      volume?: number;
-    }>;
-
-    return materials.map((material) => ({
-      id: material._id.toString(),
-      name: material.name,
-      category: material.category || "",
-      volume: material.volume || 0,
-    }));
-  } catch (error) {
-    console.error("Failed to fetch materials:", error);
-    return [];
-  }
-}
-
-export default async function MaterialsLibrary() {
-  const materials = await getMaterials();
-
+export default function MaterialsLibraryPage() {
   return (
-    <div className="container mx-auto py-10">
-      <h1 className="text-2xl font-bold mb-6">Materials</h1>
-      <DataTable<MaterialTableItem>
-        columns={materialsColumns}
-        data={materials}
-      />
+    <div className="container mx-auto py-6">
+      <MaterialLibraryComponent />
     </div>
   );
 }

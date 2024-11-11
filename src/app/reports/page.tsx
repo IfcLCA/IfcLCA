@@ -1,8 +1,7 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { ReportsPageContent } from "@/components/reports-page";
+import ReportsPage from "@/components/reports-page";
 
-export default function ReportsPage() {
-  return <ReportsPageContent />;
+export default function Page() {
+  return <ReportsPage />;
 }

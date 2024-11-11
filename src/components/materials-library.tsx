@@ -1,16 +1,31 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { usePathname, useSearchParams, useRouter } from "next/navigation";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
+import { useState, useMemo, useCallback } from "react";
+import { ArrowUpDown, Filter } from "lucide-react";
+import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+} from "@/components/ui/command";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { Checkbox } from "@/components/ui/checkbox";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
 import {
   Table,
   TableBody,
@@ -19,164 +34,351 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { PaginationWithNumbers } from "@/components/ui/pagination-with-numbers";
+import {
+  DropdownMenu,
+  DropdownMenuCheckboxItem,
+  DropdownMenuContent,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { useVirtualizer } from "@tanstack/react-virtual";
+import {
+  CheckIcon,
+  CaretSortIcon,
+  MagnifyingGlassIcon,
+} from "@radix-ui/react-icons";
 
-type Material = {
-  id: string;
-  name: string;
-  volume: number;
-  category?: string;
-};
+// Mock data for materials used in projects (expanded)
+const projectMaterials = Array.from({ length: 1000 }, (_, i) => ({
+  id: i + 1,
+  name: `Material ${i + 1}`,
+  projects: Array.from(
+    { length: Math.floor(Math.random() * 5) + 1 },
+    (_, j) => `Project ${String.fromCharCode(65 + j)}`
+  ),
+}));
 
-const PAGE_SIZES = [10, 20, 50];
+// Mock data for KBOB materials (expanded)
+const kbobMaterials = Array.from({ length: 500 }, (_, i) => ({
+  id: i + 1,
+  name: `KBOB Material ${i + 1}`,
+  category: ["Concrete", "Metals", "Wood", "Insulation", "Finishes"][
+    Math.floor(Math.random() * 5)
+  ],
+}));
 
-export function MaterialsLibrary({
-  initialProjects,
-  initialMaterials,
-}: {
-  initialProjects: any[];
-  initialMaterials: Material[];
-}) {
-  const pathname = usePathname();
-  const searchParams = useSearchParams();
-  const { replace } = useRouter();
-  const currentPage = Number(searchParams.get("page")) || 1;
-  const pageSize = Number(searchParams.get("pageSize")) || 10;
-
-  const [materials, setMaterials] = useState<Material[]>(initialMaterials);
-  const [projects] = useState(initialProjects);
-  const [selectedProject, setSelectedProject] = useState<string>(
-    projects[0]?.id
-  );
+export function MaterialLibraryComponent() {
+  const [selectedMaterials, setSelectedMaterials] = useState<number[]>([]);
+  const [open, setOpen] = useState(false);
+  const [value, setValue] = useState("");
+  const [matchedMaterials, setMatchedMaterials] = useState<{
+    [key: number]: string;
+  }>({});
   const [searchTerm, setSearchTerm] = useState("");
-  const [loading, setLoading] = useState(false);
+  const [sortColumn, setSortColumn] = useState<"name" | "projects">("name");
+  const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage] = useState(50);
+  const [selectedProjects, setSelectedProjects] = useState<string[]>([]);
 
-  const createPageURL = (pageNumber: number | string) => {
-    const params = new URLSearchParams(searchParams);
-    params.set("page", pageNumber.toString());
-    return `${pathname}?${params.toString()}`;
+  const filteredAndSortedMaterials = useMemo(() => {
+    return projectMaterials
+      .filter(
+        (material) =>
+          (material.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            material.projects.some((project) =>
+              project.toLowerCase().includes(searchTerm.toLowerCase())
+            )) &&
+          (selectedProjects.length === 0 ||
+            material.projects.some((project) =>
+              selectedProjects.includes(project)
+            ))
+      )
+      .sort((a, b) => {
+        if (sortColumn === "name") {
+          return sortDirection === "asc"
+            ? a.name.localeCompare(b.name)
+            : b.name.localeCompare(a.name);
+        } else {
+          return sortDirection === "asc"
+            ? a.projects.length - b.projects.length
+            : b.projects.length - a.projects.length;
+        }
+      });
+  }, [searchTerm, sortColumn, sortDirection, selectedProjects]);
+
+  const paginatedMaterials = useMemo(() => {
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    return filteredAndSortedMaterials.slice(
+      startIndex,
+      startIndex + itemsPerPage
+    );
+  }, [filteredAndSortedMaterials, currentPage, itemsPerPage]);
+
+  const parentRef = useCallback((node: HTMLDivElement) => {
+    if (node !== null) {
+      rowVirtualizer.scrollToIndex(0);
+    }
+  }, []);
+
+  const rowVirtualizer = useVirtualizer({
+    count: paginatedMaterials.length,
+    getScrollElement: () => parentRef.current,
+    estimateSize: () => 35,
+    overscan: 5,
+  });
+
+  const handleSelectAll = (checked: boolean) => {
+    setSelectedMaterials(checked ? paginatedMaterials.map((m) => m.id) : []);
   };
 
-  useEffect(() => {
-    async function fetchMaterials() {
-      setLoading(true);
-      try {
-        const response = await fetch(
-          `/api/materials?projectId=${selectedProject}`
-        );
-        const data = await response.json();
-        setMaterials(data);
-      } catch (error) {
-        console.error("Failed to fetch materials:", error);
-      }
-      setLoading(false);
+  const handleSelect = (materialId: number) => {
+    setSelectedMaterials((prev) =>
+      prev.includes(materialId)
+        ? prev.filter((id) => id !== materialId)
+        : [...prev, materialId]
+    );
+  };
+
+  const handleMatch = () => {
+    if (value) {
+      const newMatches = { ...matchedMaterials };
+      selectedMaterials.forEach((materialId) => {
+        newMatches[materialId] = value;
+      });
+      setMatchedMaterials(newMatches);
+      setValue("");
+      setOpen(false);
+      setSelectedMaterials([]);
     }
+  };
 
-    fetchMaterials();
-  }, [selectedProject]);
+  const toggleSort = (column: "name" | "projects") => {
+    if (sortColumn === column) {
+      setSortDirection(sortDirection === "asc" ? "desc" : "asc");
+    } else {
+      setSortColumn(column);
+      setSortDirection("asc");
+    }
+  };
 
-  useEffect(() => {
-    console.log("Initial materials:", initialMaterials);
-  }, [initialMaterials]);
-
-  const filteredMaterials = materials.filter((material) =>
-    material.name.toLowerCase().includes(searchTerm.toLowerCase())
-  );
-
-  const totalPages = Math.ceil(filteredMaterials.length / pageSize);
-  const startIndex = (currentPage - 1) * pageSize;
-  const paginatedMaterials = filteredMaterials.slice(
-    startIndex,
-    startIndex + pageSize
-  );
+  const allProjects = useMemo(() => {
+    const projectSet = new Set<string>();
+    projectMaterials.forEach((material) =>
+      material.projects.forEach((project) => projectSet.add(project))
+    );
+    return Array.from(projectSet).sort();
+  }, []);
 
   return (
-    <Card className="w-full">
+    <Card className="w-full max-w-4xl mx-auto">
       <CardHeader>
-        <CardTitle>Materials</CardTitle>
+        <CardTitle>Material Library</CardTitle>
+        <CardDescription>
+          Match project materials with KBOB environmental indicators
+        </CardDescription>
       </CardHeader>
-      <CardContent>
-        <div className="space-y-4">
-          <div className="flex items-center gap-4">
-            <Select value={selectedProject} onValueChange={setSelectedProject}>
-              <SelectTrigger className="w-[200px]">
-                <SelectValue placeholder="Select project" />
-              </SelectTrigger>
-              <SelectContent>
-                {projects.map((project) => (
-                  <SelectItem key={project.id} value={project.id}>
-                    {project.name}
-                  </SelectItem>
-                ))}
-                <SelectItem value="all">All Projects</SelectItem>
-              </SelectContent>
-            </Select>
-            <Input
-              placeholder="Search materials..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="max-w-sm"
-            />
-            <Select
-              value={pageSize.toString()}
-              onValueChange={(value) => {
-                const params = new URLSearchParams(searchParams);
-                params.set("pageSize", value);
-                params.set("page", "1");
-                replace(`${pathname}?${params.toString()}`);
-              }}
-            >
-              <SelectTrigger className="w-[70px]">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {PAGE_SIZES.map((size) => (
-                  <SelectItem key={size} value={size.toString()}>
-                    {size}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+      <CardContent className="space-y-4">
+        <div className="flex items-center space-x-2">
+          <MagnifyingGlassIcon className="w-4 h-4 text-muted-foreground" />
+          <Input
+            placeholder="Search materials or projects..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="w-full"
+          />
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" className="ml-auto">
+                <Filter className="mr-2 h-4 w-4" />
+                Filter Projects
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-[200px]">
+              {allProjects.map((project) => (
+                <DropdownMenuCheckboxItem
+                  key={project}
+                  checked={selectedProjects.includes(project)}
+                  onCheckedChange={(checked) => {
+                    setSelectedProjects((prev) =>
+                      checked
+                        ? [...prev, project]
+                        : prev.filter((p) => p !== project)
+                    );
+                  }}
+                >
+                  {project}
+                </DropdownMenuCheckboxItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
+        <div className="border rounded-md">
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Name</TableHead>
-                <TableHead>Volume (m³)</TableHead>
-                <TableHead>Category</TableHead>
+                <TableHead className="w-[50px]">
+                  <Checkbox
+                    checked={
+                      selectedMaterials.length === paginatedMaterials.length
+                    }
+                    onCheckedChange={handleSelectAll}
+                    aria-label="Select all"
+                  />
+                </TableHead>
+                <TableHead
+                  className="cursor-pointer"
+                  onClick={() => toggleSort("name")}
+                >
+                  Material Name
+                  <ArrowUpDown className="ml-2 h-4 w-4 inline" />
+                </TableHead>
+                <TableHead
+                  className="cursor-pointer"
+                  onClick={() => toggleSort("projects")}
+                >
+                  Projects
+                  <ArrowUpDown className="ml-2 h-4 w-4 inline" />
+                </TableHead>
+                <TableHead>KBOB Match</TableHead>
               </TableRow>
             </TableHeader>
-            <TableBody>
-              {loading ? (
-                <TableRow>
-                  <TableCell colSpan={3} className="text-center">
-                    Loading...
-                  </TableCell>
-                </TableRow>
-              ) : paginatedMaterials.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={3} className="text-center">
-                    No materials found
-                  </TableCell>
-                </TableRow>
-              ) : (
-                paginatedMaterials.map((material) => (
-                  <TableRow key={material.id}>
-                    <TableCell>{material.name}</TableCell>
-                    <TableCell>{material.volume.toFixed(2)}</TableCell>
-                    <TableCell>{material.category || "-"}</TableCell>
-                  </TableRow>
-                ))
-              )}
-            </TableBody>
           </Table>
-          <PaginationWithNumbers
-            totalPages={totalPages}
-            showingText={`Showing ${startIndex + 1}-${Math.min(
-              startIndex + pageSize,
-              filteredMaterials.length
-            )} of ${filteredMaterials.length}`}
-          />
+          <ScrollArea className="h-[400px]" ref={parentRef}>
+            <Table>
+              <TableBody>
+                {rowVirtualizer.getVirtualItems().map((virtualRow) => {
+                  const material = paginatedMaterials[virtualRow.index];
+                  return (
+                    <TableRow
+                      key={material.id}
+                      data-index={virtualRow.index}
+                      ref={rowVirtualizer.measureElement}
+                    >
+                      <TableCell>
+                        <Checkbox
+                          checked={selectedMaterials.includes(material.id)}
+                          onCheckedChange={() => handleSelect(material.id)}
+                          aria-label={`Select ${material.name}`}
+                        />
+                      </TableCell>
+                      <TableCell>{material.name}</TableCell>
+                      <TableCell>
+                        <div className="flex flex-wrap gap-1">
+                          {material.projects.map((project) => (
+                            <Badge
+                              key={project}
+                              variant="secondary"
+                              className="text-xs"
+                            >
+                              {project}
+                            </Badge>
+                          ))}
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        {matchedMaterials[material.id] ? (
+                          <Badge variant="outline">
+                            {matchedMaterials[material.id]}
+                          </Badge>
+                        ) : (
+                          "Not matched"
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+          </ScrollArea>
+        </div>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center space-x-2">
+            <Button
+              onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
+              disabled={currentPage === 1}
+            >
+              Previous
+            </Button>
+            <span>
+              Page {currentPage} of{" "}
+              {Math.ceil(filteredAndSortedMaterials.length / itemsPerPage)}
+            </span>
+            <Button
+              onClick={() =>
+                setCurrentPage((prev) =>
+                  Math.min(
+                    prev + 1,
+                    Math.ceil(filteredAndSortedMaterials.length / itemsPerPage)
+                  )
+                )
+              }
+              disabled={
+                currentPage ===
+                Math.ceil(filteredAndSortedMaterials.length / itemsPerPage)
+              }
+            >
+              Next
+            </Button>
+          </div>
+          <span>{filteredAndSortedMaterials.length} materials</span>
+        </div>
+        <div className="flex items-center space-x-2">
+          <Popover open={open} onOpenChange={setOpen}>
+            <PopoverTrigger asChild>
+              <Button
+                variant="outline"
+                role="combobox"
+                aria-expanded={open}
+                className="w-[300px] justify-between"
+                disabled={selectedMaterials.length === 0}
+              >
+                {value
+                  ? kbobMaterials.find((material) => material.name === value)
+                      ?.name
+                  : "Select KBOB material..."}
+                <CaretSortIcon className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-[300px] p-0">
+              <Command>
+                <CommandInput placeholder="Search KBOB material..." />
+                <CommandEmpty>No material found.</CommandEmpty>
+                <CommandGroup>
+                  <ScrollArea className="h-[200px]">
+                    {kbobMaterials.map((material) => (
+                      <CommandItem
+                        key={material.id}
+                        onSelect={() => {
+                          setValue(material.name);
+                          setOpen(false);
+                        }}
+                      >
+                        <CheckIcon
+                          className={cn(
+                            "mr-2 h-4 w-4",
+                            value === material.name
+                              ? "opacity-100"
+                              : "opacity-0"
+                          )}
+                        />
+                        <span>{material.name}</span>
+                        <Badge variant="secondary" className="ml-auto">
+                          {material.category}
+                        </Badge>
+                      </CommandItem>
+                    ))}
+                  </ScrollArea>
+                </CommandGroup>
+              </Command>
+            </PopoverContent>
+          </Popover>
+          <Button
+            onClick={handleMatch}
+            disabled={!value || selectedMaterials.length === 0}
+          >
+            Match Selected
+          </Button>
         </div>
       </CardContent>
     </Card>

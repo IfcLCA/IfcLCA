@@ -166,7 +166,7 @@ export function SidebarNavigation({
       <aside
         className={cn(
           "hidden border-r bg-background lg:block",
-          collapsed ? "w-[60px]" : "w-64"
+          collapsed ? "w-[60px]" : "w-40"
         )}
       >
         <SidebarContent />
