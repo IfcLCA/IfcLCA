@@ -14,13 +14,14 @@ import { Progress } from "@/components/ui/progress";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import {
-  BarChart,
   Building,
-  FileText,
-  Users,
-  BarChart2,
+  Box,
+  Layers,
   Upload,
   PlusCircle,
+  FileText,
+  Users,
+  BarChart,
 } from "lucide-react";
 import { UploadModal } from "@/components/upload-modal";
 import {
@@ -44,8 +45,8 @@ interface Project {
 
 interface DashboardStatistics {
   totalProjects: number;
-  activeProjects: number;
-  totalCO2Savings: number;
+  totalElements: number;
+  totalMaterials: number;
   recentActivities: number;
 }
 
@@ -66,9 +67,24 @@ interface DashboardProps {
   activities?: any[];
 }
 
+// Define the icon components explicitly
+const Icons = {
+  Building: Building,
+  Box: Box,
+  Layers: Layers,
+} as const;
+
+// Type for the metrics
+interface Metric {
+  title: string;
+  value: number;
+  description: string;
+  icon: keyof typeof Icons;
+}
+
 export function Dashboard({
   recentProjects = [],
-  statistics = {},
+  statistics: initialStatistics = {},
   activities = [],
 }: DashboardProps) {
   const [showProjectSelect, setShowProjectSelect] = useState(false);
@@ -77,12 +93,22 @@ export function Dashboard({
   );
   const [projects, setProjects] = useState<Project[]>([]);
   const router = useRouter();
+  const [statistics, setStatistics] = useState<DashboardStatistics>({
+    totalProjects: 0,
+    totalElements: 0,
+    totalMaterials: 0,
+    recentActivities: 0,
+  });
 
   useEffect(() => {
     if (showProjectSelect) {
       fetchProjects();
     }
   }, [showProjectSelect]);
+
+  useEffect(() => {
+    fetchStatistics();
+  }, []);
 
   const fetchProjects = async () => {
     try {
@@ -91,6 +117,32 @@ export function Dashboard({
       setProjects(data);
     } catch (error) {
       console.error("Failed to fetch projects:", error);
+    }
+  };
+
+  const fetchStatistics = async () => {
+    try {
+      const response = await fetch("/api/projects");
+      const projects = await response.json();
+
+      const totalElements = projects.reduce(
+        (acc: number, project: any) => acc + (project._count?.elements || 0),
+        0
+      );
+
+      const totalMaterials = projects.reduce(
+        (acc: number, project: any) => acc + (project._count?.materials || 0),
+        0
+      );
+
+      setStatistics((prev) => ({
+        ...prev,
+        totalProjects: projects.length,
+        totalElements,
+        totalMaterials,
+      }));
+    } catch (error) {
+      console.error("Failed to fetch statistics:", error);
     }
   };
 
@@ -114,6 +166,27 @@ export function Dashboard({
     recentProjects,
   });
 
+  const metrics: Metric[] = [
+    {
+      title: "Total Projects",
+      value: statistics.totalProjects,
+      description: "Total number of projects",
+      icon: "Building",
+    },
+    {
+      title: "Total Elements",
+      value: statistics.totalElements,
+      description: "Building elements across all projects",
+      icon: "Box",
+    },
+    {
+      title: "Total Materials",
+      value: statistics.totalMaterials,
+      description: "Unique materials in use",
+      icon: "Layers",
+    },
+  ];
+
   return (
     <div className="container mx-auto p-4 space-y-8">
       <section className="space-y-4">
@@ -133,9 +206,9 @@ export function Dashboard({
         </div>
       </section>
 
-      <section className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        {defaultMetrics.map((item) => {
-          const Icon = iconMap[item.icon as keyof typeof iconMap];
+      <section className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+        {metrics.map((item) => {
+          const Icon = Icons[item.icon];
           return (
             <Card key={item.title}>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">

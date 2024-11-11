@@ -1,4 +1,4 @@
-import { Building, Users, BarChart2, FileText } from "lucide-react";
+import { Building, Users, BarChart2, FileText, Activity } from "lucide-react";
 
 export type MetricType = {
   title: string;
@@ -40,4 +40,5 @@ export const iconMap = {
   Users,
   BarChart2,
   FileText,
+  Activity,
 } as const;

@@ -20,12 +20,19 @@ export async function GET() {
 
     const projectsWithCounts = await Promise.all(
       projects.map(async (project) => {
-        const uploadsCount = await mongoose.models.Upload.countDocuments({
-          projectId: project._id,
-        });
-        const elementsCount = await mongoose.models.Element.countDocuments({
-          projectId: project._id,
-        });
+        const [uploadsCount, elementsCount, materialsCount] = await Promise.all(
+          [
+            mongoose.models.Upload.countDocuments({
+              projectId: project._id,
+            }),
+            mongoose.models.Element.countDocuments({
+              projectId: project._id,
+            }),
+            mongoose.models.Material.countDocuments({
+              projectId: project._id,
+            }),
+          ]
+        );
 
         return {
           id: project._id.toString(),
@@ -37,6 +44,7 @@ export async function GET() {
           _count: {
             uploads: uploadsCount,
             elements: elementsCount,
+            materials: materialsCount,
           },
         };
       })
