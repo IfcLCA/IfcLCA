@@ -1,6 +1,15 @@
 import mongoose from "mongoose";
 
-const materialSchema = new mongoose.Schema(
+// Define the schema type for KBOB reference
+interface IMaterial {
+  name: string;
+  projectId: mongoose.Types.ObjectId;
+  category?: string;
+  volume: number;
+  kbobMatchId?: mongoose.Types.ObjectId;
+}
+
+const materialSchema = new mongoose.Schema<IMaterial>(
   {
     name: {
       type: String,
@@ -16,21 +25,21 @@ const materialSchema = new mongoose.Schema(
       type: Number,
       default: 0,
     },
+    kbobMatchId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "KBOBMaterial",
+    },
   },
   {
     timestamps: true,
   }
 );
 
-// Remove ALL indexes first
-materialSchema.indexes().forEach((index) => {
-  materialSchema.index(index[0], { unique: false });
-});
-
-// Add the correct compound index
 materialSchema.index({ name: 1, projectId: 1 }, { unique: true });
 
+// Ensure model is registered only once
 const Material =
-  mongoose.models.Material || mongoose.model("Material", materialSchema);
+  (mongoose.models.Material as mongoose.Model<IMaterial>) ||
+  mongoose.model<IMaterial>("Material", materialSchema);
 
 export { Material };

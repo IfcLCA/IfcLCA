@@ -19,11 +19,11 @@ if (!process.env.MONGODB_URI) {
 }
 
 const MONGODB_URI = process.env.MONGODB_URI;
-
 let cached = global.mongoose;
 
 export async function connectToDatabase() {
   if (cached.conn) {
+    console.log("Using cached MongoDB connection");
     return cached.conn;
   }
 
@@ -35,15 +35,29 @@ export async function connectToDatabase() {
       socketTimeoutMS: 45000,
     };
 
+    console.log("Connecting to MongoDB...");
     cached.promise = mongoose.connect(MONGODB_URI, opts);
   }
 
   try {
     cached.conn = await cached.promise;
+    console.log("Successfully connected to MongoDB");
     return cached.conn;
   } catch (e) {
+    console.error("MongoDB connection error:", e);
     cached.promise = null;
     throw e;
+  }
+}
+
+// Helper function to ensure database connection
+export async function withDatabase<T>(operation: () => Promise<T>): Promise<T> {
+  try {
+    await connectToDatabase();
+    return await operation();
+  } catch (error) {
+    console.error("Database operation failed:", error);
+    throw error;
   }
 }
 
