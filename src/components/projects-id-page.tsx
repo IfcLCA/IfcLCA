@@ -46,6 +46,7 @@ import {
   PaginationNext,
   PaginationPrevious,
 } from "@/components/ui/pagination";
+import { emissionsColumns } from "@/components/emissions-columns";
 
 type ElementWithMaterials = {
   id: string;
@@ -355,6 +356,12 @@ const ProjectTabs = ({
         Materials
       </TabsTrigger>
       <TabsTrigger
+        value="emissions"
+        className="rounded-md px-4 py-2 data-[state=active]:bg-background data-[state=active]:shadow-sm transition-all"
+      >
+        Emissions
+      </TabsTrigger>
+      <TabsTrigger
         value="graph"
         className="rounded-md px-4 py-2 data-[state=active]:bg-background data-[state=active]:shadow-sm transition-all"
       >
@@ -376,6 +383,10 @@ const ProjectTabs = ({
         materialsWithCount={materialsWithCount}
         onUpload={onUpload}
       />
+    </TabsContent>
+
+    <TabsContent value="emissions" className="space-y-4">
+      <EmissionsTab project={project} />
     </TabsContent>
 
     <TabsContent value="graph" className="space-y-4">
@@ -556,6 +567,42 @@ const MaterialsTab = ({
     )}
   </>
 );
+
+const EmissionsTab = ({ project }: { project: ExtendedProject }) => {
+  const data = project.elements.flatMap((element) =>
+    element.materials.map((materialEntry) => ({
+      name: element.name || "Unknown",
+      volume: materialEntry.volume || 0,
+      indicators: materialEntry.indicators || {
+        gwp: 0,
+        ubp: 0,
+        penre: 0,
+      },
+    }))
+  );
+
+  return (
+    <>
+      <div className="flex justify-between items-center mb-4">
+        <h2 className="text-2xl font-semibold">
+          Emissions{" "}
+          <Badge variant="secondary" className="ml-2">
+            LCA
+          </Badge>
+        </h2>
+      </div>
+      <Card>
+        <CardContent className="p-0">
+          <DataTable
+            columns={emissionsColumns}
+            data={data}
+            onRowSelectionChange={() => {}}
+          />
+        </CardContent>
+      </Card>
+    </>
+  );
+};
 
 const GraphTab = () => (
   <>
