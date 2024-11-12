@@ -11,6 +11,8 @@ export async function GET(
   { params }: { params: { id: string } }
 ) {
   try {
+    const { id } = await params;
+
     const { userId } = await auth();
 
     if (!userId) {
@@ -20,10 +22,7 @@ export async function GET(
     await connectToDatabase();
 
     // Verify project ownership and get project data
-    const project = await Project.findOne({
-      _id: params.id,
-      userId,
-    }).lean();
+    const project = await Project.findById(id).lean();
 
     if (!project) {
       return new Response("Project not found", { status: 404 });
