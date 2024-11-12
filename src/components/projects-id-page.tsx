@@ -321,7 +321,7 @@ const ProjectOverview = ({ project }: { project: ExtendedProject }) => (
       elements={project._count.elements}
       uploads={project._count.uploads}
       materials={project._count.materials}
-      emissions={project.emissions}
+      project={project}
     />
   </div>
 );

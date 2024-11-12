@@ -2,88 +2,109 @@
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import {
-  ImageIcon,
-  BoxIcon,
-  FileTextIcon,
-  LayersIcon,
-  ActivityIcon,
-} from "lucide-react";
+import { ImageIcon, BoxIcon, FileTextIcon, LayersIcon } from "lucide-react";
+import { EmissionsCard } from "@/components/emissions-card";
 
-interface DashboardCardsProps {
-  materials: number;
-}
+type DashboardCardsProps = {
+  elements?: number;
+  uploads?: number;
+  materials?: number;
+  project?: any;
+};
 
-export function DashboardCards({ materials = 0 }: DashboardCardsProps) {
+export function DashboardCards({
+  elements = 0,
+  uploads = 0,
+  materials = 0,
+  project,
+}: DashboardCardsProps) {
+  const totalEmissions = project?.elements?.reduce(
+    (acc, element) => {
+      const elementTotals = element.materials.reduce(
+        (materialAcc, material) => ({
+          gwp: materialAcc.gwp + (material.indicators?.gwp || 0),
+          ubp: materialAcc.ubp + (material.indicators?.ubp || 0),
+          penre: materialAcc.penre + (material.indicators?.penre || 0),
+        }),
+        { gwp: 0, ubp: 0, penre: 0 }
+      );
+      return {
+        gwp: acc.gwp + elementTotals.gwp,
+        ubp: acc.ubp + elementTotals.ubp,
+        penre: acc.penre + elementTotals.penre,
+      };
+    },
+    { gwp: 0, ubp: 0, penre: 0 }
+  );
+
   return (
-    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-      {/* Project Image Column */}
-      <Card className="flex flex-col">
-        <CardHeader className="flex-none flex flex-row items-center justify-between space-y-0 pb-2">
+    <div className="grid grid-cols-12 gap-6">
+      <Card className="col-span-4">
+        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
           <CardTitle className="text-sm font-medium">Project Image</CardTitle>
           <ImageIcon className="h-4 w-4 text-muted-foreground" />
         </CardHeader>
-        <CardContent className="flex-grow flex items-center justify-center">
-          <div className="flex flex-col items-center justify-center w-full h-full border-2 border-dashed rounded-lg p-4">
-            <ImageIcon className="h-12 w-12 text-muted-foreground mb-4" />
-            <p className="text-sm text-muted-foreground mb-4 text-center">
+        <CardContent>
+          <div className="aspect-video flex flex-col items-center justify-center w-full border-2 border-dashed rounded-xl bg-muted/5 hover:bg-muted/10 transition-colors">
+            <ImageIcon className="h-12 w-12 text-muted-foreground mb-2" />
+            <p className="text-xs text-muted-foreground mb-4 text-center px-2">
               No project image uploaded
             </p>
-            <Button variant="outline" size="sm">
-              <ImageIcon className="h-4 w-4 mr-2" />
-              Upload Image
+            <Button
+              variant="outline"
+              size="sm"
+              className="relative overflow-hidden"
+            >
+              <ImageIcon className="h-3 w-3 mr-2" />
+              Upload
+              <input
+                type="file"
+                className="absolute inset-0 opacity-0 cursor-pointer"
+                accept="image/*"
+              />
             </Button>
           </div>
         </CardContent>
       </Card>
 
-      {/* Emissions Column */}
-      <Card className="bg-orange-500 flex flex-col">
-        <CardHeader className="flex-none flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-sm font-medium text-white">
-            Total Emissions
-          </CardTitle>
-          <ActivityIcon className="h-4 w-4 text-white" />
+      <Card className="col-span-8">
+        <EmissionsCard emissions={totalEmissions} />
+      </Card>
+
+      <Card className="col-span-4 bg-gradient-to-br from-primary/5 to-primary/10">
+        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+          <CardTitle className="text-sm font-medium">Total Elements</CardTitle>
+          <BoxIcon className="h-4 w-4 text-primary" />
         </CardHeader>
-        <CardContent className="flex-grow flex items-center justify-center">
-          <p className="text-lg text-white">Loading emissions data...</p>
+        <CardContent>
+          <p className="text-3xl font-bold">{elements}</p>
+          <p className="text-xs text-muted-foreground mt-1">
+            Building components
+          </p>
         </CardContent>
       </Card>
 
-      {/* Metrics Column */}
-      <div className="space-y-4">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">
-              Total Elements
-            </CardTitle>
-            <BoxIcon className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <p className="text-2xl font-bold">3</p>
-          </CardContent>
-        </Card>
+      <Card className="col-span-4 bg-gradient-to-br from-secondary/5 to-secondary/10">
+        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+          <CardTitle className="text-sm font-medium">Uploads</CardTitle>
+          <FileTextIcon className="h-4 w-4 text-secondary" />
+        </CardHeader>
+        <CardContent>
+          <p className="text-3xl font-bold">{uploads}</p>
+          <p className="text-xs text-muted-foreground mt-1">Files uploaded</p>
+        </CardContent>
+      </Card>
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Uploads</CardTitle>
-            <FileTextIcon className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <p className="text-2xl font-bold">13</p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Materials</CardTitle>
-            <LayersIcon className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <p className="text-2xl font-bold">{materials}</p>
-          </CardContent>
-        </Card>
-      </div>
+      <Card className="col-span-4 bg-gradient-to-br from-accent/5 to-accent/10">
+        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+          <CardTitle className="text-sm font-medium">Materials</CardTitle>
+          <LayersIcon className="h-4 w-4 text-accent" />
+        </CardHeader>
+        <CardContent>
+          <p className="text-3xl font-bold">{materials}</p>
+          <p className="text-xs text-muted-foreground mt-1">Unique materials</p>
+        </CardContent>
+      </Card>
     </div>
   );
 }
