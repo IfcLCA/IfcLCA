@@ -6,6 +6,7 @@ interface IMaterial {
   projectId: mongoose.Types.ObjectId;
   category?: string;
   volume: number;
+  density?: number;
   kbobMatchId?: mongoose.Types.ObjectId;
 }
 
@@ -24,6 +25,9 @@ const materialSchema = new mongoose.Schema<IMaterial>(
     volume: {
       type: Number,
       default: 0,
+    },
+    density: {
+      type: Number,
     },
     kbobMatchId: {
       type: mongoose.Schema.Types.ObjectId,

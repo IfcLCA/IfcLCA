@@ -40,6 +40,9 @@ export async function GET() {
               GWP: "$indicators.gwp",
               UBP: "$indicators.ubp",
               PENRE: "$indicators.penre",
+              "kg/unit": 1,
+              "min density": 1,
+              "max density": 1,
             },
           },
         ])

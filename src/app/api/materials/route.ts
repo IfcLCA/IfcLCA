@@ -7,7 +7,7 @@ export async function GET() {
     await connectToDatabase();
 
     const materials = await Material.find({})
-      .select("name category volume kbobMatchId")
+      .select("name category volume density kbobMatchId")
       .populate("kbobMatchId")
       .lean();
 
@@ -16,6 +16,7 @@ export async function GET() {
       name: material.name,
       category: material.category,
       volume: material.volume,
+      density: material.density,
       kbobMatchId: material.kbobMatchId?._id.toString(),
       kbobMatch: material.kbobMatchId
         ? {
