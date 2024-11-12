@@ -451,9 +451,11 @@ const UploadsTab = ({
                 <PaginationItem>
                   <PaginationPrevious
                     onClick={() =>
-                      setCurrentPage((prev) => Math.max(prev - 1, 1))
+                      currentPage > 1 && setCurrentPage((prev) => prev - 1)
                     }
-                    disabled={currentPage === 1}
+                    className={
+                      currentPage === 1 ? "pointer-events-none opacity-50" : ""
+                    }
                   />
                 </PaginationItem>
                 {Array.from({ length: totalPages }, (_, i) => i + 1).map(
@@ -471,9 +473,14 @@ const UploadsTab = ({
                 <PaginationItem>
                   <PaginationNext
                     onClick={() =>
-                      setCurrentPage((prev) => Math.min(prev + 1, totalPages))
+                      currentPage < totalPages &&
+                      setCurrentPage((prev) => prev + 1)
                     }
-                    disabled={currentPage === totalPages}
+                    className={
+                      currentPage === totalPages
+                        ? "pointer-events-none opacity-50"
+                        : ""
+                    }
                   />
                 </PaginationItem>
               </PaginationContent>

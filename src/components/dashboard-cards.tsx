@@ -12,6 +12,20 @@ type DashboardCardsProps = {
   project?: any;
 };
 
+interface Indicators {
+  gwp?: number;
+  ubp?: number;
+  penre?: number;
+}
+
+interface Material {
+  indicators?: Indicators;
+}
+
+interface Element {
+  materials: Material[];
+}
+
 export function DashboardCards({
   elements = 0,
   uploads = 0,
@@ -19,22 +33,22 @@ export function DashboardCards({
   project,
 }: DashboardCardsProps) {
   const totalEmissions = project?.elements?.reduce(
-    (acc, element) => {
+    (acc: Indicators, element: Element) => {
       const elementTotals = element.materials.reduce(
         (materialAcc, material) => ({
-          gwp: materialAcc.gwp + (material.indicators?.gwp || 0),
-          ubp: materialAcc.ubp + (material.indicators?.ubp || 0),
-          penre: materialAcc.penre + (material.indicators?.penre || 0),
+          gwp: (materialAcc.gwp ?? 0) + (material.indicators?.gwp ?? 0),
+          ubp: (materialAcc.ubp ?? 0) + (material.indicators?.ubp ?? 0),
+          penre: (materialAcc.penre ?? 0) + (material.indicators?.penre ?? 0),
         }),
         { gwp: 0, ubp: 0, penre: 0 }
       );
       return {
-        gwp: acc.gwp + elementTotals.gwp,
-        ubp: acc.ubp + elementTotals.ubp,
-        penre: acc.penre + elementTotals.penre,
+        gwp: (acc.gwp ?? 0) + elementTotals.gwp,
+        ubp: (acc.ubp ?? 0) + elementTotals.ubp,
+        penre: (acc.penre ?? 0) + elementTotals.penre,
       };
     },
-    { gwp: 0, ubp: 0, penre: 0 }
+    { gwp: 0, ubp: 0, penre: 0 } as Indicators
   );
 
   return (
