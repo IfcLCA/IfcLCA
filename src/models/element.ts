@@ -1,52 +1,57 @@
 import mongoose from "mongoose";
 
-const elementMaterialSchema = new mongoose.Schema(
-  {
-    material: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "Material",
-      required: true,
-    },
-    volume: Number,
-    fraction: Number,
-  },
-  { _id: false }
-);
+interface IElement {
+  projectId: mongoose.Types.ObjectId;
+  guid: string;
+  name: string;
+  type: string;
+  volume: number;
+  materials: Array<{
+    material: mongoose.Types.ObjectId;
+    volume: number;
+    fraction: number;
+    indicators?: {
+      gwp: number;
+      ubp: number;
+      penre: number;
+    };
+  }>;
+  // ... other fields
+}
 
-const elementSchema = new mongoose.Schema(
+const elementSchema = new mongoose.Schema<IElement>(
   {
     projectId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Project",
       required: true,
     },
-    uploadId: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "Upload",
-      required: true,
-    },
-    guid: {
-      type: String,
-      required: true,
-    },
-    name: {
-      type: String,
-      required: true,
-    },
+    guid: String,
+    name: String,
     type: String,
     volume: Number,
-    buildingStorey: String,
-    materials: [elementMaterialSchema],
+    materials: [
+      {
+        material: {
+          type: mongoose.Schema.Types.ObjectId,
+          ref: "Material",
+        },
+        volume: Number,
+        fraction: Number,
+        indicators: {
+          gwp: Number,
+          ubp: Number,
+          penre: Number,
+        },
+      },
+    ],
+    // ... other fields
   },
   {
     timestamps: true,
   }
 );
 
-// Single compound index definition - no need to remove existing indexes first
-elementSchema.index({ guid: 1, projectId: 1 }, { unique: true });
-
-const Element =
-  mongoose.models.Element || mongoose.model("Element", elementSchema);
-
-export { Element };
+export const Element =
+  (mongoose.models.Element as mongoose.Model<IElement>) ||
+  mongoose.model<IElement>("Element", elementSchema);

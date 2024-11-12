@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { connectToDatabase } from "@/lib/mongodb";
 import { Material, KBOBMaterial } from "@/models";
 import mongoose from "mongoose";
+import { Element } from "@/models";
 
 export async function POST(request: Request) {
   try {
@@ -20,53 +21,135 @@ export async function POST(request: Request) {
 
     // Calculate density from KBOB material data
     let density = null;
-    if (kbobMaterial["kg/unit"]) {
+    if (
+      kbobMaterial["kg/unit"] &&
+      typeof kbobMaterial["kg/unit"] === "number"
+    ) {
       density = kbobMaterial["kg/unit"];
     } else if (kbobMaterial["min density"] && kbobMaterial["max density"]) {
       density = (kbobMaterial["min density"] + kbobMaterial["max density"]) / 2;
     }
 
-    console.log(
-      "Calculated density:",
-      density,
-      "from KBOB material:",
-      kbobMaterial
-    ); // Debug log
+    if (!density) {
+      return NextResponse.json(
+        { error: "Invalid density in KBOB material" },
+        { status: 400 }
+      );
+    }
 
     const objectIds = materialIds.map(
       (id: string) => new mongoose.Types.ObjectId(id)
     );
 
-    // Create update object with all fields that need to be set
-    const updateOperation = {
-      $set: {
-        kbobMatchId: new mongoose.Types.ObjectId(kbobMaterialId),
-        density: density,
-        updatedAt: new Date(),
-      },
-    };
-
     // Update materials with KBOB match and density
-    const result = await Material.updateMany(
+    await Material.updateMany(
       { _id: { $in: objectIds } },
-      updateOperation
+      {
+        $set: {
+          kbobMatchId: new mongoose.Types.ObjectId(kbobMaterialId),
+          density: density,
+          updatedAt: new Date(),
+        },
+      }
     );
 
-    console.log("Update operation:", updateOperation);
-    console.log("Update result:", result);
+    // Find elements that need updating
+    const elements = await Element.find({
+      "materials.material": { $in: objectIds },
+    })
+      .populate({
+        path: "materials.material",
+        select: "_id kbobMatchId density",
+      })
+      .lean();
 
-    // Fetch updated materials with KBOB data
+    console.log("Found elements to update:", elements.length);
+
+    // Prepare bulk operations for updating elements
+    const bulkOps = elements.map((element) => {
+      console.log("Processing element:", element._id);
+
+      return {
+        updateOne: {
+          filter: { _id: element._id },
+          update: [
+            {
+              $set: {
+                materials: {
+                  $map: {
+                    input: "$materials",
+                    as: "mat",
+                    in: {
+                      $cond: {
+                        if: { $in: ["$$mat.material", objectIds] },
+                        then: {
+                          material: "$$mat.material",
+                          volume: "$$mat.volume",
+                          fraction: "$$mat.fraction",
+                          indicators: {
+                            gwp: {
+                              $multiply: [
+                                "$$mat.volume",
+                                density,
+                                kbobMaterial.GWP,
+                              ],
+                            },
+                            ubp: {
+                              $multiply: [
+                                "$$mat.volume",
+                                density,
+                                kbobMaterial.UBP,
+                              ],
+                            },
+                            penre: {
+                              $multiply: [
+                                "$$mat.volume",
+                                density,
+                                kbobMaterial.PENRE,
+                              ],
+                            },
+                          },
+                        },
+                        else: "$$mat",
+                      },
+                    },
+                  },
+                },
+                updatedAt: new Date(),
+              },
+            },
+          ],
+        },
+      };
+    });
+
+    // Execute bulk operations if any
+    if (bulkOps.length > 0) {
+      console.log("Executing bulk operations:", bulkOps.length);
+      const result = await Element.bulkWrite(bulkOps);
+      console.log("Bulk write result:", result);
+
+      // Verify the update
+      const verifyElement = await Element.findById(elements[0]._id)
+        .populate({
+          path: "materials.material",
+          select: "_id kbobMatchId density",
+        })
+        .lean();
+      console.log("Verified element materials:", verifyElement?.materials);
+    }
+
+    // Fetch and return updated materials
     const updatedMaterials = await Material.find({ _id: { $in: objectIds } })
       .select("name category volume density kbobMatchId")
       .populate("kbobMatchId")
       .lean();
 
-    console.log("Updated materials:", updatedMaterials);
-
     return NextResponse.json({
       success: true,
-      matchedCount: result.modifiedCount,
+      matchedCount: updatedMaterials.length,
       materials: updatedMaterials,
+      updatedElements: bulkOps.length,
     });
   } catch (error) {
     console.error("Error matching materials:", error);
