@@ -283,7 +283,7 @@ export function MaterialLibraryComponent() {
 
   if (isLoading) {
     return (
-      <Card className="w-full max-w-4xl mx-auto">
+      <Card className="w-[90%] mx-auto">
         <CardHeader>
           <CardTitle>Material Library</CardTitle>
           <CardDescription>Loading materials...</CardDescription>
@@ -294,7 +294,7 @@ export function MaterialLibraryComponent() {
 
   if (error) {
     return (
-      <Card className="w-full max-w-4xl mx-auto">
+      <Card className="w-[90%] mx-auto">
         <CardHeader>
           <CardTitle>Material Library</CardTitle>
           <CardDescription className="text-red-500">
@@ -306,7 +306,7 @@ export function MaterialLibraryComponent() {
   }
 
   return (
-    <Card className="w-full max-w-4xl mx-auto">
+    <Card className="w-[90%] mx-auto">
       <CardHeader>
         <CardTitle>Material Library</CardTitle>
         <CardDescription>
