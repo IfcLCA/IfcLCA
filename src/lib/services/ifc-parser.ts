@@ -282,10 +282,6 @@ export class IFCParser {
           "IFCMEMBER",
           "IFCBUILDINGELEMENTPROXY",
           "IFCCURTAINWALL",
-          // "IFCWINDOW",
-          // "IFCDOOR",
-          // "IFCRAILING",
-          // "IFCFURNISHINGELEMENT",
         ].includes(entity.type)
       ) {
         const globalId = entity.attributes[0] || `No GlobalId`;
@@ -294,19 +290,11 @@ export class IFCParser {
         const spatialContainer = this._getEntityName(
           relationships.spatialContainer
         );
-        const materials = this._getMaterialInfo(relationships.material, id);
+        const { materials, materialLayers } = this._getMaterialInfo(
+          relationships.material,
+          id
+        );
         const netVolume = this.quantities[id] || "Unknown";
-
-        let materialLayers = null;
-        if (relationships.material && relationships.material.ref) {
-          const materialRel = this.entities[relationships.material.ref];
-          if (materialRel.type === "IFCMATERIALLAYERSETUSAGE") {
-            const layerSetRef = materialRel.attributes[0];
-            if (layerSetRef && layerSetRef.ref) {
-              materialLayers = this.materialLayers[layerSetRef.ref];
-            }
-          }
-        }
 
         this.elements.push({
           id,
@@ -332,19 +320,23 @@ export class IFCParser {
   private _getMaterialInfo(
     materialRef: { ref: string } | undefined,
     elementId: string
-  ): string[] {
+  ): { materials: string[]; materialLayers: any } {
     if (!materialRef?.ref) {
-      return ["Unknown"];
+      return { materials: ["Unknown"], materialLayers: null };
     }
 
     const index = parseInt(materialRef.ref, 10);
     if (isNaN(index)) {
-      return ["Unknown"];
+      return { materials: ["Unknown"], materialLayers: null };
     }
 
-    const layers: IFCLayer[] = [];
+    const materials: string[] = [];
     const queue = [materialRef];
     const visited = new Set();
+
+    // Track if we're dealing with a direct material assignment
+    let isDirectAssignment = false;
+    let materialLayers = null;
 
     while (queue.length > 0) {
       const currentRef = queue.shift();
@@ -354,14 +346,13 @@ export class IFCParser {
       visited.add(currentRef.ref);
       const entity = this.entities[currentRef.ref];
 
-      if (!entity) {
-        continue;
-      }
+      if (!entity) continue;
 
       switch (entity.type) {
         case "IFCMATERIAL":
           const materialName = entity.attributes[0] || "Unnamed Material";
-          layers.push({ ref: currentRef.ref });
+          materials.push(currentRef.ref);
+          isDirectAssignment = true;
           break;
 
         case "IFCMATERIALLAYERSET":
@@ -372,6 +363,13 @@ export class IFCParser {
                 queue.push(layerRef);
               }
             });
+          }
+          break;
+
+        case "IFCMATERIALLAYERSETUSAGE":
+          const layerSetRef = entity.attributes[0];
+          if (layerSetRef && layerSetRef.ref) {
+            materialLayers = this.materialLayers[layerSetRef.ref];
           }
           break;
 
@@ -403,12 +401,25 @@ export class IFCParser {
             queue.push(entity.attributes[2]);
           }
           break;
-
-        default:
-          break;
       }
     }
 
-    return layers.map((layer) => layer.ref);
+    // If we have direct material assignments but no layers, create a synthetic layer structure
+    if (isDirectAssignment && !materialLayers) {
+      materialLayers = {
+        layerSetName: "Direct Assignment",
+        layers: materials.map((materialRef) => {
+          const material = this.entities[materialRef];
+          return {
+            layerId: materialRef,
+            materialName: material?.attributes[0] || "Unknown",
+            thickness: 1, // Default thickness for direct assignments
+            layerName: material?.attributes[0] || "Unknown",
+          };
+        }),
+      };
+    }
+
+    return { materials, materialLayers };
   }
 }

@@ -26,5 +26,6 @@ export interface UploadResult {
   id: string;
   status: UploadStatus;
   elementCount: number;
+  materialCount: number;
   error?: string;
 }

@@ -502,10 +502,6 @@ const UploadCard = ({ upload }: { upload: ExtendedProject["uploads"][0] }) => (
         </p>
       </div>
       <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
-        <div className="flex items-center gap-2">
-          <span className="text-sm font-medium">Elements:</span>
-          <Badge variant="secondary">{upload.elementCount}</Badge>
-        </div>
         <Badge variant={upload.status === "Completed" ? "success" : "warning"}>
           {upload.status}
         </Badge>

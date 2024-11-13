@@ -26,6 +26,15 @@ export async function parseIFCFile(
     const parser = new IFCParser();
     const parseResult = await parser.parseContent(content);
 
+    // Count unique materials
+    const uniqueMaterials = new Set(
+      parseResult.flatMap(
+        (element) =>
+          element.materialLayers?.layers?.map((layer) => layer.materialName) ||
+          []
+      )
+    );
+
     // Save elements in chunks
     const chunkSize = 100;
     const chunks = [];
@@ -34,19 +43,19 @@ export async function parseIFCFile(
       chunks.push(parseResult.slice(i, i + chunkSize));
     }
 
-    let savedCount = 0;
     for (const chunk of chunks) {
-      const result = await saveElements(projectId, {
+      await saveElements(projectId, {
         elements: chunk,
         uploadId: responseData.uploadId,
+        materialCount: uniqueMaterials.size,
       });
-      savedCount += result.savedCount;
     }
 
     return {
       uploadId: responseData.uploadId,
       elements: parseResult,
-      elementCount: savedCount,
+      elementCount: parseResult.length,
+      materialCount: uniqueMaterials.size,
     };
   } catch (error) {
     console.error("IFC parsing failed:", error);
