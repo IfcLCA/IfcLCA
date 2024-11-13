@@ -98,6 +98,8 @@ export function MaterialLibraryComponent() {
   const [selectedProjects, setSelectedProjects] = useState<string[]>([]);
   const [kbobMaterials, setKbobMaterials] = useState<KbobMaterial[]>([]);
   const [kbobSearchTerm, setKbobSearchTerm] = useState("");
+  const [selectedProject, setSelectedProject] = useState<string | null>(null);
+  const [isMatchingLoading, setIsMatchingLoading] = useState(false);
   const filteredKbobMaterials = useMemo(() => {
     console.log("Filtering KBOB materials:", kbobMaterials);
     return kbobMaterials.filter((material) =>
@@ -179,9 +181,14 @@ export function MaterialLibraryComponent() {
 
     // Convert Map back to array and apply filtering/sorting
     return Array.from(uniqueMaterialsMap.values())
-      .filter((material) =>
-        material.name.toLowerCase().includes(searchTerm.toLowerCase())
-      )
+      .filter((material) => {
+        const nameMatch = material.name
+          .toLowerCase()
+          .includes(searchTerm.toLowerCase());
+        const projectMatch =
+          !selectedProject || material.projects?.includes(selectedProject);
+        return nameMatch && projectMatch;
+      })
       .sort((a, b) => {
         if (sortColumn === "name") {
           return sortDirection === "asc"
@@ -195,7 +202,7 @@ export function MaterialLibraryComponent() {
             : bLength - aLength;
         }
       });
-  }, [materials, searchTerm, sortColumn, sortDirection]);
+  }, [materials, searchTerm, sortColumn, sortDirection, selectedProject]);
 
   const paginatedMaterials = useMemo(() => {
     console.log("Paginating materials:", filteredAndSortedMaterials.length);
@@ -221,6 +228,7 @@ export function MaterialLibraryComponent() {
   const handleMatch = async () => {
     if (kbobValue && selectedMaterials.length > 0) {
       try {
+        setIsMatchingLoading(true);
         const response = await fetch("/api/materials/match", {
           method: "POST",
           headers: {
@@ -260,6 +268,8 @@ export function MaterialLibraryComponent() {
         }
       } catch (error) {
         console.error("Failed to match materials:", error);
+      } finally {
+        setIsMatchingLoading(false);
       }
     }
   };
@@ -314,14 +324,34 @@ export function MaterialLibraryComponent() {
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
-        <div className="flex items-center space-x-2">
-          <MagnifyingGlassIcon className="w-4 h-4 text-muted-foreground" />
-          <Input
-            placeholder="Search materials..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full"
-          />
+        <div className="flex items-center space-x-4">
+          <Select
+            value={selectedProject || "all"}
+            onValueChange={(value) =>
+              setSelectedProject(value === "all" ? null : value)
+            }
+          >
+            <SelectTrigger className="w-[200px]">
+              <SelectValue placeholder="Filter by project" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Projects</SelectItem>
+              {allProjects.map((project) => (
+                <SelectItem key={project} value={project}>
+                  {project}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <div className="flex items-center space-x-2 flex-1">
+            <MagnifyingGlassIcon className="w-4 h-4 text-muted-foreground" />
+            <Input
+              placeholder="Search materials..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full"
+            />
+          </div>
         </div>
         <div className="border rounded-md">
           <Table>
@@ -444,9 +474,39 @@ export function MaterialLibraryComponent() {
             </Select>
             <Button
               onClick={handleMatch}
-              disabled={!kbobValue || selectedMaterials.length === 0}
+              disabled={
+                !kbobValue ||
+                selectedMaterials.length === 0 ||
+                isMatchingLoading
+              }
             >
-              Match Selected
+              {isMatchingLoading ? (
+                <>
+                  <svg
+                    className="animate-spin -ml-1 mr-3 h-4 w-4 text-white"
+                    xmlns="http://www.w3.org/2000/svg"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                  >
+                    <circle
+                      className="opacity-25"
+                      cx="12"
+                      cy="12"
+                      r="10"
+                      stroke="currentColor"
+                      strokeWidth="4"
+                    ></circle>
+                    <path
+                      className="opacity-75"
+                      fill="currentColor"
+                      d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                    ></path>
+                  </svg>
+                  Matching...
+                </>
+              ) : (
+                "Match Selected"
+              )}
             </Button>
           </div>
         </div>

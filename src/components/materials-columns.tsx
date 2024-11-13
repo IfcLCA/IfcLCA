@@ -17,7 +17,7 @@ export const materialsColumns: ColumnDef<MaterialTableItem>[] = [
   },
   {
     accessorKey: "category",
-    header: "Category",
+    header: "Element",
   },
   {
     accessorKey: "volume",
@@ -25,14 +25,6 @@ export const materialsColumns: ColumnDef<MaterialTableItem>[] = [
     cell: ({ row }) => {
       const volume = row.getValue("volume") as number;
       return volume?.toFixed(2) || "N/A";
-    },
-  },
-  {
-    accessorKey: "projects",
-    header: "Projects",
-    cell: ({ row }) => {
-      const projects = row.getValue("projects") as string[];
-      return projects?.length || 0;
     },
   },
 ];

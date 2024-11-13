@@ -5,16 +5,19 @@ export async function getMaterialsByProject(projectId?: string) {
   try {
     await connectToDatabase();
 
-    const query = projectId ? { "elements.projectId": projectId } : {};
-
     const materials = await Material.aggregate([
-      { $match: query },
       {
         $lookup: {
-          from: "elements",
-          localField: "_id",
-          foreignField: "materials",
-          as: "elements",
+          from: "projects",
+          localField: "projectId",
+          foreignField: "_id",
+          as: "project",
+        },
+      },
+      {
+        $unwind: {
+          path: "$project",
+          preserveNullAndEmptyArrays: true,
         },
       },
       {
@@ -22,9 +25,9 @@ export async function getMaterialsByProject(projectId?: string) {
           id: "$_id",
           name: 1,
           category: 1,
-          volume: {
-            $sum: "$elements.volume",
-          },
+          volume: 1,
+          projectId: 1,
+          projectName: "$project.name",
         },
       },
     ]);
