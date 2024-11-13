@@ -16,6 +16,8 @@ export interface IFCMaterial {
 export interface IFCParseResult {
   elements: IFCElement[];
   error?: string;
+  elementCount?: number;
+  uploadId?: string;
 }
 
 export type UploadStatus = "Processing" | "Completed" | "Failed";

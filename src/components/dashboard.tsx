@@ -59,7 +59,16 @@ interface DashboardStatistics {
 
 interface Activity {
   id: string;
-  type: string;
+  type:
+    | "project_created"
+    | "file_uploaded"
+    | "material_created"
+    | "project_deleted"
+    | "material_deleted"
+    | "project_updated"
+    | "new_user"
+    | "project_member_added"
+    | "project_member_removed";
   projectId: string;
   details: any;
   user: {

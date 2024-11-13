@@ -37,22 +37,23 @@ export default function BuildingElementsPage({
   const [isLoading, setIsLoading] = useState(true);
   const router = useRouter();
 
-  useEffect(() => {
-    async function fetchElements() {
-      try {
-        setIsLoading(true);
-        console.log("Fetching elements for project:", params.id);
-        const response = await fetch(`/api/projects/${params.id}/elements`);
-        const data = await response.json();
-        console.log("Fetched elements:", data);
-        setElements(data);
-      } catch (error) {
-        console.error("Failed to fetch elements:", error);
-      } finally {
-        setIsLoading(false);
-      }
+  // Move fetchElements outside useEffect
+  async function fetchElements() {
+    try {
+      setIsLoading(true);
+      console.log("Fetching elements for project:", params.id);
+      const response = await fetch(`/api/projects/${params.id}/elements`);
+      const data = await response.json();
+      console.log("Fetched elements:", data);
+      setElements(data);
+    } catch (error) {
+      console.error("Failed to fetch elements:", error);
+    } finally {
+      setIsLoading(false);
     }
+  }
 
+  useEffect(() => {
     fetchElements();
   }, [params.id]);
 

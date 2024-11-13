@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { useDropzone } from "react-dropzone";
 import { Button } from "@/components/ui/button";
 import {
@@ -9,7 +9,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { UploadCloud } from "lucide-react";
+import { UploadCloud, CheckIcon } from "lucide-react";
 import { parseIFCFile } from "@/lib/services/ifc-parser-client";
 import { useToast } from "@/hooks/use-toast";
 interface UploadModalProps {
@@ -28,7 +28,18 @@ export function UploadModal({
   onProgress,
 }: UploadModalProps) {
   const [isUploading, setIsUploading] = useState(false);
+  const [uploadResult, setUploadResult] = useState<{
+    count: number;
+    show: boolean;
+  } | null>(null);
   const { toast } = useToast();
+
+  // Reset upload result when modal closes
+  useEffect(() => {
+    if (!open) {
+      setUploadResult(null);
+    }
+  }, [open]);
 
   const onDrop = useCallback(
     async (acceptedFiles: File[]) => {
@@ -37,17 +48,15 @@ export function UploadModal({
         const file = acceptedFiles[0];
         const result = await parseIFCFile(file, projectId);
 
-        // Close modal first
-        onOpenChange(false);
+        // Set upload result instead of showing toast
+        setUploadResult({ count: result.elementCount || 0, show: true });
 
-        // Show success toast
-        toast({
-          title: "Success",
-          description: `Uploaded ${result.elementCount} elements`,
-        });
-
-        // Finally, refresh the data
-        await onSuccess?.({ id: projectId });
+        // Hide the success message after 5 seconds and close modal
+        setTimeout(() => {
+          setUploadResult((prev) => (prev ? { ...prev, show: false } : null));
+          onOpenChange(false);
+          onSuccess?.({ id: projectId });
+        }, 5000);
       } catch (error) {
         toast({
           title: "Error",
@@ -55,6 +64,7 @@ export function UploadModal({
             error instanceof Error ? error.message : "Failed to upload file",
           variant: "destructive",
         });
+        onOpenChange(false);
       } finally {
         setIsUploading(false);
       }
@@ -78,24 +88,39 @@ export function UploadModal({
         <DialogHeader>
           <DialogTitle>Upload IFC File</DialogTitle>
         </DialogHeader>
-        <div
-          {...getRootProps()}
-          className={`
-            border-2 border-dashed rounded-lg p-8 text-center cursor-pointer
-            ${isDragActive ? "border-primary bg-primary/10" : "border-border"}
-            ${isUploading ? "opacity-50 cursor-not-allowed" : ""}
-          `}
-        >
-          <input {...getInputProps()} />
-          <UploadCloud className="mx-auto h-12 w-12 text-muted-foreground" />
-          <p className="mt-2 text-sm text-muted-foreground">
-            {isDragActive
-              ? "Drop the file here"
-              : isUploading
-              ? "Uploading..."
-              : "Drag and drop an IFC file, or click to select"}
-          </p>
-        </div>
+        {uploadResult?.show ? (
+          <div className="flex flex-col items-center justify-center p-6 space-y-4 text-center">
+            <div className="h-12 w-12 rounded-full bg-green-100 flex items-center justify-center">
+              <CheckIcon className="h-6 w-6 text-green-600" />
+            </div>
+            <div className="space-y-2">
+              <h3 className="font-semibold text-lg">Upload Successful</h3>
+              <p className="text-muted-foreground">
+                Successfully processed {uploadResult.count.toLocaleString()}{" "}
+                building elements
+              </p>
+            </div>
+          </div>
+        ) : (
+          <div
+            {...getRootProps()}
+            className={`
+              border-2 border-dashed rounded-lg p-8 text-center cursor-pointer
+              ${isDragActive ? "border-primary bg-primary/10" : "border-border"}
+              ${isUploading ? "opacity-50 cursor-not-allowed" : ""}
+            `}
+          >
+            <input {...getInputProps()} />
+            <UploadCloud className="mx-auto h-12 w-12 text-muted-foreground" />
+            <p className="mt-2 text-sm text-muted-foreground">
+              {isDragActive
+                ? "Drop the file here"
+                : isUploading
+                ? "Uploading..."
+                : "Drag and drop an IFC file, or click to select"}
+            </p>
+          </div>
+        )}
       </DialogContent>
     </Dialog>
   );
