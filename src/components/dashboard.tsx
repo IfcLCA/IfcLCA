@@ -59,6 +59,9 @@ interface DashboardStatistics {
 
 interface Activity {
   id: string;
+  type: string;
+  projectId: string;
+  details: any;
   user: {
     name: string;
     avatar: string;
@@ -91,7 +94,12 @@ interface Metric {
 
 export function Dashboard({
   initialRecentProjects = [],
-  statistics: initialStatistics = {},
+  statistics: initialStatistics = {
+    totalProjects: 0,
+    totalElements: 0,
+    totalMaterials: 0,
+    recentActivities: 0,
+  },
   initialActivities = [],
 }: DashboardProps) {
   const [showProjectSelect, setShowProjectSelect] = useState(false);
@@ -130,7 +138,7 @@ export function Dashboard({
     const fetchData = async () => {
       try {
         console.log("Fetching activities...");
-        await fetchActivities();
+        await fetchActivities(1);
         console.log("Activities fetched successfully");
       } catch (error) {
         console.error("Error in fetchData:", error);
@@ -460,16 +468,16 @@ export function Dashboard({
         <UploadModal
           projectId={selectedProjectId}
           open={true}
-          onOpenChange={(open) => {
+          onOpenChange={(open: boolean) => {
             if (!open) {
               setSelectedProjectId(null);
             }
           }}
-          onSuccess={(upload) => {
+          onSuccess={(upload: { id: string }) => {
             setSelectedProjectId(null);
             router.push(`/projects/${selectedProjectId}`);
           }}
-          onProgress={(progress) => {
+          onProgress={(progress: number) => {
             console.log("Upload progress:", progress);
           }}
         />

@@ -14,16 +14,18 @@ import { parseIFCFile } from "@/lib/services/ifc-parser-client";
 import { useToast } from "@/hooks/use-toast";
 interface UploadModalProps {
   projectId: string;
-  open?: boolean;
-  onOpenChange?: (open: boolean) => void;
-  onUploadComplete?: () => void;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onSuccess?: (upload: { id: string }) => void;
+  onProgress?: (progress: number) => void;
 }
 
 export function UploadModal({
   projectId,
   open,
   onOpenChange,
-  onUploadComplete,
+  onSuccess,
+  onProgress,
 }: UploadModalProps) {
   const [isUploading, setIsUploading] = useState(false);
   const { toast } = useToast();
@@ -36,7 +38,7 @@ export function UploadModal({
         const result = await parseIFCFile(file, projectId);
 
         // Close modal first
-        onOpenChange?.(false);
+        onOpenChange(false);
 
         // Show success toast
         toast({
@@ -45,7 +47,7 @@ export function UploadModal({
         });
 
         // Finally, refresh the data
-        await onUploadComplete?.();
+        await onSuccess?.({ id: projectId });
       } catch (error) {
         toast({
           title: "Error",
@@ -57,7 +59,7 @@ export function UploadModal({
         setIsUploading(false);
       }
     },
-    [projectId, onUploadComplete, onOpenChange, toast]
+    [projectId, onSuccess, onOpenChange, toast]
   );
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
