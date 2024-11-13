@@ -244,28 +244,53 @@ export function MaterialLibraryComponent() {
           throw new Error("Failed to match materials");
         }
 
-        // Update local state with the matched material name
+        // Wait for the database update to complete
+        await new Promise((resolve) => setTimeout(resolve, 2000));
+
         const matchedKbobMaterial = kbobMaterials.find(
           (m) => m._id === kbobValue
         );
+
         if (matchedKbobMaterial) {
-          const newMatches = { ...matchedMaterials };
-          selectedMaterials.forEach((materialId) => {
-            newMatches[materialId] = matchedKbobMaterial.Name;
-          });
-          setMatchedMaterials(newMatches);
+          // Update materials array with new matches
+          setMaterials((prevMaterials) =>
+            prevMaterials.map((material) => {
+              if (selectedMaterials.includes(material.id)) {
+                return {
+                  ...material,
+                  kbobMatch: {
+                    id: matchedKbobMaterial._id,
+                    Name: matchedKbobMaterial.Name,
+                    GWP: matchedKbobMaterial.GWP,
+                    UBP: matchedKbobMaterial.UBP,
+                    PENRE: matchedKbobMaterial.PENRE,
+                  },
+                  kbobMatchId: matchedKbobMaterial._id,
+                };
+              }
+              return material;
+            })
+          );
+
+          // Update matched materials state
+          setMatchedMaterials((prev) => ({
+            ...prev,
+            ...Object.fromEntries(
+              selectedMaterials.map((id) => [id, matchedKbobMaterial.Name])
+            ),
+          }));
         }
 
-        // Reset selection state
+        // Reset selection states
         setKbobValue("");
         setSelectedMaterials([]);
 
-        // Refresh materials list to show updated matches
-        const materialsResponse = await fetch("/api/materials");
-        if (materialsResponse.ok) {
-          const updatedMaterials = await materialsResponse.json();
-          setMaterials(updatedMaterials);
-        }
+        // Remove the automatic refetch to prevent race condition
+        // const materialsResponse = await fetch("/api/materials");
+        // if (materialsResponse.ok) {
+        //   const updatedMaterials = await materialsResponse.json();
+        //   setMaterials(updatedMaterials);
+        // }
       } catch (error) {
         console.error("Failed to match materials:", error);
       } finally {
