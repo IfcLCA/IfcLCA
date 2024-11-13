@@ -1,21 +1,8 @@
 "use client";
 
-import { useState, useMemo, useCallback, useEffect } from "react";
-import { ArrowUpDown, Filter, Check, ChevronsUpDown } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { useState, useMemo, useEffect, useRef } from "react";
+import { ArrowUpDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import {
-  Command,
-  CommandEmpty,
-  CommandGroup,
-  CommandInput,
-  CommandItem,
-} from "@/components/ui/command";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
   Card,
@@ -34,19 +21,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import {
-  DropdownMenu,
-  DropdownMenuCheckboxItem,
-  DropdownMenuContent,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import { useVirtualizer } from "@tanstack/react-virtual";
-import {
-  CheckIcon,
-  CaretSortIcon,
-  MagnifyingGlassIcon,
-} from "@radix-ui/react-icons";
+import { MagnifyingGlassIcon } from "@radix-ui/react-icons";
 import {
   Select,
   SelectContent,
@@ -54,6 +29,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  Pagination,
+  PaginationContent,
+  PaginationItem,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious,
+} from "@/components/ui/pagination";
 
 interface Material {
   id: string;
@@ -85,7 +68,6 @@ export function MaterialLibraryComponent() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedMaterials, setSelectedMaterials] = useState<string[]>([]);
-  const [open, setOpen] = useState(false);
   const [kbobValue, setKbobValue] = useState("");
   const [matchedMaterials, setMatchedMaterials] = useState<{
     [key: string]: string;
@@ -94,18 +76,19 @@ export function MaterialLibraryComponent() {
   const [sortColumn, setSortColumn] = useState<"name" | "projects">("name");
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
   const [currentPage, setCurrentPage] = useState(1);
-  const [itemsPerPage] = useState(50);
-  const [selectedProjects, setSelectedProjects] = useState<string[]>([]);
+  const [itemsPerPage, setItemsPerPage] = useState(10);
   const [kbobMaterials, setKbobMaterials] = useState<KbobMaterial[]>([]);
   const [kbobSearchTerm, setKbobSearchTerm] = useState("");
   const [selectedProject, setSelectedProject] = useState<string | null>(null);
   const [isMatchingLoading, setIsMatchingLoading] = useState(false);
+  const [isKbobOpen, setIsKbobOpen] = useState(false);
   const filteredKbobMaterials = useMemo(() => {
     console.log("Filtering KBOB materials:", kbobMaterials);
     return kbobMaterials.filter((material) =>
       material.Name?.toLowerCase().includes(kbobSearchTerm.toLowerCase())
     );
   }, [kbobMaterials, kbobSearchTerm]);
+  const dropdownRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     async function fetchMaterials() {
@@ -284,13 +267,6 @@ export function MaterialLibraryComponent() {
         // Reset selection states
         setKbobValue("");
         setSelectedMaterials([]);
-
-        // Remove the automatic refetch to prevent race condition
-        // const materialsResponse = await fetch("/api/materials");
-        // if (materialsResponse.ok) {
-        //   const updatedMaterials = await materialsResponse.json();
-        //   setMaterials(updatedMaterials);
-        // }
       } catch (error) {
         console.error("Failed to match materials:", error);
       } finally {
@@ -314,6 +290,22 @@ export function MaterialLibraryComponent() {
       material.projects?.forEach((project) => projectSet.add(project))
     );
     return Array.from(projectSet).sort();
+  }, []);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (
+        dropdownRef.current &&
+        !dropdownRef.current.contains(event.target as Node)
+      ) {
+        setIsKbobOpen(false);
+      }
+    };
+
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
   }, []);
 
   if (isLoading) {
@@ -343,40 +335,136 @@ export function MaterialLibraryComponent() {
   return (
     <Card className="w-[90%] mx-auto">
       <CardHeader>
-        <CardTitle>Material Library</CardTitle>
-        <CardDescription>
-          Match project materials with KBOB environmental indicators
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        <div className="flex items-center space-x-4">
-          <Select
-            value={selectedProject || "all"}
-            onValueChange={(value) =>
-              setSelectedProject(value === "all" ? null : value)
-            }
-          >
-            <SelectTrigger className="w-[200px]">
-              <SelectValue placeholder="Filter by project" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Projects</SelectItem>
-              {allProjects.map((project) => (
-                <SelectItem key={project} value={project}>
-                  {project}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <div className="flex items-center space-x-2 flex-1">
-            <MagnifyingGlassIcon className="w-4 h-4 text-muted-foreground" />
-            <Input
-              placeholder="Search materials..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full"
-            />
+        <div className="flex justify-between items-center">
+          <div>
+            <CardTitle>Material Library</CardTitle>
+            <CardDescription>
+              Match project materials with KBOB environmental indicators
+            </CardDescription>
           </div>
+
+          <div className="flex items-center space-x-2">
+            <Select
+              value={selectedProject || "all"}
+              onValueChange={(value) =>
+                setSelectedProject(value === "all" ? null : value)
+              }
+            >
+              <SelectTrigger className="w-[140px]">
+                <SelectValue placeholder="All Projects" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Projects</SelectItem>
+                {allProjects.map((project) => (
+                  <SelectItem key={project} value={project}>
+                    {project}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            <div className="relative w-[200px]">
+              <MagnifyingGlassIcon className="absolute left-2 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Search library..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-8"
+              />
+            </div>
+          </div>
+        </div>
+      </CardHeader>
+
+      <CardContent className="space-y-4">
+        <div className="space-y-4 bg-muted/30 p-4 rounded-lg border">
+          <div className="flex items-center space-x-4">
+            <div className="relative flex-1" ref={dropdownRef}>
+              <div className="flex items-center space-x-2">
+                <MagnifyingGlassIcon className="w-4 h-4 text-muted-foreground" />
+                <Input
+                  placeholder="Search and apply environmental impact data..."
+                  value={kbobSearchTerm}
+                  onChange={(e) => {
+                    setKbobSearchTerm(e.target.value);
+                    setIsKbobOpen(true);
+                    if (e.target.value.length > 0) {
+                      setKbobValue("");
+                    }
+                  }}
+                  onFocus={() => setIsKbobOpen(true)}
+                  className="w-full"
+                />
+              </div>
+              {isKbobOpen && (
+                <div className="absolute z-50 w-full max-h-[300px] overflow-y-auto bg-background border rounded-md shadow-lg mt-2">
+                  {filteredKbobMaterials.length > 0 ? (
+                    filteredKbobMaterials.map((material) => (
+                      <div
+                        key={material._id}
+                        className="p-2 hover:bg-primary/10 cursor-pointer flex justify-between items-center"
+                        onClick={() => {
+                          setKbobValue(material._id);
+                          setKbobSearchTerm(material.Name);
+                          setIsKbobOpen(false);
+                        }}
+                      >
+                        <span className="flex-1">{material.Name}</span>
+                        <span className="text-sm text-muted-foreground ml-4">
+                          GWP: {material.GWP}
+                        </span>
+                      </div>
+                    ))
+                  ) : (
+                    <div className="p-2 text-muted-foreground">
+                      No matches found
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+            <Button
+              onClick={handleMatch}
+              disabled={
+                !kbobValue ||
+                selectedMaterials.length === 0 ||
+                isMatchingLoading
+              }
+            >
+              {isMatchingLoading ? (
+                <>
+                  <svg
+                    className="animate-spin -ml-1 mr-3 h-4 w-4 text-white"
+                    xmlns="http://www.w3.org/2000/svg"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                  >
+                    <circle
+                      className="opacity-25"
+                      cx="12"
+                      cy="12"
+                      r="10"
+                      stroke="currentColor"
+                      strokeWidth="4"
+                    ></circle>
+                    <path
+                      className="opacity-75"
+                      fill="currentColor"
+                      d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                    ></path>
+                  </svg>
+                  Matching...
+                </>
+              ) : (
+                "Match Selected"
+              )}
+            </Button>
+          </div>
+          {kbobValue && (
+            <div className="text-sm text-muted-foreground">
+              Selected: {kbobMaterials.find((m) => m._id === kbobValue)?.Name}
+            </div>
+          )}
         </div>
         <div className="border rounded-md">
           <Table>
@@ -438,102 +526,92 @@ export function MaterialLibraryComponent() {
             </TableBody>
           </Table>
         </div>
-        <div className="flex items-center justify-between">
-          <div className="flex items-center space-x-2">
-            <Button
-              onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
-              disabled={currentPage === 1}
-            >
-              Previous
-            </Button>
-            <span>
-              Page {currentPage} of{" "}
-              {Math.ceil(filteredAndSortedMaterials.length / itemsPerPage)}
-            </span>
-            <Button
-              onClick={() =>
-                setCurrentPage((prev) =>
-                  Math.min(
-                    prev + 1,
-                    Math.ceil(filteredAndSortedMaterials.length / itemsPerPage)
-                  )
-                )
-              }
-              disabled={
-                currentPage ===
-                Math.ceil(filteredAndSortedMaterials.length / itemsPerPage)
-              }
-            >
-              Next
-            </Button>
-          </div>
-          <span>{filteredAndSortedMaterials.length} materials</span>
-        </div>
-        <div className="space-y-2">
-          <Input
-            placeholder="Search KBOB materials..."
-            value={kbobSearchTerm}
-            onChange={(e) => setKbobSearchTerm(e.target.value)}
-            className="w-[300px]"
-          />
-          <div className="flex items-center space-x-2">
+        <div className="flex flex-col sm:flex-row justify-between items-center mt-8 gap-4">
+          <div className="flex items-center gap-2">
             <Select
-              value={kbobValue}
-              onValueChange={setKbobValue}
-              disabled={selectedMaterials.length === 0}
+              value={itemsPerPage.toString()}
+              onValueChange={(value) => {
+                setItemsPerPage(
+                  value === "all"
+                    ? filteredAndSortedMaterials.length
+                    : Number(value)
+                );
+                setCurrentPage(1);
+              }}
             >
-              <SelectTrigger className="w-[300px]">
-                <SelectValue placeholder="Select KBOB material...">
-                  {kbobValue
-                    ? kbobMaterials.find((m) => m._id === kbobValue)?.Name
-                    : "Select KBOB material..."}
-                </SelectValue>
+              <SelectTrigger className="w-[70px]">
+                <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {filteredKbobMaterials.map((material) => (
-                  <SelectItem key={material._id} value={material._id}>
-                    {material.Name}
+                {[10, 40, 80, "all"].map((size) => (
+                  <SelectItem key={size.toString()} value={size.toString()}>
+                    {size}
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
-            <Button
-              onClick={handleMatch}
-              disabled={
-                !kbobValue ||
-                selectedMaterials.length === 0 ||
-                isMatchingLoading
-              }
-            >
-              {isMatchingLoading ? (
-                <>
-                  <svg
-                    className="animate-spin -ml-1 mr-3 h-4 w-4 text-white"
-                    xmlns="http://www.w3.org/2000/svg"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                  >
-                    <circle
-                      className="opacity-25"
-                      cx="12"
-                      cy="12"
-                      r="10"
-                      stroke="currentColor"
-                      strokeWidth="4"
-                    ></circle>
-                    <path
-                      className="opacity-75"
-                      fill="currentColor"
-                      d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                    ></path>
-                  </svg>
-                  Matching...
-                </>
-              ) : (
-                "Match Selected"
-              )}
-            </Button>
+            <span className="text-sm text-muted-foreground">
+              Showing {(currentPage - 1) * itemsPerPage + 1}-
+              {Math.min(
+                currentPage * itemsPerPage,
+                filteredAndSortedMaterials.length
+              )}{" "}
+              of {filteredAndSortedMaterials.length}
+            </span>
           </div>
+          <Pagination>
+            <PaginationContent>
+              <PaginationItem>
+                <PaginationPrevious
+                  href="#"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    setCurrentPage((prev) => Math.max(prev - 1, 1));
+                  }}
+                  aria-disabled={currentPage === 1}
+                />
+              </PaginationItem>
+              {Array.from({
+                length: Math.min(
+                  5,
+                  Math.ceil(filteredAndSortedMaterials.length / itemsPerPage)
+                ),
+              }).map((_, index) => (
+                <PaginationItem key={index}>
+                  <PaginationLink
+                    href="#"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      setCurrentPage(index + 1);
+                    }}
+                    isActive={currentPage === index + 1}
+                  >
+                    {index + 1}
+                  </PaginationLink>
+                </PaginationItem>
+              ))}
+              <PaginationItem>
+                <PaginationNext
+                  href="#"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    setCurrentPage((prev) =>
+                      Math.min(
+                        prev + 1,
+                        Math.ceil(
+                          filteredAndSortedMaterials.length / itemsPerPage
+                        )
+                      )
+                    );
+                  }}
+                  aria-disabled={
+                    currentPage ===
+                    Math.ceil(filteredAndSortedMaterials.length / itemsPerPage)
+                  }
+                />
+              </PaginationItem>
+            </PaginationContent>
+          </Pagination>
         </div>
       </CardContent>
     </Card>
