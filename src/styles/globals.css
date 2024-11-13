@@ -180,6 +180,22 @@
   .report-item:last-child {
     @apply border-b-0;
   }
+
+  .main-container {
+    @apply container mx-auto p-8;
+  }
+
+  .page-header {
+    @apply flex items-center justify-between mb-8;
+  }
+
+  .page-title {
+    @apply text-3xl font-bold tracking-tight;
+  }
+
+  .page-description {
+    @apply text-muted-foreground;
+  }
 }
 
 /* Responsive adjustments */

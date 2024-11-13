@@ -96,15 +96,22 @@ export default function ReportsPage() {
   };
 
   return (
-    <div className="container mx-auto py-8">
-      <h1 className="text-3xl font-bold mb-6">IfcLCA 2.0 Report Generator</h1>
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+    <div className="main-container">
+      <div className="page-header">
+        <div>
+          <h1 className="page-title">Reports</h1>
+          <p className="page-description">
+            Generate and manage project reports
+          </p>
+        </div>
+        <Button>Generate New Report</Button>
+      </div>
+
+      <div className="grid gap-6">
         <Card>
           <CardHeader>
-            <CardTitle>Report Options</CardTitle>
-            <CardDescription>
-              Customize your report by selecting the options below.
-            </CardDescription>
+            <CardTitle>Report Settings</CardTitle>
+            <CardDescription>Configure your report parameters</CardDescription>
           </CardHeader>
           <CardContent>
             <form

@@ -15,9 +15,9 @@ export default async function EmissionsPage({
   const project = await res.json();
 
   return (
-    <div className="w-full">
-      <div className="flex justify-between items-center mb-4">
-        <h2 className="text-2xl font-semibold">
+    <div className="main-container">
+      <div className="page-header">
+        <h2 className="page-title">
           Emissions{" "}
           <Badge variant="secondary" className="ml-2">
             {project?.elements?.length || 0}

@@ -58,8 +58,13 @@ type Project = {
   };
 };
 
-export function ProjectOverview() {
-  const [selectedMetric, setSelectedMetric] = useState<ImpactMetric>("GWP");
+interface ProjectOverviewProps {
+  selectedMetric?: string;
+}
+
+export function ProjectOverview({
+  selectedMetric = "GWP",
+}: ProjectOverviewProps) {
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(6);
   const [projects, setProjects] = useState<Project[]>([]);
@@ -91,12 +96,6 @@ export function ProjectOverview() {
 
     fetchProjects();
   }, []);
-
-  const handleMetricChange = (value: ImpactMetric) => {
-    setSelectedMetric(value);
-    // Here you could fetch updated project data based on the selected metric
-    // or filter/transform existing data
-  };
 
   const indexOfLastProject = currentPage * pageSize;
   const indexOfFirstProject = indexOfLastProject - pageSize;
@@ -135,32 +134,10 @@ export function ProjectOverview() {
   };
 
   return (
-    <div className="container mx-auto px-4 py-8 max-w-7xl">
-      <div className="flex flex-col md:flex-row justify-between items-center gap-6 mb-8">
-        <h1 className="text-4xl font-bold tracking-tight text-primary">
-          Project Portfolio
-        </h1>
-        <div className="flex items-center gap-4">
-          <Select value={selectedMetric} onValueChange={handleMetricChange}>
-            <SelectTrigger className="w-[180px]">
-              <SelectValue placeholder="Select metric" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="GWP">Global Warming Potential</SelectItem>
-              <SelectItem value="PENR">Primary Energy Non-Renewable</SelectItem>
-              <SelectItem value="UBP">UBP (Umweltbelastungspunkte)</SelectItem>
-            </SelectContent>
-          </Select>
-          <Button
-            asChild
-            size="lg"
-            className="bg-primary text-primary-foreground hover:bg-primary/90"
-          >
-            <Link href="/projects/new" className="gap-2">
-              <Plus className="h-5 w-5" />
-              New Project
-            </Link>
-          </Button>
+    <div className="main-container">
+      <div className="page-header">
+        <div className="">
+          <div className=""></div>
         </div>
       </div>
 

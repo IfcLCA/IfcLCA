@@ -309,311 +309,261 @@ export function MaterialLibraryComponent() {
   }, []);
 
   if (isLoading) {
-    return (
-      <Card className="w-[90%] mx-auto">
-        <CardHeader>
-          <CardTitle>Material Library</CardTitle>
-          <CardDescription>Loading materials...</CardDescription>
-        </CardHeader>
-      </Card>
-    );
+    return <div className="mt-8">Loading materials...</div>;
   }
 
   if (error) {
-    return (
-      <Card className="w-[90%] mx-auto">
-        <CardHeader>
-          <CardTitle>Material Library</CardTitle>
-          <CardDescription className="text-red-500">
-            Error: {error}
-          </CardDescription>
-        </CardHeader>
-      </Card>
-    );
+    return <div className="mt-8 text-red-500">Error: {error}</div>;
   }
 
   return (
-    <Card className="w-[90%] mx-auto">
-      <CardHeader>
-        <div className="flex justify-between items-center">
-          <div>
-            <CardTitle>Material Library</CardTitle>
-            <CardDescription>
-              Match project materials with KBOB environmental indicators
-            </CardDescription>
-          </div>
-
-          <div className="flex items-center space-x-2">
-            <Select
-              value={selectedProject || "all"}
-              onValueChange={(value) =>
-                setSelectedProject(value === "all" ? null : value)
-              }
-            >
-              <SelectTrigger className="w-[140px]">
-                <SelectValue placeholder="All Projects" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Projects</SelectItem>
-                {allProjects.map((project) => (
-                  <SelectItem key={project} value={project}>
-                    {project}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-
-            <div className="relative w-[200px]">
-              <MagnifyingGlassIcon className="absolute left-2 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Search library..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-8"
-              />
-            </div>
-          </div>
-        </div>
-      </CardHeader>
-
-      <CardContent className="space-y-4">
-        <div className="space-y-4 bg-muted/30 p-4 rounded-lg border">
-          <div className="flex items-center space-x-4">
-            <div className="relative flex-1" ref={dropdownRef}>
-              <div className="flex items-center space-x-2">
-                <MagnifyingGlassIcon className="w-4 h-4 text-muted-foreground" />
-                <Input
-                  placeholder="Search and apply environmental impact data..."
-                  value={kbobSearchTerm}
-                  onChange={(e) => {
-                    setKbobSearchTerm(e.target.value);
-                    setIsKbobOpen(true);
-                    if (e.target.value.length > 0) {
-                      setKbobValue("");
-                    }
-                  }}
-                  onFocus={() => setIsKbobOpen(true)}
-                  className="w-full"
-                />
-              </div>
-              {isKbobOpen && (
-                <div className="absolute z-50 w-full max-h-[300px] overflow-y-auto bg-background border rounded-md shadow-lg mt-2">
-                  {filteredKbobMaterials.length > 0 ? (
-                    filteredKbobMaterials.map((material) => (
-                      <div
-                        key={material._id}
-                        className="p-2 hover:bg-primary/10 cursor-pointer flex justify-between items-center"
-                        onClick={() => {
-                          setKbobValue(material._id);
-                          setKbobSearchTerm(material.Name);
-                          setIsKbobOpen(false);
-                        }}
-                      >
-                        <span className="flex-1">{material.Name}</span>
-                        <span className="text-sm text-muted-foreground ml-4">
-                          GWP: {material.GWP}
-                        </span>
-                      </div>
-                    ))
-                  ) : (
-                    <div className="p-2 text-muted-foreground">
-                      No matches found
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-            <Button
-              onClick={handleMatch}
-              disabled={
-                !kbobValue ||
-                selectedMaterials.length === 0 ||
-                isMatchingLoading
-              }
-            >
-              {isMatchingLoading ? (
-                <>
-                  <svg
-                    className="animate-spin -ml-1 mr-3 h-4 w-4 text-white"
-                    xmlns="http://www.w3.org/2000/svg"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                  >
-                    <circle
-                      className="opacity-25"
-                      cx="12"
-                      cy="12"
-                      r="10"
-                      stroke="currentColor"
-                      strokeWidth="4"
-                    ></circle>
-                    <path
-                      className="opacity-75"
-                      fill="currentColor"
-                      d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                    ></path>
-                  </svg>
-                  Matching...
-                </>
-              ) : (
-                "Match Selected"
-              )}
-            </Button>
-          </div>
-          {kbobValue && (
-            <div className="text-sm text-muted-foreground">
-              Selected: {kbobMaterials.find((m) => m._id === kbobValue)?.Name}
-            </div>
-          )}
-        </div>
-        <div className="border rounded-md">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead className="w-[50px]">
-                  <Checkbox
-                    checked={
-                      selectedMaterials.length === paginatedMaterials.length
-                    }
-                    onCheckedChange={handleSelectAll}
-                    aria-label="Select all"
+    <div>
+      <Card>
+        <CardContent className="space-y-4 p-6">
+          <div className="space-y-4 bg-muted/30 p-4 rounded-lg border">
+            <div className="flex items-center space-x-4">
+              <div className="relative flex-1" ref={dropdownRef}>
+                <div className="flex items-center space-x-2">
+                  <MagnifyingGlassIcon className="w-4 h-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Search and apply environmental impact data..."
+                    value={kbobSearchTerm}
+                    onChange={(e) => {
+                      setKbobSearchTerm(e.target.value);
+                      setIsKbobOpen(true);
+                      if (e.target.value.length > 0) {
+                        setKbobValue("");
+                      }
+                    }}
+                    onFocus={() => setIsKbobOpen(true)}
+                    className="w-full"
                   />
-                </TableHead>
-                <TableHead
-                  className="cursor-pointer"
-                  onClick={() => toggleSort("name")}
-                >
-                  Material Name
-                  <ArrowUpDown className="ml-2 h-4 w-4 inline" />
-                </TableHead>
-                <TableHead>Category</TableHead>
-                <TableHead>Volume (m³)</TableHead>
-                <TableHead>KBOB Match</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {paginatedMaterials.map((material) => (
-                <TableRow key={material.id}>
-                  <TableCell>
-                    <Checkbox
-                      checked={selectedMaterials.includes(material.id)}
-                      onCheckedChange={() => handleSelect(material.id)}
-                      aria-label={`Select ${material.name}`}
-                    />
-                  </TableCell>
-                  <TableCell>{material.name}</TableCell>
-                  <TableCell>{material.category || "N/A"}</TableCell>
-                  <TableCell>{material.volume?.toFixed(2) || "N/A"}</TableCell>
-                  <TableCell>
-                    {material.kbobMatch ? (
-                      <Badge variant="outline">{material.kbobMatch.Name}</Badge>
+                </div>
+                {isKbobOpen && (
+                  <div className="absolute z-50 w-full max-h-[300px] overflow-y-auto bg-background border rounded-md shadow-lg mt-2">
+                    {filteredKbobMaterials.length > 0 ? (
+                      filteredKbobMaterials.map((material) => (
+                        <div
+                          key={material._id}
+                          className="p-2 hover:bg-primary/10 cursor-pointer flex justify-between items-center"
+                          onClick={() => {
+                            setKbobValue(material._id);
+                            setKbobSearchTerm(material.Name);
+                            setIsKbobOpen(false);
+                          }}
+                        >
+                          <span className="flex-1">{material.Name}</span>
+                          <span className="text-sm text-muted-foreground ml-4">
+                            GWP: {material.GWP}
+                          </span>
+                        </div>
+                      ))
                     ) : (
-                      "Not matched"
+                      <div className="p-2 text-muted-foreground">
+                        No matches found
+                      </div>
                     )}
-                  </TableCell>
-                </TableRow>
-              ))}
-              {paginatedMaterials.length === 0 && (
-                <TableRow>
-                  <TableCell
-                    colSpan={5}
-                    className="h-24 text-center text-muted-foreground"
-                  >
-                    No materials found
-                  </TableCell>
-                </TableRow>
-              )}
-            </TableBody>
-          </Table>
-        </div>
-        <div className="flex flex-col sm:flex-row justify-between items-center mt-8 gap-4">
-          <div className="flex items-center gap-2">
-            <Select
-              value={itemsPerPage.toString()}
-              onValueChange={(value) => {
-                setItemsPerPage(
-                  value === "all"
-                    ? filteredAndSortedMaterials.length
-                    : Number(value)
-                );
-                setCurrentPage(1);
-              }}
-            >
-              <SelectTrigger className="w-[70px]">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {[10, 40, 80, "all"].map((size) => (
-                  <SelectItem key={size.toString()} value={size.toString()}>
-                    {size}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <span className="text-sm text-muted-foreground">
-              Showing {(currentPage - 1) * itemsPerPage + 1}-
-              {Math.min(
-                currentPage * itemsPerPage,
-                filteredAndSortedMaterials.length
-              )}{" "}
-              of {filteredAndSortedMaterials.length}
-            </span>
+                  </div>
+                )}
+              </div>
+              <Button
+                onClick={handleMatch}
+                disabled={
+                  !kbobValue ||
+                  selectedMaterials.length === 0 ||
+                  isMatchingLoading
+                }
+              >
+                {isMatchingLoading ? (
+                  <>
+                    <svg
+                      className="animate-spin -ml-1 mr-3 h-4 w-4 text-white"
+                      xmlns="http://www.w3.org/2000/svg"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                    >
+                      <circle
+                        className="opacity-25"
+                        cx="12"
+                        cy="12"
+                        r="10"
+                        stroke="currentColor"
+                        strokeWidth="4"
+                      ></circle>
+                      <path
+                        className="opacity-75"
+                        fill="currentColor"
+                        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                      ></path>
+                    </svg>
+                    Matching...
+                  </>
+                ) : (
+                  "Match Selected"
+                )}
+              </Button>
+            </div>
+            {kbobValue && (
+              <div className="text-sm text-muted-foreground">
+                Selected: {kbobMaterials.find((m) => m._id === kbobValue)?.Name}
+              </div>
+            )}
           </div>
-          <Pagination>
-            <PaginationContent>
-              <PaginationItem>
-                <PaginationPrevious
-                  href="#"
-                  onClick={(e) => {
-                    e.preventDefault();
-                    setCurrentPage((prev) => Math.max(prev - 1, 1));
-                  }}
-                  aria-disabled={currentPage === 1}
-                />
-              </PaginationItem>
-              {Array.from({
-                length: Math.min(
-                  5,
-                  Math.ceil(filteredAndSortedMaterials.length / itemsPerPage)
-                ),
-              }).map((_, index) => (
-                <PaginationItem key={index}>
-                  <PaginationLink
+          <div className="border rounded-md">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="w-[50px]">
+                    <Checkbox
+                      checked={
+                        selectedMaterials.length === paginatedMaterials.length
+                      }
+                      onCheckedChange={handleSelectAll}
+                      aria-label="Select all"
+                    />
+                  </TableHead>
+                  <TableHead
+                    className="cursor-pointer"
+                    onClick={() => toggleSort("name")}
+                  >
+                    Material Name
+                    <ArrowUpDown className="ml-2 h-4 w-4 inline" />
+                  </TableHead>
+                  <TableHead>Category</TableHead>
+                  <TableHead>Volume (m³)</TableHead>
+                  <TableHead>KBOB Match</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {paginatedMaterials.map((material) => (
+                  <TableRow key={material.id}>
+                    <TableCell>
+                      <Checkbox
+                        checked={selectedMaterials.includes(material.id)}
+                        onCheckedChange={() => handleSelect(material.id)}
+                        aria-label={`Select ${material.name}`}
+                      />
+                    </TableCell>
+                    <TableCell>{material.name}</TableCell>
+                    <TableCell>{material.category || "N/A"}</TableCell>
+                    <TableCell>
+                      {material.volume?.toFixed(2) || "N/A"}
+                    </TableCell>
+                    <TableCell>
+                      {material.kbobMatch ? (
+                        <Badge variant="outline">
+                          {material.kbobMatch.Name}
+                        </Badge>
+                      ) : (
+                        "Not matched"
+                      )}
+                    </TableCell>
+                  </TableRow>
+                ))}
+                {paginatedMaterials.length === 0 && (
+                  <TableRow>
+                    <TableCell
+                      colSpan={5}
+                      className="h-24 text-center text-muted-foreground"
+                    >
+                      No materials found
+                    </TableCell>
+                  </TableRow>
+                )}
+              </TableBody>
+            </Table>
+          </div>
+          <div className="flex flex-col sm:flex-row justify-between items-center mt-8 gap-4">
+            <div className="flex items-center gap-2">
+              <Select
+                value={itemsPerPage.toString()}
+                onValueChange={(value) => {
+                  setItemsPerPage(
+                    value === "all"
+                      ? filteredAndSortedMaterials.length
+                      : Number(value)
+                  );
+                  setCurrentPage(1);
+                }}
+              >
+                <SelectTrigger className="w-[70px]">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {[10, 40, 80, "all"].map((size) => (
+                    <SelectItem key={size.toString()} value={size.toString()}>
+                      {size}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <span className="text-sm text-muted-foreground">
+                Showing {(currentPage - 1) * itemsPerPage + 1}-
+                {Math.min(
+                  currentPage * itemsPerPage,
+                  filteredAndSortedMaterials.length
+                )}{" "}
+                of {filteredAndSortedMaterials.length}
+              </span>
+            </div>
+            <Pagination>
+              <PaginationContent>
+                <PaginationItem>
+                  <PaginationPrevious
                     href="#"
                     onClick={(e) => {
                       e.preventDefault();
-                      setCurrentPage(index + 1);
+                      setCurrentPage((prev) => Math.max(prev - 1, 1));
                     }}
-                    isActive={currentPage === index + 1}
-                  >
-                    {index + 1}
-                  </PaginationLink>
+                    aria-disabled={currentPage === 1}
+                  />
                 </PaginationItem>
-              ))}
-              <PaginationItem>
-                <PaginationNext
-                  href="#"
-                  onClick={(e) => {
-                    e.preventDefault();
-                    setCurrentPage((prev) =>
-                      Math.min(
-                        prev + 1,
-                        Math.ceil(
-                          filteredAndSortedMaterials.length / itemsPerPage
-                        )
-                      )
-                    );
-                  }}
-                  aria-disabled={
-                    currentPage ===
+                {Array.from({
+                  length: Math.min(
+                    5,
                     Math.ceil(filteredAndSortedMaterials.length / itemsPerPage)
-                  }
-                />
-              </PaginationItem>
-            </PaginationContent>
-          </Pagination>
-        </div>
-      </CardContent>
-    </Card>
+                  ),
+                }).map((_, index) => (
+                  <PaginationItem key={index}>
+                    <PaginationLink
+                      href="#"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        setCurrentPage(index + 1);
+                      }}
+                      isActive={currentPage === index + 1}
+                    >
+                      {index + 1}
+                    </PaginationLink>
+                  </PaginationItem>
+                ))}
+                <PaginationItem>
+                  <PaginationNext
+                    href="#"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      setCurrentPage((prev) =>
+                        Math.min(
+                          prev + 1,
+                          Math.ceil(
+                            filteredAndSortedMaterials.length / itemsPerPage
+                          )
+                        )
+                      );
+                    }}
+                    aria-disabled={
+                      currentPage ===
+                      Math.ceil(
+                        filteredAndSortedMaterials.length / itemsPerPage
+                      )
+                    }
+                  />
+                </PaginationItem>
+              </PaginationContent>
+            </Pagination>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
   );
 }

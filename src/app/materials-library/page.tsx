@@ -4,7 +4,18 @@ import { MaterialLibraryComponent } from "@/components/materials-library";
 
 export default function MaterialsLibraryPage() {
   return (
-    <div className="container mx-auto py-6">
+    <div className="main-container space-y-8">
+      <section>
+        <div className="page-header">
+          <div>
+            <h1 className="page-title">Material Library</h1>
+            <p className="page-description">
+              Match project materials with KBOB environmental indicators
+            </p>
+          </div>
+        </div>
+      </section>
+
       <MaterialLibraryComponent />
     </div>
   );

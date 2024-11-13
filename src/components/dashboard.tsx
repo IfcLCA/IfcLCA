@@ -35,6 +35,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { ActivityFeed } from "@/components/activity-feed";
+import { useUser } from "@clerk/nextjs";
 
 interface Project {
   id: string;
@@ -278,41 +279,48 @@ export function Dashboard({
 
   const metrics: Metric[] = [
     {
-      title: "Total Projects",
-      value: statistics.totalProjects,
-      description: "Total number of projects",
-      icon: "Building",
-    },
-    {
       title: "Total Elements",
       value: statistics.totalElements,
-      description: "Building elements across all projects",
+      description: "Construction components",
       icon: "Box",
+    },
+    {
+      title: "Total Projects",
+      value: statistics.totalProjects,
+      description: "Active projects",
+      icon: "Building",
     },
     {
       title: "Total Materials",
       value: statistics.totalMaterials,
-      description: "Unique materials in use",
+      description: "Unique materials",
       icon: "Layers",
     },
   ];
 
   return (
-    <div className="container mx-auto p-4 space-y-8">
-      <section className="space-y-4">
-        <h1 className="text-3xl font-bold tracking-tight">Home</h1>
-        <div className="flex flex-wrap gap-4">
-          <Button asChild className="bg-[#FF5722] hover:bg-[#F4511E]">
-            <Link href="/projects/new">
-              <PlusCircle className="mr-2 h-4 w-4" />
-              Create New Project
-            </Link>
-          </Button>
-          <Button variant="outline" onClick={handleUploadClick}>
-            <Upload className="mr-2 h-4 w-4" />
-            Analyse IFC
-          </Button>
-          <Button variant="outline">Generate Report</Button>
+    <div className="main-container space-y-8">
+      <section>
+        <div className="page-header">
+          <div>
+            <h1 className="page-title">Home</h1>
+            <p className="page-description">
+              Overview of your projects and recent activity
+            </p>
+          </div>
+          <div className="flex gap-4">
+            <Button asChild>
+              <Link href="/projects/new">
+                <PlusCircle className="mr-2 h-4 w-4" />
+                Create New Project
+              </Link>
+            </Button>
+            <Button variant="outline" onClick={handleUploadClick}>
+              <Upload className="mr-2 h-4 w-4" />
+              Analyse IFC
+            </Button>
+            <Button variant="outline">Generate Report</Button>
+          </div>
         </div>
       </section>
 
@@ -320,16 +328,24 @@ export function Dashboard({
         {metrics.map((item) => {
           const Icon = Icons[item.icon];
           return (
-            <Card key={item.title}>
+            <Card
+              key={item.title}
+              className="group transition-colors duration-200 hover:border-primary/50"
+            >
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">
+                <CardTitle className="text-sm font-medium group-hover:text-primary transition-colors">
                   {item.title}
                 </CardTitle>
-                <Icon className="h-4 w-4 text-muted-foreground" />
+                <Icon className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">{item.value}</div>
-                <p className="text-xs text-muted-foreground">
+                <div className="text-3xl font-bold group-hover:text-primary transition-colors">
+                  {item.value.toLocaleString("de-CH", {
+                    maximumFractionDigits: 0,
+                    useGrouping: true,
+                  })}
+                </div>
+                <p className="text-xs text-muted-foreground mt-1 group-hover:text-primary/70 transition-colors">
                   {item.description}
                 </p>
               </CardContent>
