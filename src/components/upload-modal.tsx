@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback } from "react";
 import { useDropzone } from "react-dropzone";
 import { Button } from "@/components/ui/button";
 import {
@@ -9,38 +9,28 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { UploadCloud, CheckIcon } from "lucide-react";
+import { UploadCloud } from "lucide-react";
+import { ReloadIcon } from "@radix-ui/react-icons";
 import { parseIFCFile } from "@/lib/services/ifc-parser-client";
 import { useToast } from "@/hooks/use-toast";
+import { useRouter } from "next/navigation";
+
 interface UploadModalProps {
   projectId: string;
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onSuccess?: (upload: { id: string }) => void;
-  onProgress?: (progress: number) => void;
+  onUploadComplete?: () => void;
 }
 
 export function UploadModal({
   projectId,
   open,
   onOpenChange,
-  onSuccess,
-  onProgress,
+  onUploadComplete,
 }: UploadModalProps) {
   const [isUploading, setIsUploading] = useState(false);
-  const [uploadResult, setUploadResult] = useState<{
-    count: number;
-    show: boolean;
-    elementsWithoutMaterials?: number;
-  } | null>(null);
   const { toast } = useToast();
-
-  // Reset upload result when modal closes
-  useEffect(() => {
-    if (!open) {
-      setUploadResult(null);
-    }
-  }, [open]);
+  const router = useRouter();
 
   const onDrop = useCallback(
     async (acceptedFiles: File[]) => {
@@ -51,27 +41,13 @@ export function UploadModal({
 
         toast({
           title: "Upload Successful",
-          description: `Successfully processed ${
-            results.elementCount
-          } elements (${
-            results.summary?.elementsWithoutMaterials?.length || 0
-          } without materials)`,
+          description: `Successfully processed ${results.elementCount} elements`,
         });
 
-        // Set upload result instead of showing toast
-        setUploadResult({
-          count: results.elementCount || 0,
-          show: true,
-          elementsWithoutMaterials:
-            results.summary?.elementsWithoutMaterials?.length || 0,
-        });
-
-        // Hide the success message after 5 seconds and close modal
-        setTimeout(() => {
-          setUploadResult((prev) => (prev ? { ...prev, show: false } : null));
-          onOpenChange(false);
-          onSuccess?.({ id: projectId });
-        }, 5000);
+        // Close modal immediately after successful upload
+        onOpenChange(false);
+        router.refresh();
+        onUploadComplete?.();
       } catch (error) {
         toast({
           title: "Error",
@@ -84,7 +60,7 @@ export function UploadModal({
         setIsUploading(false);
       }
     },
-    [projectId, onSuccess, onOpenChange, toast]
+    [projectId, onUploadComplete, onOpenChange, router, toast]
   );
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
@@ -101,21 +77,14 @@ export function UploadModal({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Upload IFC File</DialogTitle>
+          <DialogTitle>Load IFC File</DialogTitle>
         </DialogHeader>
-        {uploadResult?.show ? (
-          <div className="flex flex-col items-center justify-center p-6 space-y-4 text-center">
-            <div className="h-12 w-12 rounded-full bg-green-100 flex items-center justify-center">
-              <CheckIcon className="h-6 w-6 text-green-600" />
-            </div>
-            <div className="space-y-2">
-              <h3 className="font-semibold text-lg">Upload Successful</h3>
-              <p className="text-muted-foreground">
-                Successfully processed {uploadResult.count.toLocaleString()}{" "}
-                elements ({uploadResult.elementsWithoutMaterials} without
-                materials)
-              </p>
-            </div>
+        {isUploading ? (
+          <div className="flex flex-col items-center justify-center py-8">
+            <ReloadIcon className="h-8 w-8 animate-spin text-primary mb-4" />
+            <p className="text-sm text-muted-foreground">
+              Processing IFC file...
+            </p>
           </div>
         ) : (
           <div
@@ -123,7 +92,6 @@ export function UploadModal({
             className={`
               border-2 border-dashed rounded-lg p-8 text-center cursor-pointer
               ${isDragActive ? "border-primary bg-primary/10" : "border-border"}
-              ${isUploading ? "opacity-50 cursor-not-allowed" : ""}
             `}
           >
             <input {...getInputProps()} />
@@ -131,8 +99,6 @@ export function UploadModal({
             <p className="mt-2 text-sm text-muted-foreground">
               {isDragActive
                 ? "Drop the file here"
-                : isUploading
-                ? "Uploading..."
                 : "Drag and drop an IFC file, or click to select"}
             </p>
           </div>
