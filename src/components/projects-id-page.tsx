@@ -305,7 +305,7 @@ const ProjectHeader = ({
     <div className="flex flex-col sm:flex-row gap-4">
       <Button onClick={onUpload} className="bg-primary text-primary-foreground">
         <Upload className="mr-2 h-4 w-4" />
-        Upload IFC
+        Analyse IFC
       </Button>
       <Button variant="outline" onClick={onEdit}>
         <Edit className="mr-2 h-4 w-4" />
@@ -427,15 +427,15 @@ const UploadsTab = ({
         </h2>
         <Button onClick={onUpload} variant="outline">
           <UploadCloud className="h-4 w-4 mr-2" />
-          Upload IFC
+          Analyse IFC
         </Button>
       </div>
       {!project?.uploads || project.uploads.length === 0 ? (
         <EmptyState
           icon={UploadCloud}
           title="No uploads yet"
-          description="Start by uploading an IFC file."
-          action={<Button onClick={onUpload}>Upload IFC</Button>}
+          description="Get elements and materials from an IFC file."
+          action={<Button onClick={onUpload}>Analyse IFC</Button>}
         />
       ) : (
         <div className="space-y-4">
@@ -565,7 +565,7 @@ const MaterialsTab = ({
         icon={Layers}
         title="No materials found"
         description="Materials will be extracted from IFC files when uploaded."
-        action={<Button onClick={onUpload}>Upload IFC</Button>}
+        action={<Button onClick={onUpload}>Analyse IFC</Button>}
       />
     )}
   </>

@@ -1,5 +1,15 @@
 import { ColumnDef } from "@tanstack/react-table";
 
+const formatNumber = (value: number) => {
+  const decimalPlaces = value > 100 ? 0 : 2;
+  return (
+    value?.toLocaleString("de-CH", {
+      minimumFractionDigits: decimalPlaces,
+      maximumFractionDigits: decimalPlaces,
+    }) ?? "N/A"
+  );
+};
+
 export const emissionsColumns: ColumnDef<any>[] = [
   {
     accessorKey: "name",
@@ -9,21 +19,21 @@ export const emissionsColumns: ColumnDef<any>[] = [
   {
     accessorKey: "volume",
     header: "Volume (m³)",
-    cell: ({ row }) => row.original.volume?.toFixed(2) ?? "N/A",
+    cell: ({ row }) => formatNumber(row.original.volume),
   },
   {
     accessorKey: "indicators.gwp",
     header: "GWP (kg CO₂-eq)",
-    cell: ({ row }) => row.original.indicators?.gwp?.toFixed(2) ?? "N/A",
+    cell: ({ row }) => formatNumber(row.original.indicators?.gwp),
   },
   {
     accessorKey: "indicators.ubp",
     header: "UBP",
-    cell: ({ row }) => row.original.indicators?.ubp?.toFixed(2) ?? "N/A",
+    cell: ({ row }) => formatNumber(row.original.indicators?.ubp),
   },
   {
     accessorKey: "indicators.penre",
     header: "PENRE (kWh)",
-    cell: ({ row }) => row.original.indicators?.penre?.toFixed(2) ?? "N/A",
+    cell: ({ row }) => formatNumber(row.original.indicators?.penre),
   },
 ];

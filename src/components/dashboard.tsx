@@ -310,7 +310,7 @@ export function Dashboard({
           </Button>
           <Button variant="outline" onClick={handleUploadClick}>
             <Upload className="mr-2 h-4 w-4" />
-            Upload IFC
+            Analyse IFC
           </Button>
           <Button variant="outline">Generate Report</Button>
         </div>

@@ -36,7 +36,7 @@ const metrics: Record<
   },
   penre: {
     label: "PENRE",
-    unit: "MJ",
+    unit: "kWh",
     description: "Primary Energy Non-Renewable",
   },
 };
@@ -63,8 +63,9 @@ export function EmissionsCard({ emissions }: { emissions?: EmissionsProps }) {
   }
 
   const currentValue = emissions[metric];
-  const formattedValue = currentValue.toLocaleString(undefined, {
-    maximumFractionDigits: 2,
+  const formattedValue = currentValue.toLocaleString("de-CH", {
+    maximumFractionDigits: 0,
+    useGrouping: true,
   });
   const percentChange = 5.2; // Example percent change, replace with actual calculation
 

@@ -93,7 +93,7 @@ export function DashboardCards({
         <CardContent>
           <p className="text-3xl font-bold">{elements}</p>
           <p className="text-xs text-muted-foreground mt-1">
-            Building components
+            Construction components
           </p>
         </CardContent>
       </Card>
@@ -105,7 +105,7 @@ export function DashboardCards({
         </CardHeader>
         <CardContent>
           <p className="text-3xl font-bold">{uploads}</p>
-          <p className="text-xs text-muted-foreground mt-1">Files uploaded</p>
+          <p className="text-xs text-muted-foreground mt-1">Files analysed</p>
         </CardContent>
       </Card>
 
