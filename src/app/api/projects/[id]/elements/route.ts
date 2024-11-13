@@ -19,15 +19,17 @@ export async function GET(
   { params }: { params: { id: string } }
 ) {
   try {
-    console.log("Fetching elements for project:", params.id);
+    if (!params?.id || !mongoose.Types.ObjectId.isValid(params.id)) {
+      return NextResponse.json(
+        { error: "Invalid project ID" },
+        { status: 400 }
+      );
+    }
+
     await connectToDatabase();
+    const projectId = new mongoose.Types.ObjectId(params.id);
 
-    const elements = await Element.find({ projectId: params.id }).lean().exec();
-
-    console.log("Found elements:", {
-      count: elements.length,
-      firstElement: elements[0],
-    });
+    const elements = await Element.find({ projectId }).lean();
 
     const formattedElements = elements.map((element) => ({
       id: element._id.toString(),

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import { connectToDatabase } from "@/lib/mongodb";
 import { Upload } from "@/models";
+import mongoose from "mongoose";
 
 export const runtime = "nodejs";
 
@@ -11,7 +12,6 @@ export async function POST(
 ) {
   try {
     const { userId } = await auth();
-
     if (!userId) {
       return NextResponse.json(
         { error: "Unauthorized - Please sign in" },
@@ -19,27 +19,39 @@ export async function POST(
       );
     }
 
+    await connectToDatabase();
+
     const body = await request.json();
     const filename = body.filename || "Unnamed File";
 
-    await connectToDatabase();
+    // Validate and convert project ID
+    if (!mongoose.Types.ObjectId.isValid(params.id)) {
+      return NextResponse.json(
+        { error: "Invalid project ID" },
+        { status: 400 }
+      );
+    }
 
-    const upload = await Upload.create({
-      projectId: params.id,
+    // Create upload document with all required fields
+    const upload = new Upload({
+      projectId: new mongoose.Types.ObjectId(params.id),
       userId,
       filename,
       status: "Processing",
       elementCount: 0,
+      materialCount: 0,
+      deleted: false,
     });
 
-    const response = {
+    // Save with validation
+    await upload.save();
+
+    return NextResponse.json({
       success: true,
       uploadId: upload._id.toString(),
-      status: "Processing",
-      filename,
-    };
-
-    return NextResponse.json(response);
+      status: upload.status,
+      filename: upload.filename,
+    });
   } catch (error) {
     console.error("Upload creation failed:", error);
     return NextResponse.json(
