@@ -267,7 +267,27 @@ export class IFCParser {
 
   private _processElements() {
     Object.entries(this.entities).forEach(([id, entity]) => {
-      if (entity.type === "IFCWALL" || entity.type === "IFCSLAB") {
+      if (
+        [
+          "IFCWALL",
+          "IFCSLAB",
+          "IFCBEAM",
+          "IFCCOLUMN",
+          "IFCFOOTING",
+          "IFCPILE",
+          "IFCROOF",
+          "IFCSTAIR",
+          "IFCRAMP",
+          "IFCPLATE",
+          "IFCMEMBER",
+          "IFCBUILDINGELEMENTPROXY",
+          "IFCCURTAINWALL",
+          // "IFCWINDOW",
+          // "IFCDOOR",
+          // "IFCRAILING",
+          // "IFCFURNISHINGELEMENT",
+        ].includes(entity.type)
+      ) {
         const globalId = entity.attributes[0] || `No GlobalId`;
         const name = entity.attributes[2] || `Unnamed ${entity.type}`;
         const relationships = this.relationships[id] || {};
