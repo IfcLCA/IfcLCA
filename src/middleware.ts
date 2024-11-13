@@ -1,57 +1,79 @@
-import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
+import { clerkMiddleware } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
 
-// Define protected routes
-const protectedRoutes = createRouteMatcher([
-  "/api/projects/(.*)", // Protect all project API routes
-  "/dashboard(.*)",
-  "/projects(.*)",
-  "/materials(.*)",
-  "/settings(.*)",
-  "/reports(.*)",
-]);
+// Define public routes that don't require authentication
+const publicRoutes = [
+  "/",
+  "/sign-in",
+  "/sign-up",
+  "/terms",
+  "/privacy",
+  "/cookies",
+];
 
-export default clerkMiddleware(async (auth, req) => {
-  console.log("Middleware processing:", {
-    path: req.nextUrl.pathname,
-    method: req.method,
-  });
+// Define protected routes that require authentication
+const protectedRoutes = [
+  "/dashboard",
+  "/projects",
+  "/materials",
+  "/settings",
+  "/reports",
+  "/api/projects",
+];
 
-  const { userId } = await auth();
+export default clerkMiddleware((auth, request) => {
+  const { userId } = auth;
+  const { pathname } = request.nextUrl;
 
-  // Handle API routes
-  if (req.nextUrl.pathname.startsWith("/api/")) {
-    if (!userId) {
-      console.log("Unauthorized API access attempt");
-      return NextResponse.json(
-        { error: "Please sign in to continue" },
-        { status: 401 }
-      );
-    }
+  // Allow public routes
+  if (publicRoutes.some((route) => pathname.startsWith(route))) {
     return NextResponse.next();
   }
 
-  // Handle protected routes
-  if (protectedRoutes(req)) {
+  // Check if it's a protected route
+  const isProtectedRoute = protectedRoutes.some((route) =>
+    pathname.startsWith(route)
+  );
+
+  if (isProtectedRoute) {
     if (!userId) {
-      return auth.redirectToSignIn({ returnBackUrl: req.url });
+      // For API routes, return 401
+      if (pathname.startsWith("/api/")) {
+        return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      }
+
+      // For other routes, redirect to sign-in
+      const signInUrl = new URL("/sign-in", request.url);
+      signInUrl.searchParams.set("redirect_url", request.url);
+      return NextResponse.redirect(signInUrl);
     }
 
     // Check terms acceptance for non-API routes
-    const hasAcceptedTerms = req.cookies.get("terms_accepted");
-    if (!hasAcceptedTerms) {
-      const url = new URL("/", req.url);
-      url.searchParams.set("redirect", req.url);
-      return NextResponse.redirect(url);
+    if (!pathname.startsWith("/api/")) {
+      const hasAcceptedTerms = request.cookies.get("terms_accepted");
+      if (!hasAcceptedTerms) {
+        const url = new URL("/", request.url);
+        url.searchParams.set("redirect", request.url);
+        return NextResponse.redirect(url);
+      }
     }
   }
 
   return NextResponse.next();
 });
 
+// Fixed matcher pattern
 export const config = {
   matcher: [
-    "/((?!_next|[^?]*\\.(?:html?|css|js(?!on)|jpe?g|webp|png|gif|svg|ttf|woff2?|ico|csv|docx?|xlsx?|zip|webmanifest)).*)",
-    "/(api|trpc)(.*)",
+    "/",
+    "/sign-in",
+    "/sign-up",
+    "/dashboard/:path*",
+    "/projects/:path*",
+    "/materials/:path*",
+    "/settings/:path*",
+    "/reports/:path*",
+    "/api/:path*",
+    "/((?!_next/static|_next/image|favicon.ico).*)",
   ],
 };

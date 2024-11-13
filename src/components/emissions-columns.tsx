@@ -3,7 +3,7 @@ import { ColumnDef } from "@tanstack/react-table";
 export const emissionsColumns: ColumnDef<any>[] = [
   {
     accessorKey: "name",
-    header: "Building Element",
+    header: "Element",
     cell: ({ row }) => row.original.name,
   },
   {
@@ -13,7 +13,7 @@ export const emissionsColumns: ColumnDef<any>[] = [
   },
   {
     accessorKey: "indicators.gwp",
-    header: "GWP (kg CO₂ eq)",
+    header: "GWP (kg CO₂-eq)",
     cell: ({ row }) => row.original.indicators?.gwp?.toFixed(2) ?? "N/A",
   },
   {
@@ -23,7 +23,7 @@ export const emissionsColumns: ColumnDef<any>[] = [
   },
   {
     accessorKey: "indicators.penre",
-    header: "PENRE (MJ)",
+    header: "PENRE (kWh)",
     cell: ({ row }) => row.original.indicators?.penre?.toFixed(2) ?? "N/A",
   },
 ];

@@ -1,9 +1,6 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  experimental: {
-    serverComponentsExternalPackages: ["mongoose"],
-    esmExternals: "loose",
-  },
+  serverExternalPackages: ["mongoose"],
   webpack: (config) => {
     config.experiments = {
       ...config.experiments,
