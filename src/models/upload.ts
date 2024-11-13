@@ -1,35 +1,14 @@
 import mongoose from "mongoose";
 
-const uploadSchema = new mongoose.Schema(
-  {
-    projectId: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "Project",
-      required: true,
-    },
-    userId: {
-      type: String,
-      required: true,
-    },
-    filename: {
-      type: String,
-      required: true,
-    },
-    status: {
-      type: String,
-      enum: ["Processing", "Completed", "Failed"],
-      default: "Processing",
-    },
-    elementCount: {
-      type: Number,
-      default: 0,
-    },
-    error: String,
-  },
-  {
-    timestamps: true,
-  }
-);
+const uploadSchema = new mongoose.Schema({
+  filename: String,
+  status: String,
+  elementCount: Number,
+  materialCount: Number,
+  error: String,
+  createdAt: { type: Date, default: Date.now },
+  updatedAt: { type: Date, default: Date.now },
+});
 
 export const Upload =
   mongoose.models.Upload || mongoose.model("Upload", uploadSchema);

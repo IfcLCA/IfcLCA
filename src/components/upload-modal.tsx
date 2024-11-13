@@ -31,6 +31,7 @@ export function UploadModal({
   const [uploadResult, setUploadResult] = useState<{
     count: number;
     show: boolean;
+    elementsWithoutMaterials?: number;
   } | null>(null);
   const { toast } = useToast();
 
@@ -46,10 +47,24 @@ export function UploadModal({
       try {
         setIsUploading(true);
         const file = acceptedFiles[0];
-        const result = await parseIFCFile(file, projectId);
+        const results = await parseIFCFile(file, projectId);
+
+        toast({
+          title: "Upload Successful",
+          description: `Successfully processed ${
+            results.elementCount
+          } elements (${
+            results.summary?.elementsWithoutMaterials?.length || 0
+          } without materials)`,
+        });
 
         // Set upload result instead of showing toast
-        setUploadResult({ count: result.elementCount || 0, show: true });
+        setUploadResult({
+          count: results.elementCount || 0,
+          show: true,
+          elementsWithoutMaterials:
+            results.summary?.elementsWithoutMaterials?.length || 0,
+        });
 
         // Hide the success message after 5 seconds and close modal
         setTimeout(() => {
@@ -97,7 +112,8 @@ export function UploadModal({
               <h3 className="font-semibold text-lg">Upload Successful</h3>
               <p className="text-muted-foreground">
                 Successfully processed {uploadResult.count.toLocaleString()}{" "}
-                building elements
+                elements ({uploadResult.elementsWithoutMaterials} without
+                materials)
               </p>
             </div>
           </div>

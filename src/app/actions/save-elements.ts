@@ -35,7 +35,7 @@ const inputSchema = z.object({
 
 export async function saveElements(
   projectId: string,
-  data: { elements: any[]; uploadId: string }
+  data: { elements: any[]; uploadId: string; materialCount: number }
 ) {
   try {
     // Validate input data first
@@ -53,6 +53,9 @@ export async function saveElements(
 
     const projectObjectId = new mongoose.Types.ObjectId(projectId);
     const uploadObjectId = new mongoose.Types.ObjectId(data.uploadId);
+
+    // Store total element count from the original parse
+    const totalElementCount = data.elements.length;
 
     let savedCount = 0;
     let errors = [];
@@ -97,7 +100,8 @@ export async function saveElements(
           },
         }));
 
-        const result = await Element.bulkWrite(operations, { ordered: false });
+        // Execute bulk operation
+        const result = await Element.bulkWrite(operations);
         savedCount += result.upsertedCount + result.modifiedCount;
       } catch (batchError) {
         console.error("Batch processing error:", batchError);
@@ -108,21 +112,17 @@ export async function saveElements(
       }
     }
 
-    // Update upload status
+    // Update upload status with both counts
     await Upload.findByIdAndUpdate(uploadObjectId, {
-      status: errors.length > 0 ? "Completed with errors" : "Completed",
-      elementCount: savedCount,
-      errors: errors.length > 0 ? errors : undefined,
+      status: "Completed",
+      elementCount: totalElementCount,
+      materialCount: data.materialCount,
     });
 
     return {
       success: true,
-      savedCount,
-      errorCount: errors.length,
-      errors: errors.length > 0 ? errors : undefined,
-      message: `Processed ${savedCount} elements${
-        errors.length > 0 ? ` with ${errors.length} errors` : ""
-      }`,
+      elementCount: totalElementCount,
+      materialCount: data.materialCount,
     };
   } catch (error) {
     console.error("Fatal error in saveElements:", error);
@@ -151,14 +151,14 @@ async function processMaterials(
   const elementVolume =
     element.netVolume === "Unknown" ? 0 : Number(element.netVolume) || 0;
 
+  // Process material layers if available
   if (element.materialLayers?.layers) {
     for (const layer of element.materialLayers.layers) {
       if (layer.materialName) {
         try {
-          const layerThickness = Number(layer.thickness) || 0;
+          const layerThickness = Number(layer.thickness) || 1; // Use 1 for direct assignments
           const volume = elementVolume * layerThickness;
 
-          // Use a single atomic operation with upsert
           const savedMaterial = await Material.findOneAndUpdate(
             {
               name: layer.materialName,
@@ -195,6 +195,53 @@ async function processMaterials(
             projectId: projectObjectId.toString(),
           });
         }
+      }
+    }
+  }
+  // If no layers but direct materials exist, process them
+  else if (element.materials && element.materials.length > 0) {
+    const materialCount = element.materials.length;
+    const volumePerMaterial = elementVolume / materialCount;
+
+    for (const materialRef of element.materials) {
+      try {
+        const materialName =
+          this._getEntityName({ ref: materialRef }) || "Unknown";
+        const savedMaterial = await Material.findOneAndUpdate(
+          {
+            name: materialName,
+            projectId: projectObjectId,
+          },
+          {
+            $setOnInsert: {
+              name: materialName,
+              projectId: projectObjectId,
+            },
+            $set: {
+              category: "Direct Assignment",
+              volume: Math.max(0, volumePerMaterial),
+            },
+          },
+          {
+            upsert: true,
+            new: true,
+            runValidators: true,
+          }
+        );
+
+        if (savedMaterial) {
+          processedMaterials.push({
+            material: savedMaterial._id,
+            volume: Math.max(0, volumePerMaterial),
+            fraction: 1 / materialCount,
+          });
+        }
+      } catch (materialError) {
+        console.error("Direct material processing error:", {
+          materialRef,
+          error: materialError.message,
+          projectId: projectObjectId.toString(),
+        });
       }
     }
   }

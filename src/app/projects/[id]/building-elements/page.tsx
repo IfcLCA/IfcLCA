@@ -35,6 +35,7 @@ export default function BuildingElementsPage({
 }) {
   const [elements, setElements] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
   const router = useRouter();
 
   // Move fetchElements outside useEffect
@@ -67,12 +68,18 @@ export default function BuildingElementsPage({
     <div className="space-y-4">
       <div className="flex justify-between items-center">
         <h1 className="text-2xl font-bold">Building Elements</h1>
-        <UploadModal
-          projectId={params.id}
-          onUploadComplete={handleUploadComplete}
-        />
+        <Button onClick={() => setIsUploadModalOpen(true)}>
+          <Plus className="mr-2 h-4 w-4" /> Upload IFC
+        </Button>
       </div>
       <DataTable columns={columns} data={elements} isLoading={isLoading} />
+
+      <UploadModal
+        projectId={params.id}
+        open={isUploadModalOpen}
+        onOpenChange={setIsUploadModalOpen}
+        onUploadComplete={handleUploadComplete}
+      />
     </div>
   );
 }

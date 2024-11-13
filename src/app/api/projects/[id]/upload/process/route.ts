@@ -66,6 +66,9 @@ export async function POST(
     const parser = new IFCParser();
     const elements = parser.parseContent(content);
 
+    // Store total element count before any filtering
+    const totalElementCount = elements.length;
+
     console.log("Processing elements:", JSON.stringify(elements, null, 2));
 
     // Process materials from layers
@@ -194,12 +197,12 @@ export async function POST(
     // Update upload status
     await Upload.findByIdAndUpdate(uploadId, {
       status: "Completed",
-      elementCount: savedElements.length,
+      elementCount: totalElementCount,
     });
 
     return NextResponse.json({
       success: true,
-      elementCount: savedElements.length,
+      elementCount: totalElementCount,
       materialCount: savedMaterials.length,
     });
   } catch (error) {
