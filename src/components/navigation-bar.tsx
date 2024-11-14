@@ -33,6 +33,7 @@ import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import Image from "next/image";
 import { cn } from "@/lib/utils";
 import { HelpDialog } from "@/components/help-dialog";
+import { Badge } from "@/components/ui/badge";
 
 interface Project {
   id: string;
@@ -224,7 +225,7 @@ export function NavigationBar({ currentProject, notifications }: NavBarProps) {
     <nav className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
       <div className="flex h-14 items-center px-4 md:px-6">
         <div className="mr-4 hidden md:flex">
-          <Link className="mr-6 flex items-center space-x-2" href="/">
+          <Link className="mr-16 flex items-center space-x-2" href="/">
             <div className="overflow-hidden">
               <Image
                 src="/logo.png"
@@ -234,7 +235,17 @@ export function NavigationBar({ currentProject, notifications }: NavBarProps) {
                 className="h-8 w-8 rounded-lg"
               />
             </div>
-            <span className="hidden font-bold sm:inline-block">IfcLCA</span>
+            <div className="flex items-center gap-2">
+              <span className="hidden font-bold sm:inline-block relative">
+                IfcLCA
+                <Badge
+                  variant="secondary"
+                  className="absolute -top-2 -right-12 text-[10px] px-1 py-0 h-4"
+                >
+                  BETA
+                </Badge>
+              </span>
+            </div>
           </Link>
           <NavigationMenu>
             <NavigationMenuList>
