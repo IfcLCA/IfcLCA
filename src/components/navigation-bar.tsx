@@ -1,6 +1,11 @@
 "use client";
 
 import * as React from "react";
+import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
+import { useDebounce } from "@/hooks/use-debounce";
+import { Card, CardContent } from "@/components/ui/card";
+import { Loader2 } from "lucide-react";
 import {
   Bell,
   HelpCircle,
@@ -26,6 +31,8 @@ import {
 } from "@/components/ui/navigation-menu";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import Image from "next/image";
+import { cn } from "@/lib/utils";
+import { HelpDialog } from "@/components/help-dialog";
 
 interface Project {
   id: string;
@@ -44,9 +51,174 @@ interface NavBarProps {
   notifications: Notification[];
 }
 
+interface SearchResult {
+  _id: string;
+  name: string;
+  description?: string;
+}
+
+interface SearchResultsProps {
+  results: SearchResult[];
+  isExpanded: boolean;
+  selectedIndex: number;
+  onSelect: (result: SearchResult) => void;
+  onMouseEnter: (index: number) => void;
+  onShowMore: () => void;
+}
+
+function SearchResults({
+  results,
+  isExpanded,
+  selectedIndex,
+  onSelect,
+  onMouseEnter,
+  onShowMore,
+}: SearchResultsProps) {
+  const displayResults = isExpanded ? results : results.slice(0, 5);
+  const hasMore = !isExpanded && results.length > 5;
+
+  return (
+    <div className="space-y-1">
+      {displayResults.map((result, index) => (
+        <Button
+          key={result._id}
+          variant="ghost"
+          className={cn(
+            "w-full justify-start text-left",
+            index === selectedIndex && "bg-accent"
+          )}
+          onClick={() => onSelect(result)}
+          onMouseEnter={() => onMouseEnter(index)}
+        >
+          <div>
+            <div className="font-medium">{result.name}</div>
+            {result.description && (
+              <div className="text-xs text-muted-foreground line-clamp-1">
+                {result.description}
+              </div>
+            )}
+          </div>
+        </Button>
+      ))}
+      {hasMore && (
+        <Button
+          variant="ghost"
+          className="w-full justify-center text-sm text-muted-foreground hover:text-foreground"
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            onShowMore();
+          }}
+          onMouseDown={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+          }}
+        >
+          Show all {results.length} results
+        </Button>
+      )}
+    </div>
+  );
+}
+
 export function NavigationBar({ currentProject, notifications }: NavBarProps) {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = React.useState(false);
   const pathname = usePathname();
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
+  const [isSearching, setIsSearching] = useState(false);
+  const debouncedSearch = useDebounce(searchQuery, 300);
+  const router = useRouter();
+  const [selectedIndex, setSelectedIndex] = useState(-1);
+  const [isFocused, setIsFocused] = useState(false);
+  const [isExpanded, setIsExpanded] = useState(false);
+
+  useEffect(() => {
+    const searchProjects = async () => {
+      if (isFocused && !debouncedSearch) {
+        setIsSearching(true);
+        try {
+          const response = await fetch("/api/projects/search?all=true");
+          const data = await response.json();
+          setSearchResults(data);
+        } catch (error) {
+          console.error("Failed to fetch projects:", error);
+        } finally {
+          setIsSearching(false);
+        }
+        return;
+      }
+
+      if (!debouncedSearch) {
+        setSearchResults([]);
+        return;
+      }
+
+      setIsSearching(true);
+      try {
+        const response = await fetch(
+          `/api/projects/search?q=${debouncedSearch}`
+        );
+        const data = await response.json();
+        setSearchResults(data);
+      } catch (error) {
+        console.error("Failed to search projects:", error);
+      } finally {
+        setIsSearching(false);
+      }
+    };
+
+    searchProjects();
+  }, [debouncedSearch, isFocused]);
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (!searchResults.length) return;
+
+    switch (e.key) {
+      case "ArrowDown":
+        e.preventDefault();
+        setSelectedIndex((prev) =>
+          prev < searchResults.length - 1 ? prev + 1 : prev
+        );
+        break;
+      case "ArrowUp":
+        e.preventDefault();
+        setSelectedIndex((prev) => (prev > 0 ? prev - 1 : -1));
+        break;
+      case "Enter":
+        e.preventDefault();
+        if (selectedIndex >= 0) {
+          const selected = searchResults[selectedIndex];
+          router.push(`/projects/${selected._id}`);
+          setSearchQuery("");
+          setSearchResults([]);
+          setSelectedIndex(-1);
+        }
+        break;
+      case "Escape":
+        setSearchQuery("");
+        setSearchResults([]);
+        setSelectedIndex(-1);
+        break;
+    }
+  };
+
+  useEffect(() => {
+    setSelectedIndex(-1);
+  }, [searchResults]);
+
+  const handleSelect = (result: SearchResult) => {
+    router.push(`/projects/${result._id}`);
+    setSearchQuery("");
+    setSearchResults([]);
+    setSelectedIndex(-1);
+    setIsExpanded(false);
+  };
+
+  const handleShowMore = (e?: React.MouseEvent) => {
+    e?.preventDefault();
+    setIsExpanded(true);
+  };
 
   return (
     <nav className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
@@ -298,18 +470,52 @@ export function NavigationBar({ currentProject, notifications }: NavBarProps) {
         </Sheet>
 
         <div className="flex flex-1 items-center justify-between space-x-2 md:justify-end">
-          <div className="w-full flex-1 md:w-auto md:flex-none">
+          <div className="relative w-full flex-1 md:w-auto md:flex-none">
             <Input
               className="hidden md:flex"
               placeholder="Search projects..."
               type="search"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              onKeyDown={handleKeyDown}
+              onFocus={() => setIsFocused(true)}
+              onBlur={(e) => {
+                const isShowMoreButton = (
+                  e.relatedTarget as HTMLElement
+                )?.classList.contains("show-more-button");
+                if (!isShowMoreButton) {
+                  setTimeout(() => {
+                    setIsFocused(false);
+                    setSelectedIndex(-1);
+                  }, 200);
+                }
+              }}
             />
+
+            {(searchResults.length > 0 || isSearching) &&
+              (isFocused || searchQuery) && (
+                <Card className="absolute top-full mt-2 w-full z-50">
+                  <CardContent className="p-2">
+                    {isSearching ? (
+                      <div className="flex items-center justify-center p-4">
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      </div>
+                    ) : (
+                      <SearchResults
+                        results={searchResults}
+                        isExpanded={isExpanded}
+                        selectedIndex={selectedIndex}
+                        onSelect={handleSelect}
+                        onMouseEnter={setSelectedIndex}
+                        onShowMore={handleShowMore}
+                      />
+                    )}
+                  </CardContent>
+                </Card>
+              )}
           </div>
           <nav className="flex items-center space-x-2">
-            <Button variant="ghost" size="icon" className="h-8 w-8">
-              <HelpCircle className="h-4 w-4" />
-              <span className="sr-only">Help</span>
-            </Button>
+            <HelpDialog />
 
             <SignedIn>
               <UserButton
