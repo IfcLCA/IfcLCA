@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Activity, ArrowDown, ArrowUp } from "lucide-react";
+import { Activity, ArrowDown, ArrowUp, Construction } from "lucide-react";
 import {
   Select,
   SelectContent,
@@ -95,23 +95,39 @@ export function EmissionsCard({ emissions }: { emissions?: EmissionsProps }) {
           <div className="flex flex-col space-y-2">
             <div className="flex items-baseline justify-between">
               <span className="text-3xl font-bold">{formattedValue}</span>
-              <div
-                className={cn(
-                  "flex items-center text-sm",
-                  percentChange > 0 ? "text-red-500" : "text-green-500"
-                )}
-              >
-                {percentChange > 0 ? (
-                  <ArrowUp className="h-4 w-4 mr-1" />
-                ) : (
-                  <ArrowDown className="h-4 w-4 mr-1" />
-                )}
-                {Math.abs(percentChange)}%
+              <div className="relative group">
+                <div className="blur-[1px] opacity-40">
+                  <div
+                    className={cn(
+                      "flex items-center text-sm",
+                      percentChange > 0 ? "text-red-500" : "text-green-500"
+                    )}
+                  >
+                    {percentChange > 0 ? (
+                      <ArrowUp className="h-4 w-4 mr-1" />
+                    ) : (
+                      <ArrowDown className="h-4 w-4 mr-1" />
+                    )}
+                    {Math.abs(percentChange)}%
+                  </div>
+                </div>
+                <div className="absolute inset-0 flex items-center justify-end pr-1">
+                  <div className="bg-black/5 dark:bg-white/5 backdrop-blur-sm border border-black/10 dark:border-white/10 px-2.5 py-1 text-xs rounded-full flex items-center gap-1.5">
+                    <span className="relative flex h-1.5 w-1.5">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
+                      <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-blue-500"></span>
+                    </span>
+                    <span className="text-muted-foreground">Coming Soon</span>
+                  </div>
+                </div>
+                <div className="absolute invisible group-hover:visible bg-popover text-popover-foreground px-2 py-1 text-xs rounded-md shadow-lg -top-8 right-0 whitespace-nowrap">
+                  Historical data coming soon
+                </div>
               </div>
             </div>
             <div className="flex justify-between text-sm text-muted-foreground">
               <span>{metrics[metric].unit}</span>
-              <span>vs. last month</span>
+              <span className="opacity-40">vs. last month</span>
             </div>
           </div>
           <p className="text-sm text-muted-foreground">

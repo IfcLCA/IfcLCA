@@ -330,7 +330,8 @@ export function NavigationBar({ currentProject, notifications }: NavBarProps) {
                             <FileText className="h-3 w-3" />
                           </div>
                           <p className="line-clamp-2 text-sm leading-snug text-muted-foreground text-left">
-                            Add an IFC model to an existing project
+                            Add construction elements from IFC to an existing
+                            project
                           </p>
                         </button>
                       </NavigationMenuLink>
