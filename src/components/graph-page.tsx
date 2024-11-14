@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -37,54 +37,76 @@ import {
   LineChart,
 } from "recharts";
 
-// Mock data for demonstration purposes
-const projectsData = [
-  { id: 1, name: "Project A" },
-  { id: 2, name: "Project B" },
-  { id: 3, name: "Project C" },
-];
+interface MaterialData {
+  id: string;
+  name: string;
+  category?: string;
+  volume: number;
+  gwp: number;
+  ubp: number;
+  penre: number;
+}
 
-const indicatorsData = [
-  { id: "gwp", name: "Global Warming Potential" },
-  { id: "odp", name: "Ozone Depletion Potential" },
-  { id: "ap", name: "Acidification Potential" },
-  { id: "ep", name: "Eutrophication Potential" },
-];
-
-const materialsData = [
-  { id: "concrete", name: "Concrete" },
-  { id: "steel", name: "Steel" },
-  { id: "wood", name: "Wood" },
-  { id: "glass", name: "Glass" },
-];
-
-const mockChartData = [
-  { name: "Concrete", "Project A": 400, "Project B": 300, "Project C": 200 },
-  { name: "Steel", "Project A": 300, "Project B": 400, "Project C": 300 },
-  { name: "Wood", "Project A": 200, "Project B": 100, "Project C": 400 },
-  { name: "Glass", "Project A": 100, "Project B": 200, "Project C": 100 },
-];
-
-export function GraphPageComponent() {
-  const [selectedProjects, setSelectedProjects] = useState<string[]>([
-    "Project A",
-  ]);
+export function GraphPageComponent({
+  materialsData,
+}: {
+  materialsData: MaterialData[];
+}) {
   const [selectedIndicator, setSelectedIndicator] = useState<string>("gwp");
-  const [selectedMaterials, setSelectedMaterials] = useState<string[]>([
-    "concrete",
-    "steel",
-    "wood",
-    "glass",
-  ]);
+  const [selectedMaterials, setSelectedMaterials] = useState<string[]>([]);
   const [chartType, setChartType] = useState<"bar" | "line">("bar");
+  const [chartData, setChartData] = useState<any[]>([]);
 
-  const handleProjectToggle = (projectName: string) => {
-    setSelectedProjects((prev) =>
-      prev.includes(projectName)
-        ? prev.filter((p) => p !== projectName)
-        : [...prev, projectName]
+  // Memoize the unique materials to prevent unnecessary recalculations
+  const uniqueMaterials = useMemo(() => {
+    if (!materialsData?.length) return new Map<string, MaterialData>();
+
+    const materials = new Map<string, MaterialData>();
+    materialsData.forEach((material) => {
+      if (!materials.has(material.name)) {
+        materials.set(material.name, material);
+      } else {
+        const existing = materials.get(material.name)!;
+        materials.set(material.name, {
+          ...material,
+          volume: (existing.volume || 0) + (material.volume || 0),
+          gwp: (existing.gwp || 0) + (material.gwp || 0),
+          ubp: (existing.ubp || 0) + (material.ubp || 0),
+          penre: (existing.penre || 0) + (material.penre || 0),
+        });
+      }
+    });
+    return materials;
+  }, [materialsData]);
+
+  // Update selected materials when data changes
+  useEffect(() => {
+    if (uniqueMaterials.size > 0) {
+      setSelectedMaterials(Array.from(uniqueMaterials.keys()));
+    }
+  }, [uniqueMaterials]);
+
+  // Memoize chart data to prevent unnecessary updates
+  useEffect(() => {
+    const newChartData = Array.from(uniqueMaterials.values())
+      .filter((material) => selectedMaterials.includes(material.name))
+      .map((material) => ({
+        name: material.name,
+        value: material[selectedIndicator as keyof typeof material] || 0,
+        volume: material.volume || 0,
+      }))
+      .sort((a, b) => b.value - a.value);
+
+    setChartData(newChartData);
+  }, [uniqueMaterials, selectedIndicator, selectedMaterials]);
+
+  if (!materialsData?.length) {
+    return (
+      <div className="flex items-center justify-center h-[400px]">
+        <p className="text-muted-foreground">No materials data available.</p>
+      </div>
     );
-  };
+  }
 
   const handleMaterialToggle = (materialId: string) => {
     setSelectedMaterials((prev) =>
@@ -94,37 +116,31 @@ export function GraphPageComponent() {
     );
   };
 
-  const filteredChartData = mockChartData.filter((item) =>
-    selectedMaterials.includes(item.name.toLowerCase())
-  );
+  const formatValue = (value: number) => {
+    if (value >= 1000000) {
+      return `${(value / 1000000).toFixed(2)}M`;
+    } else if (value >= 1000) {
+      return `${(value / 1000).toFixed(2)}k`;
+    }
+    return value.toFixed(2);
+  };
+
+  const getIndicatorUnit = (indicator: string) => {
+    switch (indicator) {
+      case 'gwp':
+        return 'kg CO₂ eq';
+      case 'ubp':
+        return 'UBP';
+      case 'penre':
+        return 'MJ';
+      default:
+        return '';
+    }
+  };
 
   return (
     <div className="container mx-auto p-4">
-      <h1 className="text-3xl font-bold mb-6">Environmental Impact Analysis</h1>
-
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
-        <Card>
-          <CardHeader>
-            <CardTitle>Projects</CardTitle>
-            <CardDescription>Select projects to compare</CardDescription>
-          </CardHeader>
-          <CardContent>
-            {projectsData.map((project) => (
-              <div
-                key={project.id}
-                className="flex items-center space-x-2 mb-2"
-              >
-                <Checkbox
-                  id={`project-${project.id}`}
-                  checked={selectedProjects.includes(project.name)}
-                  onCheckedChange={() => handleProjectToggle(project.name)}
-                />
-                <Label htmlFor={`project-${project.id}`}>{project.name}</Label>
-              </div>
-            ))}
-          </CardContent>
-        </Card>
-
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
         <Card>
           <CardHeader>
             <CardTitle>Environmental Indicator</CardTitle>
@@ -139,11 +155,9 @@ export function GraphPageComponent() {
                 <SelectValue placeholder="Select an indicator" />
               </SelectTrigger>
               <SelectContent>
-                {indicatorsData.map((indicator) => (
-                  <SelectItem key={indicator.id} value={indicator.id}>
-                    {indicator.name}
-                  </SelectItem>
-                ))}
+                <SelectItem value="gwp">Global Warming Potential (GWP)</SelectItem>
+                <SelectItem value="ubp">Environmental Impact Points (UBP)</SelectItem>
+                <SelectItem value="penre">Non-renewable Primary Energy (PENRE)</SelectItem>
               </SelectContent>
             </Select>
           </CardContent>
@@ -154,19 +168,29 @@ export function GraphPageComponent() {
             <CardTitle>Materials</CardTitle>
             <CardDescription>Select materials to include</CardDescription>
           </CardHeader>
-          <CardContent>
-            {materialsData.map((material) => (
+          <CardContent className="max-h-[300px] overflow-y-auto">
+            {Array.from(uniqueMaterials.values()).map((material) => (
               <div
-                key={material.id}
+                key={material.name}
                 className="flex items-center space-x-2 mb-2"
               >
                 <Checkbox
-                  id={`material-${material.id}`}
-                  checked={selectedMaterials.includes(material.id)}
-                  onCheckedChange={() => handleMaterialToggle(material.id)}
+                  id={`material-${material.name}`}
+                  checked={selectedMaterials.includes(material.name)}
+                  onCheckedChange={() => handleMaterialToggle(material.name)}
                 />
-                <Label htmlFor={`material-${material.id}`}>
+                <Label htmlFor={`material-${material.name}`} className="flex-1">
                   {material.name}
+                  {material.volume > 0 && (
+                    <span className="ml-2 text-muted-foreground">
+                      ({material.volume.toFixed(2)} m³)
+                    </span>
+                  )}
+                  {material.category && (
+                    <span className="ml-2 text-xs text-muted-foreground">
+                      {material.category}
+                    </span>
+                  )}
                 </Label>
               </div>
             ))}
@@ -189,67 +213,83 @@ export function GraphPageComponent() {
             </Tabs>
           </div>
           <CardDescription>
-            Comparing {selectedIndicator.toUpperCase()} across selected projects
-            and materials
+            Comparing {selectedIndicator.toUpperCase()} ({getIndicatorUnit(selectedIndicator)}) across materials
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <ChartContainer
-            config={{
-              "Project A": {
-                label: "Project A",
-                color: "hsl(var(--chart-1))",
-              },
-              "Project B": {
-                label: "Project B",
-                color: "hsl(var(--chart-2))",
-              },
-              "Project C": {
-                label: "Project C",
-                color: "hsl(var(--chart-3))",
-              },
-            }}
-            className="h-[400px]"
-          >
+          <div className="h-[400px]">
             <ResponsiveContainer width="100%" height="100%">
               {chartType === "bar" ? (
-                <BarChart data={filteredChartData}>
+                <BarChart data={chartData} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
                   <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="name" />
-                  <YAxis />
-                  <ChartTooltip content={<ChartTooltipContent />} />
-                  <Legend />
-                  {selectedProjects.map((project, index) => (
-                    <Bar
-                      key={project}
-                      dataKey={project}
-                      fill={`var(--color-${project
-                        .replace(" ", "-")
-                        .toLowerCase()})`}
-                    />
-                  ))}
+                  <XAxis
+                    dataKey="name"
+                    angle={-45}
+                    textAnchor="end"
+                    height={100}
+                    interval={0}
+                  />
+                  <YAxis
+                    tickFormatter={formatValue}
+                    label={{ value: getIndicatorUnit(selectedIndicator), angle: -90, position: 'insideLeft' }}
+                  />
+                  <Tooltip
+                    content={({ active, payload }) => {
+                      if (active && payload && payload.length) {
+                        const data = payload[0].payload;
+                        return (
+                          <div className="rounded-lg border bg-background p-2 shadow-sm">
+                            <p className="font-semibold">{data.name}</p>
+                            <p>{`${selectedIndicator.toUpperCase()}: ${formatValue(data.value)} ${getIndicatorUnit(selectedIndicator)}`}</p>
+                            <p>{`Volume: ${data.volume.toFixed(2)} m³`}</p>
+                          </div>
+                        );
+                      }
+                      return null;
+                    }}
+                  />
+                  <Bar dataKey="value" fill="hsl(var(--primary))" />
                 </BarChart>
               ) : (
-                <LineChart data={filteredChartData}>
+                <LineChart data={chartData} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
                   <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="name" />
-                  <YAxis />
-                  <ChartTooltip content={<ChartTooltipContent />} />
-                  <Legend />
-                  {selectedProjects.map((project, index) => (
-                    <Line
-                      key={project}
-                      type="monotone"
-                      dataKey={project}
-                      stroke={`var(--color-${project
-                        .replace(" ", "-")
-                        .toLowerCase()})`}
-                    />
-                  ))}
+                  <XAxis
+                    dataKey="name"
+                    angle={-45}
+                    textAnchor="end"
+                    height={100}
+                    interval={0}
+                  />
+                  <YAxis
+                    tickFormatter={formatValue}
+                    label={{ value: getIndicatorUnit(selectedIndicator), angle: -90, position: 'insideLeft' }}
+                  />
+                  <Tooltip
+                    content={({ active, payload }) => {
+                      if (active && payload && payload.length) {
+                        const data = payload[0].payload;
+                        return (
+                          <div className="rounded-lg border bg-background p-2 shadow-sm">
+                            <p className="font-semibold">{data.name}</p>
+                            <p>{`${selectedIndicator.toUpperCase()}: ${formatValue(data.value)} ${getIndicatorUnit(selectedIndicator)}`}</p>
+                            <p>{`Volume: ${data.volume.toFixed(2)} m³`}</p>
+                          </div>
+                        );
+                      }
+                      return null;
+                    }}
+                  />
+                  <Line
+                    type="monotone"
+                    dataKey="value"
+                    stroke="hsl(var(--primary))"
+                    strokeWidth={2}
+                    dot={{ fill: "hsl(var(--primary))" }}
+                  />
                 </LineChart>
               )}
             </ResponsiveContainer>
-          </ChartContainer>
+          </div>
         </CardContent>
       </Card>
     </div>

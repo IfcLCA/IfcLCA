@@ -568,9 +568,7 @@ export function NavigationBar({ currentProject, notifications }: NavBarProps) {
             setSelectedProjectId(null);
             router.push(`/projects/${selectedProjectId}`);
           }}
-          onProgress={(progress: number) => {
-            console.log("Upload progress:", progress);
-          }}
+          onProgress={(progress: number) => {}}
         />
       )}
     </nav>

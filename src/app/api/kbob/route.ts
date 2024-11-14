@@ -9,7 +9,6 @@ export async function GET() {
     await connectToDatabase();
 
     const materials = await KBOBMaterial.findValidMaterials();
-    console.log(`KBOB Materials fetched: ${materials.length}`);
 
     return NextResponse.json(materials);
   } catch (error) {

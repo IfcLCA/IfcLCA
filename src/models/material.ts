@@ -8,6 +8,9 @@ interface IMaterial {
   volume: number;
   density?: number;
   kbobMatchId?: mongoose.Types.ObjectId;
+  gwp?: number;
+  ubp?: number;
+  penre?: number;
 }
 
 const materialSchema = new mongoose.Schema<IMaterial>(
@@ -32,6 +35,18 @@ const materialSchema = new mongoose.Schema<IMaterial>(
     kbobMatchId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "KBOBMaterial",
+    },
+    gwp: {
+      type: Number,
+      default: 0,
+    },
+    ubp: {
+      type: Number,
+      default: 0,
+    },
+    penre: {
+      type: Number,
+      default: 0,
     },
   },
   {

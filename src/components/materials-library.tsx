@@ -83,7 +83,6 @@ export function MaterialLibraryComponent() {
   const [isMatchingLoading, setIsMatchingLoading] = useState(false);
   const [isKbobOpen, setIsKbobOpen] = useState(false);
   const filteredKbobMaterials = useMemo(() => {
-    console.log("Filtering KBOB materials:", kbobMaterials);
     return kbobMaterials.filter((material) =>
       material.Name?.toLowerCase().includes(kbobSearchTerm.toLowerCase())
     );
@@ -100,7 +99,6 @@ export function MaterialLibraryComponent() {
           throw new Error(`HTTP error! status: ${response.status}`);
         }
         const data = await response.json();
-        console.log("Fetched materials:", data);
         setMaterials(data);
       } catch (error) {
         console.error("Failed to fetch materials:", error);
@@ -121,7 +119,6 @@ export function MaterialLibraryComponent() {
         const response = await fetch("/api/kbob");
         if (!response.ok) throw new Error("Failed to fetch KBOB materials");
         const data = await response.json();
-        console.log("Fetched KBOB materials:", data);
         setKbobMaterials(data);
       } catch (error) {
         console.error("Failed to fetch KBOB materials:", error);
@@ -142,8 +139,6 @@ export function MaterialLibraryComponent() {
   }, [materials]);
 
   const filteredAndSortedMaterials = useMemo(() => {
-    console.log("Filtering materials:", materials.length);
-
     // Create a Map to store unique materials by name
     const uniqueMaterialsMap = new Map();
 
@@ -188,7 +183,6 @@ export function MaterialLibraryComponent() {
   }, [materials, searchTerm, sortColumn, sortDirection, selectedProject]);
 
   const paginatedMaterials = useMemo(() => {
-    console.log("Paginating materials:", filteredAndSortedMaterials.length);
     const startIndex = (currentPage - 1) * itemsPerPage;
     return filteredAndSortedMaterials.slice(
       startIndex,

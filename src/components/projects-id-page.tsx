@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useRouter, useParams } from "next/navigation";
 import Image from "next/image";
 import { ReloadIcon } from "@radix-ui/react-icons";
@@ -74,7 +74,16 @@ interface ExtendedProject {
   updatedAt: Date;
   uploads: any[];
   elements: any[];
-  materials: any[];
+  materials: {
+    id: string;
+    name: string;
+    category?: string;
+    volume?: number;
+    fraction?: number;
+    gwp?: number;
+    ubp?: number;
+    penre?: number;
+  }[];
   _count: {
     uploads: number;
     elements: number;
@@ -144,6 +153,9 @@ export default function ProjectDetailsPage() {
       category: material.category,
       volume: material.volume || 0,
       fraction: material.fraction || 0,
+      gwp: material.gwp || 0,
+      ubp: material.ubp || 0,
+      penre: material.penre || 0,
     })),
     _count: {
       uploads: data.uploads?.length || 0,
@@ -386,7 +398,7 @@ const ProjectTabs = ({
     </TabsContent>
 
     <TabsContent value="graph" className="space-y-4">
-      <GraphTab />
+      <GraphTab project={project} />
     </TabsContent>
   </Tabs>
 );
@@ -603,19 +615,51 @@ const EmissionsTab = ({ project }: { project: ExtendedProject }) => {
   );
 };
 
-const GraphTab = () => (
-  <>
-    <div className="flex justify-between items-center mb-4">
-      <h2 className="text-2xl font-semibold">
-        Graph Analysis{" "}
-        <Badge variant="secondary" className="ml-2">
-          Beta
-        </Badge>
-      </h2>
+const GraphTab = ({ project }: { project: ExtendedProject }) => {
+  const materialsData = useMemo(() => {
+    const materialMap = new Map();
+
+    // Iterate through all elements and their materials
+    project.elements.forEach((element) => {
+      element.materials?.forEach((mat) => {
+        const materialId = mat.material;
+        const volume = mat.volume || 0;
+        const indicators = mat.indicators || { gwp: 0, ubp: 0, penre: 0 };
+
+        if (materialMap.has(materialId)) {
+          const existing = materialMap.get(materialId);
+          materialMap.set(materialId, {
+            ...existing,
+            volume: existing.volume + volume,
+            gwp: existing.gwp + (indicators.gwp || 0),
+            ubp: existing.ubp + (indicators.ubp || 0),
+            penre: existing.penre + (indicators.penre || 0),
+          });
+        } else {
+          // Find material details from project.materials
+          const materialDetails = project.materials.find((m) => m.id === materialId);
+          materialMap.set(materialId, {
+            id: materialId,
+            name: materialDetails?.name || "Unknown Material",
+            category: materialDetails?.category || undefined,
+            volume: volume,
+            gwp: indicators.gwp || 0,
+            ubp: indicators.ubp || 0,
+            penre: indicators.penre || 0,
+          });
+        }
+      });
+    });
+
+    return Array.from(materialMap.values());
+  }, [project]);
+
+  return (
+    <div className="space-y-4">
+      <GraphPageComponent materialsData={materialsData} />
     </div>
-    <GraphPageComponent />
-  </>
-);
+  );
+};
 
 const EmptyState = ({
   icon: Icon,

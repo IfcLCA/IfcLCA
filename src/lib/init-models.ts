@@ -26,8 +26,6 @@ export async function initializeIndexes() {
         { name: 1, projectId: 1 },
         { unique: true, background: true }
       );
-
-    console.log("Indexes initialized and verified");
   } catch (error) {
     console.error("Failed to initialize indexes:", error);
     throw error;

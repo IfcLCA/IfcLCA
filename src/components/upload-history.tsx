@@ -1,11 +1,16 @@
-"use client"
+"use client";
 
-import * as React from "react"
-import { format } from "date-fns"
-import { Calendar as CalendarIcon, ChevronDown, Grid, List } from "lucide-react"
+import * as React from "react";
+import { format } from "date-fns";
+import {
+  Calendar as CalendarIcon,
+  ChevronDown,
+  Grid,
+  List,
+} from "lucide-react";
 
-import { Button } from "@/components/ui/button"
-import { Calendar } from "@/components/ui/calendar"
+import { Button } from "@/components/ui/button";
+import { Calendar } from "@/components/ui/calendar";
 import {
   Card,
   CardContent,
@@ -13,67 +18,73 @@ import {
   CardFooter,
   CardHeader,
   CardTitle,
-} from "@/components/ui/card"
+} from "@/components/ui/card";
 import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
   DropdownMenuContent,
   DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
+} from "@/components/ui/dropdown-menu";
 import {
   Popover,
   PopoverContent,
   PopoverTrigger,
-} from "@/components/ui/popover"
+} from "@/components/ui/popover";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select"
-import { cn } from "@/lib/utils"
+} from "@/components/ui/select";
+import { cn } from "@/lib/utils";
 
 interface Upload {
-  id: string
-  filename: string
-  uploadDate: Date
-  status: "Processing" | "Completed" | "Failed"
-  elementCount: number
-  fileSize: string
-  version: number
+  id: string;
+  filename: string;
+  uploadDate: Date;
+  status: "Processing" | "Completed" | "Failed";
+  elementCount: number;
+  fileSize: string;
+  version: number;
 }
 
 interface UploadFilters {
-  dateRange: [Date | undefined, Date | undefined]
-  status: ("Processing" | "Completed" | "Failed")[]
+  dateRange: [Date | undefined, Date | undefined];
+  status: ("Processing" | "Completed" | "Failed")[];
 }
 
 interface UploadHistoryProps {
-  uploads: Upload[]
-  currentVersion: number
-  filters: UploadFilters
+  uploads: Upload[];
+  currentVersion: number;
+  filters: UploadFilters;
 }
 
-export function UploadHistory({ uploads, currentVersion, filters }: UploadHistoryProps) {
-  const [view, setView] = React.useState<"list" | "grid">("list")
-  const [dateRange, setDateRange] = React.useState<[Date | undefined, Date | undefined]>(filters.dateRange)
-  const [status, setStatus] = React.useState<("Processing" | "Completed" | "Failed")[]>(filters.status)
+export function UploadHistory({
+  uploads,
+  currentVersion,
+  filters,
+}: UploadHistoryProps) {
+  const [view, setView] = React.useState<"list" | "grid">("list");
+  const [dateRange, setDateRange] = React.useState<
+    [Date | undefined, Date | undefined]
+  >(filters.dateRange);
+  const [status, setStatus] = React.useState<
+    ("Processing" | "Completed" | "Failed")[]
+  >(filters.status);
 
-  const filteredUploads = uploads.filter(upload => {
-    const inDateRange = dateRange[0] && dateRange[1] ? 
-      upload.uploadDate >= dateRange[0] && upload.uploadDate <= dateRange[1] : true
-    const inStatus = status.length > 0 ? status.includes(upload.status) : true
-    return inDateRange && inStatus
-  })
+  const filteredUploads = uploads.filter((upload) => {
+    const inDateRange =
+      dateRange[0] && dateRange[1]
+        ? upload.uploadDate >= dateRange[0] && upload.uploadDate <= dateRange[1]
+        : true;
+    const inStatus = status.length > 0 ? status.includes(upload.status) : true;
+    return inDateRange && inStatus;
+  });
 
-  const handleCompare = (uploadId: string) => {
-    console.log(`Compare upload ${uploadId} with current version`)
-  }
+  const handleCompare = (uploadId: string) => {};
 
-  const handleRestore = (uploadId: string) => {
-    console.log(`Restore upload ${uploadId}`)
-  }
+  const handleRestore = (uploadId: string) => {};
 
   return (
     <div className="space-y-4">
@@ -145,9 +156,10 @@ export function UploadHistory({ uploads, currentVersion, filters }: UploadHistor
             <DropdownMenuCheckboxItem
               checked={status.includes("Processing")}
               onCheckedChange={(checked) =>
-                setStatus(checked
-                  ? [...status, "Processing"]
-                  : status.filter((s) => s !== "Processing")
+                setStatus(
+                  checked
+                    ? [...status, "Processing"]
+                    : status.filter((s) => s !== "Processing")
                 )
               }
             >
@@ -156,9 +168,10 @@ export function UploadHistory({ uploads, currentVersion, filters }: UploadHistor
             <DropdownMenuCheckboxItem
               checked={status.includes("Completed")}
               onCheckedChange={(checked) =>
-                setStatus(checked
-                  ? [...status, "Completed"]
-                  : status.filter((s) => s !== "Completed")
+                setStatus(
+                  checked
+                    ? [...status, "Completed"]
+                    : status.filter((s) => s !== "Completed")
                 )
               }
             >
@@ -167,9 +180,10 @@ export function UploadHistory({ uploads, currentVersion, filters }: UploadHistor
             <DropdownMenuCheckboxItem
               checked={status.includes("Failed")}
               onCheckedChange={(checked) =>
-                setStatus(checked
-                  ? [...status, "Failed"]
-                  : status.filter((s) => s !== "Failed")
+                setStatus(
+                  checked
+                    ? [...status, "Failed"]
+                    : status.filter((s) => s !== "Failed")
                 )
               }
             >
@@ -192,10 +206,12 @@ export function UploadHistory({ uploads, currentVersion, filters }: UploadHistor
         </Select>
       </div>
 
-      <div className={cn(
-        "grid gap-4",
-        view === "grid" ? "sm:grid-cols-2 lg:grid-cols-3" : "grid-cols-1"
-      )}>
+      <div
+        className={cn(
+          "grid gap-4",
+          view === "grid" ? "sm:grid-cols-2 lg:grid-cols-3" : "grid-cols-1"
+        )}
+      >
         {filteredUploads.map((upload) => (
           <Card key={upload.id}>
             <CardHeader>
@@ -217,12 +233,17 @@ export function UploadHistory({ uploads, currentVersion, filters }: UploadHistor
               </div>
             </CardContent>
             <CardFooter className="flex justify-between">
-              <Button variant="outline" onClick={() => handleCompare(upload.id)}>Compare</Button>
+              <Button
+                variant="outline"
+                onClick={() => handleCompare(upload.id)}
+              >
+                Compare
+              </Button>
               <Button onClick={() => handleRestore(upload.id)}>Restore</Button>
             </CardFooter>
           </Card>
         ))}
       </div>
     </div>
-  )
+  );
 }

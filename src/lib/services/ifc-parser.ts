@@ -46,7 +46,6 @@ export class IFCParser {
     this._collectMaterialLayers();
     this._processElements();
 
-    console.log("Parsed elements:", this.elements);
     return this.elements;
   }
 

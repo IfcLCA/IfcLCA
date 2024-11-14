@@ -46,7 +46,6 @@ export default function LandingPage() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    console.log("Login attempted with:", email, password);
   };
 
   const toggleDarkMode = () => {

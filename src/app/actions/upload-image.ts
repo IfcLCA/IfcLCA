@@ -11,8 +11,6 @@ export async function uploadProjectImage(
   formData: FormData
 ) {
   try {
-    console.log("Starting image upload for project:", projectId);
-
     const { userId } = await auth();
     if (!userId) throw new Error("Unauthorized");
 
@@ -21,14 +19,12 @@ export async function uploadProjectImage(
 
     // Generate unique filename
     const filename = `${projectId}-${Date.now()}-${file.name}`;
-    console.log("Generated filename:", filename);
 
     // Upload to Vercel Blob
     const blob = await put(filename, file, {
       access: "public",
       addRandomSuffix: false,
     });
-    console.log("Blob upload successful:", blob.url);
 
     // Update project in MongoDB
     await connectToDatabase();
@@ -37,7 +33,6 @@ export async function uploadProjectImage(
       { imageUrl: blob.url },
       { new: true }
     );
-    console.log("Project updated with image URL:", updatedProject);
 
     if (!updatedProject) {
       throw new Error("Failed to update project");

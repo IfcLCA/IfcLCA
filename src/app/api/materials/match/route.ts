@@ -63,12 +63,8 @@ export async function POST(request: Request) {
       })
       .lean();
 
-    console.log("Found elements to update:", elements.length);
-
     // Prepare bulk operations for updating elements
     const bulkOps = elements.map((element) => {
-      console.log("Processing element:", element._id);
-
       return {
         updateOne: {
           filter: { _id: element._id },
@@ -125,9 +121,7 @@ export async function POST(request: Request) {
 
     // Execute bulk operations if any
     if (bulkOps.length > 0) {
-      console.log("Executing bulk operations:", bulkOps.length);
       const result = await Element.bulkWrite(bulkOps);
-      console.log("Bulk write result:", result);
 
       // Verify the update
       const verifyElement = await Element.findById(elements[0]._id)
@@ -136,7 +130,6 @@ export async function POST(request: Request) {
           select: "_id kbobMatchId density",
         })
         .lean();
-      console.log("Verified element materials:", verifyElement?.materials);
     }
 
     // Fetch and return updated materials

@@ -69,8 +69,6 @@ export async function POST(
     // Store total element count before any filtering
     const totalElementCount = elements.length;
 
-    console.log("Processing elements:", JSON.stringify(elements, null, 2));
-
     // Process materials from layers
     const materialPromises = elements.flatMap((element: IFCElement) => {
       const layers = element.materialLayers?.layers;

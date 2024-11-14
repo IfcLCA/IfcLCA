@@ -27,16 +27,13 @@ export async function connectToDatabase() {
         socketTimeoutMS: 45000,
       };
 
-      console.log("Connecting to MongoDB...", MONGODB_URI.split("@")[1]);
       cached.promise = mongoose.connect(MONGODB_URI, opts);
     }
 
     cached.conn = await cached.promise;
-    console.log("Connected to MongoDB");
 
     return cached.conn;
   } catch (e) {
-    console.error("MongoDB connection error:", e);
     cached.promise = null;
     throw e;
   }
