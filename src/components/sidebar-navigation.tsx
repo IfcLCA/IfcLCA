@@ -15,7 +15,6 @@ import {
   LayoutDashboard,
   Library,
   Menu,
-  Settings,
   Upload,
   Box,
   X,
@@ -55,11 +54,6 @@ const primaryItems: SidebarItem[] = [
     icon: <FileStack className="h-4 w-4" />,
     href: "/reports",
   },
-  {
-    title: "Settings",
-    icon: <Settings className="h-4 w-4" />,
-    href: "/settings",
-  },
 ];
 
 const projectItems: SidebarItem[] = [
@@ -87,11 +81,6 @@ const projectItems: SidebarItem[] = [
     title: "Upload History",
     icon: <Upload className="h-4 w-4" />,
     href: "/project/:id/uploads",
-  },
-  {
-    title: "Project Settings",
-    icon: <Settings className="h-4 w-4" />,
-    href: "/project/:id/settings",
   },
 ];
 

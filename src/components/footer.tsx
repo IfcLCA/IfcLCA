@@ -62,9 +62,6 @@ export function Footer() {
             <Link href="/reports" className="hover:underline">
               Reports
             </Link>
-            <Link href="/settings" className="hover:underline">
-              Settings
-            </Link>
           </nav>
           <div className="flex items-center gap-2">
             <Input

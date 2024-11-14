@@ -274,7 +274,6 @@ export function Dashboard({
               <Upload className="mr-2 h-4 w-4" />
               Analyse IFC
             </Button>
-            <Button variant="outline">Generate Report</Button>
           </div>
         </div>
       </section>
