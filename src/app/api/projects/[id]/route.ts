@@ -12,23 +12,18 @@ export async function GET(
 ) {
   try {
     await connectToDatabase();
-
-    // Find project and populate uploads
     const project = await Project.findById(params.id).lean();
-    console.log("API - Found project:", project);
 
     if (!project) {
       return NextResponse.json({ error: "Project not found" }, { status: 404 });
     }
 
-    // Get related data
     const [uploads, elements, materials] = await Promise.all([
       mongoose.models.Upload.find({ projectId: project._id }).lean(),
       mongoose.models.Element.find({ projectId: project._id }).lean(),
       mongoose.models.Material.find({ projectId: project._id }).lean(),
     ]);
 
-    // Combine all data
     const projectData = {
       ...project,
       uploads: uploads || [],
@@ -36,10 +31,8 @@ export async function GET(
       materials: materials || [],
     };
 
-    console.log("API - Sending project data:", projectData);
     return NextResponse.json(projectData);
   } catch (error) {
-    console.error("API - Error fetching project:", error);
     return NextResponse.json(
       { error: "Failed to fetch project" },
       { status: 500 }

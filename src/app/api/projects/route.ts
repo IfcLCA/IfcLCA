@@ -46,6 +46,7 @@ export async function GET() {
             elements: elementsCount,
             materials: materialsCount,
           },
+          imageUrl: project.imageUrl,
         };
       })
     );

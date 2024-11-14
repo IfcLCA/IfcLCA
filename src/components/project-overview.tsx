@@ -10,6 +10,7 @@ import {
   Trash2,
   Pencil,
   Loader2,
+  Box,
 } from "lucide-react";
 import { Card, CardContent, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -42,6 +43,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { toast } from "@/hooks/use-toast";
 import { useRouter } from "next/navigation";
+import Image from "next/image";
 
 type ImpactMetric = "GWP" | "PENR" | "UBP";
 
@@ -50,6 +52,7 @@ type Project = {
   name: string;
   description: string | null;
   phase: string | null;
+  imageUrl?: string;
   createdAt: Date;
   updatedAt: Date;
   _count: {
@@ -83,7 +86,21 @@ export function ProjectOverview({
           throw new Error("Failed to fetch projects");
         }
         const data = await response.json();
-        setProjects(data);
+
+        const transformedProjects = data.map((project: any) => {
+          return {
+            ...project,
+            id: project.id || project._id,
+            imageUrl: project.imageUrl,
+            _count: {
+              elements: project._count?.elements || 0,
+              uploads: project._count?.uploads || 0,
+              materials: project._count?.materials || 0,
+            },
+          };
+        });
+
+        setProjects(transformedProjects);
       } catch (error) {
         const message =
           error instanceof Error ? error.message : "Failed to load projects";
@@ -203,102 +220,60 @@ export function ProjectOverview({
 
       {!isLoading && !error && projects.length > 0 && (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {currentProjects.map((project) => (
-            <Card
-              key={project.id}
-              className="group relative transition-all hover:shadow-lg border-2 border-muted overflow-hidden cursor-pointer"
-              tabIndex={0}
-              role="article"
-              aria-labelledby={`project-title-${project.id}`}
-              onClick={() => router.push(`/projects/${project.id}`)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" || e.key === " ") {
-                  e.preventDefault();
-                  router.push(`/projects/${project.id}`);
-                }
-              }}
-            >
-              <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-primary/10 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-              <Badge
-                variant="secondary"
-                className="absolute left-4 top-4 h-8 px-2 rounded-full flex items-center justify-center text-sm font-medium bg-primary text-primary-foreground"
+          {currentProjects.map((project) => {
+            return (
+              <Card
+                key={project.id}
+                className="group relative transition-all hover:shadow-lg border-2 border-muted overflow-hidden cursor-pointer"
+                onClick={() => router.push(`/projects/${project.id}`)}
               >
-                {project._count.uploads} uploads
-              </Badge>
-              <div
-                className="absolute right-4 top-4"
-                onClick={(e) => e.stopPropagation()}
-              >
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-8 w-8 text-muted-foreground hover:text-primary transition-colors duration-200"
-                    >
-                      <MoreVertical className="h-4 w-4" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent
-                    align="end"
-                    onClick={(e) => e.stopPropagation()}
-                  >
-                    <DropdownMenuItem
-                      onClick={() =>
-                        router.push(`/projects/${project.id}/edit`)
-                      }
-                    >
-                      <Pencil className="mr-2 h-4 w-4" />
-                      Edit
-                    </DropdownMenuItem>
-                    <DropdownMenuSeparator />
-                    <DropdownMenuItem
-                      onClick={(e) => {
-                        e.preventDefault();
-                        setDeleteProjectId(project.id);
-                      }}
-                      className="text-red-600"
-                    >
-                      <Trash2 className="mr-2 h-4 w-4" />
-                      Delete
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              </div>
-              <CardContent className="p-6 pt-12">
-                <h2
-                  id={`project-title-${project.id}`}
-                  className="text-xl font-semibold mb-2 text-primary"
-                >
-                  {project.name}
-                </h2>
-                <p className="text-muted-foreground mb-6 line-clamp-2">
-                  {project.description || "No description provided"}
-                </p>
-                <div className="space-y-2">
-                  <div className="text-sm text-muted-foreground flex items-center gap-2">
-                    <BarChart2 className="h-4 w-4" />
-                    Building Elements
-                  </div>
-                  <div className="font-mono text-lg text-primary">
-                    {project._count.elements} elements
-                  </div>
+                <div className="aspect-video relative bg-muted">
+                  {project.imageUrl ? (
+                    <>
+                      <Image
+                        src={project.imageUrl}
+                        alt={project.name}
+                        fill
+                        className="object-cover"
+                        sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+                        priority={false}
+                      />
+                    </>
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center">
+                      <Box className="h-12 w-12 text-muted-foreground/50" />
+                    </div>
+                  )}
                 </div>
-              </CardContent>
-              <CardFooter className="p-6 pt-0">
-                <Button
-                  asChild
-                  variant="ghost"
-                  className="w-full group-hover:bg-primary group-hover:text-primary-foreground transition-colors duration-300"
-                >
-                  <Link href={`/projects/${project.id}`} className="gap-2">
-                    View Details
-                    <ChevronRight className="h-4 w-4" />
-                  </Link>
-                </Button>
-              </CardFooter>
-            </Card>
-          ))}
+                <CardContent className="space-y-2 p-4">
+                  <h3 className="text-lg font-semibold leading-none tracking-tight">
+                    {project.name}
+                  </h3>
+                  {project.description && (
+                    <p className="text-sm text-muted-foreground line-clamp-2">
+                      {project.description}
+                    </p>
+                  )}
+                  <div className="flex gap-2 text-xs text-muted-foreground">
+                    <Badge
+                      variant="secondary"
+                      className="flex items-center gap-1"
+                    >
+                      <Box className="h-3 w-3" />
+                      {project._count.elements} elements
+                    </Badge>
+                    <Badge
+                      variant="secondary"
+                      className="flex items-center gap-1"
+                    >
+                      <Upload className="h-3 w-3" />
+                      {project._count.uploads} uploads
+                    </Badge>
+                  </div>
+                </CardContent>
+              </Card>
+            );
+          })}
         </div>
       )}
 
