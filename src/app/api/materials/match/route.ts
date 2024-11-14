@@ -53,96 +53,95 @@ export async function POST(request: Request) {
       }
     );
 
-    // Find elements that need updating
-    const elements = await Element.find({
+    // Find elements that need updating - add batch processing
+    const batchSize = 500;
+    const allElements = await Element.find({
       "materials.material": { $in: objectIds },
     })
       .populate({
         path: "materials.material",
-        select: "_id kbobMatchId density",
+        select: "_id name kbobMatchId density",
       })
       .lean();
 
-    // Prepare bulk operations for updating elements
-    const bulkOps = elements.map((element) => {
-      return {
-        updateOne: {
-          filter: { _id: element._id },
-          update: [
-            {
-              $set: {
-                materials: {
-                  $map: {
-                    input: "$materials",
-                    as: "mat",
-                    in: {
-                      $cond: {
-                        if: { $in: ["$$mat.material", objectIds] },
-                        then: {
-                          material: "$$mat.material",
-                          volume: "$$mat.volume",
-                          fraction: "$$mat.fraction",
-                          indicators: {
-                            gwp: {
-                              $multiply: [
-                                "$$mat.volume",
-                                density,
-                                kbobMaterial.GWP,
-                              ],
-                            },
-                            ubp: {
-                              $multiply: [
-                                "$$mat.volume",
-                                density,
-                                kbobMaterial.UBP,
-                              ],
-                            },
-                            penre: {
-                              $multiply: [
-                                "$$mat.volume",
-                                density,
-                                kbobMaterial.PENRE,
-                              ],
-                            },
-                          },
-                        },
-                        else: "$$mat",
-                      },
-                    },
-                  },
-                },
-                updatedAt: new Date(),
-              },
-            },
-          ],
-        },
-      };
-    });
-
-    // Execute bulk operations if any
-    if (bulkOps.length > 0) {
-      const result = await Element.bulkWrite(bulkOps);
-
-      // Verify the update
-      const verifyElement = await Element.findById(elements[0]._id)
-        .populate({
-          path: "materials.material",
-          select: "_id kbobMatchId density",
-        })
-        .lean();
+    // Process elements in batches
+    const batches = [];
+    for (let i = 0; i < allElements.length; i += batchSize) {
+      batches.push(allElements.slice(i, i + batchSize));
     }
 
-    // Fetch and return updated materials
-    const updatedMaterials = await Material.find({ _id: { $in: objectIds } })
-      .select("name category volume density kbobMatchId")
-      .populate("kbobMatchId")
-      .lean();
+    let totalModified = 0;
+    let totalMatched = 0;
 
-    return NextResponse.json({
-      success: true,
-      matchedCount: updatedMaterials.length,
-      materials: updatedMaterials,
-      updatedElements: bulkOps.length,
+    for (const elementBatch of batches) {
+      // Prepare bulk operations for updating elements
+      const bulkOps = elementBatch.map((element) => ({
+        updateOne: {
+          filter: { _id: element._id },
+          update: {
+            $set: {
+              materials: element.materials.map((mat: any) => {
+                if (materialIds.includes(mat.material._id.toString())) {
+                  return {
+                    _id: mat._id,
+                    material: mat.material._id,
+                    volume: mat.volume,
+                    fraction: mat.fraction,
+                    indicators: {
+                      gwp: mat.volume * density * kbobMaterial.GWP,
+                      ubp: mat.volume * density * kbobMaterial.UBP,
+                      penre: mat.volume * density * kbobMaterial.PENRE,
+                    }
+                  };
+                }
+                return mat;
+              }),
+              updatedAt: new Date()
+            }
+          }
+        }
+      }));
+
+      try {
+        const result = await Element.bulkWrite(bulkOps, { 
+          ordered: false,
+          writeConcern: { w: 1 }
+        });
+        
+        totalModified += result.modifiedCount;
+        totalMatched += result.matchedCount;
+        
+        console.log(`Batch processed: Modified ${result.modifiedCount} of ${bulkOps.length} elements`);
+      } catch (error) {
+        console.error("Error in batch:", error);
+        // Continue processing other batches
+      }
+    }
+
+    // Verify updates by sampling elements from different batches
+    const sampleSize = Math.min(5, allElements.length);
+    const sampleIndices = Array.from({length: sampleSize}, () => 
+      Math.floor(Math.random() * allElements.length)
+    );
+    
+    const sampledElements = await Element.find({
+      _id: { $in: sampleIndices.map(i => allElements[i]._id) }
+    }).lean();
+
+    console.log("Updated elements sample:", 
+      sampledElements.map(e => ({
+        _id: e._id,
+        materialsCount: e.materials.length,
+        hasIndicators: e.materials.every(m => m.indicators),
+        sampleIndicators: e.materials[0]?.indicators
+      }))
+    );
+
+    return NextResponse.json({ 
+      message: "Successfully updated materials and elements",
+      totalModified,
+      totalMatched,
+      totalElements: allElements.length
     });
   } catch (error) {
     console.error("Error matching materials:", error);

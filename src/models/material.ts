@@ -56,6 +56,25 @@ const materialSchema = new mongoose.Schema<IMaterial>(
 
 materialSchema.index({ name: 1, projectId: 1 }, { unique: true });
 
+materialSchema.post('save', async function(doc) {
+  if (this.isModified('kbobMatchId')) {
+    // Import here to avoid circular dependency
+    const { MaterialService } = require('@/lib/services/material-service');
+    await MaterialService.recalculateElementsForMaterials([doc._id]);
+  }
+});
+
+materialSchema.post('updateMany', async function(result) {
+  // For bulk updates, we need to get the updated documents
+  const updatedMaterials = await this.model.find(this.getQuery()).select('_id');
+  if (updatedMaterials.length > 0) {
+    const { MaterialService } = require('@/lib/services/material-service');
+    await MaterialService.recalculateElementsForMaterials(
+      updatedMaterials.map(m => m._id)
+    );
+  }
+});
+
 // Ensure model is registered only once
 const Material =
   (mongoose.models.Material as mongoose.Model<IMaterial>) ||
