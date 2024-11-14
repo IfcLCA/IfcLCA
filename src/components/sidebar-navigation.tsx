@@ -19,6 +19,7 @@ import {
   Box,
   X,
   PlusCircle,
+  Pin,
 } from "lucide-react";
 
 interface SidebarProps {
@@ -87,25 +88,47 @@ const projectItems: SidebarItem[] = [
 export function SidebarNavigation({
   currentPage,
   projectId,
-  collapsed,
+  collapsed: defaultCollapsed,
 }: SidebarProps) {
   const pathname = usePathname();
   const [isOpen, setIsOpen] = React.useState(false);
+  const [isPinned, setIsPinned] = React.useState(false);
+  const [isHovered, setIsHovered] = React.useState(false);
+  const [collapsed, setCollapsed] = React.useState(defaultCollapsed);
 
   const items = projectId ? [...primaryItems, ...projectItems] : primaryItems;
+
+  const isExpanded = isPinned || isHovered;
 
   const SidebarContent = ({ mobile = false }: { mobile?: boolean }) => (
     <div
       className={cn(
         "flex h-full flex-col gap-4",
-        collapsed && !mobile ? "items-center" : ""
+        !isExpanded && !mobile ? "items-center" : ""
       )}
+      onMouseEnter={() => !mobile && setIsHovered(true)}
+      onMouseLeave={() => !mobile && setIsHovered(false)}
     >
       <div className="flex h-[60px] items-center justify-between px-4">
-        {mobile && (
+        {mobile ? (
           <Button variant="ghost" size="icon" onClick={() => setIsOpen(false)}>
             <X className="h-4 w-4" />
             <span className="sr-only">Close</span>
+          </Button>
+        ) : (
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => setIsPinned(!isPinned)}
+            className={cn(
+              "opacity-0 transition-opacity",
+              isExpanded && "opacity-100"
+            )}
+          >
+            <Pin className={cn("h-4 w-4", isPinned && "fill-current")} />
+            <span className="sr-only">
+              {isPinned ? "Unpin Sidebar" : "Pin Sidebar"}
+            </span>
           </Button>
         )}
       </div>
@@ -113,7 +136,7 @@ export function SidebarNavigation({
         <div
           className={cn(
             "flex flex-col gap-4",
-            collapsed && !mobile ? "items-center" : "px-4"
+            !isExpanded && !mobile ? "items-center" : "px-4"
           )}
         >
           {items.map((item, index) => (
@@ -123,28 +146,28 @@ export function SidebarNavigation({
               className={cn(
                 "flex items-center rounded-lg px-3 py-2 text-sm font-medium hover:bg-accent",
                 pathname === item.href ? "bg-accent" : "transparent",
-                collapsed && !mobile ? "justify-center" : ""
+                !isExpanded && !mobile ? "justify-center w-10" : ""
               )}
               onClick={() => mobile && setIsOpen(false)}
             >
               {item.icon}
-              {(!collapsed || mobile) && (
+              {(isExpanded || mobile) && (
                 <span className="ml-3">{item.title}</span>
               )}
             </Link>
           ))}
         </div>
       </ScrollArea>
-      <div className={cn("p-4", collapsed && !mobile ? "w-full" : "")}>
+      <div className={cn("p-4", !isExpanded && !mobile ? "w-full" : "")}>
         <Link
           href="/projects/new"
           className={cn(
             "flex items-center justify-center rounded-lg bg-primary p-2 text-primary-foreground hover:bg-primary/90",
-            collapsed && !mobile ? "h-10 w-10" : "w-full"
+            !isExpanded && !mobile ? "h-10 w-10" : "w-full"
           )}
         >
           <PlusCircle className="h-5 w-5" />
-          {(!collapsed || mobile) && <span className="ml-2">New Project</span>}
+          {(isExpanded || mobile) && <span className="ml-2">New Project</span>}
         </Link>
       </div>
     </div>
@@ -154,8 +177,8 @@ export function SidebarNavigation({
     <>
       <aside
         className={cn(
-          "hidden border-r bg-background lg:block",
-          collapsed ? "w-[60px]" : "w-40"
+          "hidden border-r bg-background lg:block transition-all duration-300",
+          isExpanded ? "w-64" : "w-[60px]"
         )}
       >
         <SidebarContent />
