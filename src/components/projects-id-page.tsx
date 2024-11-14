@@ -317,14 +317,6 @@ const ProjectHeader = ({
 
 const ProjectOverview = ({ project }: { project: ExtendedProject }) => (
   <section className="space-y-4">
-    <div className="page-header">
-      <div>
-        <h1 className="page-title">{project.name}</h1>
-        <p className="page-description">
-          {project.description || "No description provided"}
-        </p>
-      </div>
-    </div>
     <DashboardCards
       elements={project._count.elements}
       uploads={project._count.uploads}
@@ -343,38 +335,13 @@ const ProjectTabs = ({
   onUpload: () => void;
   materialsWithCount: any[];
 }) => (
-  <Tabs defaultValue="uploads" className="space-y-6">
-    <TabsList className="bg-muted p-1 rounded-lg">
-      <TabsTrigger
-        value="uploads"
-        className="rounded-md px-4 py-2 data-[state=active]:bg-background data-[state=active]:shadow-sm transition-all"
-      >
-        Uploads
-      </TabsTrigger>
-      <TabsTrigger
-        value="elements"
-        className="rounded-md px-4 py-2 data-[state=active]:bg-background data-[state=active]:shadow-sm transition-all"
-      >
-        Elements
-      </TabsTrigger>
-      <TabsTrigger
-        value="materials"
-        className="rounded-md px-4 py-2 data-[state=active]:bg-background data-[state=active]:shadow-sm transition-all"
-      >
-        Materials
-      </TabsTrigger>
-      <TabsTrigger
-        value="emissions"
-        className="rounded-md px-4 py-2 data-[state=active]:bg-background data-[state=active]:shadow-sm transition-all"
-      >
-        Emissions
-      </TabsTrigger>
-      <TabsTrigger
-        value="graph"
-        className="rounded-md px-4 py-2 data-[state=active]:bg-background data-[state=active]:shadow-sm transition-all"
-      >
-        Charts
-      </TabsTrigger>
+  <Tabs defaultValue="uploads" className="w-full">
+    <TabsList className="grid w-full grid-cols-5">
+      <TabsTrigger value="uploads">Uploads</TabsTrigger>
+      <TabsTrigger value="elements">Elements</TabsTrigger>
+      <TabsTrigger value="materials">Materials</TabsTrigger>
+      <TabsTrigger value="emissions">Emissions</TabsTrigger>
+      <TabsTrigger value="graph">Charts</TabsTrigger>
     </TabsList>
 
     <TabsContent value="uploads" className="space-y-4">

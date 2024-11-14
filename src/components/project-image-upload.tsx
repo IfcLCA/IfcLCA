@@ -55,13 +55,13 @@ export function ProjectImageUpload({
   };
 
   return (
-    <Card>
+    <Card className="h-full flex flex-col">
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
         <CardTitle className="text-sm font-medium">Project Image</CardTitle>
         <ImageIcon className="h-4 w-4 text-muted-foreground" />
       </CardHeader>
-      <CardContent>
-        <div className="aspect-video flex flex-col items-center justify-center w-full border-2 border-dashed rounded-xl bg-muted/5 hover:bg-muted/10 transition-colors">
+      <CardContent className="flex-1 p-0">
+        <div className="h-full flex flex-col items-center justify-center w-full border-2 border-dashed rounded-xl bg-muted/5 hover:bg-muted/10 transition-colors">
           {currentImageUrl ? (
             <div className="relative w-full h-full">
               <Image

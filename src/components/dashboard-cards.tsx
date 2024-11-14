@@ -2,7 +2,7 @@
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { ImageIcon, BoxIcon, FileTextIcon, LayersIcon } from "lucide-react";
+import { ImageIcon, BoxIcon, FileTextIcon, LayersIcon, GaugeIcon } from "lucide-react";
 import { EmissionsCard } from "@/components/emissions-card";
 import { ProjectImageUpload } from "@/components/project-image-upload";
 
@@ -53,50 +53,65 @@ export function DashboardCards({
   );
 
   return (
-    <div className="grid grid-cols-12 gap-6">
-      <div className="col-span-4">
+    <div className="grid grid-cols-12 gap-4 h-full">
+      <div className="col-span-12 lg:col-span-5 h-full">
         <ProjectImageUpload
           projectId={project.id}
           imageUrl={project.imageUrl}
+          className="h-full"
         />
       </div>
 
-      <Card className="col-span-8">
-        <EmissionsCard emissions={totalEmissions} />
-      </Card>
+      <div className="col-span-12 lg:col-span-3 h-full">
+        <div className="grid grid-cols-1 gap-4 h-full">
+          <Card className="flex-1 group transition-colors duration-200 hover:border-primary/50">
+            <CardContent className="px-4 pt-2 pb-3 flex flex-col">
+              <div className="flex flex-row items-start justify-between mb-1">
+                <h3 className="text-sm font-medium group-hover:text-primary transition-colors">Elements</h3>
+                <BoxIcon className="h-6 w-6 text-foreground mt-1.5 group-hover:text-primary transition-colors" />
+              </div>
+              <div className="flex flex-col">
+                <p className="text-2xl font-bold leading-none mb-0.5 group-hover:text-primary transition-colors">{elements}</p>
+                <p className="text-xs text-muted-foreground group-hover:text-primary/70 transition-colors">Construction components</p>
+              </div>
+            </CardContent>
+          </Card>
 
-      <Card className="col-span-4 bg-gradient-to-br from-primary/5 to-primary/10">
-        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-sm font-medium">Total Elements</CardTitle>
-          <BoxIcon className="h-4 w-4 text-primary" />
-        </CardHeader>
-        <CardContent>
-          <p className="text-3xl font-bold">{elements}</p>
-          <p className="text-xs text-muted-foreground mt-1">
-            Construction components
-          </p>
-        </CardContent>
-      </Card>
+          <Card className="flex-1 group transition-colors duration-200 hover:border-primary/50">
+            <CardContent className="px-4 pt-2 pb-3 flex flex-col">
+              <div className="flex flex-row items-start justify-between mb-1">
+                <h3 className="text-sm font-medium group-hover:text-primary transition-colors">Uploads</h3>
+                <FileTextIcon className="h-6 w-6 text-foreground mt-1.5 group-hover:text-primary transition-colors" />
+              </div>
+              <div className="flex flex-col">
+                <p className="text-2xl font-bold leading-none mb-0.5 group-hover:text-primary transition-colors">{uploads}</p>
+                <p className="text-xs text-muted-foreground group-hover:text-primary/70 transition-colors">Files analysed</p>
+              </div>
+            </CardContent>
+          </Card>
 
-      <Card className="col-span-4 bg-gradient-to-br from-secondary/5 to-secondary/10">
-        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-sm font-medium">Uploads</CardTitle>
-          <FileTextIcon className="h-4 w-4 text-secondary" />
-        </CardHeader>
-        <CardContent>
-          <p className="text-3xl font-bold">{uploads}</p>
-          <p className="text-xs text-muted-foreground mt-1">Files analysed</p>
-        </CardContent>
-      </Card>
+          <Card className="flex-1 group transition-colors duration-200 hover:border-primary/50">
+            <CardContent className="px-4 pt-2 pb-3 flex flex-col">
+              <div className="flex flex-row items-start justify-between mb-1">
+                <h3 className="text-sm font-medium group-hover:text-primary transition-colors">Materials</h3>
+                <LayersIcon className="h-6 w-6 text-foreground mt-1.5 group-hover:text-primary transition-colors" />
+              </div>
+              <div className="flex flex-col">
+                <p className="text-2xl font-bold leading-none mb-0.5 group-hover:text-primary transition-colors">{materials}</p>
+                <p className="text-xs text-muted-foreground group-hover:text-primary/70 transition-colors">Unique materials</p>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
 
-      <Card className="col-span-4 bg-gradient-to-br from-accent/5 to-accent/10">
-        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-sm font-medium">Materials</CardTitle>
-          <LayersIcon className="h-4 w-4 text-accent" />
-        </CardHeader>
-        <CardContent>
-          <p className="text-3xl font-bold">{materials}</p>
-          <p className="text-xs text-muted-foreground mt-1">Unique materials</p>
+      <Card className="col-span-12 lg:col-span-4 h-full group transition-colors duration-200 hover:border-primary/50">
+        <CardContent className="px-4 pt-4 h-full flex flex-col">
+          <div className="flex flex-row items-start justify-between mb-6">
+            <h3 className="text-sm font-medium group-hover:text-primary transition-colors">Total Emissions</h3>
+            <GaugeIcon className="h-6 w-6 text-foreground mt-1.5 group-hover:text-primary transition-colors" />
+          </div>
+          <EmissionsCard emissions={totalEmissions} />
         </CardContent>
       </Card>
     </div>
