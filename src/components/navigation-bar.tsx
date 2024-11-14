@@ -15,6 +15,8 @@ import {
   Database,
   FileText,
   BarChart,
+  Moon,
+  Sun,
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -34,6 +36,7 @@ import Image from "next/image";
 import { cn } from "@/lib/utils";
 import { HelpDialog } from "@/components/help-dialog";
 import { Badge } from "@/components/ui/badge";
+import { useTheme } from "next-themes";
 
 interface Project {
   id: string;
@@ -133,6 +136,7 @@ export function NavigationBar({ currentProject, notifications }: NavBarProps) {
   const [selectedIndex, setSelectedIndex] = useState(-1);
   const [isFocused, setIsFocused] = useState(false);
   const [isExpanded, setIsExpanded] = useState(false);
+  const { theme, setTheme } = useTheme();
 
   useEffect(() => {
     const searchProjects = async () => {
@@ -526,6 +530,17 @@ export function NavigationBar({ currentProject, notifications }: NavBarProps) {
               )}
           </div>
           <nav className="flex items-center space-x-2">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setTheme(theme === "light" ? "dark" : "light")}
+              className="h-8 w-8"
+            >
+              <Sun className="h-4 w-4 rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />
+              <Moon className="absolute h-4 w-4 rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100" />
+              <span className="sr-only">Toggle theme</span>
+            </Button>
+
             <HelpDialog />
 
             <SignedIn>
