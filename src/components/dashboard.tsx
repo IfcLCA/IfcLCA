@@ -2,15 +2,12 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { defaultMetrics, iconMap } from "@/lib/data/metrics";
 import {
   Card,
   CardContent,
-  CardDescription,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import {
   Building,
@@ -18,9 +15,6 @@ import {
   Layers,
   Upload,
   PlusCircle,
-  FileText,
-  Users,
-  BarChart,
 } from "lucide-react";
 import { UploadModal } from "@/components/upload-modal";
 import {
@@ -30,11 +24,9 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { useToast } from "@/hooks/use-toast";
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { ActivityFeed } from "@/components/activity-feed";
-import { useUser } from "@clerk/nextjs";
 import Image from "next/image";
 import { Badge } from "@/components/ui/badge";
 

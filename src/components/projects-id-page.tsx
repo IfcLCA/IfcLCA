@@ -2,13 +2,11 @@
 
 import { useState, useEffect, useMemo } from "react";
 import { useRouter, useParams } from "next/navigation";
-import Image from "next/image";
 import { ReloadIcon } from "@radix-ui/react-icons";
 import { toast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   AlertDialog,
@@ -23,13 +21,9 @@ import {
 import {
   Trash2,
   Upload,
-  FileText,
-  Box,
   Layers,
   UploadCloud,
   Edit,
-  ImageIcon,
-  Activity,
 } from "lucide-react";
 import { UploadModal } from "@/components/upload-modal";
 import { DataTable } from "@/components/data-table";
