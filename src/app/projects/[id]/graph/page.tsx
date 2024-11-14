@@ -33,7 +33,20 @@ async function MaterialsGraph({ projectId }: { projectId: string }) {
     })
   );
 
-  return <GraphPageComponent materialsData={materialsData} />;
+  return (
+    <div className="container mx-auto p-4">
+      <div className="print:hidden">
+        <Card className="mb-4">
+          <CardHeader>
+            <CardTitle>{project.name}</CardTitle>
+            <CardDescription>{project.description}</CardDescription>
+          </CardHeader>
+        </Card>
+      </div>
+
+      <GraphPageComponent materialsData={materialsData} />
+    </div>
+  );
 }
 
 export default function GraphPage({ params }: { params: { id: string } }) {

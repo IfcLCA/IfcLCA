@@ -373,7 +373,7 @@ const ProjectTabs = ({
         value="graph"
         className="rounded-md px-4 py-2 data-[state=active]:bg-background data-[state=active]:shadow-sm transition-all"
       >
-        Graph
+        Charts
       </TabsTrigger>
     </TabsList>
 
