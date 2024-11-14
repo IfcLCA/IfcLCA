@@ -133,7 +133,7 @@ export function Dashboard({
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
   const [isLoadingActivities, setIsLoadingActivities] = useState(false);
-  const ITEMS_PER_PAGE = 10;
+  const ITEMS_PER_PAGE = 5;
 
   useEffect(() => {
     if (showProjectSelect) {
@@ -146,16 +146,7 @@ export function Dashboard({
   }, []);
 
   useEffect(() => {
-    const fetchData = async () => {
-      try {
-        console.log("Fetching activities...");
-        await fetchActivities(1);
-        console.log("Activities fetched successfully");
-      } catch (error) {
-        console.error("Error in fetchData:", error);
-      }
-    };
-    fetchData();
+    fetchActivities(1);
   }, []);
 
   const fetchProjects = async () => {
@@ -200,25 +191,17 @@ export function Dashboard({
     }
   };
 
-  const fetchActivities = async (pageNum: number) => {
+  const fetchActivities = async (page: number) => {
     try {
       setIsLoadingActivities(true);
-      const response = await fetch(
-        `/api/activities?page=${pageNum}&limit=${ITEMS_PER_PAGE}`
-      );
-
-      if (!response.ok) {
-        throw new Error("Failed to fetch activities");
-      }
-
+      const response = await fetch(`/api/activities?page=${page}`);
       const data = await response.json();
 
-      if (pageNum === 1) {
+      if (page === 1) {
         setActivities(data.activities);
       } else {
         setActivities((prev) => [...prev, ...data.activities]);
       }
-
       setHasMore(data.hasMore);
     } catch (error) {
       console.error("Failed to fetch activities:", error);
@@ -228,15 +211,12 @@ export function Dashboard({
   };
 
   const handleLoadMore = () => {
-    const nextPage = page + 1;
-    setPage(nextPage);
-    fetchActivities(nextPage);
+    if (!isLoadingActivities && hasMore) {
+      const nextPage = page + 1;
+      setPage(nextPage);
+      fetchActivities(nextPage);
+    }
   };
-
-  // Initial fetch
-  useEffect(() => {
-    fetchActivities(1);
-  }, []);
 
   const handleUploadClick = async () => {
     try {
@@ -251,12 +231,6 @@ export function Dashboard({
       console.error("Failed to check projects:", error);
     }
   };
-
-  console.log("Current state:", {
-    showProjectSelect,
-    selectedProjectId,
-    recentProjects,
-  });
 
   const metrics: Metric[] = [
     {

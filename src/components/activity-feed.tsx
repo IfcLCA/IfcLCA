@@ -1,18 +1,31 @@
 "use client";
 
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { formatDistanceToNow } from "date-fns";
-import { Loader2 } from "lucide-react";
+import {
+  Loader2,
+  PlusCircle,
+  Upload,
+  Pencil,
+  Trash2,
+  Image as ImageIcon,
+  Activity,
+} from "lucide-react";
 import Link from "next/link";
+import Image from "next/image";
 
 interface Activity {
   id: string;
-  type: "project_created" | "file_uploaded";
+  type:
+    | "project_created"
+    | "file_uploaded"
+    | "project_updated"
+    | "project_deleted"
+    | "image_uploaded";
   user: {
     name: string;
-    avatar: string;
+    imageUrl: string;
   };
   action: string;
   project: string;
@@ -22,8 +35,30 @@ interface Activity {
     description?: string;
     fileName?: string;
     elementCount?: number;
+    imageUrl?: string;
+    changes?: {
+      name?: string;
+      description?: string;
+    };
   };
 }
+
+const getActivityIcon = (type: Activity["type"]) => {
+  switch (type) {
+    case "project_created":
+      return <PlusCircle className="h-4 w-4" />;
+    case "file_uploaded":
+      return <Upload className="h-4 w-4" />;
+    case "project_updated":
+      return <Pencil className="h-4 w-4" />;
+    case "project_deleted":
+      return <Trash2 className="h-4 w-4" />;
+    case "image_uploaded":
+      return <ImageIcon className="h-4 w-4" />;
+    default:
+      return <Activity className="h-4 w-4" />;
+  }
+};
 
 interface ActivityFeedProps {
   activities: Activity[];
@@ -42,7 +77,7 @@ export function ActivityFeed({
     return (
       <Card>
         <CardContent className="p-6 text-center text-muted-foreground">
-          No activities yet
+          No recent activity
         </CardContent>
       </Card>
     );
@@ -54,21 +89,17 @@ export function ActivityFeed({
         {activities.map((activity, index) => (
           <div
             key={activity.id}
-            className={`flex items-start p-4 ${
+            className={`flex items-start space-x-4 p-4 ${
               index !== activities.length - 1 ? "border-b" : ""
-            }`}
+            } hover:bg-muted/50 transition-colors`}
           >
-            <Avatar className="h-9 w-9">
-              <AvatarImage
-                src={activity.user.avatar}
-                alt={activity.user.name}
-              />
-              <AvatarFallback>{activity.user.name.charAt(0)}</AvatarFallback>
-            </Avatar>
-            <div className="ml-4 flex-1">
+            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-muted">
+              {getActivityIcon(activity.type)}
+            </div>
+            <div className="flex-1 space-y-1">
               <div className="flex items-center justify-between">
                 <p className="text-sm font-medium">{activity.user.name}</p>
-                <span className="text-sm text-muted-foreground">
+                <span className="text-xs text-muted-foreground">
                   {formatDistanceToNow(new Date(activity.timestamp), {
                     addSuffix: true,
                   })}
@@ -76,25 +107,42 @@ export function ActivityFeed({
               </div>
               <div className="text-sm text-muted-foreground">
                 <span>{activity.action} </span>
-                <Link
-                  href={`/projects/${activity.projectId}`}
-                  className="text-primary hover:underline font-medium inline-block"
-                >
-                  {activity.project}
-                </Link>
+                {activity.type !== "project_deleted" ? (
+                  <Link
+                    href={`/projects/${activity.projectId}`}
+                    className="font-medium text-primary hover:underline"
+                  >
+                    {activity.project}
+                  </Link>
+                ) : (
+                  <span className="text-muted-foreground">
+                    {activity.project}
+                  </span>
+                )}
               </div>
               {activity.type === "project_created" &&
                 activity.details.description && (
-                  <p className="mt-2 text-sm text-muted-foreground bg-muted p-2 rounded-md">
+                  <p className="text-sm text-muted-foreground bg-muted/50 p-2 rounded-md">
                     {activity.details.description}
                   </p>
                 )}
               {activity.type === "file_uploaded" && (
-                <div className="mt-2 text-sm text-muted-foreground">
-                  <p>File: {activity.details.fileName}</p>
-                  <p>Elements: {activity.details.elementCount}</p>
+                <div className="text-xs space-y-1 bg-muted/50 p-2 rounded-md">
+                  <p className="font-medium">{activity.details.fileName}</p>
+                  <p>{activity.details.elementCount} elements</p>
                 </div>
               )}
+              {activity.type === "image_uploaded" &&
+                activity.details.imageUrl && (
+                  <div className="relative h-24 w-full rounded-md overflow-hidden mt-2">
+                    <Image
+                      src={activity.details.imageUrl}
+                      alt="Uploaded image"
+                      fill
+                      className="object-cover"
+                    />
+                  </div>
+                )}
             </div>
           </div>
         ))}

@@ -12,7 +12,7 @@ export async function GET(request: Request) {
 
     const { searchParams } = new URL(request.url);
     const page = parseInt(searchParams.get("page") || "1");
-    const limit = 5; // Fixed limit of 5 items
+    const limit = 2; // Changed to 2 items per page
     const skip = (page - 1) * limit;
 
     await connectToDatabase();
