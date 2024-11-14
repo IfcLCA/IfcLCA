@@ -61,7 +61,7 @@ export function ProjectImageUpload({
         <ImageIcon className="h-4 w-4 text-muted-foreground" />
       </CardHeader>
       <CardContent className="flex-1 p-0">
-        <div className="h-full flex flex-col items-center justify-center w-full border-2 border-dashed rounded-xl bg-muted/5 hover:bg-muted/10 transition-colors">
+        <div className="h-full flex flex-col items-center justify-center w-full rounded-xl bg-muted/5 hover:bg-muted/10 transition-colors">
           {currentImageUrl ? (
             <div className="relative w-full h-full">
               <Image
