@@ -16,45 +16,77 @@ export async function GET() {
 
     await connectToDatabase();
 
-    const projects = await Project.find({ userId }).lean();
-
-    const projectsWithCounts = await Promise.all(
-      projects.map(async (project) => {
-        const [uploadsCount, elementsCount, materialsCount] = await Promise.all(
-          [
-            mongoose.models.Upload.countDocuments({
-              projectId: project._id,
-            }),
-            mongoose.models.Element.countDocuments({
-              projectId: project._id,
-            }),
-            mongoose.models.Material.countDocuments({
-              projectId: project._id,
-            }),
-          ]
-        );
-
-        return {
-          id: project._id.toString(),
-          name: project.name,
-          description: project.description,
-          phase: project.phase,
-          createdAt: project.createdAt,
-          updatedAt: project.updatedAt,
-          _count: {
-            uploads: uploadsCount,
-            elements: elementsCount,
-            materials: materialsCount,
+    // Aggregate projects with their latest activity timestamps
+    const projects = await Project.aggregate([
+      { $match: { userId } },
+      {
+        $lookup: {
+          from: "uploads",
+          localField: "_id",
+          foreignField: "projectId",
+          as: "uploads",
+        },
+      },
+      {
+        $lookup: {
+          from: "elements",
+          localField: "_id",
+          foreignField: "projectId",
+          as: "elements",
+        },
+      },
+      {
+        $lookup: {
+          from: "materials",
+          localField: "_id",
+          foreignField: "projectId",
+          as: "materials",
+        },
+      },
+      {
+        $addFields: {
+          lastActivityAt: {
+            $max: [
+              "$updatedAt",
+              { $max: "$uploads.createdAt" },
+              { $max: "$elements.createdAt" },
+              { $max: "$materials.createdAt" },
+            ],
           },
-          imageUrl: project.imageUrl,
-        };
-      })
-    );
+          _count: {
+            elements: { $size: "$elements" },
+            uploads: { $size: "$uploads" },
+            materials: { $size: "$materials" },
+          },
+        },
+      },
+      { $sort: { lastActivityAt: -1 } },
+      {
+        $project: {
+          _id: 1,
+          name: 1,
+          description: 1,
+          imageUrl: 1,
+          updatedAt: 1,
+          lastActivityAt: 1,
+          _count: 1,
+        },
+      },
+    ]);
 
-    return NextResponse.json(projectsWithCounts);
+    const transformedProjects = projects.map((project) => ({
+      id: project._id.toString(),
+      name: project.name,
+      description: project.description,
+      imageUrl: project.imageUrl,
+      updatedAt: project.lastActivityAt || project.updatedAt,
+      _count: project._count,
+    }));
+
+    return NextResponse.json(transformedProjects);
   } catch (error) {
-    console.error("Failed to fetch projects:", error);
-    return new Response("Internal Server Error", { status: 500 });
+    console.error("API - Error fetching projects:", error);
+    return new NextResponse("Internal Server Error", { status: 500 });
   }
 }
 

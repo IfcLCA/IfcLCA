@@ -10,7 +10,6 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Progress } from "@/components/ui/progress";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import {
@@ -36,6 +35,8 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { ActivityFeed } from "@/components/activity-feed";
 import { useUser } from "@clerk/nextjs";
+import Image from "next/image";
+import { Badge } from "@/components/ui/badge";
 
 interface Project {
   id: string;
@@ -169,31 +170,12 @@ export function Dashboard({
 
   const fetchStatistics = async () => {
     try {
-      const response = await fetch("/api/projects");
+      const response = await fetch("/api/projects", {
+        cache: "no-store",
+      });
       const projects = await response.json();
 
-      // Sort projects by creation date (most recent first)
-      const sortedProjects = projects.sort(
-        (a: any, b: any) =>
-          new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-      );
-
-      // Find the maximum number of elements across all projects
-      const maxProjectElements = Math.max(
-        ...projects.map((project: any) => project._count?.elements || 0)
-      );
-      setMaxElements(maxProjectElements);
-
-      // Take only the 3 most recent projects
-      const recentProjects = sortedProjects.slice(0, 3).map((project: any) => ({
-        id: project.id,
-        name: project.name,
-        description: project.description,
-        elements: project._count?.elements || 0,
-        thumbnail: "/placeholder-image.jpg",
-        updatedAt: project.updatedAt,
-        _count: project._count,
-      }));
+      const recentProjects = projects.slice(0, 3);
 
       const totalElements = projects.reduce(
         (acc: number, project: any) => acc + (project._count?.elements || 0),
@@ -212,7 +194,6 @@ export function Dashboard({
         totalMaterials,
       }));
 
-      // Update recent projects state
       setRecentProjects(recentProjects);
     } catch (error) {
       console.error("Failed to fetch statistics:", error);
@@ -361,47 +342,59 @@ export function Dashboard({
             <Card
               key={project.id}
               className="group relative transition-all hover:shadow-lg border-2 border-muted overflow-hidden cursor-pointer"
-              tabIndex={0}
-              role="article"
-              aria-labelledby={`project-title-${project.id}`}
               onClick={() => router.push(`/projects/${project.id}`)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" || e.key === " ") {
-                  e.preventDefault();
-                  router.push(`/projects/${project.id}`);
-                }
-              }}
             >
-              <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-primary/10 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-              <CardHeader>
-                <CardTitle>{project.name}</CardTitle>
-                <CardDescription>{project.description}</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="aspect-video mb-4 rounded-lg bg-muted overflow-hidden">
-                  <img
-                    src={project.thumbnail}
+              <div className="aspect-video relative bg-muted">
+                {project.imageUrl ? (
+                  <Image
+                    src={project.imageUrl}
                     alt={project.name}
-                    className="object-cover w-full h-full"
+                    fill
+                    className="object-cover"
+                    sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+                    priority={false}
                   />
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center">
+                    <Box className="h-12 w-12 text-muted-foreground/50" />
+                  </div>
+                )}
+              </div>
+              <CardContent className="space-y-2 p-4">
+                <h3 className="text-lg font-semibold leading-none tracking-tight">
+                  {project.name}
+                </h3>
+                {project.description && (
+                  <p className="text-sm text-muted-foreground line-clamp-2">
+                    {project.description}
+                  </p>
+                )}
+                <div className="flex gap-2 text-xs text-muted-foreground">
+                  <Badge
+                    variant="secondary"
+                    className="flex items-center gap-1"
+                  >
+                    <Box className="h-3 w-3" />
+                    {project._count.elements} elements
+                  </Badge>
+                  <Badge
+                    variant="secondary"
+                    className="flex items-center gap-1"
+                  >
+                    <Upload className="h-3 w-3" />
+                    {project._count.uploads} uploads
+                  </Badge>
                 </div>
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <div className="space-y-1">
-                      <p className="text-sm font-medium">Elements</p>
-                      <Progress
-                        value={(project.elements / maxElements) * 100}
-                        className="w-[60%]"
-                      />
-                    </div>
-                    <div className="text-sm text-muted-foreground">
-                      {project.elements} elements
-                    </div>
-                  </div>
-                  <div className="text-sm text-muted-foreground">
-                    Last upload:{" "}
-                    {new Date(project.updatedAt).toLocaleDateString()}
-                  </div>
+                <div className="text-sm text-muted-foreground">
+                  Last update:{" "}
+                  {new Date(project.updatedAt).toLocaleString("en-US", {
+                    year: "numeric",
+                    month: "short",
+                    day: "numeric",
+                    hour: "2-digit",
+                    minute: "2-digit",
+                    hour12: false,
+                  })}
                 </div>
               </CardContent>
             </Card>
