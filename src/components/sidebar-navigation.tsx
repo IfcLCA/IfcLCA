@@ -21,6 +21,7 @@ import {
   PlusCircle,
   Pin,
 } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
 
 interface SidebarProps {
   currentPage: string;
@@ -32,6 +33,10 @@ interface SidebarItem {
   title: string;
   icon: React.ReactNode;
   href: string;
+  badge?: {
+    text: string;
+    variant: "default" | "secondary" | "destructive" | "outline";
+  };
 }
 
 const primaryItems: SidebarItem[] = [
@@ -53,7 +58,11 @@ const primaryItems: SidebarItem[] = [
   {
     title: "Reports",
     icon: <FileStack className="h-4 w-4" />,
-    href: "/reports",
+    href: "#",
+    badge: {
+      text: "Coming Soon",
+      variant: "secondary",
+    },
   },
 ];
 
@@ -142,17 +151,25 @@ export function SidebarNavigation({
           {items.map((item, index) => (
             <Link
               key={index}
-              href={item.href.replace(":id", projectId || "")}
+              href={item.href}
               className={cn(
                 "flex items-center rounded-lg px-3 py-2 text-sm font-medium hover:bg-accent",
                 pathname === item.href ? "bg-accent" : "transparent",
-                !isExpanded && !mobile ? "justify-center w-10" : ""
+                !isExpanded && !mobile ? "justify-center w-10" : "",
+                item.href === "#" && "pointer-events-none opacity-60"
               )}
               onClick={() => mobile && setIsOpen(false)}
             >
               {item.icon}
               {(isExpanded || mobile) && (
-                <span className="ml-3">{item.title}</span>
+                <div className="ml-3 flex items-center gap-2">
+                  {item.title}
+                  {item.badge && (
+                    <Badge variant={item.badge.variant} className="text-[10px]">
+                      {item.badge.text}
+                    </Badge>
+                  )}
+                </div>
               )}
             </Link>
           ))}

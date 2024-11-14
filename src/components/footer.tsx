@@ -59,9 +59,12 @@ export function Footer() {
             <Link href="/materials-library" className="hover:underline">
               Materials
             </Link>
-            <Link href="/reports" className="hover:underline">
+            <span className="text-muted-foreground flex items-center gap-1 cursor-not-allowed">
               Reports
-            </Link>
+              <span className="text-[10px] text-muted-foreground">
+                (Coming Soon)
+              </span>
+            </span>
           </nav>
           <div className="flex items-center gap-2">
             <Input

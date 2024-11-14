@@ -17,6 +17,8 @@ import {
   BarChart,
   Moon,
   Sun,
+  ExternalLink,
+  Construction,
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -37,6 +39,14 @@ import { cn } from "@/lib/utils";
 import { HelpDialog } from "@/components/help-dialog";
 import { Badge } from "@/components/ui/badge";
 import { useTheme } from "next-themes";
+import { UploadModal } from "@/components/upload-modal";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 interface Project {
   id: string;
@@ -137,6 +147,11 @@ export function NavigationBar({ currentProject, notifications }: NavBarProps) {
   const [isFocused, setIsFocused] = useState(false);
   const [isExpanded, setIsExpanded] = useState(false);
   const { theme, setTheme } = useTheme();
+  const [showProjectSelect, setShowProjectSelect] = useState(false);
+  const [selectedProjectId, setSelectedProjectId] = useState<string | null>(
+    null
+  );
+  const [projects, setProjects] = useState<Project[]>([]);
 
   useEffect(() => {
     const searchProjects = async () => {
@@ -225,6 +240,21 @@ export function NavigationBar({ currentProject, notifications }: NavBarProps) {
     setIsExpanded(true);
   };
 
+  const handleAnalyseClick = async () => {
+    try {
+      const response = await fetch("/api/projects");
+      const projects = await response.json();
+
+      if (!projects?.length) {
+        return;
+      }
+      setProjects(projects);
+      setShowProjectSelect(true);
+    } catch (error) {
+      console.error("Failed to check projects:", error);
+    }
+  };
+
   return (
     <nav className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
       <div className="flex h-14 items-center px-4 md:px-6">
@@ -239,12 +269,12 @@ export function NavigationBar({ currentProject, notifications }: NavBarProps) {
                 className="h-8 w-8 rounded-lg"
               />
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center">
               <span className="hidden font-bold sm:inline-block relative">
                 IfcLCA
                 <Badge
                   variant="secondary"
-                  className="absolute -top-2 -right-12 text-[10px] px-1 py-0 h-4"
+                  className="absolute -top-2 -right-8 text-[10px] px-1 py-0 h-4"
                 >
                   BETA
                 </Badge>
@@ -279,8 +309,9 @@ export function NavigationBar({ currentProject, notifications }: NavBarProps) {
                           href="/projects"
                           className="block select-none space-y-1 rounded-md p-3 leading-none no-underline outline-none transition-colors hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground"
                         >
-                          <div className="text-sm font-medium leading-none">
+                          <div className="text-sm font-medium leading-none flex items-center gap-2">
                             All Projects
+                            <Construction className="h-3 w-3" />
                           </div>
                           <p className="line-clamp-2 text-sm leading-snug text-muted-foreground">
                             View and manage all your LCA projects.
@@ -290,32 +321,18 @@ export function NavigationBar({ currentProject, notifications }: NavBarProps) {
                     </li>
                     <li>
                       <NavigationMenuLink asChild>
-                        <Link
-                          href="/projects?filter=active"
-                          className="block select-none space-y-1 rounded-md p-3 leading-none no-underline outline-none transition-colors hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground"
+                        <button
+                          onClick={handleAnalyseClick}
+                          className="w-full block select-none space-y-1 rounded-md p-3 leading-none no-underline outline-none transition-colors hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground"
                         >
-                          <div className="text-sm font-medium leading-none">
-                            Active Projects
+                          <div className="text-sm font-medium leading-none flex items-center gap-2">
+                            Analyse IFC
+                            <FileText className="h-3 w-3" />
                           </div>
-                          <p className="line-clamp-2 text-sm leading-snug text-muted-foreground">
-                            View and manage your ongoing LCA projects.
+                          <p className="line-clamp-2 text-sm leading-snug text-muted-foreground text-left">
+                            Add an IFC model to an existing project
                           </p>
-                        </Link>
-                      </NavigationMenuLink>
-                    </li>
-                    <li>
-                      <NavigationMenuLink asChild>
-                        <Link
-                          href="/projects?filter=completed"
-                          className="block select-none space-y-1 rounded-md p-3 leading-none no-underline outline-none transition-colors hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground"
-                        >
-                          <div className="text-sm font-medium leading-none">
-                            Completed Projects
-                          </div>
-                          <p className="line-clamp-2 text-sm leading-snug text-muted-foreground">
-                            Access your finished LCA projects and reports.
-                          </p>
-                        </Link>
+                        </button>
                       </NavigationMenuLink>
                     </li>
                   </ul>
@@ -328,135 +345,79 @@ export function NavigationBar({ currentProject, notifications }: NavBarProps) {
                     <li className="row-span-3">
                       <NavigationMenuLink asChild>
                         <Link
-                          href="/materials/new"
+                          href="/materials-library"
                           className="flex h-full w-full select-none flex-col justify-end rounded-md bg-gradient-to-b from-muted/50 to-muted p-6 no-underline outline-none focus:shadow-md"
                         >
                           <Database className="h-6 w-6 mb-2" />
                           <div className="mb-2 text-lg font-medium">
-                            Create New Material
+                            Match Materials
                           </div>
                           <p className="text-sm leading-tight text-muted-foreground">
-                            Add a new material to your LCA database.
+                            Match your project materials with KBOB environmental
+                            indicators.
                           </p>
                         </Link>
                       </NavigationMenuLink>
                     </li>
                     <li>
                       <NavigationMenuLink asChild>
-                        <Link
-                          href="/materials-library"
+                        <a
+                          href="https://www.lcadata.ch"
+                          target="_blank"
+                          rel="noopener noreferrer"
                           className="block select-none space-y-1 rounded-md p-3 leading-none no-underline outline-none transition-colors hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground"
                         >
-                          <div className="text-sm font-medium leading-none">
-                            Material Library
+                          <div className="text-sm font-medium leading-none flex items-center gap-2">
+                            KBOB Data
+                            <ExternalLink className="h-3 w-3" />
                           </div>
                           <p className="line-clamp-2 text-sm leading-snug text-muted-foreground">
-                            Browse and manage your material database.
+                            Access KBOB environmental data through our API
+                            interface
                           </p>
-                        </Link>
+                        </a>
                       </NavigationMenuLink>
                     </li>
                     <li>
                       <NavigationMenuLink asChild>
-                        <Link
-                          href="/custom-materials"
+                        <a
+                          href="https://www.kbob.admin.ch/de/oekobilanzdaten-im-baubereich"
+                          target="_blank"
+                          rel="noopener noreferrer"
                           className="block select-none space-y-1 rounded-md p-3 leading-none no-underline outline-none transition-colors hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground"
                         >
-                          <div className="text-sm font-medium leading-none">
-                            Custom Materials
+                          <div className="text-sm font-medium leading-none flex items-center gap-2">
+                            Official KBOB Website
+                            <ExternalLink className="h-3 w-3" />
                           </div>
                           <p className="line-clamp-2 text-sm leading-snug text-muted-foreground">
-                            Create and manage custom material entries.
+                            Visit the official KBOB environmental data portal
                           </p>
-                        </Link>
-                      </NavigationMenuLink>
-                    </li>
-                    <li>
-                      <NavigationMenuLink asChild>
-                        <Link
-                          href="/material-reports"
-                          className="block select-none space-y-1 rounded-md p-3 leading-none no-underline outline-none transition-colors hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground"
-                        >
-                          <div className="text-sm font-medium leading-none">
-                            Material Reports
-                          </div>
-                          <p className="line-clamp-2 text-sm leading-snug text-muted-foreground">
-                            Generate reports on material usage and impact.
-                          </p>
-                        </Link>
+                        </a>
                       </NavigationMenuLink>
                     </li>
                   </ul>
                 </NavigationMenuContent>
               </NavigationMenuItem>
               <NavigationMenuItem>
-                <NavigationMenuTrigger>Reports</NavigationMenuTrigger>
+                <NavigationMenuTrigger>
+                  Reports
+                  <Badge variant="secondary" className="ml-2 text-[10px]">
+                    Coming Soon
+                  </Badge>
+                </NavigationMenuTrigger>
                 <NavigationMenuContent>
-                  <ul className="grid gap-3 p-6 md:w-[400px] lg:w-[500px] lg:grid-cols-[.75fr_1fr]">
-                    <li className="row-span-3">
-                      <NavigationMenuLink asChild>
-                        <Link
-                          href="/reports"
-                          className="flex h-full w-full select-none flex-col justify-end rounded-md bg-gradient-to-b from-muted/50 to-muted p-6 no-underline outline-none focus:shadow-md"
-                        >
-                          <FileText className="h-6 w-6 mb-2" />
-                          <div className="mb-2 mt-4 text-lg font-medium">
-                            LCA Reports
-                          </div>
-                          <p className="text-sm leading-tight text-muted-foreground">
-                            Comprehensive Life Cycle Assessment reports for your
-                            projects.
-                          </p>
-                        </Link>
-                      </NavigationMenuLink>
-                    </li>
-                    <li>
-                      <NavigationMenuLink asChild>
-                        <Link
-                          href="/reports/carbon-footprint"
-                          className="block select-none space-y-1 rounded-md p-3 leading-none no-underline outline-none transition-colors hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground"
-                        >
-                          <div className="text-sm font-medium leading-none">
-                            Carbon Footprint
-                          </div>
-                          <p className="line-clamp-2 text-sm leading-snug text-muted-foreground">
-                            Analyze and report on project carbon emissions.
-                          </p>
-                        </Link>
-                      </NavigationMenuLink>
-                    </li>
-                    <li>
-                      <NavigationMenuLink asChild>
-                        <Link
-                          href="/reports/material-impact"
-                          className="block select-none space-y-1 rounded-md p-3 leading-none no-underline outline-none transition-colors hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground"
-                        >
-                          <div className="text-sm font-medium leading-none">
-                            Material Impact
-                          </div>
-                          <p className="line-clamp-2 text-sm leading-snug text-muted-foreground">
-                            Detailed reports on material environmental impact.
-                          </p>
-                        </Link>
-                      </NavigationMenuLink>
-                    </li>
-                    <li>
-                      <NavigationMenuLink asChild>
-                        <Link
-                          href="/reports/comparison"
-                          className="block select-none space-y-1 rounded-md p-3 leading-none no-underline outline-none transition-colors hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground"
-                        >
-                          <div className="text-sm font-medium leading-none">
-                            Comparison
-                          </div>
-                          <p className="line-clamp-2 text-sm leading-snug text-muted-foreground">
-                            Compare LCA results across multiple projects or
-                            scenarios.
-                          </p>
-                        </Link>
-                      </NavigationMenuLink>
-                    </li>
-                  </ul>
+                  <div className="flex flex-col gap-4 p-6 w-[400px]">
+                    <div className="text-center space-y-2">
+                      <FileText className="h-12 w-12 mx-auto text-muted-foreground" />
+                      <h3 className="font-medium text-lg">Reports</h3>
+                      <p className="text-sm text-muted-foreground">
+                        We're working on comprehensive LCA reporting features.
+                        Stay tuned for detailed environmental impact analysis,
+                        material assessments, and project comparisons.
+                      </p>
+                    </div>
+                  </div>
                 </NavigationMenuContent>
               </NavigationMenuItem>
             </NavigationMenuList>
@@ -567,6 +528,50 @@ export function NavigationBar({ currentProject, notifications }: NavBarProps) {
           </nav>
         </div>
       </div>
+      <Dialog open={showProjectSelect} onOpenChange={setShowProjectSelect}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Select Project</DialogTitle>
+            <DialogDescription>
+              Choose a project to upload the IFC file to
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4">
+            {projects.map((project) => (
+              <Button
+                key={project.id}
+                variant="outline"
+                className="w-full justify-start"
+                onClick={() => {
+                  setSelectedProjectId(project.id);
+                  setShowProjectSelect(false);
+                }}
+              >
+                {project.name}
+              </Button>
+            ))}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {selectedProjectId && (
+        <UploadModal
+          projectId={selectedProjectId}
+          open={true}
+          onOpenChange={(open: boolean) => {
+            if (!open) {
+              setSelectedProjectId(null);
+            }
+          }}
+          onSuccess={(upload: { id: string }) => {
+            setSelectedProjectId(null);
+            router.push(`/projects/${selectedProjectId}`);
+          }}
+          onProgress={(progress: number) => {
+            console.log("Upload progress:", progress);
+          }}
+        />
+      )}
     </nav>
   );
 }
