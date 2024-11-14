@@ -151,13 +151,7 @@ export function ProjectOverview({
   };
 
   return (
-    <div className="main-container">
-      <div className="page-header">
-        <div className="">
-          <div className=""></div>
-        </div>
-      </div>
-
+    <div>
       {isLoading && (
         <>
           <div aria-live="polite" className="sr-only">

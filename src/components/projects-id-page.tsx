@@ -304,14 +304,22 @@ const ProjectHeader = ({
 );
 
 const ProjectOverview = ({ project }: { project: ExtendedProject }) => (
-  <div className="space-y-4">
+  <section className="space-y-4">
+    <div className="page-header">
+      <div>
+        <h1 className="page-title">{project.name}</h1>
+        <p className="page-description">
+          {project.description || "No description provided"}
+        </p>
+      </div>
+    </div>
     <DashboardCards
       elements={project._count.elements}
       uploads={project._count.uploads}
       materials={project._count.materials}
       project={project}
     />
-  </div>
+  </section>
 );
 
 const ProjectTabs = ({

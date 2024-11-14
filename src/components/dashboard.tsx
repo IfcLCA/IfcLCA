@@ -387,48 +387,6 @@ export function Dashboard({
         />
       </section>
 
-      <section>
-        <h2 className="text-2xl font-bold mb-4">Quick Access</h2>
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-          <Button variant="outline" className="h-20 text-left justify-start">
-            <FileText className="mr-2 h-5 w-5" />
-            <div>
-              <div className="font-semibold">Recent Files</div>
-              <div className="text-sm text-muted-foreground">
-                Access your latest work
-              </div>
-            </div>
-          </Button>
-          <Button variant="outline" className="h-20 text-left justify-start">
-            <Users className="mr-2 h-5 w-5" />
-            <div>
-              <div className="font-semibold">Team Projects</div>
-              <div className="text-sm text-muted-foreground">
-                Collaborate with your team
-              </div>
-            </div>
-          </Button>
-          <Button variant="outline" className="h-20 text-left justify-start">
-            <BarChart className="mr-2 h-5 w-5" />
-            <div>
-              <div className="font-semibold">Analytics</div>
-              <div className="text-sm text-muted-foreground">
-                View project insights
-              </div>
-            </div>
-          </Button>
-          <Button variant="outline" className="h-20 text-left justify-start">
-            <Building className="mr-2 h-5 w-5" />
-            <div>
-              <div className="font-semibold">Material Library</div>
-              <div className="text-sm text-muted-foreground">
-                Browse and manage materials
-              </div>
-            </div>
-          </Button>
-        </div>
-      </section>
-
       <Dialog open={showProjectSelect} onOpenChange={setShowProjectSelect}>
         <DialogContent>
           <DialogHeader>
