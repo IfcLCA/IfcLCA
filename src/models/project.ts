@@ -21,6 +21,9 @@ const projectSchema = new mongoose.Schema({
     type: Date,
     default: Date.now,
   },
+  imageUrl: {
+    type: String,
+  },
 });
 
 export const Project =

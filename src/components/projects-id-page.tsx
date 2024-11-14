@@ -66,36 +66,19 @@ type ElementWithMaterials = {
 
 interface ExtendedProject {
   id: string;
+  _id?: string;
   name: string;
   description?: string;
-  phase?: string;
+  imageUrl?: string;
   createdAt: Date;
   updatedAt: Date;
-  uploads: {
-    _id: string;
-    filename: string;
-    status: string;
-    elementCount: number;
-    createdAt: Date;
-  }[];
-  elements: ElementWithMaterials[];
-  materials: {
-    id: string;
-    name: string;
-    category?: string;
-    volume?: number;
-    fraction: number;
-  }[];
+  uploads: any[];
+  elements: any[];
+  materials: any[];
   _count: {
-    elements: number;
     uploads: number;
+    elements: number;
     materials: number;
-  };
-  imageUrl?: string;
-  emissions: {
-    gwp: number;
-    ubp: number;
-    penre: number;
   };
 }
 
@@ -118,9 +101,12 @@ export default function ProjectDetailsPage() {
   const fetchProject = async () => {
     try {
       setIsLoading(true);
+      console.log("Fetching project:", projectId);
       const response = await fetch(`/api/projects/${projectId}`);
       const data = await response.json();
+      console.log("Raw project data:", data);
       const transformed = transformProjectData(data);
+      console.log("Transformed project data:", transformed);
       setProject(transformed);
     } catch (err) {
       console.error("Error fetching project:", err);
@@ -137,7 +123,8 @@ export default function ProjectDetailsPage() {
     id: data.id || data._id,
     createdAt: new Date(data.createdAt),
     updatedAt: new Date(data.updatedAt),
-    uploads: data.uploads.map((upload: any) => ({
+    imageUrl: data.imageUrl,
+    uploads: (data.uploads || []).map((upload: any) => ({
       ...upload,
       _id: upload._id,
       filename: upload.filename,
@@ -145,20 +132,19 @@ export default function ProjectDetailsPage() {
       elementCount: upload.elementCount,
       createdAt: new Date(upload.createdAt),
     })),
-    elements: data.elements.map((element: any) => ({
+    elements: (data.elements || []).map((element: any) => ({
       ...element,
       id: element.id || element._id,
       _id: element._id,
       materials: element.materials || [],
     })),
-    materials:
-      data.materials?.map((material: any) => ({
-        id: material.id || material._id,
-        name: material.name,
-        category: material.category,
-        volume: material.volume || 0,
-        fraction: material.fraction || 0,
-      })) || [],
+    materials: (data.materials || []).map((material: any) => ({
+      id: material.id || material._id,
+      name: material.name,
+      category: material.category,
+      volume: material.volume || 0,
+      fraction: material.fraction || 0,
+    })),
     _count: {
       uploads: data.uploads?.length || 0,
       elements: data.elements?.length || 0,
@@ -296,11 +282,13 @@ const ProjectHeader = ({
   onEdit: () => void;
 }) => (
   <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-    <div>
-      <h1 className="text-3xl font-bold text-primary">{project.name}</h1>
-      {project.description && (
-        <p className="text-muted-foreground mt-1">{project.description}</p>
-      )}
+    <div className="space-y-4">
+      <div>
+        <h1 className="text-3xl font-bold text-primary">{project.name}</h1>
+        {project.description && (
+          <p className="text-muted-foreground mt-1">{project.description}</p>
+        )}
+      </div>
     </div>
     <div className="flex flex-col sm:flex-row gap-4">
       <Button onClick={onUpload} className="bg-primary text-primary-foreground">

@@ -4,6 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { ImageIcon, BoxIcon, FileTextIcon, LayersIcon } from "lucide-react";
 import { EmissionsCard } from "@/components/emissions-card";
+import { ProjectImageUpload } from "@/components/project-image-upload";
 
 type DashboardCardsProps = {
   elements?: number;
@@ -53,33 +54,12 @@ export function DashboardCards({
 
   return (
     <div className="grid grid-cols-12 gap-6">
-      <Card className="col-span-4">
-        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-sm font-medium">Project Image</CardTitle>
-          <ImageIcon className="h-4 w-4 text-muted-foreground" />
-        </CardHeader>
-        <CardContent>
-          <div className="aspect-video flex flex-col items-center justify-center w-full border-2 border-dashed rounded-xl bg-muted/5 hover:bg-muted/10 transition-colors">
-            <ImageIcon className="h-12 w-12 text-muted-foreground mb-2" />
-            <p className="text-xs text-muted-foreground mb-4 text-center px-2">
-              No project image uploaded
-            </p>
-            <Button
-              variant="outline"
-              size="sm"
-              className="relative overflow-hidden"
-            >
-              <ImageIcon className="h-3 w-3 mr-2" />
-              Upload
-              <input
-                type="file"
-                className="absolute inset-0 opacity-0 cursor-pointer"
-                accept="image/*"
-              />
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
+      <div className="col-span-4">
+        <ProjectImageUpload
+          projectId={project.id}
+          imageUrl={project.imageUrl}
+        />
+      </div>
 
       <Card className="col-span-8">
         <EmissionsCard emissions={totalEmissions} />

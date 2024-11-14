@@ -11,82 +11,39 @@ export async function GET(
   { params }: { params: { id: string } }
 ) {
   try {
-    const { id } = await params;
-
-    const { userId } = await auth();
-
-    if (!userId) {
-      return new Response("Unauthorized", { status: 401 });
-    }
-
     await connectToDatabase();
 
-    // Verify project ownership and get project data
-    const project = await Project.findById(id).lean();
+    // Find project and populate uploads
+    const project = await Project.findById(params.id).lean();
+    console.log("API - Found project:", project);
 
     if (!project) {
-      return new Response("Project not found", { status: 404 });
+      return NextResponse.json({ error: "Project not found" }, { status: 404 });
     }
 
-    // Get uploads for this project
-    const uploads = await Upload.find({
-      projectId: project._id,
-      deleted: { $ne: true },
-    }).sort({ createdAt: -1 });
+    // Get related data
+    const [uploads, elements, materials] = await Promise.all([
+      mongoose.models.Upload.find({ projectId: project._id }).lean(),
+      mongoose.models.Element.find({ projectId: project._id }).lean(),
+      mongoose.models.Material.find({ projectId: project._id }).lean(),
+    ]);
 
-    // Get elements for this project
-    const elements = await Element.find({
-      projectId: project._id,
-    }).lean();
-
-    // Get materials for this project
-    const materials = await Material.find({
-      projectId: project._id,
-    }).lean();
-
-    // Format the response
+    // Combine all data
     const projectData = {
-      id: project._id.toString(),
-      name: project.name,
-      description: project.description,
-      phase: project.phase,
-      createdAt: project.createdAt,
-      updatedAt: project.updatedAt,
-      uploads: uploads.map((upload) => ({
-        _id: upload._id.toString(),
-        filename: upload.filename,
-        status: upload.status,
-        elementCount: upload.elementCount,
-        createdAt: upload.createdAt,
-      })),
-      elements: elements.map((element) => ({
-        id: element._id.toString(),
-        _id: element._id.toString(),
-        guid: element.guid,
-        name: element.name,
-        type: element.type,
-        volume: element.volume,
-        buildingStorey: element.buildingStorey,
-        materials: element.materials || [],
-      })),
-      materials: materials.map((material) => ({
-        id: material._id.toString(),
-        name: material.name,
-        category: material.category,
-        volume: material.volume || 0,
-        fraction: 0, // Calculate this if needed
-      })),
-      _count: {
-        uploads: uploads.length,
-        elements: elements.length,
-        materials: materials.length,
-      },
+      ...project,
+      uploads: uploads || [],
+      elements: elements || [],
+      materials: materials || [],
     };
 
+    console.log("API - Sending project data:", projectData);
     return NextResponse.json(projectData);
   } catch (error) {
-    console.error("Failed to fetch project:", error);
-    return new Response("Internal Server Error", { status: 500 });
+    console.error("API - Error fetching project:", error);
+    return NextResponse.json(
+      { error: "Failed to fetch project" },
+      { status: 500 }
+    );
   }
 }
 
@@ -149,5 +106,38 @@ export async function DELETE(
   } catch (error) {
     console.error("Failed to delete project:", error);
     return new Response("Internal Server Error", { status: 500 });
+  }
+}
+
+export async function PATCH(
+  request: Request,
+  { params }: { params: { id: string } }
+) {
+  try {
+    const { userId } = await auth();
+    if (!userId) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    await connectToDatabase();
+
+    const body = await request.json();
+    const project = await Project.findOneAndUpdate(
+      { _id: params.id, userId },
+      { $set: body },
+      { new: true }
+    );
+
+    if (!project) {
+      return NextResponse.json({ error: "Project not found" }, { status: 404 });
+    }
+
+    return NextResponse.json(project);
+  } catch (error) {
+    console.error("Failed to update project:", error);
+    return NextResponse.json(
+      { error: "Failed to update project" },
+      { status: 500 }
+    );
   }
 }
