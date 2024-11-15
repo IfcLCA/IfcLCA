@@ -14,18 +14,44 @@ export const materialsColumns: ColumnDef<MaterialTableItem>[] = [
   {
     accessorKey: "ifcMaterial",
     header: "IFC Material",
+    enableResizing: true,
+    size: 200,
+    minSize: 100,
+    cell: ({ row }) => (
+      <div className="truncate">
+        {row.getValue("ifcMaterial") || "Unknown"}
+      </div>
+    ),
   },
   {
     accessorKey: "kbobMaterial",
     header: "KBOB Material",
-    cell: ({ row }) => row.getValue("kbobMaterial") || "Unknown",
+    enableResizing: true,
+    size: 200,
+    minSize: 100,
+    cell: ({ row }) => (
+      <div className="truncate">
+        {row.getValue("kbobMaterial") || "Unknown"}
+      </div>
+    ),
   },
   {
     accessorKey: "category",
     header: "Element",
+    enableResizing: true,
+    size: 200,
+    minSize: 100,
+    cell: ({ row }) => (
+      <div className="truncate">
+        {row.getValue("category") || "Unknown"}
+      </div>
+    ),
   },
   {
     accessorKey: "volume",
+    enableResizing: true,
+    size: 100,
+    minSize: 80,
     header: () => (
       <div className="text-center">
         Volume (m³)

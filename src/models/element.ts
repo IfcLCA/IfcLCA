@@ -9,6 +9,8 @@ interface IElement {
   materials: Array<{
     material: mongoose.Types.ObjectId;
     volume: number;
+    density: number;
+    mass: number;
     fraction: number;
     indicators?: {
       gwp: number;
@@ -16,6 +18,11 @@ interface IElement {
       penre: number;
     };
   }>;
+  indicators?: {
+    gwp: number;
+    ubp: number;
+    penre: number;
+  };
   // ... other fields
 }
 
@@ -37,6 +44,8 @@ const elementSchema = new mongoose.Schema<IElement>(
           ref: "Material",
         },
         volume: Number,
+        density: Number,
+        mass: Number,
         fraction: Number,
         indicators: {
           gwp: Number,
@@ -45,6 +54,11 @@ const elementSchema = new mongoose.Schema<IElement>(
         },
       },
     ],
+    indicators: {
+      gwp: Number,
+      ubp: Number,
+      penre: Number,
+    },
     // ... other fields
   },
   {

@@ -298,10 +298,16 @@ export async function POST(
     // Save elements with update for duplicates
     const savedElements = await Promise.all(
       elements.map(async (element: any) => {
+        // Get all materials for this project to reference them
+        const projectMaterials = await Material.find({ projectId: projectId })
+          .populate('kbobMatchId'); // Make sure to populate KBOB data
+
         // Calculate indicators for each material in the element
         const materialsWithIndicators = (element.materialLayers?.layers || []).map((material: any) => {
-          const matchedMaterial = materialMatches.find(m => m.name === material.materialName);
-          if (matchedMaterial?.kbobMatch) {
+          // Find the saved material in the database
+          const savedMaterial = projectMaterials.find(m => m.name === material.materialName);
+          
+          if (savedMaterial && savedMaterial.kbobMatchId) {
             // Calculate volume based on layer thickness and element net volume
             const layerThickness = material.thickness || 0;
             const totalThickness = element.materialLayers?.layers.reduce((sum: number, layer: any) => sum + (layer.thickness || 0), 0) || 1;
@@ -310,7 +316,7 @@ export async function POST(
 
             // Get density from KBOB data
             let density = 0;
-            const kbobData = matchedMaterial.kbobMatch;
+            const kbobData = savedMaterial.kbobMatchId;
             
             if (typeof kbobData['kg/unit'] === 'number') {
               density = kbobData['kg/unit'];
@@ -318,9 +324,16 @@ export async function POST(
                      typeof kbobData['max density'] === 'number') {
               density = (kbobData['min density'] + kbobData['max density']) / 2;
             }
-            
+
             // Calculate mass in tons (volume in m³, density in kg/m³)
-            const mass = volume * density;
+            const mass = volume * density / 1000; // Convert kg to tons
+
+            // Calculate indicators (KBOB values are per ton)
+            const indicators = {
+              gwp: (kbobData.GWP || 0) * mass,
+              ubp: (kbobData.UBP || 0) * mass,
+              penre: (kbobData.PENRE || 0) * mass
+            };
 
             logger.debug(`Material indicators calculated`, {
               materialName: material.materialName,
@@ -335,23 +348,18 @@ export async function POST(
                 gwp: kbobData.GWP,
                 ubp: kbobData.UBP,
                 penre: kbobData.PENRE
-              }
+              },
+              calculatedIndicators: indicators
             });
-            
+
             return {
+              material: savedMaterial._id,
               name: material.materialName,
               volume: volume,
               thickness: material.thickness,
-              category: matchedMaterial.category,
-              kbobMatchId: kbobData._id,
               density: density,
               mass: mass,
-              indicators: {
-                // KBOB values are per ton, mass is in tons
-                gwp: (kbobData.GWP || 0) * mass,
-                ubp: (kbobData.UBP || 0) * mass,
-                penre: (kbobData.PENRE || 0) * mass
-              }
+              indicators
             };
           }
           return {

@@ -62,6 +62,8 @@ interface Material {
 interface MaterialEntry {
   name: string;
   volume: number;
+  density: number;
+  mass: number;
   thickness?: number;
   material?: {
     name: string;
@@ -643,21 +645,29 @@ const EmissionsTab = ({
   const data = useMemo(() => {
     // First, create a map to group identical materials
     const groupedMaterials = project.elements.flatMap((element: ElementWithMaterials) =>
-      element.materials.map((materialEntry: MaterialEntry) => ({
-        kbobMaterial: materialEntry.material?.kbobMatchId?.Name || "Unknown",
-        ifcMaterial: materialEntry.material?.name || "Unknown",
-        volume: materialEntry.volume || 0,
-        kbobIndicators: {
-          gwp: materialEntry.material?.kbobMatchId?.GWP || 0,
-          ubp: materialEntry.material?.kbobMatchId?.UBP || 0,
-          penre: materialEntry.material?.kbobMatchId?.PENRE || 0,
-        },
-        indicators: materialEntry.indicators || {
-          gwp: 0,
-          ubp: 0,
-          penre: 0
-        }
-      }))
+      element.materials.map((materialEntry: MaterialEntry) => {
+        // Log the material entry to debug
+        console.log('Material Entry:', materialEntry);
+        
+        return {
+          id: materialEntry._id,
+          kbobMaterial: materialEntry.material?.kbobMatchId?.Name || "Unknown",
+          ifcMaterial: materialEntry.material?.name || "Unknown",
+          volume: materialEntry.volume || 0,
+          density: materialEntry.material?.density || 0,
+          mass: materialEntry.mass || 0,
+          kbobIndicators: {
+            gwp: materialEntry.material?.kbobMatchId?.GWP || 0,
+            ubp: materialEntry.material?.kbobMatchId?.UBP || 0,
+            penre: materialEntry.material?.kbobMatchId?.PENRE || 0,
+          },
+          indicators: materialEntry.indicators || {
+            gwp: 0,
+            ubp: 0,
+            penre: 0,
+          },
+        };
+      })
     ).reduce((acc, curr) => {
       const key = `${curr.kbobMaterial}-${curr.ifcMaterial}`;
       if (!acc[key]) {
@@ -665,9 +675,11 @@ const EmissionsTab = ({
       } else {
         // Sum up the volumes and indicators
         acc[key].volume += curr.volume;
+        acc[key].mass += curr.mass;
         acc[key].indicators.gwp += curr.indicators.gwp;
         acc[key].indicators.ubp += curr.indicators.ubp;
         acc[key].indicators.penre += curr.indicators.penre;
+        // Keep the same density since it should be the same for identical materials
       }
       return acc;
     }, {} as Record<string, any>);
@@ -736,18 +748,24 @@ const EmissionsTab = ({
 
 const GraphTab = ({ project }: { project: ExtendedProject }) => {
   const materialsData = project.elements.flatMap((element: ElementWithMaterials) =>
-    element.materials.map((materialEntry: MaterialEntry) => ({
-      name: element.name || "Unknown",
-      volume: materialEntry.volume || 0,
-      indicators: materialEntry.indicators || {
-        gwp: 0,
-        ubp: 0,
-        penre: 0,
-      },
-      category: materialEntry.material?.category,
-      kbobMaterial: materialEntry.material?.kbobMatchId?.Name,
-      ifcMaterial: materialEntry.material?.name,
-    }))
+    element.materials.map((materialEntry: MaterialEntry) => {
+      const volume = materialEntry.volume || 0;
+      const density = materialEntry.material?.density || 0;
+      const kbobIndicators = materialEntry.material?.kbobMatchId || { GWP: 0, UBP: 0, PENRE: 0 };
+
+      return {
+        name: element.name || "Unknown",
+        volume: volume,
+        indicators: {
+          gwp: volume * density * (kbobIndicators.GWP || 0),
+          ubp: volume * density * (kbobIndicators.UBP || 0),
+          penre: volume * density * (kbobIndicators.PENRE || 0),
+        },
+        category: materialEntry.material?.category,
+        kbobMaterial: materialEntry.material?.kbobMatchId?.Name,
+        ifcMaterial: materialEntry.material?.name,
+      };
+    })
   );
 
   return (

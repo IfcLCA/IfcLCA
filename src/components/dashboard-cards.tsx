@@ -21,6 +21,15 @@ interface Indicators {
 
 interface Material {
   indicators?: Indicators;
+  volume?: number;
+  material?: {
+    density?: number;
+    kbobMatchId?: {
+      GWP?: number;
+      UBP?: number;
+      PENRE?: number;
+    };
+  };
 }
 
 interface Element {
@@ -36,17 +45,23 @@ export function DashboardCards({
   const totalEmissions = project?.elements?.reduce(
     (acc: Indicators, element: Element) => {
       const elementTotals = element.materials.reduce(
-        (materialAcc, material) => ({
-          gwp: (materialAcc.gwp ?? 0) + (material.indicators?.gwp ?? 0),
-          ubp: (materialAcc.ubp ?? 0) + (material.indicators?.ubp ?? 0),
-          penre: (materialAcc.penre ?? 0) + (material.indicators?.penre ?? 0),
-        }),
+        (materialAcc, material) => {
+          const volume = material.volume || 0;
+          const density = material.material?.density || 0;
+          const kbobIndicators = material.material?.kbobMatchId || { GWP: 0, UBP: 0, PENRE: 0 };
+
+          return {
+            gwp: materialAcc.gwp + (volume * density * (kbobIndicators.GWP || 0)),
+            ubp: materialAcc.ubp + (volume * density * (kbobIndicators.UBP || 0)),
+            penre: materialAcc.penre + (volume * density * (kbobIndicators.PENRE || 0)),
+          };
+        },
         { gwp: 0, ubp: 0, penre: 0 }
       );
       return {
-        gwp: (acc.gwp ?? 0) + elementTotals.gwp,
-        ubp: (acc.ubp ?? 0) + elementTotals.ubp,
-        penre: (acc.penre ?? 0) + elementTotals.penre,
+        gwp: acc.gwp + elementTotals.gwp,
+        ubp: acc.ubp + elementTotals.ubp,
+        penre: acc.penre + elementTotals.penre,
       };
     },
     { gwp: 0, ubp: 0, penre: 0 } as Indicators

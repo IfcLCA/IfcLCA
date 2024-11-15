@@ -7,6 +7,7 @@ interface EmissionRow {
   kbobMaterial: string;
   ifcMaterial: string;
   volume: number;
+  density: number;
   indicators: {
     gwp: number;
     ubp: number;
@@ -55,18 +56,57 @@ export const emissionsColumns = (selectedIndicator: IndicatorType): ColumnDef<Em
   {
     accessorKey: "kbobMaterial",
     header: "KBOB Material",
-    cell: ({ row }) => row.getValue("kbobMaterial") || "Unknown",
+    cell: ({ row }) => (
+      <div className="w-[200px] truncate">
+        {row.getValue("kbobMaterial") || "Unknown"}
+      </div>
+    ),
+  },
+  {
+    accessorKey: "ifcMaterial",
+    header: "IFC Material",
+    cell: ({ row }) => (
+      <div className="w-[200px] truncate">
+        {row.getValue("ifcMaterial") || "Unknown"}
+      </div>
+    ),
+  },
+  {
+    accessorKey: "volume",
+    header: () => (
+      <div className="text-center w-[100px]">
+        Volume (m³)
+      </div>
+    ),
+    cell: ({ row }) => (
+      <div className="text-center w-[100px]">
+        {formatNumber(row.getValue("volume"), 2)}
+      </div>
+    ),
+  },
+  {
+    accessorKey: "density",
+    header: () => (
+      <div className="text-center w-[100px]">
+        Density (kg/m³)
+      </div>
+    ),
+    cell: ({ row }) => (
+      <div className="text-center w-[100px]">
+        {formatNumber(row.getValue("density"), 0)}
+      </div>
+    ),
   },
   {
     accessorKey: "kbobIndicators",
     id: "kbob_indicator",
     header: () => (
-      <div className="text-center">
+      <div className="text-center w-[120px]">
         KBOB {indicatorLabels[selectedIndicator].name} ({indicatorLabels[selectedIndicator].kbobUnit})
       </div>
     ),
     cell: ({ row }) => (
-      <div className="text-center">
+      <div className="text-center w-[120px]">
         {formatNumber(
           row.original.kbobIndicators[selectedIndicator],
           indicatorLabels[selectedIndicator].decimals
@@ -75,35 +115,24 @@ export const emissionsColumns = (selectedIndicator: IndicatorType): ColumnDef<Em
     ),
   },
   {
-    accessorKey: "ifcMaterial",
-    header: "IFC Material",
-    cell: ({ row }) => row.getValue("ifcMaterial") || "Unknown",
-  },
-  {
-    accessorKey: "volume",
-    header: () => (
-      <div className="text-center">
-        Volume (m³)
-      </div>
-    ),
-    cell: ({ row }) => (
-      <div className="text-center">
-        {formatNumber(row.getValue("volume"), 2)}
-      </div>
-    ),
-  },
-  {
     accessorKey: "indicators",
     id: "total_indicator",
     header: () => (
-      <div className="text-center">
+      <div className="text-center w-[120px]">
         Total {indicatorLabels[selectedIndicator].name} ({indicatorLabels[selectedIndicator].unit})
       </div>
     ),
-    cell: ({ row }) => (
-      <div className="text-center">
-        {formatNumber(row.original.indicators[selectedIndicator], 0)}
-      </div>
-    ),
+    cell: ({ row }) => {
+      const volume = row.getValue("volume") as number;
+      const density = row.getValue("density") as number;
+      const indicatorPerKg = row.original.kbobIndicators[selectedIndicator];
+      const total = volume * density * indicatorPerKg;
+      
+      return (
+        <div className="text-center w-[120px]">
+          {formatNumber(total, 0)}
+        </div>
+      );
+    },
   },
 ];
