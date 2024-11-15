@@ -13,20 +13,14 @@ import {
 import {
   LayoutDashboard,
   BarChart3,
-  FileStack,
-  FolderTree,
   Home,
-  Library,
-  Upload,
   Box,
   PlusCircle,
   Building,
   Database,
   FileBarChart2,
   Boxes,
-  Cube,
   History,
-  UploadCloud,
 } from "lucide-react";
 import { UploadIfcButton } from "@/components/upload-ifc-button";
 
@@ -90,7 +84,7 @@ const projectItems: SidebarItem[] = [
   },
   {
     title: "3D Viewer",
-    icon: <Cube className="h-5 w-5" />,
+    icon: <Box className="h-5 w-5" />,
     href: "/project/:id/viewer",
   },
   {
@@ -108,12 +102,11 @@ export function SidebarNavigation({
   const items = projectId ? [...primaryItems, ...projectItems] : primaryItems;
 
   return (
-    <TooltipProvider delayDuration={0}>
+    <TooltipProvider>
       <aside className="fixed left-0 top-0 h-screen z-10">
         <div className="h-full pt-[64px] -mt-px">
           <nav className="h-full flex flex-col bg-background border-r shadow-sm w-16">
             <div className="flex-1" />
-
             <div className="p-2 flex flex-col items-center gap-2">
               {items.map((item, index) => (
                 <Tooltip key={index}>
@@ -152,9 +145,7 @@ export function SidebarNavigation({
                   </TooltipContent>
                 </Tooltip>
               ))}
-
               <div className="my-2 w-10 border-t" />
-
               <Tooltip>
                 <TooltipTrigger asChild>
                   <div className="w-10 h-10">
@@ -169,7 +160,6 @@ export function SidebarNavigation({
                   Add new IFC
                 </TooltipContent>
               </Tooltip>
-
               <Tooltip>
                 <TooltipTrigger asChild>
                   <Link

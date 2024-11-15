@@ -10,38 +10,11 @@ import {
   Pencil,
   Trash2,
   Image as ImageIcon,
-  Activity,
+  Activity as ActivityIcon,
 } from "lucide-react";
 import Link from "next/link";
 import Image from "next/image";
-
-interface Activity {
-  id: string;
-  type:
-    | "project_created"
-    | "file_uploaded"
-    | "project_updated"
-    | "project_deleted"
-    | "image_uploaded";
-  user: {
-    name: string;
-    imageUrl: string;
-  };
-  action: string;
-  project: string;
-  projectId: string;
-  timestamp: string;
-  details: {
-    description?: string;
-    fileName?: string;
-    elementCount?: number;
-    imageUrl?: string;
-    changes?: {
-      name?: string;
-      description?: string;
-    };
-  };
-}
+import { Activity } from "@/lib/types/activity";
 
 const getActivityIcon = (type: Activity["type"]) => {
   switch (type) {
@@ -56,7 +29,7 @@ const getActivityIcon = (type: Activity["type"]) => {
     case "image_uploaded":
       return <ImageIcon className="h-4 w-4" />;
     default:
-      return <Activity className="h-4 w-4" />;
+      return <ActivityIcon className="h-4 w-4" />;
   }
 };
 

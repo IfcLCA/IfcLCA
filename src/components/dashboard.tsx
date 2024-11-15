@@ -31,6 +31,7 @@ import Image from "next/image";
 import { Badge } from "@/components/ui/badge";
 import { EmissionsSummaryCard } from "@/components/emissions-summary-card";
 import { UploadIfcButton } from "@/components/upload-ifc-button";
+import { Activity } from "@/lib/types/activity";
 
 interface Project {
   id: string;
@@ -56,29 +57,6 @@ interface DashboardStatistics {
     ubp: number;
     penre: number;
   };
-}
-
-interface Activity {
-  id: string;
-  type:
-    | "project_created"
-    | "file_uploaded"
-    | "material_created"
-    | "project_deleted"
-    | "material_deleted"
-    | "project_updated"
-    | "new_user"
-    | "project_member_added"
-    | "project_member_removed";
-  projectId: string;
-  details: any;
-  user: {
-    name: string;
-    avatar: string;
-  };
-  action: string;
-  project: string;
-  timestamp: string;
 }
 
 interface DashboardProps {
