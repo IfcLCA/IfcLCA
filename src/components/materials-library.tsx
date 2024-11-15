@@ -38,6 +38,7 @@ import {
   PaginationPrevious,
 } from "@/components/ui/pagination";
 import { MaterialChangesPreviewModal } from "@/components/material-changes-preview-modal";
+import { StarFilledIcon, StarIcon } from "@radix-ui/react-icons";
 
 interface Material {
   id: string;
@@ -84,10 +85,12 @@ export function MaterialLibraryComponent() {
   const [kbobSearchTerm, setKbobSearchTerm] = useState("");
   const [selectedProject, setSelectedProject] = useState<string | null>(null);
   const [projects, setProjects] = useState<Array<{id: string; name: string; materialIds: string[]}>>([]);
-  const [isMatchingLoading, setIsMatchingLoading] = useState(false);
+  const [isMatchingInProgress, setIsMatchingInProgress] = useState(false);
   const [isKbobOpen, setIsKbobOpen] = useState(false);
   const [previewChanges, setPreviewChanges] = useState<any[]>([]);
   const [showPreview, setShowPreview] = useState(false);
+  const [favoriteMaterials, setFavoriteMaterials] = useState<string[]>([]);
+  const [selectedKbobId, setSelectedKbobId] = useState<string | null>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -239,9 +242,9 @@ export function MaterialLibraryComponent() {
   };
 
   const handleMatch = async () => {
-    if (kbobSearchTerm && selectedMaterials.length > 0) {
+    if (selectedKbobId && selectedMaterials.length > 0) {
       try {
-        setIsMatchingLoading(true);
+        setIsMatchingInProgress(true);
         
         // First get the preview
         const previewResponse = await fetch("/api/materials/match/preview", {
@@ -251,7 +254,7 @@ export function MaterialLibraryComponent() {
           },
           body: JSON.stringify({
             materialIds: selectedMaterials,
-            kbobMaterialId: kbobSearchTerm,
+            kbobMaterialId: selectedKbobId,
           }),
         });
 
@@ -262,17 +265,18 @@ export function MaterialLibraryComponent() {
         const previewData = await previewResponse.json();
         setPreviewChanges(previewData.changes);
         setShowPreview(true);
-        setIsMatchingLoading(false);
       } catch (error) {
         console.error("Failed to get match preview:", error);
-        setIsMatchingLoading(false);
+        alert('Failed to get match preview. Please try again.');
+      } finally {
+        setIsMatchingInProgress(false);
       }
     }
   };
 
   const handleConfirmMatch = async () => {
     try {
-      setIsMatchingLoading(true);
+      setIsMatchingInProgress(true);
       const response = await fetch("/api/materials/match", {
         method: "POST",
         headers: {
@@ -280,7 +284,7 @@ export function MaterialLibraryComponent() {
         },
         body: JSON.stringify({
           materialIds: selectedMaterials,
-          kbobMaterialId: kbobSearchTerm,
+          kbobMaterialId: selectedKbobId,
         }),
       });
 
@@ -306,14 +310,14 @@ export function MaterialLibraryComponent() {
     } catch (error) {
       console.error("Failed to match materials:", error);
     } finally {
-      setIsMatchingLoading(false);
+      setIsMatchingInProgress(false);
     }
   };
 
   const handleCancelMatch = () => {
     setShowPreview(false);
     setPreviewChanges([]);
-    setIsMatchingLoading(false);
+    setIsMatchingInProgress(false);
   };
 
   const toggleSort = (column: "name" | "projects") => {
@@ -332,6 +336,107 @@ export function MaterialLibraryComponent() {
     );
     return Array.from(projectSet).sort();
   }, [materials]);
+
+  const sortedKbobMaterials = useMemo(() => {
+    return [...kbobMaterials].sort((a, b) => {
+      const aFav = favoriteMaterials.includes(a._id);
+      const bFav = favoriteMaterials.includes(b._id);
+      if (aFav && !bFav) return -1;
+      if (!aFav && bFav) return 1;
+      return a.Name?.localeCompare(b.Name || '') || 0;
+    });
+  }, [kbobMaterials, favoriteMaterials]);
+
+  const commonWords = useMemo(() => {
+    const words = new Map<string, number>();
+    kbobMaterials.forEach(material => {
+      if (!material.Name) return;
+      const wordList = material.Name.split(/[\s,.-]+/).filter(w => w.length > 2);
+      wordList.forEach(word => {
+        words.set(word.toLowerCase(), (words.get(word.toLowerCase()) || 0) + 1);
+      });
+    });
+    return Array.from(words.entries())
+      .filter(([_, count]) => count > 1) // Only keep words that appear more than once
+      .sort((a, b) => b[1] - a[1])
+      .map(([word]) => word);
+  }, [kbobMaterials]);
+
+  const commonPhrases = useMemo(() => {
+    const phrases = new Map<string, number>();
+    kbobMaterials.forEach(material => {
+      if (!material.Name) return;
+      // Get 2-3 word phrases
+      const words = material.Name.split(/[\s,.-]+/).filter(w => w.length > 2);
+      for (let i = 0; i < words.length - 1; i++) {
+        const twoWords = `${words[i]} ${words[i + 1]}`.toLowerCase();
+        phrases.set(twoWords, (phrases.get(twoWords) || 0) + 1);
+        if (i < words.length - 2) {
+          const threeWords = `${words[i]} ${words[i + 1]} ${words[i + 2]}`.toLowerCase();
+          phrases.set(threeWords, (phrases.get(threeWords) || 0) + 1);
+        }
+      }
+    });
+    // Convert to array and sort by frequency
+    return Array.from(phrases.entries())
+      .filter(([_, count]) => count > 1) // Only keep phrases that appear more than once
+      .sort((a, b) => b[1] - a[1])
+      .map(([phrase]) => phrase);
+  }, [kbobMaterials]);
+
+  // Normalize text for comparison (handle special characters, case, etc.)
+  const normalizeText = (text: string) => {
+    return text
+      .toLowerCase()
+      // Replace special characters with their basic form
+      .normalize('NFKD')
+      .replace(/[\u0300-\u036f]/g, '')
+      // Replace special characters and punctuation
+      .replace(/[^a-z0-9\s]/g, '')
+      // Replace multiple spaces with single space
+      .replace(/\s+/g, ' ')
+      .trim();
+  };
+
+  const getSuggestions = useCallback((input: string) => {
+    if (!input || input.length < 2) return [];
+    const searchTerm = normalizeText(input);
+    
+    // First, get exact favorites matches
+    const favoriteMatches = sortedKbobMaterials
+      .filter(m => {
+        if (!m.Name) return false;
+        const normalizedName = normalizeText(m.Name);
+        return favoriteMaterials.includes(m._id) && 
+               normalizedName.includes(searchTerm);
+      })
+      .slice(0, 3)
+      .map(m => ({ type: 'favorite' as const, text: m.Name, id: m._id }));
+    
+    // Then, get phrase suggestions
+    const phraseMatches = commonPhrases
+      .filter(phrase => normalizeText(phrase).includes(searchTerm))
+      .slice(0, 3)
+      .map(phrase => ({ type: 'phrase' as const, text: phrase, id: null }));
+    
+    // Finally, get word suggestions
+    const wordMatches = commonWords
+      .filter(word => normalizeText(word).includes(searchTerm))
+      .slice(0, 3)
+      .map(word => ({ type: 'word' as const, text: word, id: null }));
+    
+    return [...favoriteMatches, ...phraseMatches, ...wordMatches];
+  }, [commonPhrases, commonWords, sortedKbobMaterials, favoriteMaterials]);
+
+  const toggleFavorite = useCallback((materialId: string) => {
+    setFavoriteMaterials(prev => {
+      if (prev.includes(materialId)) {
+        return prev.filter(id => id !== materialId);
+      } else {
+        return [...prev, materialId];
+      }
+    });
+  }, []);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -360,19 +465,19 @@ export function MaterialLibraryComponent() {
   return (
     <div className="container mx-auto py-10">
       <Card>
-        <CardHeader>
-          <CardTitle>Material Library</CardTitle>
-          <CardDescription>
-            Manage and update your material properties
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="flex gap-4 mb-4">
-            <div className="relative flex-1">
-              <MagnifyingGlassIcon className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+          <div>
+            <CardTitle>Material Library</CardTitle>
+            <CardDescription>
+              Manage and update your material properties
+            </CardDescription>
+          </div>
+          <div className="flex items-center gap-4">
+            <div className="relative">
+              <MagnifyingGlassIcon className="absolute left-2 top-2.5 h-3 w-3 text-muted-foreground" />
               <Input
                 placeholder="Search materials..."
-                className="pl-8"
+                className="pl-7 w-[180px] h-8 text-sm"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
               />
@@ -394,124 +499,188 @@ export function MaterialLibraryComponent() {
               </SelectContent>
             </Select>
           </div>
-
-          <div className="flex items-center space-x-4">
+        </CardHeader>
+        <CardContent>
+          <div className="flex gap-4 mb-4">
             <div className="relative flex-1" ref={dropdownRef}>
-              <div className="flex items-center space-x-2">
-                <MagnifyingGlassIcon className="w-4 h-4 text-muted-foreground" />
-                <Input
-                  placeholder="Search and apply environmental impact data..."
-                  value={kbobSearchTerm}
-                  onChange={(e) => {
-                    setKbobSearchTerm(e.target.value);
-                    setIsKbobOpen(true);
-                  }}
-                  onFocus={() => {
-                    setKbobSearchTerm("");
-                    setIsKbobOpen(true);
-                  }}
-                  onKeyDown={(e) => {
-                    const filteredMaterials = kbobMaterials.filter((material) =>
-                      material.Name?.toLowerCase().includes(kbobSearchTerm.toLowerCase())
-                    );
-                    const currentIndex = filteredMaterials.findIndex(
-                      (material) => material._id === kbobSearchTerm
-                    );
-
-                    switch (e.key) {
-                      case "ArrowDown":
-                        e.preventDefault();
-                        if (currentIndex < filteredMaterials.length - 1) {
-                          setKbobSearchTerm(filteredMaterials[currentIndex + 1]._id);
-                        } else {
-                          setKbobSearchTerm(filteredMaterials[0]._id);
-                        }
-                        break;
-                      case "ArrowUp":
-                        e.preventDefault();
-                        if (currentIndex > 0) {
-                          setKbobSearchTerm(filteredMaterials[currentIndex - 1]._id);
-                        } else {
-                          setKbobSearchTerm(filteredMaterials[filteredMaterials.length - 1]._id);
-                        }
-                        break;
-                      case "Enter":
-                        if (currentIndex !== -1) {
-                          e.preventDefault();
-                          setIsKbobOpen(false);
-                        }
-                        break;
-                      case "Escape":
-                        e.preventDefault();
-                        setIsKbobOpen(false);
-                        break;
-                    }
-                  }}
-                  className="w-full"
-                />
-              </div>
-              {isKbobOpen && (
-                <div className="absolute z-50 w-full max-h-[300px] overflow-y-auto bg-background border rounded-md shadow-lg mt-2">
-                  {kbobMaterials
-                    .filter((material) =>
-                      material.Name?.toLowerCase().includes(kbobSearchTerm.toLowerCase())
-                    )
-                    .map((material) => (
-                      <div
-                        key={material._id}
-                        className={`p-2 hover:bg-primary/10 cursor-pointer flex justify-between items-center ${
-                          material._id === kbobSearchTerm ? "bg-primary/10" : ""
-                        }`}
-                        onClick={() => {
-                          setKbobSearchTerm(material._id);
-                          setIsKbobOpen(false);
-                        }}
-                      >
-                        <span className="flex-1">{material.Name}</span>
-                        <span className="text-sm text-muted-foreground ml-4">
-                          GWP: {material.GWP}
-                        </span>
-                      </div>
-                    ))}
+              <div className="flex flex-col space-y-2">
+                <div className="flex items-center space-x-2 text-sm font-medium">
+                  <MagnifyingGlassIcon className="w-4 h-4" />
+                  <span>Search and apply environmental impact data</span>
                 </div>
-              )}
-            </div>
-            <Button
-              onClick={handleMatch}
-              disabled={
-                !kbobSearchTerm ||
-                selectedMaterials.length === 0 ||
-                isMatchingLoading
-              }
-            >
-              {isMatchingLoading ? (
-                <>
-                  <svg
-                    className="animate-spin -ml-1 mr-3 h-4 w-4 text-white"
-                    xmlns="http://www.w3.org/2000/svg"
-                    fill="none"
-                    viewBox="0 0 24 24"
+                <div className="flex gap-2">
+                  <div className="relative flex-1">
+                    <Input
+                      placeholder="Search KBOB materials to match..."
+                      value={kbobMaterials.find(m => m._id === selectedKbobId)?.Name || kbobSearchTerm}
+                      onChange={(e) => {
+                        const value = e.target.value;
+                        setKbobSearchTerm(value);
+                        setSelectedKbobId(""); // Clear selected ID when user types
+                        setIsKbobOpen(true);
+                      }}
+                      onFocus={() => {
+                        setKbobSearchTerm("");
+                        setSelectedKbobId(""); // Clear selected ID on focus
+                        setIsKbobOpen(true);
+                      }}
+                      onKeyDown={(e) => {
+                        const filteredMaterials = sortedKbobMaterials.filter((material) =>
+                          material.Name?.toLowerCase().includes(kbobSearchTerm.toLowerCase())
+                        );
+                        const currentIndex = filteredMaterials.findIndex(
+                          (material) => material._id === selectedKbobId
+                        );
+
+                        switch (e.key) {
+                          case "ArrowDown":
+                            e.preventDefault();
+                            if (currentIndex < filteredMaterials.length - 1) {
+                              setSelectedKbobId(filteredMaterials[currentIndex + 1]._id);
+                            } else {
+                              setSelectedKbobId(filteredMaterials[0]._id);
+                            }
+                            break;
+                          case "ArrowUp":
+                            e.preventDefault();
+                            if (currentIndex > 0) {
+                              setSelectedKbobId(filteredMaterials[currentIndex - 1]._id);
+                            } else {
+                              setSelectedKbobId(filteredMaterials[filteredMaterials.length - 1]._id);
+                            }
+                            break;
+                          case "Enter":
+                            if (currentIndex !== -1) {
+                              e.preventDefault();
+                              setIsKbobOpen(false);
+                            }
+                            break;
+                          case "Escape":
+                            e.preventDefault();
+                            setIsKbobOpen(false);
+                            break;
+                        }
+                      }}
+                      className="w-full"
+                    />
+                    {isKbobOpen && (
+                      <div className="absolute z-50 w-full max-h-[300px] overflow-y-auto bg-background border rounded-md shadow-lg mt-2">
+                        {/* Suggestions */}
+                        {!selectedKbobId && kbobSearchTerm.length >= 2 && (
+                          <div className="p-2 border-b">
+                            {getSuggestions(kbobSearchTerm).map(({ type, text, id }, index) => (
+                              <div
+                                key={`${type}-${text}`}
+                                className="flex items-center gap-2 p-1 cursor-pointer hover:bg-primary/10 rounded"
+                                onClick={() => {
+                                  if (id) {
+                                    // If it's a favorite with an ID, set both the ID and search term
+                                    setSelectedKbobId(id);
+                                    setKbobSearchTerm(text);
+                                    setIsKbobOpen(false);
+                                  } else {
+                                    // For phrases and words, just set the search term
+                                    setKbobSearchTerm(text);
+                                  }
+                                }}
+                              >
+                                {type === 'favorite' && <StarFilledIcon className="w-3 h-3 text-yellow-400" />}
+                                {type === 'phrase' && <MagnifyingGlassIcon className="w-3 h-3 text-muted-foreground" />}
+                                <span className="text-sm">{text}</span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                        {/* Material matches */}
+                        <div className="divide-y">
+                          {sortedKbobMaterials
+                            .filter((material) => {
+                              if (!material.Name) return false;
+                              return normalizeText(material.Name).includes(
+                                normalizeText(kbobSearchTerm)
+                              );
+                            })
+                            .map((material) => (
+                              <div
+                                key={material._id}
+                                className={`p-2 hover:bg-primary/10 cursor-pointer ${
+                                  material._id === selectedKbobId ? "bg-primary/10" : ""
+                                }`}
+                              >
+                                <div className="flex justify-between items-center gap-2">
+                                  <span 
+                                    className="flex-1"
+                                    onClick={() => {
+                                      setSelectedKbobId(material._id);
+                                      setKbobSearchTerm(material.Name || "");
+                                      setIsKbobOpen(false);
+                                    }}
+                                  >
+                                    <div className="font-medium">{material.Name}</div>
+                                    <div className="text-sm text-muted-foreground">
+                                      GWP: {material.GWP} kg CO₂-eq
+                                    </div>
+                                  </span>
+                                  <button
+                                    className="p-1 hover:bg-primary/20 rounded"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      toggleFavorite(material._id);
+                                    }}
+                                  >
+                                    {favoriteMaterials.includes(material._id) ? (
+                                      <StarFilledIcon className="w-4 h-4 text-yellow-400" />
+                                    ) : (
+                                      <StarIcon className="w-4 h-4 text-muted-foreground" />
+                                    )}
+                                  </button>
+                                </div>
+                              </div>
+                            ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                  <Button
+                    onClick={handleMatch}
+                    disabled={
+                      !selectedKbobId ||
+                      selectedMaterials.length === 0 ||
+                      isMatchingInProgress
+                    }
+                    className="h-10"
                   >
-                    <circle
-                      className="opacity-25"
-                      cx="12"
-                      cy="12"
-                      r="10"
-                      stroke="currentColor"
-                      strokeWidth="4"
-                    ></circle>
-                    <path
-                      className="opacity-75"
-                      fill="currentColor"
-                      d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                    ></path>
-                  </svg>
-                  Matching...
-                </>
-              ) : (
-                "Match Selected"
-              )}
-            </Button>
+                    {isMatchingInProgress ? (
+                      <>
+                        <svg
+                          className="animate-spin -ml-1 mr-3 h-4 w-4 text-white"
+                          xmlns="http://www.w3.org/2000/svg"
+                          fill="none"
+                          viewBox="0 0 24 24"
+                        >
+                          <circle
+                            className="opacity-25"
+                            cx="12"
+                            cy="12"
+                            r="10"
+                            stroke="currentColor"
+                            strokeWidth="4"
+                          ></circle>
+                          <path
+                            className="opacity-75"
+                            fill="currentColor"
+                            d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                          ></path>
+                        </svg>
+                        Matching...
+                      </>
+                    ) : (
+                      "Match Selected"
+                    )}
+                  </Button>
+                </div>
+              </div>
+            </div>
           </div>
 
           <Table>
