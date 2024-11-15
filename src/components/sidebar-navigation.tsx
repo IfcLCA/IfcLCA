@@ -4,29 +4,35 @@ import * as React from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
-import { Button } from "@/components/ui/button";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import {
+  LayoutDashboard,
   BarChart3,
   FileStack,
   FolderTree,
   Home,
-  LayoutDashboard,
   Library,
-  Menu,
   Upload,
   Box,
-  X,
   PlusCircle,
-  Pin,
+  Building,
+  Database,
+  FileBarChart2,
+  Boxes,
+  Cube,
+  History,
+  UploadCloud,
 } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
+import { UploadIfcButton } from "@/components/upload-ifc-button";
 
 interface SidebarProps {
   currentPage: string;
   projectId?: string;
-  collapsed: boolean;
 }
 
 interface SidebarItem {
@@ -42,22 +48,22 @@ interface SidebarItem {
 const primaryItems: SidebarItem[] = [
   {
     title: "Home",
-    icon: <LayoutDashboard className="h-4 w-4" />,
+    icon: <LayoutDashboard className="h-5 w-5" />,
     href: "/",
   },
   {
     title: "Projects",
-    icon: <FolderTree className="h-4 w-4" />,
+    icon: <Building className="h-5 w-5" />,
     href: "/projects",
   },
   {
     title: "Materials",
-    icon: <Library className="h-4 w-4" />,
+    icon: <Database className="h-5 w-5" />,
     href: "/materials-library",
   },
   {
     title: "Reports",
-    icon: <FileStack className="h-4 w-4" />,
+    icon: <FileBarChart2 className="h-5 w-5" />,
     href: "#",
     badge: {
       text: "Coming Soon",
@@ -69,27 +75,27 @@ const primaryItems: SidebarItem[] = [
 const projectItems: SidebarItem[] = [
   {
     title: "Project Overview",
-    icon: <Home className="h-4 w-4" />,
+    icon: <Home className="h-5 w-5" />,
     href: "/project/:id",
   },
   {
     title: "Building Elements",
-    icon: <Box className="h-4 w-4" />,
+    icon: <Boxes className="h-5 w-5" />,
     href: "/project/:id/elements",
   },
   {
     title: "LCA Analysis",
-    icon: <BarChart3 className="h-4 w-4" />,
+    icon: <BarChart3 className="h-5 w-5" />,
     href: "/project/:id/lca",
   },
   {
     title: "3D Viewer",
-    icon: <Box className="h-4 w-4" />,
+    icon: <Cube className="h-5 w-5" />,
     href: "/project/:id/viewer",
   },
   {
     title: "Upload History",
-    icon: <Upload className="h-4 w-4" />,
+    icon: <History className="h-5 w-5" />,
     href: "/project/:id/uploads",
   },
 ];
@@ -97,124 +103,90 @@ const projectItems: SidebarItem[] = [
 export function SidebarNavigation({
   currentPage,
   projectId,
-  collapsed: defaultCollapsed,
 }: SidebarProps) {
   const pathname = usePathname();
-  const [isOpen, setIsOpen] = React.useState(false);
-  const [isPinned, setIsPinned] = React.useState(false);
-  const [isHovered, setIsHovered] = React.useState(false);
-  const [collapsed, setCollapsed] = React.useState(defaultCollapsed);
-
   const items = projectId ? [...primaryItems, ...projectItems] : primaryItems;
 
-  const isExpanded = isPinned || isHovered;
-
-  const SidebarContent = ({ mobile = false }: { mobile?: boolean }) => (
-    <div
-      className={cn(
-        "flex h-full flex-col gap-4",
-        !isExpanded && !mobile ? "items-center" : ""
-      )}
-      onMouseEnter={() => !mobile && setIsHovered(true)}
-      onMouseLeave={() => !mobile && setIsHovered(false)}
-    >
-      <div className="flex h-[60px] items-center justify-between px-4">
-        {mobile ? (
-          <Button variant="ghost" size="icon" onClick={() => setIsOpen(false)}>
-            <X className="h-4 w-4" />
-            <span className="sr-only">Close</span>
-          </Button>
-        ) : (
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => setIsPinned(!isPinned)}
-            className={cn(
-              "opacity-0 transition-opacity",
-              isExpanded && "opacity-100"
-            )}
-          >
-            <Pin className={cn("h-4 w-4", isPinned && "fill-current")} />
-            <span className="sr-only">
-              {isPinned ? "Unpin Sidebar" : "Pin Sidebar"}
-            </span>
-          </Button>
-        )}
-      </div>
-      <ScrollArea className="flex-1">
-        <div
-          className={cn(
-            "flex flex-col gap-4",
-            !isExpanded && !mobile ? "items-center" : "px-4"
-          )}
-        >
-          {items.map((item, index) => (
-            <Link
-              key={index}
-              href={item.href}
-              className={cn(
-                "flex items-center rounded-lg px-3 py-2 text-sm font-medium hover:bg-accent",
-                pathname === item.href ? "bg-accent" : "transparent",
-                !isExpanded && !mobile ? "justify-center w-10" : "",
-                item.href === "#" && "pointer-events-none opacity-60"
-              )}
-              onClick={() => mobile && setIsOpen(false)}
-            >
-              {item.icon}
-              {(isExpanded || mobile) && (
-                <div className="ml-3 flex items-center gap-2">
-                  {item.title}
-                  {item.badge && (
-                    <Badge variant={item.badge.variant} className="text-[10px]">
-                      {item.badge.text}
-                    </Badge>
-                  )}
-                </div>
-              )}
-            </Link>
-          ))}
-        </div>
-      </ScrollArea>
-      <div className={cn("p-4", !isExpanded && !mobile ? "w-full" : "")}>
-        <Link
-          href="/projects/new"
-          className={cn(
-            "flex items-center justify-center rounded-lg bg-primary p-2 text-primary-foreground hover:bg-primary/90",
-            !isExpanded && !mobile ? "h-10 w-10" : "w-full"
-          )}
-        >
-          <PlusCircle className="h-5 w-5" />
-          {(isExpanded || mobile) && <span className="ml-2">New Project</span>}
-        </Link>
-      </div>
-    </div>
-  );
-
   return (
-    <>
-      <aside
-        className={cn(
-          "hidden border-r bg-background lg:block transition-all duration-300",
-          isExpanded ? "w-64" : "w-[60px]"
-        )}
-      >
-        <SidebarContent />
+    <TooltipProvider delayDuration={0}>
+      <aside className="fixed left-0 top-0 h-screen z-10">
+        <div className="h-full pt-[64px] -mt-px">
+          <nav className="h-full flex flex-col bg-background border-r shadow-sm w-16">
+            <div className="flex-1" />
+
+            <div className="p-2 flex flex-col items-center gap-2">
+              {items.map((item, index) => (
+                <Tooltip key={index}>
+                  <TooltipTrigger asChild>
+                    <Link
+                      href={item.href}
+                      className={cn(
+                        "flex items-center justify-center w-10 h-10 rounded-md hover:bg-accent hover:text-accent-foreground transition-colors relative group",
+                        pathname === item.href ? "bg-accent text-accent-foreground" : "transparent",
+                        item.href === "#" && "opacity-60 pointer-events-none"
+                      )}
+                    >
+                      {item.icon}
+                      {item.badge && (
+                        <span className="absolute bottom-0 right-0 -mr-1 mb-0">
+                          <span className="flex h-2.5 w-2.5">
+                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75"></span>
+                            <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-primary"></span>
+                          </span>
+                        </span>
+                      )}
+                    </Link>
+                  </TooltipTrigger>
+                  <TooltipContent side="right" className="flex items-center gap-2">
+                    <span>{item.title}</span>
+                    {item.badge && (
+                      <span className="px-1.5 py-0.5 text-xs font-medium bg-secondary text-secondary-foreground rounded">
+                        {item.badge.text}
+                      </span>
+                    )}
+                    {item.title === "Reports" && (
+                      <span className="text-xs text-muted-foreground">
+                        Generate detailed environmental impact reports
+                      </span>
+                    )}
+                  </TooltipContent>
+                </Tooltip>
+              ))}
+
+              <div className="my-2 w-10 border-t" />
+
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <div className="w-10 h-10">
+                    <UploadIfcButton
+                      variant="ghost"
+                      className="w-full h-full p-0"
+                      showText={false}
+                    />
+                  </div>
+                </TooltipTrigger>
+                <TooltipContent side="right">
+                  Add new IFC
+                </TooltipContent>
+              </Tooltip>
+
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Link
+                    href="/projects/new"
+                    className="flex items-center justify-center w-10 h-10 rounded-md bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
+                  >
+                    <PlusCircle className="h-5 w-5" />
+                  </Link>
+                </TooltipTrigger>
+                <TooltipContent side="right">
+                  New Project
+                </TooltipContent>
+              </Tooltip>
+            </div>
+          </nav>
+        </div>
       </aside>
-      <Sheet open={isOpen} onOpenChange={setIsOpen}>
-        <SheetTrigger asChild>
-          <Button
-            variant="outline"
-            size="icon"
-            className="fixed left-4 top-4 z-40 lg:hidden"
-          >
-            <Menu className="h-4 w-4" />
-            <span className="sr-only">Toggle Sidebar</span>
-          </Button>
-        </SheetTrigger>
-        <SheetContent side="left" className="w-full max-w-xs p-0">
-          <SidebarContent mobile />
-        </SheetContent>
-      </Sheet>
-    </>
+    </TooltipProvider>
   );
 }

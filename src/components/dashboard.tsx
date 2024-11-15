@@ -30,6 +30,7 @@ import { ActivityFeed } from "@/components/activity-feed";
 import Image from "next/image";
 import { Badge } from "@/components/ui/badge";
 import { EmissionsSummaryCard } from "@/components/emissions-summary-card";
+import { UploadIfcButton } from "@/components/upload-ifc-button";
 
 interface Project {
   id: string;
@@ -282,10 +283,7 @@ export function Dashboard({
                 Create New Project
               </Link>
             </Button>
-            <Button variant="outline" onClick={handleUploadClick}>
-              <UploadCloud className="mr-2 h-4 w-4" />
-              Add New Ifc
-            </Button>
+            <UploadIfcButton variant="outline" />
           </div>
         </div>
       </section>

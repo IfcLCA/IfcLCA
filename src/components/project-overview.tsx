@@ -269,10 +269,48 @@ export function ProjectOverview({
             return (
               <Card
                 key={project.id}
-                className="group relative transition-all hover:shadow-lg border-2 border-muted overflow-hidden cursor-pointer"
-                onClick={() => router.push(`/projects/${project.id}`)}
+                className="group relative transition-all hover:shadow-lg border-2 border-muted overflow-hidden"
               >
-                <div className="aspect-video relative bg-muted">
+                <div className="absolute top-2 right-2 z-10">
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        className="h-8 w-8 p-0 hover:bg-background/80"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <MoreVertical className="h-4 w-4" />
+                        <span className="sr-only">Open menu</span>
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuItem
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          router.push(`/projects/${project.id}/edit`);
+                        }}
+                      >
+                        <Pencil className="mr-2 h-4 w-4" />
+                        Edit
+                      </DropdownMenuItem>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem
+                        className="text-destructive"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setDeleteProjectId(project.id);
+                        }}
+                      >
+                        <Trash2 className="mr-2 h-4 w-4" />
+                        Delete
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </div>
+                <div
+                  className="aspect-video relative bg-muted cursor-pointer"
+                  onClick={() => router.push(`/projects/${project.id}`)}
+                >
                   {project.imageUrl ? (
                     <>
                       <Image
@@ -393,19 +431,17 @@ export function ProjectOverview({
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
-            <AlertDialogDescription>
-              This action cannot be undone. This will permanently delete the
-              project and all associated data.
+            <AlertDialogTitle>Are you really sure you don't need it anymore?</AlertDialogTitle>
+            <AlertDialogDescription className="space-y-2">
+              <p>We can get it back but it involves us digging into our database, which we would rather avoid. So better be sure you don't need it anymore...</p>
+              <p>This action cannot be undone. This will permanently delete the project and all associated data.</p>
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction
-              onClick={() =>
-                deleteProjectId && handleDeleteProject(deleteProjectId)
-              }
-              className="bg-red-600 hover:bg-red-700 text-white"
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => deleteProjectId && handleDeleteProject(deleteProjectId)}
             >
               Delete Project
             </AlertDialogAction>

@@ -12,9 +12,19 @@ import {
   CardTitle,
   CardDescription,
 } from "@/components/ui/card";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { toast } from "@/hooks/use-toast";
 import { Breadcrumbs } from "@/components/breadcrumbs";
-import { LoaderIcon, Pencil, ArrowLeft } from "lucide-react";
+import { LoaderIcon, Pencil, ArrowLeft, Trash2 } from "lucide-react";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 
@@ -24,6 +34,7 @@ export default function EditProjectPage() {
   const projectId = params.id as string;
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
 
@@ -80,6 +91,31 @@ export default function EditProjectPage() {
     }
   };
 
+  const handleDeleteProject = async () => {
+    try {
+      const response = await fetch(`/api/projects/${projectId}`, {
+        method: "DELETE",
+      });
+
+      if (!response.ok) throw new Error("Failed to delete project");
+
+      toast({
+        title: "Project deleted",
+        description: "The project has been successfully deleted.",
+      });
+      router.push("/projects");
+    } catch (error) {
+      console.error("Failed to delete project:", error);
+      toast({
+        title: "Error",
+        description: "Failed to delete the project. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsDeleteDialogOpen(false);
+    }
+  };
+
   const breadcrumbItems = [
     { label: "Projects", href: "/projects" },
     { label: name || "Loading...", href: `/projects/${projectId}` },
@@ -117,11 +153,25 @@ export default function EditProjectPage() {
       <Breadcrumbs items={breadcrumbItems} />
       <Card className="max-w-2xl mx-auto">
         <CardHeader>
-          <CardTitle className="text-2xl font-bold flex items-center gap-2">
-            <Pencil className="h-6 w-6 text-muted-foreground" />
-            Edit Project
-          </CardTitle>
-          <CardDescription>Update your project details below</CardDescription>
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle className="text-2xl font-bold flex items-center gap-2">
+                <Pencil className="h-6 w-6 text-muted-foreground" />
+                Edit Project
+              </CardTitle>
+              <CardDescription>Update your project details below</CardDescription>
+            </div>
+            <Button
+              type="button"
+              variant="destructive"
+              size="icon"
+              onClick={() => setIsDeleteDialogOpen(true)}
+              disabled={isSaving}
+              className="h-10 w-10"
+            >
+              <Trash2 className="h-4 w-4" />
+            </Button>
+          </div>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-6">
@@ -176,6 +226,27 @@ export default function EditProjectPage() {
           </form>
         </CardContent>
       </Card>
+
+      <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Are you really sure you don't need it anymore?</AlertDialogTitle>
+            <AlertDialogDescription className="space-y-2">
+              <p>We can get it back but it involves us digging into our database, which we would rather avoid. So better be sure you don't need it anymore...</p>
+              <p>This action cannot be undone. This will permanently delete the project and all associated data.</p>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={handleDeleteProject}
+            >
+              Delete Project
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

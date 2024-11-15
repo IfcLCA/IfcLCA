@@ -867,17 +867,17 @@ const DeleteProjectDialog = ({
   <AlertDialog open={isOpen} onOpenChange={onClose}>
     <AlertDialogContent>
       <AlertDialogHeader>
-        <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
-        <AlertDialogDescription>
-          This action cannot be undone. This will permanently delete the project
-          and all associated data.
+        <AlertDialogTitle>Are you really sure you don't need it anymore?</AlertDialogTitle>
+        <AlertDialogDescription className="space-y-2">
+          <p>We can get it back but it involves us digging into our database, which we would rather avoid. So better be sure you don't need it anymore...</p>
+          <p>This action cannot be undone. This will permanently delete the project and all associated data.</p>
         </AlertDialogDescription>
       </AlertDialogHeader>
       <AlertDialogFooter>
         <AlertDialogCancel>Cancel</AlertDialogCancel>
         <AlertDialogAction
-          onClick={onDelete}
           className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+          onClick={onDelete}
         >
           Delete Project
         </AlertDialogAction>
