@@ -264,110 +264,119 @@ export function ProjectOverview({
       )}
 
       {!isLoading && !error && projects.length > 0 && (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {currentProjects.map((project) => {
-            return (
-              <Card
-                key={project.id}
-                className="group relative transition-all hover:shadow-lg border-2 border-muted overflow-hidden"
-              >
-                <div className="absolute top-2 right-2 z-10">
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button
-                        variant="ghost"
-                        className="h-8 w-8 p-0 hover:bg-background/80"
-                        onClick={(e) => e.stopPropagation()}
-                      >
-                        <MoreVertical className="h-4 w-4" />
-                        <span className="sr-only">Open menu</span>
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      <DropdownMenuItem
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          router.push(`/projects/${project.id}/edit`);
-                        }}
-                      >
-                        <Pencil className="mr-2 h-4 w-4" />
-                        Edit
-                      </DropdownMenuItem>
-                      <DropdownMenuSeparator />
-                      <DropdownMenuItem
-                        className="text-destructive"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setDeleteProjectId(project.id);
-                        }}
-                      >
-                        <Trash2 className="mr-2 h-4 w-4" />
-                        Delete
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                </div>
-                <div
-                  className="aspect-video relative bg-muted cursor-pointer"
-                  onClick={() => router.push(`/projects/${project.id}`)}
+        <>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {currentProjects.map((project) => {
+              return (
+                <Card
+                  key={project.id}
+                  className="group relative transition-all hover:shadow-lg border-2 border-muted overflow-hidden"
                 >
-                  {project.imageUrl ? (
-                    <>
-                      <Image
-                        src={project.imageUrl}
-                        alt={project.name}
-                        fill
-                        className="object-cover"
-                        sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
-                        priority={false}
-                      />
-                    </>
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center">
-                      <Box className="h-12 w-12 text-muted-foreground/50" />
-                    </div>
-                  )}
-                </div>
-                <CardContent className="space-y-2 p-4">
-                  <h3 className="text-lg font-semibold leading-none tracking-tight">
-                    {project.name}
-                  </h3>
-                  {project.description && (
-                    <p className="text-sm text-muted-foreground line-clamp-2">
-                      {project.description}
-                    </p>
-                  )}
-                  <div className="flex flex-wrap gap-2 text-xs text-muted-foreground">
-                    <Badge
-                      variant="secondary"
-                      className="flex items-center gap-1"
-                    >
-                      <Box className="h-3 w-3" />
-                      {project._count.elements} elements
-                    </Badge>
-                    <Badge
-                      variant="secondary"
-                      className="flex items-center gap-1"
-                    >
-                      <Upload className="h-3 w-3" />
-                      {project._count.uploads} uploads
-                    </Badge>
-                    {project.elements?.some(e => e.materials?.length > 0) && (
+                  <div className="absolute top-2 right-2 z-10">
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button
+                          variant="ghost"
+                          className="h-8 w-8 p-0 hover:bg-background/80"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <MoreVertical className="h-4 w-4" />
+                          <span className="sr-only">Open menu</span>
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            router.push(`/projects/${project.id}/edit`);
+                          }}
+                        >
+                          <Pencil className="mr-2 h-4 w-4" />
+                          Edit
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem
+                          className="text-destructive"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setDeleteProjectId(project.id);
+                          }}
+                        >
+                          <Trash2 className="mr-2 h-4 w-4" />
+                          Delete
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </div>
+                  <div
+                    className="aspect-video relative bg-muted cursor-pointer"
+                    onClick={() => router.push(`/projects/${project.id}`)}
+                  >
+                    {project.imageUrl ? (
+                      <>
+                        <Image
+                          src={project.imageUrl}
+                          alt={project.name}
+                          fill
+                          className="object-cover"
+                          sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+                          priority={false}
+                        />
+                      </>
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center">
+                        <Box className="h-12 w-12 text-muted-foreground/50" />
+                      </div>
+                    )}
+                  </div>
+                  <CardContent className="space-y-2 p-4">
+                    <h3 className="text-lg font-semibold leading-none tracking-tight">
+                      {project.name}
+                    </h3>
+                    {project.description && (
+                      <p className="text-sm text-muted-foreground line-clamp-2">
+                        {project.description}
+                      </p>
+                    )}
+                    <div className="flex flex-wrap gap-2 text-xs text-muted-foreground">
                       <Badge
                         variant="secondary"
                         className="flex items-center gap-1"
                       >
-                        <BarChart2Icon className="h-3 w-3" />
-                        <span>{formatEmissionValue(calculateTotalEmissions(project))}</span>
-                        <span className="text-muted-foreground/70">{metrics[selectedMetric].unit}</span>
+                        <Box className="h-3 w-3" />
+                        {project._count.elements} elements
                       </Badge>
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
-            );
-          })}
-        </div>
+                      <Badge
+                        variant="secondary"
+                        className="flex items-center gap-1"
+                      >
+                        <Upload className="h-3 w-3" />
+                        {project._count.uploads} uploads
+                      </Badge>
+                      {project.elements?.some(e => e.materials?.length > 0) && (
+                        <Badge
+                          variant="secondary"
+                          className="flex items-center gap-1"
+                        >
+                          <BarChart2Icon className="h-3 w-3" />
+                          <span>{formatEmissionValue(calculateTotalEmissions(project))}</span>
+                          <span className="text-muted-foreground/70">{metrics[selectedMetric].unit}</span>
+                        </Badge>
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
+              );
+            })}
+          </div>
+          {projects.length >= 3 && (
+            <div className="mt-6 text-center">
+              <p className="text-sm text-muted-foreground">
+                ⚡️ You've reached the project limit during our BETA phase. More projects coming soon! 🚀
+              </p>
+            </div>
+          )}
+        </>
       )}
 
       {!isLoading && !error && projects.length > pageSize && (
