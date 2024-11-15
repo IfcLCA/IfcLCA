@@ -110,39 +110,32 @@ export async function POST(
         return [];
       }
 
-      // Calculate total thickness for this element's layers
-      const totalThickness = layers.reduce((sum, layer) => sum + (layer.thickness || 0), 0) || 1;
-
-      return layers.map(layer => {
+      const uniqueMaterials = new Map();
+      layers.forEach((layer) => {
         if (layer.materialName) {
-          // Calculate volume based on layer thickness and element net volume
-          const layerThickness = layer.thickness || 0;
-          const volumeFraction = layerThickness / totalThickness;
-          const volume = (element.netVolume || 0) * volumeFraction;
-
-          logger.debug(`Calculated material volume for "${layer.materialName}"`, {
-            elementId: element.globalId,
-            elementType: element.type,
-            layerThickness,
-            totalThickness,
-            volumeFraction,
-            elementNetVolume: element.netVolume,
-            calculatedVolume: volume
-          });
-
-          return {
+          const existingMaterial = uniqueMaterials.get(layer.materialName);
+          const newVolume = (existingMaterial?.volume || 0) + (layer.thickness || 0);
+          
+          uniqueMaterials.set(layer.materialName, {
             name: layer.materialName,
             category: element.materialLayers?.layerSetName,
-            volume: volume,
-          };
+            volume: newVolume,
+          });
+          
+          logger.debug(`Updated material "${layer.materialName}"`, {
+            category: element.materialLayers?.layerSetName,
+            newVolume,
+            layerThickness: layer.thickness
+          });
         } else {
           logger.warn(`Layer missing material name`, layer);
-          return null;
         }
-      }).filter(m => m !== null);
+      });
+
+      return Array.from(uniqueMaterials.values());
     });
 
-    logger.info(`Found ${materialsToProcess.length} material instances to process`);
+    logger.info(`Found ${materialsToProcess.length} unique materials to process`);
 
     // Clean material name function
     const cleanMaterialName = (name: string) => {
@@ -248,16 +241,11 @@ export async function POST(
       if (!acc[key]) {
         acc[key] = {
           ...material,
-          totalVolume: 0,
-          instances: []
+          volume: material.volume || 0
         };
+      } else {
+        acc[key].volume += (material.volume || 0);
       }
-      // Store each volume instance separately
-      acc[key].instances.push({
-        volume: material.volume || 0
-      });
-      // Update total volume
-      acc[key].totalVolume += (material.volume || 0);
       return acc;
     }, {});
 
@@ -283,28 +271,24 @@ export async function POST(
         });
 
         if (existingMaterial) {
-          // Update existing material with accumulated volume
+          // Update existing material
           logger.debug(`Updating existing material: ${material.name}`, {
             currentVolume: existingMaterial.volume,
-            addedVolume: material.totalVolume,
-            instanceCount: material.instances.length,
-            volumes: material.instances.map((i: any) => i.volume)
+            addedVolume: material.volume || 0
           });
           
-          existingMaterial.volume = material.totalVolume;
+          existingMaterial.volume = (existingMaterial.volume || 0) + (material.volume || 0);
           existingMaterial.set(materialData);
           return await existingMaterial.save();
         } else {
-          // Create new material with accumulated volume
+          // Create new material
           logger.debug(`Creating new material: ${material.name}`, {
-            volume: material.totalVolume,
-            instanceCount: material.instances.length,
-            volumes: material.instances.map((i: any) => i.volume)
+            volume: material.volume || 0
           });
           
           return await Material.create({
             ...materialData,
-            volume: material.totalVolume
+            volume: material.volume || 0
           });
         }
       })
@@ -347,19 +331,6 @@ export async function POST(
               volume,
               density,
               mass,
-              materialDoc: savedMaterials.find(m => 
-                m.name === material.materialName && 
-                m.projectId.toString() === projectId
-              ) ? {
-                id: savedMaterials.find(m => 
-                  m.name === material.materialName && 
-                  m.projectId.toString() === projectId
-                )?._id,
-                name: savedMaterials.find(m => 
-                  m.name === material.materialName && 
-                  m.projectId.toString() === projectId
-                )?.name
-              } : null,
               kbobValues: {
                 gwp: kbobData.GWP,
                 ubp: kbobData.UBP,
@@ -372,10 +343,6 @@ export async function POST(
               volume: volume,
               thickness: material.thickness,
               category: matchedMaterial.category,
-              material: savedMaterials.find(m => 
-                m.name === material.materialName && 
-                m.projectId.toString() === projectId
-              )?._id, // Store reference to Material document
               kbobMatchId: kbobData._id,
               density: density,
               mass: mass,
@@ -391,7 +358,6 @@ export async function POST(
             name: material.materialName,
             volume: material.thickness || 0,
             thickness: material.thickness,
-            material: null, // No material reference for unmatched materials
             density: 0,
             mass: 0,
             indicators: {

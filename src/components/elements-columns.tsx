@@ -2,27 +2,21 @@
 
 import { ColumnDef } from "@tanstack/react-table";
 
-interface MaterialTableItem {
+interface ElementTableItem {
   id: string;
-  ifcMaterial: string;
-  kbobMaterial: string;
-  category: string;
+  name: string;
+  type: string;
   volume: number;
 }
 
-export const materialsColumns: ColumnDef<MaterialTableItem>[] = [
+export const elementsColumns: ColumnDef<ElementTableItem>[] = [
   {
-    accessorKey: "ifcMaterial",
-    header: "IFC Material",
+    accessorKey: "name",
+    header: "Name",
   },
   {
-    accessorKey: "kbobMaterial",
-    header: "KBOB Material",
-    cell: ({ row }) => row.getValue("kbobMaterial") || "Unknown",
-  },
-  {
-    accessorKey: "category",
-    header: "Element",
+    accessorKey: "type",
+    header: "Type",
   },
   {
     accessorKey: "volume",

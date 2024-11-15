@@ -28,8 +28,8 @@ import {
 import { UploadModal } from "@/components/upload-modal";
 import { DataTable } from "@/components/data-table";
 import { Breadcrumbs } from "@/components/breadcrumbs";
-import { columns } from "@/components/columns";
 import { materialsColumns } from "@/components/materials-columns";
+import { elementsColumns } from "@/components/elements-columns";
 import { GraphPageComponent } from "@/components/graph-page";
 import { DashboardCards } from "@/components/dashboard-cards";
 import {
@@ -396,7 +396,7 @@ const ProjectTabs = ({
     </TabsContent>
 
     <TabsContent value="emissions" className="space-y-4">
-      <EmissionsTab project={project} />
+      <EmissionsTab project={project} onUpload={onUpload} />
     </TabsContent>
 
     <TabsContent value="graph" className="space-y-4">
@@ -520,27 +520,47 @@ const UploadCard = ({ upload }: { upload: ExtendedProject["uploads"][0] }) => (
   </Card>
 );
 
-const ElementsTab = ({ project }: { project: ExtendedProject }) => (
-  <>
-    <div className="flex justify-between items-center mb-4">
-      <h2 className="text-2xl font-semibold">
-        Elements{" "}
-        <Badge variant="secondary" className="ml-2">
-          {project?._count.elements || 0}
-        </Badge>
-      </h2>
-    </div>
-    <Card>
-      <CardContent className="p-0">
-        <DataTable
-          columns={columns}
-          data={project.elements}
-          onRowSelectionChange={() => {}}
+const ElementsTab = ({ project }: { project: ExtendedProject }) => {
+  const data = useMemo(() => {
+    return project.elements.map((element: ElementWithMaterials) => ({
+      id: element._id || "unknown",
+      name: element.name || "Unknown",
+      type: element.type || "Unknown",
+      volume: element.volume || 0,
+    }));
+  }, [project.elements]);
+
+  return (
+    <>
+      <div className="flex justify-between items-center mb-4">
+        <h2 className="text-2xl font-semibold">
+          Elements{" "}
+          <Badge variant="secondary" className="ml-2">
+            {project?._count.elements || 0}
+          </Badge>
+        </h2>
+      </div>
+      {project?.elements && project.elements.length > 0 ? (
+        <Card>
+          <CardContent className="p-0">
+            <DataTable
+              columns={elementsColumns}
+              data={data}
+              onRowSelectionChange={() => {}}
+            />
+          </CardContent>
+        </Card>
+      ) : (
+        <EmptyState
+          icon={Layers}
+          title="No elements found"
+          description="Elements will be extracted from IFC files when uploaded."
+          action={<Button onClick={onUpload}>Analyse IFC</Button>}
         />
-      </CardContent>
-    </Card>
-  </>
-);
+      )}
+    </>
+  );
+};
 
 const MaterialsTab = ({
   project,
@@ -550,38 +570,74 @@ const MaterialsTab = ({
   project: ExtendedProject;
   materialsWithCount: any[];
   onUpload: () => void;
-}) => (
-  <>
-    <div className="flex justify-between items-center mb-4">
-      <h2 className="text-2xl font-semibold">
-        Materials{" "}
-        <Badge variant="secondary" className="ml-2">
-          {project?._count.materials || 0}
-        </Badge>
-      </h2>
-    </div>
-    {project?.materials && project.materials.length > 0 ? (
-      <Card>
-        <CardContent className="p-0">
-          <DataTable
-            columns={materialsColumns}
-            data={materialsWithCount}
-            onRowSelectionChange={() => {}}
-          />
-        </CardContent>
-      </Card>
-    ) : (
-      <EmptyState
-        icon={Layers}
-        title="No materials found"
-        description="Materials will be extracted from IFC files when uploaded."
-        action={<Button onClick={onUpload}>Analyse IFC</Button>}
-      />
-    )}
-  </>
-);
+}) => {
+  const data = useMemo(() => {
+    // First map all materials
+    const materials = project.elements.flatMap((element: ElementWithMaterials) =>
+      element.materials.map((materialEntry: MaterialEntry) => ({
+        id: materialEntry.material?._id || "unknown",
+        ifcMaterial: materialEntry.material?.name || "Unknown",
+        kbobMaterial: materialEntry.material?.kbobMatchId?.Name || "Unknown",
+        category: element.name,
+        volume: materialEntry.volume || 0,
+      }))
+    );
 
-const EmissionsTab = ({ project }: { project: ExtendedProject }) => {
+    // Then group identical materials
+    const groupedMaterials = materials.reduce((acc, curr) => {
+      const key = `${curr.ifcMaterial}-${curr.kbobMaterial}-${curr.category}`;
+      if (!acc[key]) {
+        acc[key] = curr;
+      } else {
+        // Sum up the volumes
+        acc[key].volume += curr.volume;
+      }
+      return acc;
+    }, {} as Record<string, any>);
+
+    // Convert back to array
+    return Object.values(groupedMaterials);
+  }, [project.elements]);
+
+  return (
+    <>
+      <div className="flex justify-between items-center mb-4">
+        <h2 className="text-2xl font-semibold">
+          Materials{" "}
+          <Badge variant="secondary" className="ml-2">
+            {project?._count.materials || 0}
+          </Badge>
+        </h2>
+      </div>
+      {project?.materials && project.materials.length > 0 ? (
+        <Card>
+          <CardContent className="p-0">
+            <DataTable
+              columns={materialsColumns}
+              data={data}
+              onRowSelectionChange={() => {}}
+            />
+          </CardContent>
+        </Card>
+      ) : (
+        <EmptyState
+          icon={Layers}
+          title="No materials found"
+          description="Materials will be extracted from IFC files when uploaded."
+          action={<Button onClick={onUpload}>Analyse IFC</Button>}
+        />
+      )}
+    </>
+  );
+};
+
+const EmissionsTab = ({
+  project,
+  onUpload,
+}: {
+  project: ExtendedProject;
+  onUpload: () => void;
+}) => {
   const [selectedIndicator, setSelectedIndicator] = useState<IndicatorType>("gwp");
 
   const data = useMemo(() => {
@@ -618,111 +674,62 @@ const EmissionsTab = ({ project }: { project: ExtendedProject }) => {
 
     // Convert the grouped map back to an array
     return Object.values(groupedMaterials);
-  }, [project.elements]);
+  }, [project.elements, selectedIndicator]);
 
-  const indicatorLabels = {
-    gwp: {
-      name: "GWP",
-      unit: "kg CO₂ eq",
-      kbobUnit: "kg CO₂ eq/kg",
-    },
-    ubp: {
-      name: "UBP",
-      unit: "UBP",
-      kbobUnit: "UBP/kg",
-    },
-    penre: {
-      name: "PENRE",
-      unit: "kWh",
-      kbobUnit: "kWh/kg",
-    }
-  };
-
-  const columns = useMemo(() => [
-    {
-      accessorKey: "kbobMaterial",
-      header: "KBOB Material",
-      cell: ({ row }) => row.getValue("kbobMaterial") || "Unknown",
-    },
-    {
-      accessorKey: "kbobIndicators",
-      id: "kbob_indicator",
-      header: () => (
-        <div className="text-center">
-          KBOB {indicatorLabels[selectedIndicator].name} ({indicatorLabels[selectedIndicator].kbobUnit})
-        </div>
-      ),
-      cell: ({ row }) => (
-        <div className="text-center">
-          {formatNumber(row.original.kbobIndicators[selectedIndicator], selectedIndicator === "gwp" ? 3 : 2)}
-        </div>
-      ),
-    },
-    {
-      accessorKey: "ifcMaterial",
-      header: "IFC Material",
-      cell: ({ row }) => row.getValue("ifcMaterial") || "Unknown",
-    },
-    {
-      accessorKey: "volume",
-      header: () => (
-        <div className="text-center">
-          Volume (m³)
-        </div>
-      ),
-      cell: ({ row }) => (
-        <div className="text-center">
-          {formatNumber(row.getValue("volume"), 2)}
-        </div>
-      ),
-    },
-    {
-      accessorKey: "indicators",
-      id: "total_indicator",
-      header: () => (
-        <div className="text-center">
-          Total {indicatorLabels[selectedIndicator].name} ({indicatorLabels[selectedIndicator].unit})
-        </div>
-      ),
-      cell: ({ row }) => (
-        <div className="text-center">
-          {formatNumber(row.original.indicators[selectedIndicator], 0)}
-        </div>
-      ),
-    },
-  ], [selectedIndicator]);
-
-  const indicatorOptions = [
-    { value: "gwp", label: "Global Warming Potential (GWP)" },
+  const indicators = [
+    { value: "gwp", label: "Global Warming Potential (kg CO₂ eq)" },
     { value: "ubp", label: "Environmental Impact Points (UBP)" },
     { value: "penre", label: "Primary Energy Non-Renewable (kWh)" },
   ];
 
   return (
     <>
-      <div className="flex justify-end mb-4">
-        <Select
-          value={selectedIndicator}
-          onValueChange={(value: IndicatorType) => setSelectedIndicator(value)}
-        >
-          <SelectTrigger className="w-[180px]">
-            <SelectValue placeholder="Select indicator" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="gwp">GWP (CO₂ eq)</SelectItem>
-            <SelectItem value="ubp">UBP</SelectItem>
-            <SelectItem value="penre">PENRE (kWh)</SelectItem>
-          </SelectContent>
-        </Select>
+      <div className="flex justify-between items-center mb-4">
+        <div className="flex items-center gap-2">
+          <h2 className="text-2xl font-semibold">
+            Emissions{" "}
+            <Badge variant="secondary" className="ml-2">
+              LCA
+            </Badge>
+          </h2>
+        </div>
+        <div className="flex items-center gap-2">
+          <span className="text-sm text-muted-foreground">Indicator:</span>
+          <Select
+            value={selectedIndicator}
+            onValueChange={(value: IndicatorType) => setSelectedIndicator(value)}
+          >
+            <SelectTrigger className="w-[180px]">
+              <SelectValue placeholder="Select indicator" />
+            </SelectTrigger>
+            <SelectContent>
+              {indicators.map((indicator) => (
+                <SelectItem key={indicator.value} value={indicator.value}>
+                  {indicator.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
       </div>
-      <Card>
-        <CardContent className="p-0">
-          <DataTable
-            columns={columns}
-            data={data}
-          />
-        </CardContent>
-      </Card>
+      {project?.elements && project.elements.some(e => e.materials?.length > 0) ? (
+        <Card>
+          <CardContent className="p-0">
+            <DataTable
+              columns={emissionsColumns(selectedIndicator)}
+              data={data}
+              onRowSelectionChange={() => {}}
+            />
+          </CardContent>
+        </Card>
+      ) : (
+        <EmptyState
+          icon={Layers}
+          title="No emissions data found"
+          description="Emissions data will be calculated from materials when an IFC file is uploaded."
+          action={<Button onClick={onUpload}>Analyse IFC</Button>}
+        />
+      )}
     </>
   );
 };
