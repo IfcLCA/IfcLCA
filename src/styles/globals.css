@@ -125,6 +125,17 @@
     @apply bg-muted dark:bg-gray-900;
   }
 
+  .data-table-cell {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .data-table-cell-first {
+    white-space: normal;
+    word-break: break-word;
+  }
+
   .button-primary {
     @apply bg-primary hover:bg-primary/90 text-primary-foreground font-bold py-2 px-4 rounded;
   }
@@ -251,6 +262,20 @@
     .resizer::after {
       width: 2px;
     }
+  }
+
+  .select-content {
+    max-width: none !important;
+    width: var(--radix-select-trigger-width);
+    min-width: var(--radix-select-trigger-width);
+  }
+
+  .select-item {
+    padding: 8px;
+  }
+
+  .select-item[data-highlighted] {
+    @apply bg-accent;
   }
 }
 

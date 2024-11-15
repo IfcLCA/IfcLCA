@@ -42,6 +42,7 @@ import {
 } from "@/components/ui/pagination";
 import { emissionsColumns } from "@/components/emissions-columns";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Label } from "@/components/ui/label";
 
 interface KBOBMaterial {
   _id: string;
@@ -687,9 +688,27 @@ const EmissionsTab = ({
   }, [project.elements, selectedIndicator]);
 
   const indicators = [
-    { value: "gwp", label: "Global Warming Potential (kg CO₂ eq)" },
-    { value: "ubp", label: "Environmental Impact Points (UBP)" },
-    { value: "penre", label: "Primary Energy Non-Renewable (kWh)" },
+    { 
+      value: "gwp", 
+      label: <div className="flex flex-col">
+        <span className="font-bold">GWP</span>
+        <span className="text-sm text-muted-foreground">Global Warming Potential (kg CO₂ eq)</span>
+      </div>
+    },
+    { 
+      value: "ubp", 
+      label: <div className="flex flex-col">
+        <span className="font-bold">UBP</span>
+        <span className="text-sm text-muted-foreground">Environmental Impact Points</span>
+      </div>
+    },
+    { 
+      value: "penre", 
+      label: <div className="flex flex-col">
+        <span className="font-bold">PENRE</span>
+        <span className="text-sm text-muted-foreground">Primary Energy Non-Renewable (kWh)</span>
+      </div>
+    },
   ];
 
   return (
@@ -703,18 +722,26 @@ const EmissionsTab = ({
             </Badge>
           </h2>
         </div>
-        <div className="flex items-center gap-2">
-          <span className="text-sm text-muted-foreground">Indicator:</span>
+        <div className="flex items-center gap-4">
+          <Label className="text-sm font-medium">Indicator:</Label>
           <Select
             value={selectedIndicator}
             onValueChange={(value: IndicatorType) => setSelectedIndicator(value)}
           >
             <SelectTrigger className="w-[180px]">
-              <SelectValue placeholder="Select indicator" />
+              <SelectValue>
+                {selectedIndicator === 'gwp' && "GWP (kg CO₂ eq)"}
+                {selectedIndicator === 'ubp' && "UBP (pts)"}
+                {selectedIndicator === 'penre' && "PENRE (kWh)"}
+              </SelectValue>
             </SelectTrigger>
             <SelectContent>
               {indicators.map((indicator) => (
-                <SelectItem key={indicator.value} value={indicator.value}>
+                <SelectItem 
+                  key={indicator.value} 
+                  value={indicator.value}
+                  className="py-2"
+                >
                   {indicator.label}
                 </SelectItem>
               ))}

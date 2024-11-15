@@ -53,6 +53,7 @@ export function DataTable<TData, TValue>({
   });
 
   const [columnSizing, setColumnSizing] = React.useState({});
+  const [firstColumnWidth, setFirstColumnWidth] = React.useState(0);
 
   const table = useReactTable({
     data,
@@ -78,7 +79,24 @@ export function DataTable<TData, TValue>({
   }, [table.getAllColumns()]);
 
   const containerRef = React.useRef<HTMLDivElement>(null);
+  const firstColumnRef = React.useRef<HTMLDivElement>(null);
   const [containerWidth, setContainerWidth] = React.useState(0);
+
+  React.useEffect(() => {
+    if (firstColumnRef.current) {
+      const resizeObserver = new ResizeObserver((entries) => {
+        for (const entry of entries) {
+          const contentWidth = Math.ceil(entry.contentRect.width);
+          if (contentWidth > 0 && contentWidth !== firstColumnWidth) {
+            setFirstColumnWidth(contentWidth + 32); // Add padding
+          }
+        }
+      });
+
+      resizeObserver.observe(firstColumnRef.current);
+      return () => resizeObserver.disconnect();
+    }
+  }, [firstColumnWidth]);
 
   React.useEffect(() => {
     if (containerRef.current) {
@@ -95,18 +113,28 @@ export function DataTable<TData, TValue>({
 
   React.useEffect(() => {
     if (containerWidth && totalColumnsWidth < containerWidth) {
-      const remainingWidth = containerWidth - totalColumnsWidth;
-      const columnsToAdjust = table.getAllColumns();
-      const widthPerColumn = Math.floor(remainingWidth / columnsToAdjust.length);
+      const firstColumn = table.getAllColumns()[0];
+      const otherColumns = table.getAllColumns().slice(1);
 
-      const newColumnSizing = columnsToAdjust.reduce((acc, column) => {
-        acc[column.id] = column.getSize() + widthPerColumn;
-        return acc;
-      }, {} as Record<string, number>);
+      const desiredFirstColumnWidth = Math.min(
+        firstColumnWidth,
+        containerWidth * 0.4 // Max 40% of container width
+      );
+
+      const remainingWidth = containerWidth - desiredFirstColumnWidth;
+      const widthPerColumn = Math.floor(remainingWidth / otherColumns.length);
+
+      const newColumnSizing: Record<string, number> = {
+        [firstColumn.id]: desiredFirstColumnWidth,
+      };
+
+      otherColumns.forEach((column) => {
+        newColumnSizing[column.id] = widthPerColumn;
+      });
 
       setColumnSizing(newColumnSizing);
     }
-  }, [containerWidth, totalColumnsWidth]);
+  }, [containerWidth, totalColumnsWidth, firstColumnWidth]);
 
   if (isLoading) {
     return (
@@ -138,7 +166,10 @@ export function DataTable<TData, TValue>({
                         ? null
                         : (
                           <>
-                            <div className="select-none">
+                            <div
+                              className={`select-none ${header.index === 0 ? "whitespace-normal" : ""}`}
+                              ref={header.index === 0 ? firstColumnRef : undefined}
+                            >
                               {flexRender(
                                 header.column.columnDef.header,
                                 header.getContext()
@@ -172,10 +203,12 @@ export function DataTable<TData, TValue>({
                           width: cell.column.getSize(),
                         }}
                       >
-                        {flexRender(
-                          cell.column.columnDef.cell,
-                          cell.getContext()
-                        )}
+                        <div className={cell.column.index === 0 ? "whitespace-normal" : ""}>
+                          {flexRender(
+                            cell.column.columnDef.cell,
+                            cell.getContext()
+                          )}
+                        </div>
                       </TableCell>
                     ))}
                   </TableRow>
