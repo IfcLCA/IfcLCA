@@ -58,20 +58,35 @@ export async function GET() {
             uploads: { $size: "$uploads" },
             materials: { $size: "$materials" },
           },
+          elements: {
+            $map: {
+              input: "$elements",
+              as: "element",
+              in: {
+                _id: "$$element._id",
+                name: "$$element.name",
+                type: "$$element.type",
+                volume: "$$element.volume",
+                materials: {
+                  $map: {
+                    input: "$$element.materials",
+                    as: "material",
+                    in: {
+                      volume: "$$material.volume",
+                      indicators: {
+                        gwp: "$$material.indicators.gwp",
+                        ubp: "$$material.indicators.ubp",
+                        penre: "$$material.indicators.penre"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
         },
       },
-      { $sort: { lastActivityAt: -1 } },
-      {
-        $project: {
-          _id: 1,
-          name: 1,
-          description: 1,
-          imageUrl: 1,
-          updatedAt: 1,
-          lastActivityAt: 1,
-          _count: 1,
-        },
-      },
+      { $sort: { lastActivityAt: -1 } }
     ]);
 
     const transformedProjects = projects.map((project) => ({
@@ -81,6 +96,11 @@ export async function GET() {
       imageUrl: project.imageUrl,
       updatedAt: project.lastActivityAt || project.updatedAt,
       _count: project._count,
+      elements: project.elements.map(element => ({
+        ...element,
+        _id: element._id.toString(),
+        materials: element.materials || []
+      }))
     }));
 
     return NextResponse.json(transformedProjects);

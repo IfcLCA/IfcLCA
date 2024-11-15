@@ -11,6 +11,7 @@ import {
   Pencil,
   Loader2,
   Box,
+  BarChart2 as BarChart2Icon
 } from "lucide-react";
 import { Card, CardContent, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -45,7 +46,7 @@ import { toast } from "@/hooks/use-toast";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 
-type ImpactMetric = "GWP" | "PENR" | "UBP";
+type ImpactMetric = "gwp" | "penre" | "ubp";
 
 type Project = {
   id: string;
@@ -58,15 +59,17 @@ type Project = {
   _count: {
     uploads: number;
     elements: number;
+    materials: number;
   };
+  elements?: any[];
 };
 
 interface ProjectOverviewProps {
-  selectedMetric?: string;
+  selectedMetric: ImpactMetric;
 }
 
 export function ProjectOverview({
-  selectedMetric = "GWP",
+  selectedMetric,
 }: ProjectOverviewProps) {
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(6);
@@ -81,7 +84,7 @@ export function ProjectOverview({
       try {
         setIsLoading(true);
         setError(null);
-        const response = await fetch("/api/projects");
+        const response = await fetch("/api/projects?include=elements");
         if (!response.ok) {
           throw new Error("Failed to fetch projects");
         }
@@ -92,6 +95,7 @@ export function ProjectOverview({
             ...project,
             id: project.id || project._id,
             imageUrl: project.imageUrl,
+            elements: project.elements || [],
             _count: {
               elements: project._count?.elements || 0,
               uploads: project._count?.uploads || 0,
@@ -120,6 +124,53 @@ export function ProjectOverview({
     indexOfFirstProject,
     indexOfLastProject
   );
+
+  const metrics: Record<ImpactMetric, { label: string; unit: string; description: string }> = {
+    gwp: { label: "GWP", unit: "kg CO₂ eq", description: "Global Warming Potential" },
+    ubp: { label: "UBP", unit: "pts", description: "Environmental Impact Points" },
+    penre: { label: "PENRE", unit: "kWh", description: "Primary Energy Non-Renewable" },
+  };
+
+  const calculateTotalEmissions = (project: any) => {
+    if (!project.elements?.length) return 0;
+    
+    console.log('Calculating for metric:', selectedMetric);
+    
+    return project.elements.reduce((total: number, element: any) => {
+      if (!element.materials?.length) return total;
+      
+      const elementTotal = element.materials.reduce((materialTotal: number, material: any) => {
+        if (!material.indicators) return materialTotal;
+        
+        console.log('-------------------');
+        console.log('Material:', material);
+        console.log('Indicators:', material.indicators);
+        console.log('Volume:', material.volume);
+        console.log('Current total:', materialTotal);
+        console.log('Adding:', material.indicators[selectedMetric]);
+        
+        const value = material.indicators[selectedMetric] || 0;
+        const volume = material.volume || 0;
+        const contribution = value * volume;
+        
+        console.log('Value:', value);
+        console.log('Volume:', volume);
+        console.log('Contribution:', contribution);
+        
+        return materialTotal + contribution;
+      }, 0);
+      
+      console.log('Element total:', elementTotal);
+      return total + elementTotal;
+    }, 0);
+  };
+
+  const formatEmissionValue = (value: number) => {
+    return value.toLocaleString('de-CH', {
+      maximumFractionDigits: 0,
+      useGrouping: true
+    });
+  };
 
   const handleDeleteProject = async (projectId: string) => {
     try {
@@ -248,7 +299,7 @@ export function ProjectOverview({
                       {project.description}
                     </p>
                   )}
-                  <div className="flex gap-2 text-xs text-muted-foreground">
+                  <div className="flex flex-wrap gap-2 text-xs text-muted-foreground">
                     <Badge
                       variant="secondary"
                       className="flex items-center gap-1"
@@ -263,6 +314,16 @@ export function ProjectOverview({
                       <Upload className="h-3 w-3" />
                       {project._count.uploads} uploads
                     </Badge>
+                    {project.elements?.some(e => e.materials?.length > 0) && (
+                      <Badge
+                        variant="secondary"
+                        className="flex items-center gap-1"
+                      >
+                        <BarChart2Icon className="h-3 w-3" />
+                        <span>{formatEmissionValue(calculateTotalEmissions(project))}</span>
+                        <span className="text-muted-foreground/70">{metrics[selectedMetric].unit}</span>
+                      </Badge>
+                    )}
                   </div>
                 </CardContent>
               </Card>
