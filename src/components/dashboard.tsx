@@ -29,6 +29,7 @@ import { useRouter } from "next/navigation";
 import { ActivityFeed } from "@/components/activity-feed";
 import Image from "next/image";
 import { Badge } from "@/components/ui/badge";
+import { EmissionsSummaryCard } from "@/components/emissions-summary-card";
 
 interface Project {
   id: string;
@@ -49,6 +50,11 @@ interface DashboardStatistics {
   totalElements: number;
   totalMaterials: number;
   recentActivities: number;
+  totalEmissions?: {
+    gwp: number;
+    ubp: number;
+    penre: number;
+  };
 }
 
 interface Activity {
@@ -170,16 +176,29 @@ export function Dashboard({
         0
       );
 
+      const totalEmissions = await fetchEmissions();
+
       setStatistics((prev) => ({
         ...prev,
         totalProjects: projects.length,
         totalElements,
         totalMaterials,
+        totalEmissions,
       }));
 
       setRecentProjects(recentProjects);
     } catch (error) {
       console.error("Failed to fetch statistics:", error);
+    }
+  };
+
+  const fetchEmissions = async () => {
+    try {
+      const response = await fetch("/api/emissions");
+      const data = await response.json();
+      return data;
+    } catch (error) {
+      console.error("Failed to fetch emissions:", error);
     }
   };
 
@@ -226,17 +245,18 @@ export function Dashboard({
 
   const metrics: Metric[] = [
     {
-      title: "Total Elements",
-      value: statistics.totalElements,
-      description: "Construction components",
-      icon: "Box",
-    },
-    {
       title: "Total Projects",
       value: statistics.totalProjects,
       description: "Active projects",
       icon: "Building",
     },
+    {
+      title: "Total Elements",
+      value: statistics.totalElements,
+      description: "Construction components",
+      icon: "Box",
+    },
+
     {
       title: "Total Materials",
       value: statistics.totalMaterials,
@@ -264,40 +284,33 @@ export function Dashboard({
             </Button>
             <Button variant="outline" onClick={handleUploadClick}>
               <Upload className="mr-2 h-4 w-4" />
-              Analyse IFC
+              New IFC
             </Button>
           </div>
         </div>
       </section>
 
-      <section className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-        {metrics.map((item) => {
-          const Icon = Icons[item.icon];
+      <section className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+        {metrics.map((metric) => {
+          const Icon = Icons[metric.icon];
           return (
-            <Card
-              key={item.title}
-              className="group transition-colors duration-200 hover:border-primary/50"
-            >
+            <Card key={metric.title} className="group transition-all hover:bg-muted/5">
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium group-hover:text-primary transition-colors">
-                  {item.title}
+                <CardTitle className="text-sm font-medium">
+                  {metric.title}
                 </CardTitle>
                 <Icon className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors" />
               </CardHeader>
               <CardContent>
-                <div className="text-3xl font-bold group-hover:text-primary transition-colors">
-                  {item.value.toLocaleString("de-CH", {
-                    maximumFractionDigits: 0,
-                    useGrouping: true,
-                  })}
-                </div>
-                <p className="text-xs text-muted-foreground mt-1 group-hover:text-primary/70 transition-colors">
-                  {item.description}
+                <div className="text-2xl font-bold group-hover:text-primary transition-colors">{metric.value}</div>
+                <p className="text-xs text-muted-foreground">
+                  {metric.description}
                 </p>
               </CardContent>
             </Card>
           );
         })}
+        <EmissionsSummaryCard emissions={statistics.totalEmissions} />
       </section>
 
       <section>
