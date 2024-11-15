@@ -37,7 +37,7 @@ export function HelpDialog() {
         <div className="space-y-4">
           <p className="text-sm text-muted-foreground">
             IfcLCA leverages openBIM and Open Data Standards to analyze
-            environmental impact of construction projects through IFC files
+            environmental impact of construction projects through Ifc files
             across the entire project lifecycle using Swiss KBOB data from{" "}
             <a
               href="https://lcadata.ch"

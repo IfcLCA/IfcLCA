@@ -283,9 +283,19 @@ export function NavigationBar({ currentProject, notifications }: NavBarProps) {
           </Link>
           <NavigationMenu>
             <NavigationMenuList>
-              <NavigationMenuItem>
-                <NavigationMenuTrigger>Projects</NavigationMenuTrigger>
-                <NavigationMenuContent>
+              <NavigationMenuItem className="relative">
+                <div className="flex items-center gap-1">
+                  <NavigationMenuLink asChild>
+                    <Link
+                      href="/projects"
+                      className="inline-flex h-9 items-center justify-center rounded-l-md bg-background px-4 py-2 text-sm font-medium transition-colors hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground"
+                    >
+                      Projects
+                    </Link>
+                  </NavigationMenuLink>
+                  <NavigationMenuTrigger className="h-9 rounded-l-none px-2 hover:bg-accent" />
+                </div>
+                <NavigationMenuContent className="data-[motion^=from-]:animate-in data-[motion^=to-]:animate-out data-[motion^=from-]:fade-in-0 data-[motion^=to-]:fade-out-0 data-[motion=from-end]:slide-in-from-right-52 data-[motion=from-start]:slide-in-from-left-52 data-[motion=to-end]:slide-out-to-right-52 data-[motion=to-start]:slide-out-to-left-52">
                   <ul className="grid gap-3 p-6 md:w-[400px] lg:w-[500px] lg:grid-cols-[.75fr_1fr]">
                     <li className="row-span-3">
                       <NavigationMenuLink asChild>
@@ -326,11 +336,11 @@ export function NavigationBar({ currentProject, notifications }: NavBarProps) {
                           className="w-full block select-none space-y-1 rounded-md p-3 leading-none no-underline outline-none transition-colors hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground"
                         >
                           <div className="text-sm font-medium leading-none flex items-center gap-2">
-                            Analyse IFC
+                            New Ifc
                             <FileText className="h-3 w-3" />
                           </div>
                           <p className="line-clamp-2 text-sm leading-snug text-muted-foreground text-left">
-                            Add construction elements from IFC to an existing
+                            Add construction elements from Ifc to an existing
                             project
                           </p>
                         </button>
@@ -339,9 +349,19 @@ export function NavigationBar({ currentProject, notifications }: NavBarProps) {
                   </ul>
                 </NavigationMenuContent>
               </NavigationMenuItem>
-              <NavigationMenuItem>
-                <NavigationMenuTrigger>Materials</NavigationMenuTrigger>
-                <NavigationMenuContent>
+              <NavigationMenuItem className="relative">
+                <div className="flex items-center gap-1">
+                  <NavigationMenuLink asChild>
+                    <Link
+                      href="/materials-library"
+                      className="inline-flex h-9 items-center justify-center rounded-l-md bg-background px-4 py-2 text-sm font-medium transition-colors hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground"
+                    >
+                      Materials
+                    </Link>
+                  </NavigationMenuLink>
+                  <NavigationMenuTrigger className="h-9 rounded-l-none px-2 hover:bg-accent" />
+                </div>
+                <NavigationMenuContent className="data-[motion^=from-]:animate-in data-[motion^=to-]:animate-out data-[motion^=from-]:fade-in-0 data-[motion^=to-]:fade-out-0 data-[motion=from-end]:slide-in-from-right-52 data-[motion=from-start]:slide-in-from-left-52 data-[motion=to-end]:slide-out-to-right-52 data-[motion=to-start]:slide-out-to-left-52">
                   <ul className="grid gap-3 p-6 md:w-[400px] lg:w-[500px] lg:grid-cols-[.75fr_1fr]">
                     <li className="row-span-3">
                       <NavigationMenuLink asChild>
@@ -401,25 +421,10 @@ export function NavigationBar({ currentProject, notifications }: NavBarProps) {
                 </NavigationMenuContent>
               </NavigationMenuItem>
               <NavigationMenuItem>
-                <NavigationMenuTrigger>
+                <div className="flex items-center gap-2 px-4 py-2 text-sm">
                   Reports
-                  <Badge variant="secondary" className="ml-2 text-[10px]">
-                    Coming Soon
-                  </Badge>
-                </NavigationMenuTrigger>
-                <NavigationMenuContent>
-                  <div className="flex flex-col gap-4 p-6 w-[400px]">
-                    <div className="text-center space-y-2">
-                      <FileText className="h-12 w-12 mx-auto text-muted-foreground" />
-                      <h3 className="font-medium text-lg">Reports</h3>
-                      <p className="text-sm text-muted-foreground">
-                        We're working on comprehensive LCA reporting features.
-                        Stay tuned for detailed environmental impact analysis,
-                        material assessments, and project comparisons.
-                      </p>
-                    </div>
-                  </div>
-                </NavigationMenuContent>
+                  <Badge variant="secondary" className="text-[10px]">Coming Soon</Badge>
+                </div>
               </NavigationMenuItem>
             </NavigationMenuList>
           </NavigationMenu>
@@ -534,7 +539,7 @@ export function NavigationBar({ currentProject, notifications }: NavBarProps) {
           <DialogHeader>
             <DialogTitle>Select Project</DialogTitle>
             <DialogDescription>
-              Choose a project to upload the IFC file to
+              Choose a project to upload the Ifc file to
             </DialogDescription>
           </DialogHeader>
           <div className="grid gap-4">

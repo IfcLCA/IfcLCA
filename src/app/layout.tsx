@@ -5,7 +5,7 @@ import AuthenticatedLayout from "@/components/authenticated-layout";
 
 export const metadata = {
   title: "IfcLCA",
-  description: "LCA Analysis for IFC Models",
+  description: "LCA Analysis for Ifc Models",
 };
 
 export default function RootLayout({

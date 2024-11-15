@@ -342,8 +342,8 @@ const ProjectHeader = ({
     </div>
     <div className="flex flex-col sm:flex-row gap-4">
       <Button onClick={onUpload} className="bg-primary text-primary-foreground">
-        <Upload className="mr-2 h-4 w-4" />
-        Analyse IFC
+        <UploadCloud className="mr-2 h-4 w-4" />
+        Add New Ifc
       </Button>
       <Button variant="outline" onClick={onEdit}>
         <Edit className="mr-2 h-4 w-4" />
@@ -387,7 +387,7 @@ const ProjectTabs = ({
     </TabsContent>
 
     <TabsContent value="elements" className="space-y-4">
-      <ElementsTab project={project} />
+      <ElementsTab project={project} onUpload={onUpload} />
     </TabsContent>
 
     <TabsContent value="materials" className="space-y-4">
@@ -440,15 +440,20 @@ const UploadsTab = ({
         </h2>
         <Button onClick={onUpload} variant="outline">
           <UploadCloud className="h-4 w-4 mr-2" />
-          Analyse IFC
+          Add New Ifc
         </Button>
       </div>
       {!project?.uploads || project.uploads.length === 0 ? (
         <EmptyState
           icon={UploadCloud}
           title="No uploads yet"
-          description="Get elements and materials from an IFC file."
-          action={<Button onClick={onUpload}>Analyse IFC</Button>}
+          description="Get elements and materials from an Ifc file."
+          action={
+            <Button onClick={onUpload}>
+              <UploadCloud className="mr-2 h-4 w-4" />
+              Add New Ifc
+            </Button>
+          }
         />
       ) : (
         <div className="space-y-4">
@@ -523,7 +528,13 @@ const UploadCard = ({ upload }: { upload: ExtendedProject["uploads"][0] }) => (
   </Card>
 );
 
-const ElementsTab = ({ project }: { project: ExtendedProject }) => {
+const ElementsTab = ({
+  project,
+  onUpload,
+}: {
+  project: ExtendedProject;
+  onUpload: () => void;
+}) => {
   const data = useMemo(() => {
     return project.elements.map((element: ElementWithMaterials) => ({
       id: element._id || "unknown",
@@ -557,8 +568,13 @@ const ElementsTab = ({ project }: { project: ExtendedProject }) => {
         <EmptyState
           icon={Layers}
           title="No elements found"
-          description="Elements will be extracted from IFC files when uploaded."
-          action={<Button onClick={onUpload}>Analyse IFC</Button>}
+          description="Elements will be extracted from Ifc files when uploaded."
+          action={
+            <Button onClick={onUpload}>
+              <UploadCloud className="mr-2 h-4 w-4" />
+              Add New Ifc
+            </Button>
+          }
         />
       )}
     </>
@@ -626,8 +642,13 @@ const MaterialsTab = ({
         <EmptyState
           icon={Layers}
           title="No materials found"
-          description="Materials will be extracted from IFC files when uploaded."
-          action={<Button onClick={onUpload}>Analyse IFC</Button>}
+          description="Materials will be extracted from Ifc files when uploaded."
+          action={
+            <Button onClick={onUpload}>
+              <UploadCloud className="mr-2 h-4 w-4" />
+              Add New Ifc
+            </Button>
+          }
         />
       )}
     </>
@@ -763,8 +784,13 @@ const EmissionsTab = ({
         <EmptyState
           icon={Layers}
           title="No emissions data found"
-          description="Emissions data will be calculated from materials when an IFC file is uploaded."
-          action={<Button onClick={onUpload}>Analyse IFC</Button>}
+          description="Emissions data will be calculated from materials when an Ifc file is uploaded."
+          action={
+            <Button onClick={onUpload}>
+              <UploadCloud className="mr-2 h-4 w-4" />
+              Add New Ifc
+            </Button>
+          }
         />
       )}
     </>

@@ -13,7 +13,7 @@ export default function PrivacyPage() {
           <p>We collect the following types of information:</p>
           <ul className="list-disc pl-6 space-y-2">
             <li>Account information (email, name) for authentication</li>
-            <li>IFC files that you upload for analysis</li>
+            <li>Ifc files that you upload for analysis</li>
             <li>Calculation results and reports generated from your data</li>
             <li>Usage data to improve our service</li>
             <li>
@@ -60,7 +60,7 @@ export default function PrivacyPage() {
           <p>We implement the following security measures:</p>
           <ul className="list-disc pl-6 space-y-2">
             <li>Encryption of data in transit using HTTPS</li>
-            <li>Secure storage of IFC files and calculation results</li>
+            <li>Secure storage of Ifc files and calculation results</li>
             <li>Regular security updates and monitoring</li>
             <li>Access controls and authentication mechanisms</li>
           </ul>

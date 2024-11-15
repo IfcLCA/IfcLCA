@@ -13,7 +13,7 @@ interface MaterialTableItem {
 export const materialsColumns: ColumnDef<MaterialTableItem>[] = [
   {
     accessorKey: "ifcMaterial",
-    header: "IFC Material",
+    header: "Ifc Material",
     enableResizing: true,
     size: 200,
     minSize: 100,

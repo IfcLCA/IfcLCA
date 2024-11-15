@@ -67,7 +67,7 @@ export default function LCAAnalysisPage({
           This Life Cycle Assessment (LCA) analysis provides an overview of the
           environmental impacts associated with the building project. The
           results are calculated based on the materials and quantities derived
-          from the IFC model, combined with environmental impact data from our
+          from the Ifc model, combined with environmental impact data from our
           materials library.
         </p>
       </div>

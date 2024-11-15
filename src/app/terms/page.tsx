@@ -12,7 +12,7 @@ export default function TermsPage() {
         <CardContent className="space-y-4">
           <p>
             IfcLCA provides a web-based platform for conducting Life Cycle
-            Assessment (LCA) calculations on building models using IFC (Industry
+            Assessment (LCA) calculations on building models using Ifc (Industry
             Foundation Classes) files. Our service includes material analysis,
             environmental impact calculations, and report generation.
           </p>
@@ -98,7 +98,7 @@ export default function TermsPage() {
             IfcLCA, you acknowledge that:
           </p>
           <ul className="list-disc pl-6 space-y-2">
-            <li>Your uploaded IFC files are processed and stored securely</li>
+            <li>Your uploaded Ifc files are processed and stored securely</li>
             <li>Calculation results are associated with your account</li>
             <li>
               Anonymous usage statistics may be collected to improve the service

@@ -164,9 +164,9 @@ export default function LandingPage() {
               },
               {
                 icon: Upload,
-                title: "IFC Integration",
+                title: "Ifc Integration",
                 description:
-                  "Deep IFC integration with custom parser for accurate material and quantity analysis.",
+                  "Deep Ifc integration with custom parser for accurate material and quantity analysis.",
               },
               {
                 icon: BarChart3,
@@ -178,7 +178,7 @@ export default function LandingPage() {
                 icon: Leaf,
                 title: "No Data Storage",
                 description:
-                  "We don't save your IFC files, ensuring data privacy and security.",
+                  "We don't save your Ifc files, ensuring data privacy and security.",
               },
               {
                 icon: Users,
@@ -220,7 +220,7 @@ export default function LandingPage() {
               <p className="text-gray-600 dark:text-gray-300 mb-4">
                 IfcLCA is the next generation of open-source Life Cycle
                 Assessment tools for the entire built environment. By leveraging
-                Industry Foundation Classes (IFC) and advanced analytics, we
+                Industry Foundation Classes (Ifc) and advanced analytics, we
                 provide unparalleled insights into the environmental impact of
                 structures throughout their lifecycle.
               </p>
@@ -232,8 +232,8 @@ export default function LandingPage() {
                 pursuit of a greener future.
               </p>
               <p className="text-gray-600 dark:text-gray-300">
-                To get started, simply upload any IFC file with BaseQuantities.
-                Our custom IFC parser will analyze the file, extracting
+                To get started, simply upload any Ifc file with BaseQuantities.
+                Our custom Ifc parser will analyze the file, extracting
                 materials and quantities along with metadata, without storing
                 any of your sensitive data.
               </p>

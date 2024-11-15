@@ -72,8 +72,8 @@ export async function POST(
       return NextResponse.json({ error: "Upload not found" }, { status: 404 });
     }
 
-    // Parse IFC content
-    logger.info("Starting IFC parsing", {
+    // Parse Ifc content
+    logger.info("Starting Ifc parsing", {
       projectId,
       uploadId,
       contentLength: body.content.length
@@ -83,7 +83,7 @@ export async function POST(
     let elements;
     try {
       elements = parser.parseContent(body.content);
-      logger.info(`Parsed ${elements.length} elements from IFC`, {
+      logger.info(`Parsed ${elements.length} elements from Ifc`, {
         firstElement: elements[0] ? {
           id: elements[0].globalId,
           type: elements[0].type,
@@ -91,11 +91,11 @@ export async function POST(
         } : null
       });
     } catch (error: any) {
-      logger.error("IFC parsing failed", {
+      logger.error("Ifc parsing failed", {
         error: error.message,
         uploadId
       });
-      throw new Error(`IFC parsing failed: ${error.message}`);
+      throw new Error(`Ifc parsing failed: ${error.message}`);
     }
 
     // Extract and process materials

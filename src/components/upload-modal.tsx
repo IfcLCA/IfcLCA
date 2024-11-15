@@ -77,13 +77,13 @@ export function UploadModal({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Load IFC File</DialogTitle>
+          <DialogTitle>Load Ifc File</DialogTitle>
         </DialogHeader>
         {isUploading ? (
           <div className="flex flex-col items-center justify-center py-8">
             <ReloadIcon className="h-8 w-8 animate-spin text-primary mb-4" />
             <p className="text-sm text-muted-foreground">
-              Processing IFC file...
+              Processing Ifc file...
             </p>
           </div>
         ) : (
@@ -99,7 +99,7 @@ export function UploadModal({
             <p className="mt-2 text-sm text-muted-foreground">
               {isDragActive
                 ? "Drop the file here"
-                : "Drag and drop an IFC file, or click to select"}
+                : "Drag and drop an Ifc file, or click to select"}
             </p>
           </div>
         )}

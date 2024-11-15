@@ -4,7 +4,7 @@ import mongoose from "mongoose";
 
 export class UploadService {
   /**
-   * Process materials from an IFC file upload
+   * Process materials from an Ifc file upload
    */
   static async processMaterials(
     projectId: string,
@@ -210,7 +210,7 @@ export class UploadService {
   }
 
   /**
-   * Process elements from an IFC file upload
+   * Process elements from an Ifc file upload
    */
   static async processElements(
     projectId: string,

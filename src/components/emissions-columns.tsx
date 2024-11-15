@@ -67,7 +67,7 @@ export const emissionsColumns = (selectedIndicator: IndicatorType): ColumnDef<Em
   },
   {
     accessorKey: "ifcMaterial",
-    header: "IFC Material",
+    header: "Ifc Material",
     enableResizing: true,
     size: 250,
     minSize: 150,

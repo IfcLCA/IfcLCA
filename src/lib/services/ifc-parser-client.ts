@@ -6,7 +6,7 @@ export async function parseIFCFile(
   projectId: string
 ): Promise<IFCParseResult> {
   try {
-    console.log(`Starting IFC file parsing for project ${projectId}`, {
+    console.log(`Starting Ifc file parsing for project ${projectId}`, {
       filename: file.name,
       size: file.size,
       type: file.type,
@@ -60,7 +60,7 @@ export async function parseIFCFile(
     };
 
   } catch (error) {
-    console.error("IFC parsing failed:", error);
+    console.error("Ifc parsing failed:", error);
     throw error;
   }
 }

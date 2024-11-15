@@ -29,11 +29,11 @@ export class IFCParser {
   }
 
   parseContent(content: string) {
-    console.log(' [IFCParser] Starting to parse IFC content...');
+    console.log(' [IFCParser] Starting to parse Ifc content...');
     const dataSectionMatch = content.match(/DATA;([\s\S]*?)ENDSEC;/);
     if (!dataSectionMatch) {
-      console.error(' [IFCParser] Invalid IFC file: DATA section not found');
-      throw new Error("Invalid IFC file: DATA section not found");
+      console.error(' [IFCParser] Invalid Ifc file: DATA section not found');
+      throw new Error("Invalid Ifc file: DATA section not found");
     }
     const dataSection = dataSectionMatch[1].trim();
     console.log(' [IFCParser] Found DATA section');

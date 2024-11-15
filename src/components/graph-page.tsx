@@ -95,7 +95,7 @@ export function GraphPageComponent({
       const key = groupingMode === 'kbobMaterials' ? 
         (material.kbobMaterial || 'Unknown KBOB Material') :
         groupingMode === 'ifcMaterials' ? 
-        (material.ifcMaterial || 'Unknown IFC Material') :
+        (material.ifcMaterial || 'Unknown Ifc Material') :
         material.name;
 
       const existingMaterial = materials.get(key);
@@ -712,7 +712,7 @@ export function GraphPageComponent({
                   <SelectContent>
                     <SelectItem value="elements">Group by Elements</SelectItem>
                     <SelectItem value="kbobMaterials">Group by KBOB Materials</SelectItem>
-                    <SelectItem value="ifcMaterials">Group by IFC Materials</SelectItem>
+                    <SelectItem value="ifcMaterials">Group by Ifc Materials</SelectItem>
                   </SelectContent>
                 </Select>
               </div>

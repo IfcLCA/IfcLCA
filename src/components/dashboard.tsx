@@ -13,7 +13,7 @@ import {
   Building,
   Box,
   Layers,
-  Upload,
+  UploadCloud,
   PlusCircle,
 } from "lucide-react";
 import { UploadModal } from "@/components/upload-modal";
@@ -283,8 +283,8 @@ export function Dashboard({
               </Link>
             </Button>
             <Button variant="outline" onClick={handleUploadClick}>
-              <Upload className="mr-2 h-4 w-4" />
-              New IFC
+              <UploadCloud className="mr-2 h-4 w-4" />
+              Add New Ifc
             </Button>
           </div>
         </div>
@@ -359,7 +359,7 @@ export function Dashboard({
                     variant="secondary"
                     className="flex items-center gap-1"
                   >
-                    <Upload className="h-3 w-3" />
+                    <UploadCloud className="h-3 w-3" />
                     {project._count.uploads} uploads
                   </Badge>
                 </div>
@@ -397,7 +397,7 @@ export function Dashboard({
           <DialogHeader>
             <DialogTitle>Select Project</DialogTitle>
             <DialogDescription>
-              Choose a project to upload the IFC file to
+              Choose a project to upload the Ifc file to
             </DialogDescription>
           </DialogHeader>
           <div className="grid gap-4">
