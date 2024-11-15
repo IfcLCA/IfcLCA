@@ -1,12 +1,18 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  serverExternalPackages: ["mongoose"],
   webpack: (config) => {
     config.experiments = {
       ...config.experiments,
       topLevelAwait: true,
     };
     return config;
+  },
+  logging: {
+    fetches: {
+      fullUrl: true,
+    },
+    level: 'info',
+    debug: true,
   },
   typescript: {
     // !! WARN !!

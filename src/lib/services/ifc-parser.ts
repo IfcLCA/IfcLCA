@@ -29,22 +29,43 @@ export class IFCParser {
   }
 
   parseContent(content: string) {
+    console.log(' [IFCParser] Starting to parse IFC content...');
     const dataSectionMatch = content.match(/DATA;([\s\S]*?)ENDSEC;/);
     if (!dataSectionMatch) {
+      console.error(' [IFCParser] Invalid IFC file: DATA section not found');
       throw new Error("Invalid IFC file: DATA section not found");
     }
     const dataSection = dataSectionMatch[1].trim();
+    console.log(' [IFCParser] Found DATA section');
 
+    let lineCount = 0;
     dataSection.split("\n").forEach((line) => {
       if (line.trim()) {
         this._parseLine(line.trim());
+        lineCount++;
       }
     });
+    console.log(` [IFCParser] Parsed ${lineCount} lines`);
 
+    console.log(' [IFCParser] Processing relationships...');
     this._processRelationships();
+    
+    console.log(' [IFCParser] Collecting net volumes...');
     this._collectNetVolumes();
+    
+    console.log(' [IFCParser] Collecting material layers...');
     this._collectMaterialLayers();
+    
+    console.log(' [IFCParser] Processing elements...');
     this._processElements();
+
+    console.log(` [IFCParser] Parsing complete. Found:`, {
+      entityCount: Object.keys(this.entities).length,
+      elementCount: this.elements.length,
+      relationshipCount: Object.keys(this.relationships).length,
+      quantityCount: Object.keys(this.quantities).length,
+      materialLayerCount: Object.keys(this.materialLayers).length
+    });
 
     return this.elements;
   }
@@ -53,6 +74,7 @@ export class IFCParser {
     line = line.endsWith(";") ? line.slice(0, -1) : line;
     const [idPart, content] = line.split("=", 2);
     if (!idPart || !content) {
+      console.warn(' [IFCParser] Invalid line format:', line);
       return;
     }
 
@@ -63,6 +85,12 @@ export class IFCParser {
       type: entityType,
       attributes: attributes,
     };
+
+    if (entityType === 'IFCRELDEFINESBYPROPERTIES' || 
+        entityType === 'IFCRELCONTAINEDINSPATIALSTRUCTURE' ||
+        entityType === 'IFCRELASSOCIATESMATERIAL') {
+      console.log(` [IFCParser] Found relationship: ${entityType} (#${entityId})`);
+    }
   }
 
   private _parseEntity(content: string): [string, any[]] {
@@ -240,9 +268,33 @@ export class IFCParser {
 
                 if (materialRef && materialRef.ref) {
                   const materialEntity = this.entities[materialRef.ref];
-                  if (materialEntity && materialEntity.attributes[0]) {
-                    materialName = materialEntity.attributes[0];
+                  if (materialEntity) {
+                    if (materialEntity.type === "IFCMATERIAL" && materialEntity.attributes[0]) {
+                      materialName = materialEntity.attributes[0];
+                      console.log(` [IFCParser] Found material in layer:`, {
+                        layerSetId: id,
+                        layerId: layerRef.ref,
+                        materialId: materialRef.ref,
+                        materialName,
+                        materialType: materialEntity.type,
+                        thickness
+                      });
+                    } else {
+                      console.log(` [IFCParser] Invalid material entity:`, {
+                        layerSetId: id,
+                        layerId: layerRef.ref,
+                        materialId: materialRef.ref,
+                        materialType: materialEntity.type,
+                        attributes: materialEntity.attributes
+                      });
+                    }
                   }
+                } else {
+                  console.log(` [IFCParser] Layer missing material reference:`, {
+                    layerSetId: id,
+                    layerId: layerRef.ref,
+                    layerName
+                  });
                 }
 
                 layers.push({
@@ -255,10 +307,23 @@ export class IFCParser {
             }
           });
 
-          this.materialLayers[id] = {
-            layerSetName,
-            layers,
-          };
+          if (layers.length > 0) {
+            console.log(` [IFCParser] Found material layer set #${id}:`, {
+              layerSetName,
+              layerCount: layers.length,
+              layers: layers.map(l => ({
+                materialName: l.materialName,
+                thickness: l.thickness,
+                layerName: l.layerName
+              }))
+            });
+            this.materialLayers[id] = {
+              layerSetName,
+              layers,
+            };
+          } else {
+            console.log(` [IFCParser] Empty material layer set #${id}`);
+          }
         }
       }
     });
@@ -295,7 +360,7 @@ export class IFCParser {
         );
         const netVolume = this.quantities[id] || "Unknown";
 
-        this.elements.push({
+        const element = {
           id,
           globalId,
           type: entity.type,
@@ -304,7 +369,19 @@ export class IFCParser {
           materials,
           netVolume,
           materialLayers,
-        });
+        };
+
+        if (materialLayers?.layers?.length > 0) {
+          console.log(` [IFCParser] Processed element #${id}:`, {
+            type: element.type,
+            materialCount: element.materialLayers.layers.length,
+            materials: element.materialLayers.layers.map(l => ({
+              name: l.materialName,
+              thickness: l.thickness
+            }))
+          });
+        }
+        this.elements.push(element);
       }
     });
   }

@@ -1,13 +1,19 @@
 import { IFCParser } from "./ifc-parser";
 import { IFCParseResult } from "../types/ifc";
-import { saveElements } from "@/app/actions/save-elements";
 
 export async function parseIFCFile(
   file: File,
   projectId: string
 ): Promise<IFCParseResult> {
   try {
-    // Create upload record with JSON
+    console.log(`Starting IFC file parsing for project ${projectId}`, {
+      filename: file.name,
+      size: file.size,
+      type: file.type,
+    });
+
+    // Create upload record
+    console.log("Creating upload record...");
     const uploadResponse = await fetch(`/api/projects/${projectId}/upload`, {
       method: "POST",
       headers: {
@@ -18,45 +24,41 @@ export async function parseIFCFile(
 
     const responseData = await uploadResponse.json();
     if (!uploadResponse.ok || !responseData.uploadId) {
+      console.error("Failed to create upload record:", responseData);
       throw new Error(responseData.error || "Failed to create upload record");
     }
+    console.log("Upload record created successfully", { uploadId: responseData.uploadId });
 
-    // Parse file client-side
+    // Read file content
+    console.log("Reading file contents...");
     const content = await file.text();
-    const parser = new IFCParser();
-    const parseResult = await parser.parseContent(content);
 
-    // Count unique materials
-    const uniqueMaterials = new Set(
-      parseResult.flatMap(
-        (element) =>
-          element.materialLayers?.layers?.map((layer) => layer.materialName) ||
-          []
-      )
-    );
-
-    // Save elements in chunks
-    const chunkSize = 100;
-    const chunks = [];
-
-    for (let i = 0; i < parseResult.length; i += chunkSize) {
-      chunks.push(parseResult.slice(i, i + chunkSize));
-    }
-
-    for (const chunk of chunks) {
-      await saveElements(projectId, {
-        elements: chunk,
+    // Send content to server for processing
+    console.log("Sending content to server for processing...");
+    const processResponse = await fetch(`/api/projects/${projectId}/upload/process`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
         uploadId: responseData.uploadId,
-        materialCount: uniqueMaterials.size,
-      });
+        content
+      }),
+    });
+
+    if (!processResponse.ok) {
+      const error = await processResponse.json();
+      console.error("Failed to process upload:", error);
+      throw new Error(error.error || "Failed to process upload");
     }
 
+    console.log("Upload processed successfully");
     return {
       uploadId: responseData.uploadId,
-      elements: parseResult,
-      elementCount: parseResult.length,
-      materialCount: uniqueMaterials.size,
+      elementCount: 0, // Server will update these counts
+      materialCount: 0,
     };
+
   } catch (error) {
     console.error("IFC parsing failed:", error);
     throw error;

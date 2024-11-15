@@ -3,6 +3,7 @@ import mongoose from "mongoose";
 interface IKBOBMaterial {
   KBOB_ID: number;
   Name: string;
+  Category?: string;
   GWP: number;
   UBP: number;
   PENRE: number;
@@ -17,11 +18,12 @@ interface KBOBMaterialModel extends mongoose.Model<IKBOBMaterial> {
 
 const kbobSchema = new mongoose.Schema<IKBOBMaterial, KBOBMaterialModel>(
   {
-    KBOB_ID: Number,
-    Name: String,
-    GWP: Number,
-    UBP: Number,
-    PENRE: Number,
+    KBOB_ID: { type: Number, required: true, index: true },
+    Name: { type: String, required: true, index: true },
+    Category: { type: String },
+    GWP: { type: Number, required: true },
+    UBP: { type: Number, required: true },
+    PENRE: { type: Number, required: true },
     "kg/unit": mongoose.Schema.Types.Mixed,
     "min density": Number,
     "max density": Number,
@@ -31,6 +33,10 @@ const kbobSchema = new mongoose.Schema<IKBOBMaterial, KBOBMaterialModel>(
     strict: false,
   }
 );
+
+// Add indexes for better query performance
+kbobSchema.index({ Name: 1 });
+kbobSchema.index({ Category: 1 });
 
 // Add a static method to find valid materials
 kbobSchema.static("findValidMaterials", function () {
@@ -48,7 +54,7 @@ kbobSchema.static("findValidMaterials", function () {
               $exists: true,
               $ne: null,
               $ne: "-",
-              $type: "number", // Ensure it's a number
+              $type: "number",
             },
           },
           {
@@ -63,7 +69,7 @@ kbobSchema.static("findValidMaterials", function () {
   }).sort({ Name: 1 });
 });
 
-// Create and export the model
+// Create or update the model
 export const KBOBMaterial =
   (mongoose.models.KBOBMaterial as KBOBMaterialModel) ||
   mongoose.model<IKBOBMaterial, KBOBMaterialModel>("KBOBMaterial", kbobSchema);

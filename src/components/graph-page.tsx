@@ -56,14 +56,19 @@ import {
 import { PrinterIcon } from "lucide-react";
 
 interface MaterialData {
-  id: string;
   name: string;
-  category?: string;
   volume: number;
-  gwp: number;
-  ubp: number;
-  penre: number;
+  indicators?: {
+    gwp: number;
+    ubp: number;
+    penre: number;
+  };
+  kbobMaterial?: string;
+  ifcMaterial?: string;
+  category?: string;
 }
+
+type GroupingMode = 'elements' | 'kbobMaterials' | 'ifcMaterials';
 
 interface Props {
   materialsData?: MaterialData[];
@@ -75,6 +80,7 @@ export function GraphPageComponent({
   const [selectedIndicator, setSelectedIndicator] = useState<string>("gwp");
   const [selectedMaterials, setSelectedMaterials] = useState<string[]>([]);
   const [chartType, setChartType] = useState<"bar" | "line" | "pie" | "bubble">("bar");
+  const [groupingMode, setGroupingMode] = useState<GroupingMode>("elements");
   const [chartData, setChartData] = useState<any[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [colorTheme, setColorTheme] = useState<ColorTheme>('standard');
@@ -85,21 +91,43 @@ export function GraphPageComponent({
 
     const materials = new Map<string, MaterialData>();
     materialsData.forEach((material) => {
-      if (!materials.has(material.name)) {
-        materials.set(material.name, material);
+      // Determine the key based on grouping mode
+      const key = groupingMode === 'kbobMaterials' ? 
+        (material.kbobMaterial || 'Unknown KBOB Material') :
+        groupingMode === 'ifcMaterials' ? 
+        (material.ifcMaterial || 'Unknown IFC Material') :
+        material.name;
+
+      const existingMaterial = materials.get(key);
+      
+      if (!existingMaterial) {
+        materials.set(key, {
+          name: key,
+          volume: material.volume || 0,
+          indicators: {
+            gwp: material.indicators?.gwp || 0,
+            ubp: material.indicators?.ubp || 0,
+            penre: material.indicators?.penre || 0
+          },
+          category: material.category,
+          kbobMaterial: material.kbobMaterial,
+          ifcMaterial: material.ifcMaterial
+        });
       } else {
-        const existing = materials.get(material.name)!;
-        materials.set(material.name, {
-          ...material,
-          volume: (existing.volume || 0) + (material.volume || 0),
-          gwp: (existing.gwp || 0) + (material.gwp || 0),
-          ubp: (existing.ubp || 0) + (material.ubp || 0),
-          penre: (existing.penre || 0) + (material.penre || 0),
+        // Aggregate volumes and indicators
+        materials.set(key, {
+          ...existingMaterial,
+          volume: (existingMaterial.volume || 0) + (material.volume || 0),
+          indicators: {
+            gwp: (existingMaterial.indicators?.gwp || 0) + (material.indicators?.gwp || 0),
+            ubp: (existingMaterial.indicators?.ubp || 0) + (material.indicators?.ubp || 0),
+            penre: (existingMaterial.indicators?.penre || 0) + (material.indicators?.penre || 0)
+          }
         });
       }
     });
     return materials;
-  }, [materialsData]);
+  }, [materialsData, groupingMode]);
 
   // Update selected materials when data changes
   useEffect(() => {
@@ -107,6 +135,27 @@ export function GraphPageComponent({
       setSelectedMaterials(Array.from(uniqueMaterials.keys()));
     }
   }, [uniqueMaterials]);
+
+  // Update chart data when selected materials or indicator changes
+  useEffect(() => {
+    if (!materialsData?.length) return;
+
+    const filteredData = Array.from(uniqueMaterials.values())
+      .filter((material) => selectedMaterials.includes(material.name))
+      .map(material => ({
+        name: material.name,
+        volume: material.volume || 0,
+        gwp: material.indicators?.gwp || 0,
+        ubp: material.indicators?.ubp || 0,
+        penre: material.indicators?.penre || 0,
+        category: material.category,
+        kbobMaterial: material.kbobMaterial,
+        ifcMaterial: material.ifcMaterial
+      }))
+      .sort((a, b) => b[selectedIndicator] - a[selectedIndicator]);
+
+    setChartData(filteredData);
+  }, [uniqueMaterials, selectedMaterials, selectedIndicator]);
 
   const formatValue = (value: number | null | undefined, selectedIndicator: string) => {
     if (value === null || value === undefined) return '0';
@@ -531,22 +580,6 @@ export function GraphPageComponent({
     }
   };
 
-  useEffect(() => {
-    if (!materialsData || !selectedMaterials) return;
-
-    const filteredData = materialsData
-      .filter((material) => selectedMaterials.includes(material.name))
-      .map((material) => ({
-        name: material.name,
-        [selectedIndicator]: material[selectedIndicator] || 0,
-        volume: material.volume || 0,
-        category: material.category || ''
-      }))
-      .sort((a, b) => (b[selectedIndicator] || 0) - (a[selectedIndicator] || 0));
-
-    setChartData(filteredData);
-  }, [materialsData, selectedMaterials, selectedIndicator]);
-
   if (!materialsData?.length) {
     return (
       <div className="flex items-center justify-center h-[400px]">
@@ -666,6 +699,22 @@ export function GraphPageComponent({
                     <TabsTrigger value="bubble">Bubble</TabsTrigger>
                   </TabsList>
                 </Tabs>
+              </div>
+              <div className="flex-1">
+                <Label className="mb-2 block">Grouping Mode</Label>
+                <Select
+                  value={groupingMode}
+                  onValueChange={(value) => setGroupingMode(value as any)}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select grouping mode" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="elements">Group by Elements</SelectItem>
+                    <SelectItem value="kbobMaterials">Group by KBOB Materials</SelectItem>
+                    <SelectItem value="ifcMaterials">Group by IFC Materials</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
             </div>
           </div>

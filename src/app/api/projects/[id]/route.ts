@@ -18,21 +18,58 @@ export async function GET(
       return NextResponse.json({ error: "Project not found" }, { status: 404 });
     }
 
-    const [uploads, elements, materials] = await Promise.all([
-      mongoose.models.Upload.find({ projectId: project._id }).lean(),
-      mongoose.models.Element.find({ projectId: project._id }).lean(),
-      mongoose.models.Material.find({ projectId: project._id }).lean(),
-    ]);
+    // First, get all materials for the project
+    const materials = await mongoose.models.Material.find({ projectId: project._id })
+      .populate('kbobMatchId')
+      .lean();
+
+    // Get elements with their material references
+    const elements = await mongoose.models.Element.find({ projectId: project._id })
+      .lean();
+
+    console.log("Materials in DB:", materials.map(m => ({ id: m._id.toString(), name: m.name })));
+    
+    // Create a map of material IDs to their full objects
+    const materialMap = new Map();
+    materials.forEach(m => {
+      materialMap.set(m._id.toString(), m);
+    });
+
+    // Manually populate material references with detailed logging
+    const populatedElements = elements.map(element => {
+      console.log("\nProcessing element:", element.name);
+      
+      return {
+        ...element,
+        materials: element.materials.map(mat => {
+          // Convert material reference to string if it's an ObjectId
+          const materialId = mat.material?.toString();
+          console.log("Material reference:", materialId);
+          
+          // Look up material in our map
+          const materialRef = materialId ? materialMap.get(materialId) : null;
+          console.log("Found material:", materialRef ? materialRef.name : 'null');
+          
+          return {
+            ...mat,
+            material: materialRef // Replace reference with full material object
+          };
+        })
+      };
+    });
+
+    const uploads = await mongoose.models.Upload.find({ projectId: project._id }).lean();
 
     const projectData = {
       ...project,
       uploads: uploads || [],
-      elements: elements || [],
+      elements: populatedElements || [],
       materials: materials || [],
     };
 
     return NextResponse.json(projectData);
   } catch (error) {
+    console.error("Failed to fetch project:", error);
     return NextResponse.json(
       { error: "Failed to fetch project" },
       { status: 500 }

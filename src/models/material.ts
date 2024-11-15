@@ -11,6 +11,8 @@ interface IMaterial {
   gwp?: number;
   ubp?: number;
   penre?: number;
+  autoMatched?: boolean;
+  matchScore?: number;
 }
 
 const materialSchema = new mongoose.Schema<IMaterial>(
@@ -47,6 +49,15 @@ const materialSchema = new mongoose.Schema<IMaterial>(
     penre: {
       type: Number,
       default: 0,
+    },
+    autoMatched: {
+      type: Boolean,
+      default: false,
+    },
+    matchScore: {
+      type: Number,
+      min: 0,
+      max: 1,
     },
   },
   {

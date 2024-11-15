@@ -41,24 +41,50 @@ import {
   PaginationPrevious,
 } from "@/components/ui/pagination";
 import { emissionsColumns } from "@/components/emissions-columns";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
-type ElementWithMaterials = {
-  id: string;
+interface KBOBMaterial {
   _id: string;
-  guid: string;
-  name: string;
-  type?: string;
-  volume?: number;
-  buildingStorey?: string;
-  materials: {
-    id: string;
-    name: string;
-    category?: string;
-    volume?: number;
-  }[];
-};
+  Name: string;
+  Category?: string;
+  GWP: number;
+  UBP: number;
+  PENRE: number;
+}
 
-interface ExtendedProject {
+interface Material {
+  _id: string;
+  name: string;
+  category?: string;
+  kbobMatchId?: KBOBMaterial;
+}
+
+interface MaterialEntry {
+  name: string;
+  volume: number;
+  thickness?: number;
+  material?: {
+    name: string;
+    kbobMatchId?: {
+      Name: string;
+      GWP?: number;
+      UBP?: number;
+      PENRE?: number;
+    };
+  };
+  indicators?: {
+    gwp: number;
+    ubp: number;
+    penre: number;
+  };
+}
+
+interface ElementWithMaterials {
+  name: string;
+  materials: MaterialEntry[];
+}
+
+interface Project {
   id: string;
   _id?: string;
   name: string;
@@ -84,6 +110,21 @@ interface ExtendedProject {
     materials: number;
   };
 }
+
+interface ExtendedProject extends Project {
+  elements: ElementWithMaterials[];
+}
+
+type IndicatorType = "gwp" | "ubp" | "penre";
+
+const formatNumber = (value: number, decimalPlaces: number = 2) => {
+  return (
+    value?.toLocaleString("de-CH", {
+      minimumFractionDigits: decimalPlaces,
+      maximumFractionDigits: decimalPlaces,
+    }) ?? "N/A"
+  );
+};
 
 export default function ProjectDetailsPage() {
   const router = useRouter();
@@ -541,34 +582,144 @@ const MaterialsTab = ({
 );
 
 const EmissionsTab = ({ project }: { project: ExtendedProject }) => {
-  const data = project.elements.flatMap((element) =>
-    element.materials.map((materialEntry) => ({
-      name: element.name || "Unknown",
-      volume: materialEntry.volume || 0,
-      indicators: materialEntry.indicators || {
-        gwp: 0,
-        ubp: 0,
-        penre: 0,
-      },
-    }))
-  );
+  const [selectedIndicator, setSelectedIndicator] = useState<IndicatorType>("gwp");
+
+  const data = useMemo(() => {
+    // First, create a map to group identical materials
+    const groupedMaterials = project.elements.flatMap((element: ElementWithMaterials) =>
+      element.materials.map((materialEntry: MaterialEntry) => ({
+        kbobMaterial: materialEntry.material?.kbobMatchId?.Name || "Unknown",
+        ifcMaterial: materialEntry.material?.name || "Unknown",
+        volume: materialEntry.volume || 0,
+        kbobIndicators: {
+          gwp: materialEntry.material?.kbobMatchId?.GWP || 0,
+          ubp: materialEntry.material?.kbobMatchId?.UBP || 0,
+          penre: materialEntry.material?.kbobMatchId?.PENRE || 0,
+        },
+        indicators: materialEntry.indicators || {
+          gwp: 0,
+          ubp: 0,
+          penre: 0
+        }
+      }))
+    ).reduce((acc, curr) => {
+      const key = `${curr.kbobMaterial}-${curr.ifcMaterial}`;
+      if (!acc[key]) {
+        acc[key] = curr;
+      } else {
+        // Sum up the volumes and indicators
+        acc[key].volume += curr.volume;
+        acc[key].indicators.gwp += curr.indicators.gwp;
+        acc[key].indicators.ubp += curr.indicators.ubp;
+        acc[key].indicators.penre += curr.indicators.penre;
+      }
+      return acc;
+    }, {} as Record<string, any>);
+
+    // Convert the grouped map back to an array
+    return Object.values(groupedMaterials);
+  }, [project.elements]);
+
+  const indicatorLabels = {
+    gwp: {
+      name: "GWP",
+      unit: "kg CO₂ eq",
+      kbobUnit: "kg CO₂ eq/kg",
+    },
+    ubp: {
+      name: "UBP",
+      unit: "UBP",
+      kbobUnit: "UBP/kg",
+    },
+    penre: {
+      name: "PENRE",
+      unit: "kWh",
+      kbobUnit: "kWh/kg",
+    }
+  };
+
+  const columns = useMemo(() => [
+    {
+      accessorKey: "kbobMaterial",
+      header: "KBOB Material",
+      cell: ({ row }) => row.getValue("kbobMaterial") || "Unknown",
+    },
+    {
+      accessorKey: "kbobIndicators",
+      id: "kbob_indicator",
+      header: () => (
+        <div className="text-center">
+          KBOB {indicatorLabels[selectedIndicator].name} ({indicatorLabels[selectedIndicator].kbobUnit})
+        </div>
+      ),
+      cell: ({ row }) => (
+        <div className="text-center">
+          {formatNumber(row.original.kbobIndicators[selectedIndicator], selectedIndicator === "gwp" ? 3 : 2)}
+        </div>
+      ),
+    },
+    {
+      accessorKey: "ifcMaterial",
+      header: "IFC Material",
+      cell: ({ row }) => row.getValue("ifcMaterial") || "Unknown",
+    },
+    {
+      accessorKey: "volume",
+      header: () => (
+        <div className="text-center">
+          Volume (m³)
+        </div>
+      ),
+      cell: ({ row }) => (
+        <div className="text-center">
+          {formatNumber(row.getValue("volume"), 2)}
+        </div>
+      ),
+    },
+    {
+      accessorKey: "indicators",
+      id: "total_indicator",
+      header: () => (
+        <div className="text-center">
+          Total {indicatorLabels[selectedIndicator].name} ({indicatorLabels[selectedIndicator].unit})
+        </div>
+      ),
+      cell: ({ row }) => (
+        <div className="text-center">
+          {formatNumber(row.original.indicators[selectedIndicator], 0)}
+        </div>
+      ),
+    },
+  ], [selectedIndicator]);
+
+  const indicatorOptions = [
+    { value: "gwp", label: "Global Warming Potential (GWP)" },
+    { value: "ubp", label: "Environmental Impact Points (UBP)" },
+    { value: "penre", label: "Primary Energy Non-Renewable (kWh)" },
+  ];
 
   return (
     <>
-      <div className="flex justify-between items-center mb-4">
-        <h2 className="text-2xl font-semibold">
-          Emissions{" "}
-          <Badge variant="secondary" className="ml-2">
-            LCA
-          </Badge>
-        </h2>
+      <div className="flex justify-end mb-4">
+        <Select
+          value={selectedIndicator}
+          onValueChange={(value: IndicatorType) => setSelectedIndicator(value)}
+        >
+          <SelectTrigger className="w-[180px]">
+            <SelectValue placeholder="Select indicator" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="gwp">GWP (CO₂ eq)</SelectItem>
+            <SelectItem value="ubp">UBP</SelectItem>
+            <SelectItem value="penre">PENRE (kWh)</SelectItem>
+          </SelectContent>
+        </Select>
       </div>
       <Card>
         <CardContent className="p-0">
           <DataTable
-            columns={emissionsColumns}
+            columns={columns}
             data={data}
-            onRowSelectionChange={() => {}}
           />
         </CardContent>
       </Card>
@@ -577,47 +728,30 @@ const EmissionsTab = ({ project }: { project: ExtendedProject }) => {
 };
 
 const GraphTab = ({ project }: { project: ExtendedProject }) => {
-  const materialsData = useMemo(() => {
-    const materialMap = new Map();
-
-    // Iterate through all elements and their materials
-    project.elements.forEach((element) => {
-      element.materials?.forEach((mat) => {
-        const materialId = mat.material;
-        const volume = mat.volume || 0;
-        const indicators = mat.indicators || { gwp: 0, ubp: 0, penre: 0 };
-
-        if (materialMap.has(materialId)) {
-          const existing = materialMap.get(materialId);
-          materialMap.set(materialId, {
-            ...existing,
-            volume: existing.volume + volume,
-            gwp: existing.gwp + (indicators.gwp || 0),
-            ubp: existing.ubp + (indicators.ubp || 0),
-            penre: existing.penre + (indicators.penre || 0),
-          });
-        } else {
-          // Find material details from project.materials
-          const materialDetails = project.materials.find((m) => m.id === materialId);
-          materialMap.set(materialId, {
-            id: materialId,
-            name: materialDetails?.name || "Unknown Material",
-            category: materialDetails?.category || undefined,
-            volume: volume,
-            gwp: indicators.gwp || 0,
-            ubp: indicators.ubp || 0,
-            penre: indicators.penre || 0,
-          });
-        }
-      });
-    });
-
-    return Array.from(materialMap.values());
-  }, [project]);
+  const materialsData = project.elements.flatMap((element: ElementWithMaterials) =>
+    element.materials.map((materialEntry: MaterialEntry) => ({
+      name: element.name || "Unknown",
+      volume: materialEntry.volume || 0,
+      indicators: materialEntry.indicators || {
+        gwp: 0,
+        ubp: 0,
+        penre: 0,
+      },
+      category: materialEntry.material?.category,
+      kbobMaterial: materialEntry.material?.kbobMatchId?.Name,
+      ifcMaterial: materialEntry.material?.name,
+    }))
+  );
 
   return (
     <div className="space-y-4">
-      <GraphPageComponent materialsData={materialsData} />
+      <div className="grid gap-4">
+        <Card>
+          <CardContent className="pt-6">
+            <GraphPageComponent materialsData={materialsData} />
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 };
