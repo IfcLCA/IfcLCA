@@ -56,8 +56,11 @@ export const emissionsColumns = (selectedIndicator: IndicatorType): ColumnDef<Em
   {
     accessorKey: "kbobMaterial",
     header: "KBOB Material",
+    enableResizing: true,
+    size: 250,
+    minSize: 150,
     cell: ({ row }) => (
-      <div className="w-[200px] truncate">
+      <div className="truncate">
         {row.getValue("kbobMaterial") || "Unknown"}
       </div>
     ),
@@ -65,34 +68,43 @@ export const emissionsColumns = (selectedIndicator: IndicatorType): ColumnDef<Em
   {
     accessorKey: "ifcMaterial",
     header: "IFC Material",
+    enableResizing: true,
+    size: 250,
+    minSize: 150,
     cell: ({ row }) => (
-      <div className="w-[200px] truncate">
+      <div className="truncate">
         {row.getValue("ifcMaterial") || "Unknown"}
       </div>
     ),
   },
   {
     accessorKey: "volume",
+    enableResizing: true,
+    size: 130,
+    minSize: 100,
     header: () => (
-      <div className="text-center w-[100px]">
+      <div className="text-center">
         Volume (m³)
       </div>
     ),
     cell: ({ row }) => (
-      <div className="text-center w-[100px]">
+      <div className="text-center">
         {formatNumber(row.getValue("volume"), 2)}
       </div>
     ),
   },
   {
     accessorKey: "density",
+    enableResizing: true,
+    size: 130,
+    minSize: 100,
     header: () => (
-      <div className="text-center w-[100px]">
+      <div className="text-center">
         Density (kg/m³)
       </div>
     ),
     cell: ({ row }) => (
-      <div className="text-center w-[100px]">
+      <div className="text-center">
         {formatNumber(row.getValue("density"), 0)}
       </div>
     ),
@@ -100,13 +112,16 @@ export const emissionsColumns = (selectedIndicator: IndicatorType): ColumnDef<Em
   {
     accessorKey: "kbobIndicators",
     id: "kbob_indicator",
+    enableResizing: true,
+    size: 200,
+    minSize: 150,
     header: () => (
-      <div className="text-center w-[120px]">
+      <div className="text-center">
         KBOB {indicatorLabels[selectedIndicator].name} ({indicatorLabels[selectedIndicator].kbobUnit})
       </div>
     ),
     cell: ({ row }) => (
-      <div className="text-center w-[120px]">
+      <div className="text-center">
         {formatNumber(
           row.original.kbobIndicators[selectedIndicator],
           indicatorLabels[selectedIndicator].decimals
@@ -117,8 +132,11 @@ export const emissionsColumns = (selectedIndicator: IndicatorType): ColumnDef<Em
   {
     accessorKey: "indicators",
     id: "total_indicator",
+    enableResizing: true,
+    size: 200,
+    minSize: 150,
     header: () => (
-      <div className="text-center w-[120px]">
+      <div className="text-center">
         Total {indicatorLabels[selectedIndicator].name} ({indicatorLabels[selectedIndicator].unit})
       </div>
     ),
@@ -129,7 +147,7 @@ export const emissionsColumns = (selectedIndicator: IndicatorType): ColumnDef<Em
       const total = volume * density * indicatorPerKg;
       
       return (
-        <div className="text-center w-[120px]">
+        <div className="text-center">
           {formatNumber(total, 0)}
         </div>
       );

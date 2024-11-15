@@ -8,6 +8,7 @@ import {
   useReactTable,
   getPaginationRowModel,
   PaginationState,
+  ColumnResizeMode,
 } from "@tanstack/react-table";
 import {
   Table,
@@ -37,17 +38,21 @@ interface DataTableProps<TData, TValue> {
   columns: ColumnDef<TData, TValue>[];
   data: TData[] | undefined;
   isLoading?: boolean;
+  columnResizeMode?: ColumnResizeMode;
 }
 
 export function DataTable<TData, TValue>({
   columns,
   data = [],
   isLoading = false,
+  columnResizeMode = "onChange",
 }: DataTableProps<TData, TValue>) {
   const [pagination, setPagination] = React.useState<PaginationState>({
     pageIndex: 0,
     pageSize: 20,
   });
+
+  const [columnSizing, setColumnSizing] = React.useState({});
 
   const table = useReactTable({
     data,
@@ -55,10 +60,53 @@ export function DataTable<TData, TValue>({
     getCoreRowModel: getCoreRowModel(),
     getPaginationRowModel: getPaginationRowModel(),
     onPaginationChange: setPagination,
+    columnResizeMode,
+    enableColumnResizing: true,
+    defaultColumn: {
+      minSize: 80,
+      size: 150,
+    },
     state: {
       pagination,
+      columnSizing,
     },
+    onColumnSizingChange: setColumnSizing,
   });
+
+  const totalColumnsWidth = React.useMemo(() => {
+    return table.getAllColumns().reduce((acc, column) => acc + column.getSize(), 0);
+  }, [table.getAllColumns()]);
+
+  const containerRef = React.useRef<HTMLDivElement>(null);
+  const [containerWidth, setContainerWidth] = React.useState(0);
+
+  React.useEffect(() => {
+    if (containerRef.current) {
+      const resizeObserver = new ResizeObserver((entries) => {
+        for (const entry of entries) {
+          setContainerWidth(entry.contentRect.width);
+        }
+      });
+
+      resizeObserver.observe(containerRef.current);
+      return () => resizeObserver.disconnect();
+    }
+  }, []);
+
+  React.useEffect(() => {
+    if (containerWidth && totalColumnsWidth < containerWidth) {
+      const remainingWidth = containerWidth - totalColumnsWidth;
+      const columnsToAdjust = table.getAllColumns();
+      const widthPerColumn = Math.floor(remainingWidth / columnsToAdjust.length);
+
+      const newColumnSizing = columnsToAdjust.reduce((acc, column) => {
+        acc[column.id] = column.getSize() + widthPerColumn;
+        return acc;
+      }, {} as Record<string, number>);
+
+      setColumnSizing(newColumnSizing);
+    }
+  }, [containerWidth, totalColumnsWidth]);
 
   if (isLoading) {
     return (
@@ -72,50 +120,79 @@ export function DataTable<TData, TValue>({
 
   return (
     <div>
-      <div className="rounded-md border">
-        <Table>
-          <TableHeader>
-            {table.getHeaderGroups().map((headerGroup) => (
-              <TableRow key={headerGroup.id}>
-                {headerGroup.headers.map((header) => (
-                  <TableHead key={header.id}>
-                    {header.isPlaceholder
-                      ? null
-                      : flexRender(
-                          header.column.columnDef.header,
-                          header.getContext()
+      <div ref={containerRef} className="rounded-md border overflow-hidden">
+        <div className="overflow-auto">
+          <Table>
+            <TableHeader>
+              {table.getHeaderGroups().map((headerGroup) => (
+                <TableRow key={headerGroup.id} className="relative">
+                  {headerGroup.headers.map((header) => (
+                    <TableHead
+                      key={header.id}
+                      style={{
+                        position: "relative",
+                        width: header.getSize(),
+                      }}
+                    >
+                      {header.isPlaceholder
+                        ? null
+                        : (
+                          <>
+                            <div className="select-none">
+                              {flexRender(
+                                header.column.columnDef.header,
+                                header.getContext()
+                              )}
+                            </div>
+                            {header.column.getCanResize() && (
+                              <div
+                                onMouseDown={header.getResizeHandler()}
+                                onTouchStart={header.getResizeHandler()}
+                                className={`resizer ${
+                                  header.column.getIsResizing() ? "isResizing" : ""
+                                }`}
+                                role="separator"
+                              />
+                            )}
+                          </>
                         )}
-                  </TableHead>
-                ))}
-              </TableRow>
-            ))}
-          </TableHeader>
-          <TableBody>
-            {table.getRowModel().rows?.length ? (
-              table.getRowModel().rows.map((row) => (
-                <TableRow key={row.id}>
-                  {row.getVisibleCells().map((cell) => (
-                    <TableCell key={cell.id}>
-                      {flexRender(
-                        cell.column.columnDef.cell,
-                        cell.getContext()
-                      )}
-                    </TableCell>
+                    </TableHead>
                   ))}
                 </TableRow>
-              ))
-            ) : (
-              <TableRow>
-                <TableCell
-                  colSpan={columns.length}
-                  className="h-24 text-center text-muted-foreground"
-                >
-                  No results.
-                </TableCell>
-              </TableRow>
-            )}
-          </TableBody>
-        </Table>
+              ))}
+            </TableHeader>
+            <TableBody>
+              {table.getRowModel().rows?.length ? (
+                table.getRowModel().rows.map((row) => (
+                  <TableRow key={row.id}>
+                    {row.getVisibleCells().map((cell) => (
+                      <TableCell
+                        key={cell.id}
+                        style={{
+                          width: cell.column.getSize(),
+                        }}
+                      >
+                        {flexRender(
+                          cell.column.columnDef.cell,
+                          cell.getContext()
+                        )}
+                      </TableCell>
+                    ))}
+                  </TableRow>
+                ))
+              ) : (
+                <TableRow>
+                  <TableCell
+                    colSpan={columns.length}
+                    className="h-24 text-center text-muted-foreground"
+                  >
+                    No results.
+                  </TableCell>
+                </TableRow>
+              )}
+            </TableBody>
+          </Table>
+        </div>
       </div>
       {data.length > 20 && (
         <div className="flex items-center justify-between space-x-2 py-4 px-4">

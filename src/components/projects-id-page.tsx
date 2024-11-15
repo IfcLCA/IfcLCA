@@ -646,8 +646,6 @@ const EmissionsTab = ({
     // First, create a map to group identical materials
     const groupedMaterials = project.elements.flatMap((element: ElementWithMaterials) =>
       element.materials.map((materialEntry: MaterialEntry) => {
-        // Log the material entry to debug
-        console.log('Material Entry:', materialEntry);
         
         return {
           id: materialEntry._id,

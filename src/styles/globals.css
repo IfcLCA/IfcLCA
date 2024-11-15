@@ -196,6 +196,62 @@
   .page-description {
     @apply text-muted-foreground;
   }
+
+  .resizer {
+    position: absolute;
+    right: -3px;
+    top: 50%;
+    transform: translateY(-50%);
+    height: 24px;
+    width: 6px;
+    background: transparent;
+    cursor: col-resize;
+    user-select: none;
+    touch-action: none;
+    transition: all 0.2s;
+    z-index: 10;
+  }
+
+  .resizer::after {
+    content: '';
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    height: 20px;
+    width: 2px;
+    border-radius: 1px;
+    background: var(--border);
+    transition: all 0.2s;
+  }
+
+  .resizer:hover {
+    background: var(--primary);
+    opacity: 0.1;
+  }
+
+  .resizer:hover::after {
+    width: 2px;
+    background: var(--primary);
+    opacity: 1;
+  }
+
+  .resizer.isResizing,
+  .resizer.isResizing::after {
+    background: var(--primary);
+    opacity: 1;
+  }
+
+  @media (hover: none) {
+    .resizer {
+      opacity: 1;
+      width: 8px;
+    }
+    
+    .resizer::after {
+      width: 2px;
+    }
+  }
 }
 
 /* Responsive adjustments */
