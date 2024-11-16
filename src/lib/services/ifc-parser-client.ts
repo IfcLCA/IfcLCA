@@ -52,12 +52,19 @@ export async function parseIFCFile(
       throw new Error(error.error || "Failed to process upload");
     }
 
-    console.log("Upload processed successfully");
-    return {
+    const processResult = await processResponse.json();
+    console.log("[DEBUG] Process result:", processResult);
+
+    const result = {
       uploadId: responseData.uploadId,
-      elementCount: 0, // Server will update these counts
-      materialCount: 0,
+      elementCount: processResult.elementCount || 0,
+      materialCount: processResult.materialCount || 0,
+      unmatchedMaterialCount: processResult.unmatchedMaterialCount || 0,
+      shouldRedirectToLibrary: processResult.unmatchedMaterialCount > 0,
     };
+
+    console.log("[DEBUG] Returning result:", result);
+    return result;
 
   } catch (error) {
     console.error("Ifc parsing failed:", error);

@@ -602,21 +602,19 @@ const MaterialsTab = ({
       }))
     );
 
-    // Then group identical materials
+    // Group materials by id to sum up volumes
     const groupedMaterials = materials.reduce((acc, curr) => {
-      const key = `${curr.ifcMaterial}-${curr.kbobMaterial}-${curr.category}`;
+      const key = `${curr.ifcMaterial}-${curr.kbobMaterial}`;
       if (!acc[key]) {
-        acc[key] = curr;
+        acc[key] = { ...curr };
       } else {
-        // Sum up the volumes
         acc[key].volume += curr.volume;
       }
       return acc;
-    }, {} as Record<string, any>);
+    }, {} as Record<string, typeof materials[0]>);
 
-    // Convert back to array
     return Object.values(groupedMaterials);
-  }, [project.elements]);
+  }, [project]);
 
   return (
     <>
@@ -664,49 +662,43 @@ const EmissionsTab = ({
 }) => {
   const [selectedIndicator, setSelectedIndicator] = useState<IndicatorType>("gwp");
 
-  const data = useMemo(() => {
+  const emissionsData = useMemo(() => {
     // First, create a map to group identical materials
     const groupedMaterials = project.elements.flatMap((element: ElementWithMaterials) =>
-      element.materials.map((materialEntry: MaterialEntry) => {
-        
-        return {
-          id: materialEntry._id,
-          kbobMaterial: materialEntry.material?.kbobMatchId?.Name || "Unknown",
-          ifcMaterial: materialEntry.material?.name || "Unknown",
-          volume: materialEntry.volume || 0,
-          density: materialEntry.material?.density || 0,
-          mass: materialEntry.mass || 0,
-          kbobIndicators: {
-            gwp: materialEntry.material?.kbobMatchId?.GWP || 0,
-            ubp: materialEntry.material?.kbobMatchId?.UBP || 0,
-            penre: materialEntry.material?.kbobMatchId?.PENRE || 0,
-          },
-          indicators: materialEntry.indicators || {
-            gwp: 0,
-            ubp: 0,
-            penre: 0,
-          },
-        };
-      })
+      element.materials.map((materialEntry: MaterialEntry) => ({
+        id: materialEntry._id,
+        kbobMaterial: materialEntry.material?.kbobMatchId?.Name || "Unknown",
+        ifcMaterial: materialEntry.material?.name || "Unknown",
+        volume: materialEntry.volume || 0,
+        density: materialEntry.material?.density || 0,
+        mass: (materialEntry.volume || 0) * (materialEntry.material?.density || 0),
+        kbobIndicators: {
+          gwp: materialEntry.material?.kbobMatchId?.GWP || 0,
+          ubp: materialEntry.material?.kbobMatchId?.UBP || 0,
+          penre: materialEntry.material?.kbobMatchId?.PENRE || 0,
+        },
+      }))
     ).reduce((acc, curr) => {
-      const key = `${curr.kbobMaterial}-${curr.ifcMaterial}`;
+      // Group by IFC name, KBOB name, and density
+      const key = `${curr.ifcMaterial}-${curr.kbobMaterial}-${curr.density}`;
       if (!acc[key]) {
-        acc[key] = curr;
+        acc[key] = { ...curr };
       } else {
-        // Sum up the volumes and indicators
+        // Sum up volumes and recalculate mass and totals
         acc[key].volume += curr.volume;
-        acc[key].mass += curr.mass;
-        acc[key].indicators.gwp += curr.indicators.gwp;
-        acc[key].indicators.ubp += curr.indicators.ubp;
-        acc[key].indicators.penre += curr.indicators.penre;
-        // Keep the same density since it should be the same for identical materials
+        acc[key].mass = acc[key].volume * acc[key].density;
       }
       return acc;
     }, {} as Record<string, any>);
 
-    // Convert the grouped map back to an array
-    return Object.values(groupedMaterials);
-  }, [project.elements, selectedIndicator]);
+    // Convert back to array and calculate total emissions
+    return Object.values(groupedMaterials).map(material => ({
+      ...material,
+      totalGWP: material.mass * material.kbobIndicators.gwp,
+      totalUBP: material.mass * material.kbobIndicators.ubp,
+      totalPENRE: material.mass * material.kbobIndicators.penre,
+    }));
+  }, [project]);
 
   const indicators = [
     { 
@@ -775,7 +767,7 @@ const EmissionsTab = ({
           <CardContent className="p-0">
             <DataTable
               columns={emissionsColumns(selectedIndicator)}
-              data={data}
+              data={emissionsData}
               onRowSelectionChange={() => {}}
             />
           </CardContent>

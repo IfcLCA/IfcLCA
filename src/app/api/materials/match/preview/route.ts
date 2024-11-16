@@ -7,8 +7,7 @@ export async function POST(request: Request) {
     const { materialIds, kbobMaterialId } = await request.json();
     await connectToDatabase();
 
-    const materialService = new MaterialService();
-    const preview = await materialService.getKBOBMatchPreview(
+    const preview = await MaterialService.getKBOBMatchPreview(
       materialIds,
       kbobMaterialId
     );

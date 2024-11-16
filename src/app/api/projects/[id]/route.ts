@@ -18,43 +18,58 @@ export async function GET(
       return NextResponse.json({ error: "Project not found" }, { status: 404 });
     }
 
-    // First, get all materials for the project
+    // First, get all materials for the project with populated KBOB matches
     const materials = await mongoose.models.Material.find({ projectId: project._id })
-      .populate('kbobMatchId')
+      .populate({
+        path: 'kbobMatchId',
+        model: 'KBOBMaterial',
+        select: 'Name Category GWP UBP PENRE kg/unit min density max density'
+      })
       .lean();
 
+    console.log("Materials with KBOB:", materials.map(m => ({ 
+      id: m._id.toString(), 
+      name: m.name,
+      kbob: m.kbobMatchId ? { id: m.kbobMatchId._id, name: m.kbobMatchId.Name } : null
+    })));
+    
     // Get elements with their material references
     const elements = await mongoose.models.Element.find({ projectId: project._id })
+      .populate({
+        path: 'materials.material',
+        model: 'Material',
+        populate: {
+          path: 'kbobMatchId',
+          model: 'KBOBMaterial',
+          select: 'Name Category GWP UBP PENRE'
+        }
+      })
       .lean();
 
     console.log("Materials in DB:", materials.map(m => ({ id: m._id.toString(), name: m.name })));
     
-    // Create a map of material IDs to their full objects
-    const materialMap = new Map();
-    materials.forEach(m => {
-      materialMap.set(m._id.toString(), m);
-    });
-
-    // Manually populate material references with detailed logging
+    // Process elements to ensure material references are properly populated
     const populatedElements = elements.map(element => {
-      console.log("\nProcessing element:", element.name);
-      
       return {
         ...element,
         materials: element.materials.map(mat => {
-          // Convert material reference to string if it's an ObjectId
-          const materialId = mat.material?.toString();
-          console.log("Material reference:", materialId);
-          
-          // Look up material in our map
-          const materialRef = materialId ? materialMap.get(materialId) : null;
-          console.log("Found material:", materialRef ? materialRef.name : 'null');
-          
+          const materialRef = mat.material;
+          const kbobRef = materialRef?.kbobMatchId;
           return {
             ...mat,
-            material: materialRef // Replace reference with full material object
+            material: {
+              ...materialRef,
+              name: materialRef?.name || 'Unknown',
+              kbobMatchId: kbobRef ? {
+                Name: kbobRef.Name,
+                Category: kbobRef.Category,
+                GWP: kbobRef.GWP,
+                UBP: kbobRef.UBP,
+                PENRE: kbobRef.PENRE
+              } : null
+            }
           };
-        })
+        }).filter(mat => mat.material !== null)
       };
     });
 

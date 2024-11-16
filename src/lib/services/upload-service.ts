@@ -11,14 +11,23 @@ export class UploadService {
     materials: Array<{
       name: string;
       category: string;
-      volume: number;
+      elements: Array<{
+        id: string;
+        name: string;
+        volume: number;
+        materials: Array<{
+          name: string;
+          thickness: number;
+        }>;
+      }>;
     }>,
     uploadId: string
   ) {
     const session = await mongoose.startSession();
     try {
-      console.log('🔍 [processMaterials] Starting material processing...');
-      console.log('📋 [processMaterials] Material names to process:', materials.map(m => m.name));
+      console.log('\n🚀 [IFC Parser] Starting material processing phase...');
+      console.log(`📊 [IFC Parser] Processing ${materials.length} unique materials`);
+      console.log('📋 [IFC Parser] Material categories:', [...new Set(materials.map(m => m.category))]);
 
       // First, get all existing materials with KBOB matches from any project
       const existingMatches = await Material.find({
@@ -31,20 +40,12 @@ export class UploadService {
         select: 'Name GWP UBP PENRE kg/unit min_density max_density'
       });  
 
-      console.log(`🎯 [processMaterials] Found ${existingMatches.length} existing materials with KBOB matches:`, 
+      console.log(`✨ [IFC Parser] Found ${existingMatches.length} existing materials with KBOB matches`);
+      console.log('📝 [IFC Parser] Existing material matches:', 
         existingMatches.map(m => ({
           name: m.name,
-          kbobId: m.kbobMatchId?._id,
           kbobName: m.kbobMatchId?.Name,
-          density: m.density,
-          kbobData: m.kbobMatchId ? {
-            gwp: m.kbobMatchId.GWP,
-            ubp: m.kbobMatchId.UBP,
-            penre: m.kbobMatchId.PENRE,
-            kgPerUnit: m.kbobMatchId['kg/unit'],
-            minDensity: m.kbobMatchId.min_density,
-            maxDensity: m.kbobMatchId.max_density
-          } : null
+          density: m.density
         }))
       );
 
@@ -60,150 +61,72 @@ export class UploadService {
       }
 
       // Then try to find matches for any remaining materials
-      for (const material of materials) {
-        if (!matchMap.has(material.name)) {
-          console.log(`🔍 [processMaterials] Looking for KBOB match for new material "${material.name}"...`);
-          const bestMatch = await MaterialService.findBestKBOBMatch(material.name);
+      const unmatchedMaterials = materials.filter(m => !matchMap.has(m.name));
+      console.log(`🔍 [IFC Parser] Looking for KBOB matches for ${unmatchedMaterials.length} new materials...`);
+
+      for (const material of unmatchedMaterials) {
+        console.log(`\n📦 [IFC Parser] Processing material "${material.name}"`);
+        console.log(`   Category: ${material.category}`);
+        console.log(`   Used in ${material.elements.length} elements`);
+        
+        const bestMatch = await MaterialService.findBestKBOBMatch(material.name);
+        
+        if (bestMatch && bestMatch.score >= 0.8) {
+          console.log(`✅ [IFC Parser] High confidence match found:`);
+          console.log(`   KBOB Material: ${bestMatch.kbobMaterial.Name}`);
+          console.log(`   Match Score: ${(bestMatch.score * 100).toFixed(1)}%`);
           
-          if (bestMatch && bestMatch.score >= 0.8) { // Only use matches with high confidence
-            console.log(`✨ [processMaterials] Found KBOB match for "${material.name}":`, {
-              kbobName: bestMatch.kbobMaterial.Name,
-              score: bestMatch.score
+          const density = MaterialService.calculateDensity(bestMatch.kbobMaterial);
+          if (density) {
+            matchMap.set(material.name, {
+              kbobMatchId: bestMatch.kbobMaterial,
+              density,
+              matchScore: bestMatch.score
             });
-            
-            const density = MaterialService.calculateDensity(bestMatch.kbobMaterial);
-            if (density) {
-              matchMap.set(material.name, {
-                kbobMatchId: bestMatch.kbobMaterial,
-                density,
-                matchScore: bestMatch.score
-              });
-            } else {
-              console.log(`⚠️ [processMaterials] No valid density found for KBOB match "${bestMatch.kbobMaterial.Name}"`);
-            }
           } else {
-            console.log(`⚠️ [processMaterials] No good KBOB match found for "${material.name}"`, 
-              bestMatch ? `(best score: ${bestMatch.score})` : '');
+            console.warn(`⚠️ [IFC Parser] No density available for "${material.name}"`);
+          }
+        } else {
+          console.warn(`⚠️ [IFC Parser] No high confidence match found for "${material.name}"`);
+          if (bestMatch) {
+            console.log(`   Best match was "${bestMatch.kbobMaterial.Name}" with score ${(bestMatch.score * 100).toFixed(1)}%`);
           }
         }
       }
 
-      console.log('🗺️ [processMaterials] Final match map with entries:', 
-        Array.from(matchMap.entries()).map(([name, data]) => ({
-          name,
-          hasKbob: !!data.kbobMatchId,
-          density: data.density,
-          kbobId: data.kbobMatchId?._id,
-          matchScore: data.matchScore
-        }))
+      // Add KBOB match information to materials
+      const materialsWithKBOB = materials.map(material => ({
+        ...material,
+        kbobMatch: matchMap.get(material.name)?.kbobMatchId,
+        density: matchMap.get(material.name)?.density,
+        matchScore: matchMap.get(material.name)?.matchScore
+      }));
+
+      console.log('\n📊 [IFC Parser] Material processing summary:');
+      console.log(`   Total materials: ${materials.length}`);
+      console.log(`   Materials with KBOB matches: ${materialsWithKBOB.filter(m => m.kbobMatch).length}`);
+      console.log(`   Materials without matches: ${materialsWithKBOB.filter(m => !m.kbobMatch).length}`);
+
+      // Let MaterialService handle the actual material processing
+      const result = await MaterialService.processMaterials(projectId, materialsWithKBOB, uploadId);
+
+      // Update upload status
+      await Upload.findByIdAndUpdate(
+        uploadId,
+        {
+          $set: {
+            materialCount: result.materialCount,
+            status: 'ProcessingElements'
+          }
+        },
+        { session }
       );
 
-      await session.withTransaction(async () => {
-        // Process materials in batches to avoid memory issues
-        const batchSize = 50;
-        const batches = materials.reduce((acc, material, index) => {
-          const chunkIndex = Math.floor(index / batchSize);
-          if (!acc[chunkIndex]) {
-            acc[chunkIndex] = [];
-          }
-          acc[chunkIndex].push(material);
-          return acc;
-        }, []);
-
-        for (const batch of batches) {
-          console.log(`📦 [processMaterials] Processing batch of ${batch.length} materials`);
-          
-          // Create or update materials
-          const ops = batch.map(material => {
-            const existingMatch = matchMap.get(material.name);
-            console.log(`🔄 [processMaterials] Processing material "${material.name}":`, {
-              hasExistingMatch: !!existingMatch,
-              kbobId: existingMatch?.kbobMatchId?._id,
-              density: existingMatch?.density,
-              volume: material.volume
-            });
-
-            const updateData = {
-              category: material.category,
-              volume: material.volume,
-              updatedAt: new Date()
-            };
-
-            // If we have a KBOB match, calculate indicators
-            if (existingMatch?.kbobMatchId && existingMatch?.density) {
-              console.log(`📊 [processMaterials] Found KBOB match for "${material.name}":`, {
-                volume: material.volume,
-                density: existingMatch.density,
-                kbobData: {
-                  id: existingMatch.kbobMatchId._id,
-                  name: existingMatch.kbobMatchId.Name,
-                  gwp: existingMatch.kbobMatchId.GWP,
-                  ubp: existingMatch.kbobMatchId.UBP,
-                  penre: existingMatch.kbobMatchId.PENRE
-                }
-              });
-
-              const indicators = MaterialService.calculateIndicators(
-                material.volume,
-                existingMatch.density,
-                existingMatch.kbobMatchId
-              );
-
-              console.log(`✨ [processMaterials] Calculated indicators for "${material.name}":`, indicators);
-
-              if (indicators) {
-                Object.assign(updateData, {
-                  kbobMatchId: existingMatch.kbobMatchId._id,
-                  density: existingMatch.density,
-                  autoMatched: true,
-                  gwp: indicators.gwp,
-                  ubp: indicators.ubp,
-                  penre: indicators.penre
-                });
-              }
-            } else {
-              console.log(`⚠️ [processMaterials] No KBOB match found for "${material.name}"`);
-            }
-
-            return {
-              updateOne: {
-                filter: { 
-                  name: material.name,
-                  projectId: new mongoose.Types.ObjectId(projectId)
-                },
-                update: {
-                  $setOnInsert: {
-                    name: material.name,
-                    projectId: new mongoose.Types.ObjectId(projectId),
-                    createdAt: new Date()
-                  },
-                  $set: updateData
-                },
-                upsert: true
-              }
-            };
-          });
-
-          const result = await Material.bulkWrite(ops, { session });
-          console.log(`[processMaterials] Batch processed:`, {
-            matched: result.matchedCount,
-            modified: result.modifiedCount,
-            upserted: result.upsertedCount
-          });
-        }
-
-        // Update upload status
-        await Upload.findByIdAndUpdate(
-          uploadId,
-          {
-            $set: {
-              materialCount: materials.length,
-              status: 'ProcessingElements'
-            }
-          },
-          { session }
-        );
-      });
+      console.log('✅ [IFC Parser] Material processing phase completed');
+      return result;
+    } catch (error) {
+      console.error('❌ [IFC Parser] Error in material processing:', error);
+      throw error;
     } finally {
       await session.endSession();
     }
@@ -215,163 +138,99 @@ export class UploadService {
   static async processElements(
     projectId: string,
     elements: Array<{
-      guid: string;
+      id: string;
       name: string;
-      type: string;
+      category: string;
       volume: number;
       materials: Array<{
-        material: string; // material name
-        volume: number;
-        fraction: number;
+        name: string;
+        thickness: number;
       }>;
     }>,
     uploadId: string
   ) {
     const session = await mongoose.startSession();
     try {
-      console.log(`🔍 [processElements] Starting element processing for project ${projectId}`);
-      console.log(`📋 [processElements] Processing ${elements.length} elements`);
+      return await session.withTransaction(async () => {
+        console.log('\n🚀 [IFC Parser] Starting element processing phase...');
+        console.log(`📊 [IFC Parser] Processing ${elements.length} elements`);
+        console.log('📋 [IFC Parser] Element categories:', [...new Set(elements.map(e => e.category))]);
 
-      // Get all materials for this project
-      const projectMaterials = await Material.find({
-        projectId: new mongoose.Types.ObjectId(projectId)
-      })
-      .select('_id name kbobMatchId density')
-      .populate({
-        path: 'kbobMatchId',
-        select: 'Name GWP UBP PENRE kg/unit min_density max_density'
-      })
-      .lean();
+        // First, get all materials from DB for this project
+        const existingMaterials = await Material.find({ 
+          projectId: new mongoose.Types.ObjectId(projectId) 
+        }).select('_id name').lean();
 
-      console.log(`🎯 [processElements] Found ${projectMaterials.length} materials in project`);
-      console.log('[processElements] Materials:', projectMaterials.map(m => ({
-        id: m._id,
-        name: m.name,
-        hasKbobMatch: !!m.kbobMatchId,
-        kbobDetails: m.kbobMatchId ? {
-          id: m.kbobMatchId._id,
-          name: m.kbobMatchId.Name,
-          gwp: m.kbobMatchId.GWP,
-          ubp: m.kbobMatchId.UBP,
-          penre: m.kbobMatchId.PENRE,
-          density: m.density || m.kbobMatchId['kg/unit'] || 
-            (m.kbobMatchId['min_density'] && m.kbobMatchId['max_density'] ? 
-              (m.kbobMatchId['min_density'] + m.kbobMatchId['max_density']) / 2 : undefined)
-        } : null,
-        density: m.density
-      })));
+        console.log(`📦 [IFC Parser] Found ${existingMaterials.length} materials in database`);
 
-      // Create material name to ID mapping with KBOB data
-      const materialMap = new Map(
-        projectMaterials.map(m => [m.name, { 
-          _id: m._id,
-          kbobMatchId: m.kbobMatchId,
-          density: m.density || (m.kbobMatchId && MaterialService.calculateDensity(m.kbobMatchId))
-        }])
-      );
+        // Create a map for quick lookups, normalize material names
+        const materialMap = new Map(
+          existingMaterials.map(m => [m.name.trim().toLowerCase(), m._id])
+        );
 
-      console.log('[processElements] Material map:', {
-        keys: Array.from(materialMap.keys()),
-        entries: Array.from(materialMap.entries()).map(([key, value]) => ({
-          name: key,
-          hasKbobMatch: !!value.kbobMatchId,
-          hasDensity: !!value.density
-        }))
-      });
-
-      await session.withTransaction(async () => {
-        // Process elements in batches
+        // Process elements in batches to avoid memory issues
         const batchSize = 50;
-        let totalElementsWithIndicators = 0;
-        let totalMaterialsProcessed = 0;
-        let totalMaterialsWithIndicators = 0;
+        const batches = elements.reduce((acc, element, index) => {
+          const chunkIndex = Math.floor(index / batchSize);
+          if (!acc[chunkIndex]) {
+            acc[chunkIndex] = [];
+          }
+          acc[chunkIndex].push(element);
+          return acc;
+        }, []);
 
-        for (let i = 0; i < elements.length; i += batchSize) {
-          const batch = elements.slice(i, i + batchSize);
-          console.log(`📦 [processElements] Processing batch ${i/batchSize + 1}, size: ${batch.length}`);
-          
+        let processedElements = 0;
+        let elementsWithMissingMaterials = 0;
+        let totalMaterialReferences = 0;
+        let successfulMaterialReferences = 0;
+
+        console.log(`📦 [IFC Parser] Processing elements in ${batches.length} batches of ${batchSize}`);
+
+        for (let batchIndex = 0; batchIndex < batches.length; batchIndex++) {
+          const batch = batches[batchIndex];
+          console.log(`\n🔄 [IFC Parser] Processing batch ${batchIndex + 1}/${batches.length}`);
+
           const ops = batch.map(element => {
-            console.log(`🔄 [processElements] Processing element: ${element.guid}`);
-            console.log(`📋 [processElements] Element materials:`, element.materials);
-
-            const processedMaterials = element.materials.map(mat => {
-              const materialInfo = materialMap.get(mat.material);
-              console.log(`🔍 [processElements] Processing material "${mat.material}":`, {
-                found: !!materialInfo,
-                hasKbobMatch: !!materialInfo?.kbobMatchId,
-                hasDensity: !!materialInfo?.density,
-                volume: mat.volume,
-                fraction: mat.fraction
-              });
-              
-              totalMaterialsProcessed++;
-              
-              // Calculate indicators if material has KBOB match
-              let indicators;
-              if (materialInfo?.kbobMatchId) {
-                console.log(`📊 [processElements] Attempting to calculate indicators for "${mat.material}":`, {
-                  volume: mat.volume,
-                  density: materialInfo.density,
-                  kbobMatch: {
-                    name: materialInfo.kbobMatchId.Name,
-                    gwp: materialInfo.kbobMatchId.GWP,
-                    ubp: materialInfo.kbobMatchId.UBP,
-                    penre: materialInfo.kbobMatchId.PENRE
-                  }
-                });
+            // Map material references
+            const materialRefs = element.materials
+              .map(material => {
+                totalMaterialReferences++;
+                const normalizedName = material.name.trim().toLowerCase();
+                const materialId = materialMap.get(normalizedName);
                 
-                indicators = MaterialService.calculateIndicators(
-                  mat.volume,
-                  materialInfo.density,
-                  materialInfo.kbobMatchId
-                );
-                
-                if (indicators) {
-                  totalMaterialsWithIndicators++;
-                  console.log(`✨ [processElements] Successfully calculated indicators for "${mat.material}":`, indicators);
-                } else {
-                  console.log(`⚠️ [processElements] Failed to calculate indicators for "${mat.material}" despite having KBOB match`);
+                if (!materialId) {
+                  return null;
                 }
-              } else {
-                console.log(`🚫 [processElements] No indicators calculated for "${mat.material}" - missing KBOB match or density`);
-              }
 
-              const result = {
-                material: materialInfo?._id,
-                volume: mat.volume,
-                fraction: mat.fraction,
-                ...(indicators && { indicators })
-              };
+                successfulMaterialReferences++;
+                return {
+                  materialId,
+                  thickness: material.thickness
+                };
+              })
+              .filter((ref): ref is { materialId: any; thickness: number } => ref !== null);
 
-              console.log(`📈 [processElements] Final material data:`, {
-                materialName: mat.material,
-                hasKbobMatch: !!materialInfo?.kbobMatchId,
-                hasDensity: !!materialInfo?.density,
-                hasIndicators: !!indicators,
-                result
-              });
-              return result;
-            });
-
-            if (processedMaterials.some(m => m.indicators)) {
-              totalElementsWithIndicators++;
+            if (materialRefs.length === 0) {
+              elementsWithMissingMaterials++;
             }
 
             return {
               updateOne: {
                 filter: {
-                  guid: element.guid,
-                  projectId: new mongoose.Types.ObjectId(projectId)
+                  projectId: new mongoose.Types.ObjectId(projectId),
+                  elementId: element.id
                 },
                 update: {
                   $setOnInsert: {
+                    projectId: new mongoose.Types.ObjectId(projectId),
+                    elementId: element.id,
                     createdAt: new Date()
                   },
                   $set: {
                     name: element.name,
-                    type: element.type,
+                    category: element.category,
                     volume: element.volume,
-                    materials: processedMaterials,
+                    materials: materialRefs,
                     updatedAt: new Date()
                   }
                 },
@@ -380,12 +239,10 @@ export class UploadService {
             };
           });
 
-          const bulkWriteResult = await Element.bulkWrite(ops, { session });
-          console.log(`📊 [processElements] Bulk write result:`, {
-            matchedCount: bulkWriteResult.matchedCount,
-            modifiedCount: bulkWriteResult.modifiedCount,
-            upsertedCount: bulkWriteResult.upsertedCount
-          });
+          if (ops.length > 0) {
+            const result = await Element.bulkWrite(ops, { session });
+            processedElements += result.upsertedCount + result.modifiedCount;
+          }
         }
 
         // Update upload status
@@ -393,26 +250,29 @@ export class UploadService {
           uploadId,
           {
             $set: {
-              elementCount: elements.length,
+              elementCount: processedElements,
               status: 'Completed'
             }
           },
           { session }
         );
 
-        // Log final statistics
-        const matchedMaterialsCount = projectMaterials.filter(m => m.kbobMatchId).length;
-        console.log(`📊 [processElements] Final statistics:`, {
-          totalElements: elements.length,
-          totalElementsWithIndicators,
-          totalMaterials: totalMaterialsProcessed,
-          totalMaterialsWithIndicators,
-          matchedMaterialsCount,
-          totalProjectMaterials: projectMaterials.length
-        });
+        console.log('\n📊 [IFC Parser] Element processing summary:');
+        console.log(`   Total elements processed: ${processedElements}`);
+        console.log(`   Elements with missing materials: ${elementsWithMissingMaterials}`);
+        console.log(`   Total material references: ${totalMaterialReferences}`);
+        console.log(`   Successful material references: ${successfulMaterialReferences}`);
+        console.log(`   Material reference success rate: ${((successfulMaterialReferences / totalMaterialReferences) * 100).toFixed(1)}%`);
+        
+        console.log('✅ [IFC Parser] Element processing phase completed');
+
+        return {
+          success: true,
+          elementCount: processedElements
+        };
       });
     } catch (error) {
-      console.error('[processElements] Error processing elements:', error);
+      console.error('❌ [IFC Parser] Error in element processing:', error);
       throw error;
     } finally {
       await session.endSession();

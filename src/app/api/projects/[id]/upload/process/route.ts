@@ -114,7 +114,24 @@ export async function POST(
       layers.forEach((layer) => {
         if (layer.materialName) {
           const existingMaterial = uniqueMaterials.get(layer.materialName);
-          const newVolume = (existingMaterial?.volume || 0) + (layer.thickness || 0);
+          const layerThickness = layer.thickness || 0;
+          const totalThickness = layers.reduce((sum, layer) => {
+            return sum + (layer.thickness || 0);
+          }, 0);
+
+          if (totalThickness <= 0) {
+            logger.warn(`Invalid total thickness for element`, {
+              id: element.globalId,
+              type: element.type,
+              totalThickness
+            });
+            return;
+          }
+
+          const fraction = layerThickness / totalThickness;
+          const layerVolume = (element.netVolume || 0) * fraction;
+          
+          const newVolume = (existingMaterial?.volume || 0) + layerVolume;
           
           uniqueMaterials.set(layer.materialName, {
             name: layer.materialName,
@@ -123,9 +140,13 @@ export async function POST(
           });
           
           logger.debug(`Updated material "${layer.materialName}"`, {
-            category: element.materialLayers?.layerSetName,
-            newVolume,
-            layerThickness: layer.thickness
+            elementId: element.globalId,
+            elementVolume: element.netVolume,
+            layerThickness,
+            totalThickness,
+            fraction,
+            layerVolume,
+            newTotalVolume: newVolume
           });
         } else {
           logger.warn(`Layer missing material name`, layer);
@@ -299,160 +320,119 @@ export async function POST(
     const savedElements = await Promise.all(
       elements.map(async (element: any) => {
         // Get all materials for this project to reference them
-        const projectMaterials = await Material.find({ projectId: projectId })
-          .populate('kbobMatchId'); // Make sure to populate KBOB data
+        const projectMaterials = await Material.find({ projectId: projectId });
 
-        // Calculate indicators for each material in the element
-        const materialsWithIndicators = (element.materialLayers?.layers || []).map((material: any) => {
+        // Calculate materials and indicators for this element
+        const materialsWithIndicators = (element.materialLayers?.layers || []).map((layer: any) => {
           // Find the saved material in the database
-          const savedMaterial = projectMaterials.find(m => m.name === material.materialName);
+          const savedMaterial = projectMaterials.find(m => m.name === layer.materialName);
           
-          if (savedMaterial && savedMaterial.kbobMatchId) {
-            // Calculate volume based on layer thickness and element net volume
-            const layerThickness = material.thickness || 0;
-            const totalThickness = element.materialLayers?.layers.reduce((sum: number, layer: any) => sum + (layer.thickness || 0), 0) || 1;
-            const volumeFraction = layerThickness / totalThickness;
-            const volume = (element.netVolume || 0) * volumeFraction;
-
-            // Get density from KBOB data
-            let density = 0;
-            const kbobData = savedMaterial.kbobMatchId;
-            
-            if (typeof kbobData['kg/unit'] === 'number') {
-              density = kbobData['kg/unit'];
-            } else if (typeof kbobData['min density'] === 'number' && 
-                     typeof kbobData['max density'] === 'number') {
-              density = (kbobData['min density'] + kbobData['max density']) / 2;
-            }
-
-            // Calculate mass in tons (volume in m³, density in kg/m³)
-            const mass = volume * density / 1000; // Convert kg to tons
-
-            // Calculate indicators (KBOB values are per ton)
-            const indicators = {
-              gwp: (kbobData.GWP || 0) * mass,
-              ubp: (kbobData.UBP || 0) * mass,
-              penre: (kbobData.PENRE || 0) * mass
-            };
-
-            logger.debug(`Material indicators calculated`, {
-              materialName: material.materialName,
-              layerThickness,
-              totalThickness,
-              volumeFraction,
-              elementNetVolume: element.netVolume,
-              volume,
-              density,
-              mass,
-              kbobValues: {
-                gwp: kbobData.GWP,
-                ubp: kbobData.UBP,
-                penre: kbobData.PENRE
-              },
-              calculatedIndicators: indicators
+          if (!savedMaterial) {
+            logger.warn(`Material not found for layer`, {
+              elementName: element.name,
+              materialName: layer.materialName
             });
-
-            return {
-              material: savedMaterial._id,
-              name: material.materialName,
-              volume: volume,
-              thickness: material.thickness,
-              density: density,
-              mass: mass,
-              indicators
-            };
+            return null;
           }
-          return {
-            name: material.materialName,
-            volume: material.thickness || 0,
-            thickness: material.thickness,
-            density: 0,
-            mass: 0,
-            indicators: {
-              gwp: 0,
-              ubp: 0,
-              penre: 0
-            }
-          };
-        });
 
-        // Calculate total indicators for the element
-        const totalIndicators = materialsWithIndicators.reduce((acc: any, material: any) => {
-          return {
-            gwp: acc.gwp + (material.indicators?.gwp || 0),
-            ubp: acc.ubp + (material.indicators?.ubp || 0),
-            penre: acc.penre + (material.indicators?.penre || 0)
-          };
-        }, { gwp: 0, ubp: 0, penre: 0 });
+          // Calculate volume based on layer thickness
+          const layerThickness = layer.thickness || 0;
+          const totalThickness = element.materialLayers?.layers.reduce((sum: number, l: any) => sum + (l.thickness || 0), 0) || 1;
+          const volumeFraction = layerThickness / totalThickness;
+          const volume = (element.netVolume || 0) * volumeFraction;
 
+          logger.debug(`Calculated material volume for element`, {
+            elementName: element.name,
+            materialName: layer.materialName,
+            layerThickness,
+            totalThickness,
+            volumeFraction,
+            volume
+          });
+
+          return {
+            material: savedMaterial._id,
+            name: layer.materialName,
+            volume: volume,
+            thickness: layer.thickness
+          };
+        }).filter(Boolean);
+
+        // Create or update element
         const elementData = {
           projectId: projectId,
           guid: element.globalId,
           name: element.name,
           type: element.type,
-          volume: element.netVolume,
-          buildingStorey: element.spatialContainer,
-          materials: materialsWithIndicators,
-          indicators: totalIndicators
+          volume: element.netVolume || 0,
+          materials: materialsWithIndicators
         };
 
-        logger.debug(`Element indicators calculated`, {
-          elementName: element.name,
-          materialCount: materialsWithIndicators.length,
-          totalMass: materialsWithIndicators.reduce((acc, m) => acc + (m.mass || 0), 0),
-          totalIndicators,
-          materialDetails: materialsWithIndicators.map(m => ({
-            name: m.name,
-            volume: m.volume,
-            density: m.density,
-            mass: m.mass,
-            indicators: m.indicators
-          }))
-        });
-
-        // First try to find existing element
-        let existingElement = await Element.findOne({
+        // Try to find existing element
+        const existingElement = await Element.findOne({
           guid: element.globalId,
           projectId: projectId
         });
 
         if (existingElement) {
-          // Update existing element
           logger.debug(`Updating existing element: ${element.name}`, {
-            guid: element.globalId,
-            type: element.type
+            materialCount: materialsWithIndicators.length
           });
-          
           existingElement.set(elementData);
           return await existingElement.save();
         } else {
-          // Create new element
           logger.debug(`Creating new element: ${element.name}`, {
-            guid: element.globalId,
-            type: element.type
+            materialCount: materialsWithIndicators.length
           });
-          
           return await Element.create(elementData);
         }
       })
     );
-    logger.info(`Saved ${savedElements.length} elements to database`);
 
-    // Update upload with counts
-    upload.status = "Completed";
-    upload.elements = elements;
-    upload.materials = materialMatches;
-    upload.elementCount = savedElements.length;
-    upload.materialCount = savedMaterials.length;
-    await upload.save();
-    logger.info("Upload results saved successfully", { uploadId });
+    const elementCount = savedElements.length;
+    const materialCount = savedMaterials.length;
 
-    return NextResponse.json({
-      success: true,
-      elementCount: elements.length,
-      materialCount: materialsToProcess.length,
-      matchedMaterialCount: matchedCount
+    // Save elements and materials
+    const { elementCount: processedElementCount, materialCount: processedMaterialCount } = await MaterialService.processMaterials(
+      projectId,
+      materialMatches,
+      uploadId
+    );
+
+    // Update upload status
+    await Upload.findByIdAndUpdate(
+      uploadId,
+      {
+        status: "Completed",
+        elementCount: processedElementCount,
+        materialCount: processedMaterialCount,
+      },
+      { new: true }
+    );
+
+    // Count materials that need matching (don't have a KBOB match)
+    const unmatchedCount = materialMatches.filter(m => !m.kbobMatch).length;
+    
+    logger.info("[DEBUG] Material matching summary", {
+      totalMaterials: materialMatches.length,
+      unmatchedCount,
+      materialMatches: materialMatches.map(m => ({
+        name: m.name,
+        hasKbobMatch: !!m.kbobMatch
+      }))
     });
+
+    // Return success with counts and unmatched materials info
+    const response = {
+      success: true,
+      elementCount: processedElementCount,
+      materialCount: processedMaterialCount,
+      unmatchedMaterialCount: unmatchedCount,
+    };
+
+    logger.info("[DEBUG] Sending response:", response);
+    return NextResponse.json(response);
+
   } catch (error: any) {
     logger.error("Error processing upload", {
       error: error.message,

@@ -72,4 +72,4 @@ kbobSchema.static("findValidMaterials", function () {
 // Create or update the model
 export const KBOBMaterial =
   (mongoose.models.KBOBMaterial as KBOBMaterialModel) ||
-  mongoose.model<IKBOBMaterial, KBOBMaterialModel>("KBOBMaterial", kbobSchema);
+  mongoose.model<IKBOBMaterial, KBOBMaterialModel>("KBOBMaterial", kbobSchema, "indicatorsKBOB");

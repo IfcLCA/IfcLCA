@@ -38,16 +38,29 @@ export function UploadModal({
         setIsUploading(true);
         const file = acceptedFiles[0];
         const results = await parseIFCFile(file, projectId);
+        console.log("[DEBUG] Upload results:", results);
 
         toast({
           title: "Upload Successful",
-          description: `Successfully processed ${results.elementCount} elements`,
+          description: results.unmatchedMaterialCount > 0
+            ? `Successfully processed ${results.elementCount} elements. Found ${results.unmatchedMaterialCount} materials that need matching.`
+            : `Successfully processed ${results.elementCount} elements`,
         });
 
         // Close modal immediately after successful upload
         onOpenChange(false);
-        router.refresh();
-        onUploadComplete?.();
+
+        // If we have unmatched materials, redirect to the materials library
+        console.log("[DEBUG] Should redirect:", results.shouldRedirectToLibrary);
+        if (results.shouldRedirectToLibrary) {
+          console.log("[DEBUG] Redirecting to materials library...");
+          router.push(`/materials-library?projectId=${projectId}`);
+          router.refresh();
+        } else {
+          console.log("[DEBUG] No redirection needed, refreshing page");
+          router.refresh();
+          onUploadComplete?.();
+        }
       } catch (error) {
         toast({
           title: "Error",
