@@ -15,6 +15,7 @@ import {
 import Link from "next/link";
 import Image from "next/image";
 import { Activity } from "@/lib/types/activity";
+import { cn } from "@/lib/utils";
 
 const getActivityIcon = (type: Activity["type"]) => {
   switch (type) {
@@ -33,6 +34,33 @@ const getActivityIcon = (type: Activity["type"]) => {
   }
 };
 
+const formatActivityMessage = (activity: Activity) => {
+  return (
+    <span>
+      <span className="font-medium">{activity.user?.name}</span>
+      <span className="text-muted-foreground">
+        {` ${activity.action} `}
+        <Link
+          href={`/projects/${activity.projectId}`}
+          className="text-primary hover:underline"
+        >
+          {activity.project}
+        </Link>
+      </span>
+      {activity.details?.description && (
+        <p className="text-sm text-muted-foreground mt-0.5">
+          {activity.details.description}
+        </p>
+      )}
+      <span className="text-xs text-muted-foreground whitespace-nowrap">
+        {formatDistanceToNow(new Date(activity.timestamp), {
+          addSuffix: true,
+        })}
+      </span>
+    </span>
+  );
+};
+
 interface ActivityFeedProps {
   activities: Activity[];
   isLoading: boolean;
@@ -46,10 +74,13 @@ export function ActivityFeed({
   hasMore,
   onLoadMore,
 }: ActivityFeedProps) {
+  // Show only the 6 most recent activities
+  const recentActivities = activities.slice(0, 6);
+
   return (
     <Card>
       <CardContent className="p-4 space-y-2">
-        {activities.map((activity) => (
+        {recentActivities.map((activity) => (
           <div
             key={activity.id}
             className="flex items-center gap-4 py-2 border-b last:border-0"
@@ -97,22 +128,6 @@ export function ActivityFeed({
             </span>
           </div>
         ))}
-
-        {hasMore && (
-          <Button
-            variant="ghost"
-            size="sm"
-            className="w-full"
-            onClick={onLoadMore}
-            disabled={isLoading}
-          >
-            {isLoading ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              "Load more"
-            )}
-          </Button>
-        )}
       </CardContent>
     </Card>
   );

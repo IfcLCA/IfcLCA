@@ -25,7 +25,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { ActivityFeed } from "@/components/activity-feed";
 import Image from "next/image";
@@ -111,101 +111,174 @@ export function Dashboard({
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
   const [isLoadingActivities, setIsLoadingActivities] = useState(false);
+  const [isLoadingStatistics, setIsLoadingStatistics] = useState(false);
   const ITEMS_PER_PAGE = 5;
 
-  useEffect(() => {
-    if (showProjectSelect) {
-      fetchProjects();
-    }
-  }, [showProjectSelect]);
+  const abortControllerRef = useRef<AbortController>();
+  const lastFetchRef = useRef<number>(0);
 
-  useEffect(() => {
-    fetchStatistics();
-  }, []);
+  const CACHE_TIMEOUT = 5 * 60 * 1000;
 
-  useEffect(() => {
-    fetchActivities(1);
-  }, []);
+  const metrics = useMemo(() => [
+    {
+      title: "Total Projects",
+      value: statistics.totalProjects,
+      description: "Active projects in your workspace",
+      icon: "Building" as const,
+    },
+    {
+      title: "Total Elements",
+      value: statistics.totalElements,
+      description: "Building elements across all projects",
+      icon: "Box" as const,
+    },
+    {
+      title: "Total Materials",
+      value: statistics.totalMaterials,
+      description: "Unique materials in use",
+      icon: "Layers" as const,
+    },
+  ], [statistics.totalProjects, statistics.totalElements, statistics.totalMaterials]);
 
-  const fetchProjects = async () => {
+  const fetchProjects = useCallback(async () => {
     try {
-      const response = await fetch("/api/projects");
+      const response = await fetch("/api/projects", {
+        cache: 'force-cache',
+      });
       const data = await response.json();
       setProjects(data);
     } catch (error) {
       console.error("Failed to fetch projects:", error);
     }
-  };
+  }, []);
 
-  const fetchStatistics = async () => {
+  const fetchStatistics = useCallback(async (force = false) => {
+    const now = Date.now();
+    if (!force && now - lastFetchRef.current < CACHE_TIMEOUT) {
+      return; // Use cached data
+    }
+
     try {
-      const response = await fetch("/api/projects", {
-        cache: "no-store",
-      });
-      const projects = await response.json();
+      setIsLoadingStatistics(true);
+      
+      // Cancel previous request if it exists
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+      abortControllerRef.current = new AbortController();
+
+      const [projectsRes, emissionsRes] = await Promise.all([
+        fetch("/api/projects", {
+          signal: abortControllerRef.current.signal,
+          cache: 'force-cache',
+        }),
+        fetch("/api/emissions", {
+          signal: abortControllerRef.current.signal,
+          cache: 'force-cache',
+        })
+      ]);
+
+      const [projects, emissions] = await Promise.all([
+        projectsRes.json(),
+        emissionsRes.json()
+      ]);
 
       const recentProjects = projects.slice(0, 3);
-
       const totalElements = projects.reduce(
         (acc: number, project: any) => acc + (project._count?.elements || 0),
         0
       );
-
       const totalMaterials = projects.reduce(
         (acc: number, project: any) => acc + (project._count?.materials || 0),
         0
       );
 
-      const totalEmissions = await fetchEmissions();
-
-      setStatistics((prev) => ({
+      setStatistics(prev => ({
         ...prev,
         totalProjects: projects.length,
         totalElements,
         totalMaterials,
-        totalEmissions,
+        totalEmissions: emissions,
       }));
 
       setRecentProjects(recentProjects);
+      lastFetchRef.current = now;
     } catch (error) {
-      console.error("Failed to fetch statistics:", error);
+      if (error.name !== 'AbortError') {
+        console.error("Failed to fetch statistics:", error);
+      }
+    } finally {
+      setIsLoadingStatistics(false);
     }
-  };
+  }, []);
 
-  const fetchEmissions = async () => {
-    try {
-      const response = await fetch("/api/emissions");
-      const data = await response.json();
-      return data;
-    } catch (error) {
-      console.error("Failed to fetch emissions:", error);
-    }
-  };
-
-  const fetchActivities = async (page: number) => {
+  const fetchActivities = useCallback(async () => {
     try {
       setIsLoadingActivities(true);
-      const response = await fetch(`/api/activities?page=${page}`);
+      const response = await fetch('/api/activities?limit=6', {
+        cache: 'force-cache'
+      });
       const data = await response.json();
-
-      if (page === 1) {
-        setActivities(data.activities);
-      } else {
-        setActivities((prev) => [...prev, ...data.activities]);
-      }
-      setHasMore(data.hasMore);
+      setActivities(data.activities);
     } catch (error) {
       console.error("Failed to fetch activities:", error);
     } finally {
       setIsLoadingActivities(false);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    fetchActivities();
+  }, [fetchActivities]);
+
+  const prefetchNextPage = useCallback(() => {
+    if (hasMore && !isLoadingActivities) {
+      const nextPage = page + 1;
+      const prefetchController = new AbortController();
+      
+      fetch(`/api/activities?page=${nextPage}`, {
+        signal: prefetchController.signal,
+        cache: 'force-cache'
+      }).catch(() => {});
+    }
+  }, [hasMore, isLoadingActivities, page]);
+
+  useEffect(() => {
+    if (showProjectSelect) {
+      fetchProjects();
+    }
+  }, [showProjectSelect, fetchProjects]);
+
+  useEffect(() => {
+    fetchStatistics();
+    const intervalId = setInterval(() => {
+      fetchStatistics(true);
+    }, CACHE_TIMEOUT);
+
+    return () => {
+      clearInterval(intervalId);
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+    };
+  }, [fetchStatistics]);
+
+  useEffect(() => {
+    const handleScroll = () => {
+      if ((window.innerHeight + window.scrollY) >= document.documentElement.scrollHeight - 1000) {
+        prefetchNextPage();
+      }
+    };
+
+    window.addEventListener('scroll', handleScroll);
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, [prefetchNextPage]);
 
   const handleLoadMore = () => {
     if (!isLoadingActivities && hasMore) {
       const nextPage = page + 1;
       setPage(nextPage);
-      fetchActivities(nextPage);
+      fetchActivities();
     }
   };
 
@@ -222,28 +295,6 @@ export function Dashboard({
       console.error("Failed to check projects:", error);
     }
   };
-
-  const metrics: Metric[] = [
-    {
-      title: "Total Projects",
-      value: statistics.totalProjects,
-      description: "Active projects",
-      icon: "Building",
-    },
-    {
-      title: "Total Elements",
-      value: statistics.totalElements,
-      description: "Construction components",
-      icon: "Box",
-    },
-
-    {
-      title: "Total Materials",
-      value: statistics.totalMaterials,
-      description: "Unique materials",
-      icon: "Layers",
-    },
-  ];
 
   return (
     <div className="main-container space-y-8">
@@ -366,7 +417,7 @@ export function Dashboard({
         <ActivityFeed
           activities={activities}
           isLoading={isLoadingActivities}
-          hasMore={hasMore}
+          hasMore={false}
           onLoadMore={handleLoadMore}
         />
       </section>
