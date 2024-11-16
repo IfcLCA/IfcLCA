@@ -9,15 +9,15 @@ const getInitialData = unstable_cache(
     try {
       const [projectsRes, activitiesRes, emissionsRes] = await Promise.all([
         fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/projects`, { 
-          cache: 'force-cache',
+          cache: 'no-store',
           headers: { 'Content-Type': 'application/json' }
         }),
         fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/activities?page=1`, {
-          cache: 'force-cache',
+          cache: 'no-store',
           headers: { 'Content-Type': 'application/json' }
         }),
         fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/emissions`, {
-          cache: 'force-cache',
+          cache: 'no-store',
           headers: { 'Content-Type': 'application/json' }
         })
       ]);
