@@ -129,22 +129,3 @@
 .animate-gradient {
   animation: gradient 15s ease infinite;
 }
-
-.bg-grid-pattern {
-  background-size: 50px 50px;
-  background-image: linear-gradient(
-      to right,
-      rgb(0 0 0 / 0.05) 1px,
-      transparent 1px
-    ),
-    linear-gradient(to bottom, rgb(0 0 0 / 0.05) 1px, transparent 1px);
-}
-
-.dark .bg-grid-pattern {
-  background-image: linear-gradient(
-      to right,
-      rgb(255 255 255 / 0.05) 1px,
-      transparent 1px
-    ),
-    linear-gradient(to bottom, rgb(255 255 255 / 0.05) 1px, transparent 1px);
-}

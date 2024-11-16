@@ -15,9 +15,14 @@ export async function GET() {
 
     await connectToDatabase();
 
-    // Aggregate emissions across all projects for the user
+    // Aggregate emissions across all active projects for the user
     const projects = await Project.aggregate([
-      { $match: { userId } },
+      { 
+        $match: { 
+          userId,
+          isArchived: { $ne: true } // Only include non-archived projects
+        } 
+      },
       {
         $lookup: {
           from: "elements",
@@ -30,6 +35,14 @@ export async function GET() {
         $unwind: {
           path: "$elements",
           preserveNullAndEmptyArrays: true,
+        },
+      },
+      {
+        $lookup: {
+          from: "materials",
+          localField: "elements.materials.materialId",
+          foreignField: "_id",
+          as: "element.material",
         },
       },
       {
@@ -46,6 +59,7 @@ export async function GET() {
               $multiply: [
                 { $ifNull: ["$elements.materials.indicators.gwp", 0] },
                 { $ifNull: ["$elements.materials.volume", 0] },
+                { $ifNull: ["$elements.materials.density", 1] }, // Include density in calculation
               ],
             },
           },
@@ -54,6 +68,7 @@ export async function GET() {
               $multiply: [
                 { $ifNull: ["$elements.materials.indicators.ubp", 0] },
                 { $ifNull: ["$elements.materials.volume", 0] },
+                { $ifNull: ["$elements.materials.density", 1] }, // Include density in calculation
               ],
             },
           },
@@ -62,6 +77,7 @@ export async function GET() {
               $multiply: [
                 { $ifNull: ["$elements.materials.indicators.penre", 0] },
                 { $ifNull: ["$elements.materials.volume", 0] },
+                { $ifNull: ["$elements.materials.density", 1] }, // Include density in calculation
               ],
             },
           },

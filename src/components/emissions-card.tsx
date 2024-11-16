@@ -54,16 +54,30 @@ export function EmissionsCard({ emissions }: { emissions?: EmissionsProps }) {
   }
 
   const currentValue = emissions[metric];
-  const formattedValue = currentValue.toLocaleString("de-CH", {
-    maximumFractionDigits: 0,
-    useGrouping: true,
-  });
+  const MILLION = 1_000_000;
+  
+  let formattedValue: string;
+  let unit = metrics[metric].unit;
+  
+  if (currentValue >= MILLION) {
+    formattedValue = (currentValue / MILLION).toLocaleString("de-CH", {
+      maximumFractionDigits: 3,
+      minimumFractionDigits: 1,
+      useGrouping: true,
+    });
+    formattedValue = `${formattedValue} Mio.`;
+  } else {
+    formattedValue = currentValue.toLocaleString("de-CH", {
+      maximumFractionDigits: 0,
+      useGrouping: true,
+    });
+  }
 
   return (
     <div className="h-full flex flex-col group">
       <div className="flex flex-col justify-center flex-1 min-h-0">
         <p className="text-[clamp(2rem,5vw,4rem)] font-bold leading-none mb-2 group-hover:text-primary transition-colors">{formattedValue}</p>
-        <p className="text-sm text-muted-foreground group-hover:text-primary/70 transition-colors">{metrics[metric].unit}</p>
+        <p className="text-sm text-muted-foreground group-hover:text-primary/70 transition-colors">{unit}</p>
       </div>
       <Select
         value={metric}

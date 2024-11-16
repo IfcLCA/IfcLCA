@@ -72,7 +72,7 @@ export function EmissionsSummaryCard({ emissions }: { emissions?: EmissionsProps
   
   if (currentValue >= MILLION) {
     formattedValue = (currentValue / MILLION).toLocaleString("de-CH", {
-      maximumFractionDigits: 1,
+      maximumFractionDigits: 3,
       minimumFractionDigits: 1,
       useGrouping: true,
     });

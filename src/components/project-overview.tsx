@@ -134,33 +134,16 @@ export function ProjectOverview({
   const calculateTotalEmissions = (project: any) => {
     if (!project.elements?.length) return 0;
     
-    console.log('Calculating for metric:', selectedMetric);
-    
     return project.elements.reduce((total: number, element: any) => {
       if (!element.materials?.length) return total;
       
       const elementTotal = element.materials.reduce((materialTotal: number, material: any) => {
         if (!material.indicators) return materialTotal;
         
-        console.log('-------------------');
-        console.log('Material:', material);
-        console.log('Indicators:', material.indicators);
-        console.log('Volume:', material.volume);
-        console.log('Current total:', materialTotal);
-        console.log('Adding:', material.indicators[selectedMetric]);
-        
         const value = material.indicators[selectedMetric] || 0;
-        const volume = material.volume || 0;
-        const contribution = value * volume;
-        
-        console.log('Value:', value);
-        console.log('Volume:', volume);
-        console.log('Contribution:', contribution);
-        
-        return materialTotal + contribution;
+        return materialTotal + value;
       }, 0);
       
-      console.log('Element total:', elementTotal);
       return total + elementTotal;
     }, 0);
   };

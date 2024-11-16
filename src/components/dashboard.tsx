@@ -15,6 +15,7 @@ import {
   Layers,
   UploadCloud,
   PlusCircle,
+  Activity,
 } from "lucide-react";
 import { UploadModal } from "@/components/upload-modal";
 import {
@@ -31,7 +32,7 @@ import Image from "next/image";
 import { Badge } from "@/components/ui/badge";
 import { EmissionsSummaryCard } from "@/components/emissions-summary-card";
 import { UploadIfcButton } from "@/components/upload-ifc-button";
-import { Activity } from "@/lib/types/activity";
+import { Activity as ActivityType } from "@/lib/types/activity";
 
 interface Project {
   id: string;
@@ -62,7 +63,7 @@ interface DashboardStatistics {
 interface DashboardProps {
   initialRecentProjects?: Project[];
   statistics?: DashboardStatistics;
-  initialActivities?: Activity[];
+  initialActivities?: ActivityType[];
 }
 
 // Define the icon components explicitly
@@ -286,7 +287,9 @@ export function Dashboard({
             </Card>
           );
         })}
-        <EmissionsSummaryCard emissions={statistics.totalEmissions} />
+        <div className="group transition-all hover:bg-muted/5">
+          <EmissionsSummaryCard emissions={statistics.totalEmissions} />
+        </div>
       </section>
 
       <section>

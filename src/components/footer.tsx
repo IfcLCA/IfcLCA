@@ -1,7 +1,5 @@
 import Link from "next/link";
 import Image from "next/image";
-import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
 import { Linkedin, Github, Mail, ExternalLink } from "lucide-react";
 
 export function Footer() {
@@ -66,21 +64,10 @@ export function Footer() {
               </span>
             </span>
           </nav>
-          <div className="flex items-center gap-2">
-            <Input
-              type="email"
-              placeholder="Enter your email"
-              className="h-8 text-xs w-40 sm:w-auto"
-            />
-            <Button type="submit" size="sm" className="h-8">
-              <Mail className="h-3 w-3" />
-              <span className="sr-only">Subscribe</span>
-            </Button>
-          </div>
         </div>
         <div className="flex flex-col sm:flex-row justify-between items-center gap-2 mt-4 text-xs text-muted-foreground">
           <div className="flex flex-wrap items-center justify-center gap-2">
-            <p>© {currentYear} IfcLCA. All rights reserved.</p>
+            <p> {currentYear} IfcLCA. All rights reserved.</p>
             <div className="flex items-center gap-1">
               <span>Powered by</span>
               <Link

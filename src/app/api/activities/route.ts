@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { connectToDatabase } from "@/lib/mongodb";
-import { Project, Upload } from "@/models";
+import { Project, Upload, MaterialDeletion } from "@/models";
 import { auth } from "@clerk/nextjs/server";
 
 export async function GET(request: Request) {
@@ -18,19 +18,26 @@ export async function GET(request: Request) {
     await connectToDatabase();
 
     // Get total counts for pagination
-    const [projectsCount, uploadsCount] = await Promise.all([
+    const [projectsCount, uploadsCount, materialDeletionsCount] = await Promise.all([
       Project.countDocuments({ userId }),
       Upload.countDocuments({ userId }),
+      MaterialDeletion.countDocuments({ userId }),
     ]);
 
     // Fetch paginated projects and uploads
-    const [projects, uploads] = await Promise.all([
+    const [projects, uploads, materialDeletions] = await Promise.all([
       Project.find({ userId })
         .sort({ createdAt: -1 })
         .skip(skip)
         .limit(limit)
         .lean(),
       Upload.find({ userId })
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit)
+        .populate("projectId", "name")
+        .lean(),
+      MaterialDeletion.find({ userId })
         .sort({ createdAt: -1 })
         .skip(skip)
         .limit(limit)
@@ -71,6 +78,22 @@ export async function GET(request: Request) {
           elementCount: upload.elementCount || 0,
         },
       })),
+      ...materialDeletions.map((deletion) => ({
+        id: deletion._id.toString(),
+        type: "material_deleted",
+        user: {
+          name: "You",
+          avatar: "/placeholder-avatar.jpg",
+        },
+        action: "deleted a material from",
+        project: deletion.projectId?.name || "Unknown Project",
+        projectId: deletion.projectId?._id?.toString() || "",
+        timestamp: deletion.createdAt,
+        details: {
+          materialName: deletion.materialName,
+          reason: deletion.reason || "No reason provided",
+        },
+      })),
     ];
 
     // Sort by timestamp descending
@@ -79,7 +102,7 @@ export async function GET(request: Request) {
         new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
     );
 
-    const totalCount = projectsCount + uploadsCount;
+    const totalCount = projectsCount + uploadsCount + materialDeletionsCount;
     const hasMore = skip + sortedActivities.length < totalCount;
 
     return NextResponse.json({
