@@ -40,6 +40,7 @@ import {
 import { MaterialChangesPreviewModal } from "@/components/material-changes-preview-modal";
 import { StarFilledIcon, StarIcon } from "@radix-ui/react-icons";
 import { ReloadIcon } from "@radix-ui/react-icons";
+import { useRouter } from "next/navigation";
 
 interface Material {
   id: string;
@@ -73,6 +74,7 @@ interface Project {
 }
 
 export function MaterialLibraryComponent() {
+  const router = useRouter();
   const [materials, setMaterials] = useState<Material[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -264,7 +266,22 @@ export function MaterialLibraryComponent() {
         }
 
         const previewData = await previewResponse.json();
-        setPreviewChanges(previewData.changes);
+        
+        // Log for debugging
+        console.log('Preview response:', previewData);
+        
+        // Ensure projects array is properly populated
+        const enhancedChanges = previewData.changes.map((change: any) => ({
+          ...change,
+          projects: projects
+            .filter(p => p.materialIds.includes(change.materialId))
+            .map(p => p.id)
+        }));
+        
+        // Log enhanced changes
+        console.log('Enhanced changes:', enhancedChanges);
+        
+        setPreviewChanges(enhancedChanges);
         setShowPreview(true);
       } catch (error) {
         console.error("Failed to get match preview:", error);
@@ -454,6 +471,11 @@ export function MaterialLibraryComponent() {
       document.removeEventListener("mousedown", handleClickOutside);
     };
   }, []);
+
+  const handleNavigateToProject = (projectId: string) => {
+    router.push(`/projects/${projectId}`);
+    handleCancelMatch(); // Close the preview modal
+  };
 
   if (error) {
     return <div className="text-red-500">Error: {error}</div>;
@@ -842,6 +864,7 @@ export function MaterialLibraryComponent() {
         isOpen={showPreview}
         onClose={handleCancelMatch}
         onConfirm={handleConfirmMatch}
+        onNavigateToProject={handleNavigateToProject}
         changes={previewChanges}
       />
     </>
