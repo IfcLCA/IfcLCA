@@ -572,10 +572,12 @@ export class MaterialService {
       netVolume: number;
       materialLayers?: {
         layerSetName: string;
+        totalThickness: number;
         layers: Array<{
           layerId: string;
           layerName: string;
           thickness: number;
+          volumeFraction: number;
           materialName: string;
         }>;
       };
@@ -584,7 +586,7 @@ export class MaterialService {
     session: mongoose.ClientSession
   ) {
     try {
-      // Convert IFC elements to material structure
+      // Convert IFC elements to material structure with correct volume distribution
       const materialsByLayer = elements.reduce((acc, element) => {
         if (element.materialLayers?.layers) {
           element.materialLayers.layers.forEach((layer) => {
@@ -593,20 +595,19 @@ export class MaterialService {
               acc[materialKey] = {
                 name: layer.materialName,
                 category: element.type,
+                volume: 0,
                 elements: [],
               };
             }
 
+            // Use pre-calculated volume fraction from IFC parser
+            const layerVolume = (element.netVolume || 0) * layer.volumeFraction;
+            acc[materialKey].volume += layerVolume;
             acc[materialKey].elements.push({
               id: element.globalId,
               name: element.name,
-              volume: element.netVolume || 0,
-              materials: [
-                {
-                  name: layer.materialName,
-                  thickness: layer.thickness,
-                },
-              ],
+              volume: layerVolume,
+              thickness: layer.thickness,
             });
           });
         }
@@ -615,7 +616,7 @@ export class MaterialService {
 
       const materials = Object.values(materialsByLayer);
 
-      // Prepare bulk operations for materials
+      // Prepare bulk operations for materials with pre-calculated volumes
       const materialOps = materials.map((material) => ({
         updateOne: {
           filter: {
@@ -625,10 +626,7 @@ export class MaterialService {
           update: {
             $set: {
               category: material.category,
-              volume: material.elements.reduce(
-                (sum, e) => sum + (e.volume || 0),
-                0
-              ),
+              volume: material.volume,
               updatedAt: new Date(),
             },
             $setOnInsert: {
@@ -640,7 +638,7 @@ export class MaterialService {
         },
       }));
 
-      // Execute material operations first and wait for them to complete
+      // Execute material operations
       let materialResults = { upserted: 0, modified: 0 };
       if (materialOps.length > 0) {
         const materialResult = await Material.bulkWrite(materialOps, {
@@ -653,7 +651,7 @@ export class MaterialService {
         };
       }
 
-      // Now get all materials including newly created ones
+      // Get all materials including newly created ones
       const allMaterials = await Material.find({
         projectId: new mongoose.Types.ObjectId(projectId),
       })
@@ -661,12 +659,12 @@ export class MaterialService {
         .lean()
         .session(session);
 
-      // Create material lookup map with updated materials
+      // Create material lookup map
       const materialMap = new Map(
         allMaterials.map((m) => [m.name.trim().toLowerCase(), m._id])
       );
 
-      // Prepare bulk operations for elements with updated material map
+      // Prepare bulk operations for elements with correct volume distribution
       const elementOps = elements.map((element) => ({
         updateOne: {
           filter: {
@@ -683,12 +681,11 @@ export class MaterialService {
                   material: new mongoose.Types.ObjectId(
                     materialMap.get(layer.materialName.trim().toLowerCase())
                   ),
-                  volume:
-                    (element.netVolume || 0) /
-                    (element.materialLayers.layers.length || 1),
-                  density: 0, // Will be updated later with material properties
-                  mass: 0, // Will be calculated later
-                  fraction: 1 / (element.materialLayers.layers.length || 1),
+                  volume: (element.netVolume || 0) * layer.volumeFraction,
+                  density: 0,
+                  mass: 0,
+                  fraction: layer.volumeFraction,
+                  thickness: layer.thickness,
                   indicators: {
                     gwp: 0,
                     ubp: 0,
@@ -724,31 +721,9 @@ export class MaterialService {
         };
       }
 
-      // Count unmatched materials by checking only for existing matches in DB
-      const unmatchedMaterialCount = await Promise.all(
-        materials.map(async (m) => {
-          // Check if this material already exists in DB with a KBOB match
-          const existingMaterial = await Material.findOne({
-            name: m.name,
-            kbobMatchId: { $exists: true },
-          }).session(session);
-
-          const isUnmatched = existingMaterial ? 0 : 1;
-          console.log(`[DEBUG] Material ${m.name}: ${isUnmatched ? 'no match in DB' : 'found match in DB'}`);
-          return isUnmatched;
-        })
-      ).then(results => results.reduce((a, b) => a + b, 0));
-
-      console.log("[DEBUG] Material matching summary:", {
-        totalMaterials: materials.length,
-        unmatchedMaterials: unmatchedMaterialCount,
-        matchedMaterials: materials.length - unmatchedMaterialCount
-      });
-
       return {
         materialCount: materialResults.upserted + materialResults.modified,
         elementCount: elementResults.upserted + elementResults.modified,
-        unmatchedMaterialCount,
       };
     } catch (error) {
       console.error("Error in processMaterials:", error);

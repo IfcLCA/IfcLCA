@@ -153,11 +153,20 @@ async function processMaterials(
 
   // Process material layers if available
   if (element.materialLayers?.layers) {
+    // Calculate total thickness for volume fraction
+    const totalThickness = element.materialLayers.layers.reduce(
+      (sum: number, layer: any) => sum + (Number(layer.thickness) || 0),
+      0
+    );
+
     for (const layer of element.materialLayers.layers) {
       if (layer.materialName) {
         try {
-          const layerThickness = Number(layer.thickness) || 1; // Use 1 for direct assignments
-          const volume = elementVolume * layerThickness;
+          const layerThickness = Number(layer.thickness) || 0;
+          // Calculate volume fraction based on thickness ratio
+          const volumeFraction = totalThickness > 0
+            ? layerThickness / totalThickness
+            : 1 / element.materialLayers.layers.length;
 
           const savedMaterial = await Material.findOneAndUpdate(
             {
@@ -170,8 +179,8 @@ async function processMaterials(
                 projectId: projectObjectId,
               },
               $set: {
-                category: element.materialLayers?.layerSetName,
-                volume: Math.max(0, volume),
+                category: element.materialLayers?.layerSetName || element.type,
+                updatedAt: new Date(),
               },
             },
             {
@@ -184,8 +193,16 @@ async function processMaterials(
           if (savedMaterial) {
             processedMaterials.push({
               material: savedMaterial._id,
-              volume: Math.max(0, volume),
-              fraction: elementVolume > 0 ? volume / elementVolume : 0,
+              volume: Math.max(0, elementVolume * volumeFraction),
+              density: 0,
+              mass: 0,
+              fraction: volumeFraction,
+              thickness: layerThickness,
+              indicators: {
+                gwp: 0,
+                ubp: 0,
+                penre: 0,
+              },
             });
           }
         } catch (materialError) {
@@ -199,14 +216,12 @@ async function processMaterials(
     }
   }
   // If no layers but direct materials exist, process them
-  else if (element.materials && element.materials.length > 0) {
+  else if (element.materials && element.materials.length > 0 && !element.materials.includes("No materials found")) {
     const materialCount = element.materials.length;
     const volumePerMaterial = elementVolume / materialCount;
 
-    for (const materialRef of element.materials) {
+    for (const materialName of element.materials) {
       try {
-        const materialName =
-          this._getEntityName({ ref: materialRef }) || "Unknown";
         const savedMaterial = await Material.findOneAndUpdate(
           {
             name: materialName,
@@ -219,7 +234,7 @@ async function processMaterials(
             },
             $set: {
               category: "Direct Assignment",
-              volume: Math.max(0, volumePerMaterial),
+              updatedAt: new Date(),
             },
           },
           {
@@ -233,12 +248,19 @@ async function processMaterials(
           processedMaterials.push({
             material: savedMaterial._id,
             volume: Math.max(0, volumePerMaterial),
+            density: 0,
+            mass: 0,
             fraction: 1 / materialCount,
+            indicators: {
+              gwp: 0,
+              ubp: 0,
+              penre: 0,
+            },
           });
         }
       } catch (materialError) {
         console.error("Direct material processing error:", {
-          materialRef,
+          materialName,
           error: materialError.message,
           projectId: projectObjectId.toString(),
         });

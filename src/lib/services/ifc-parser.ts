@@ -257,50 +257,43 @@ export class IFCParser {
 
         if (Array.isArray(materialLayerRefs)) {
           const layers = [];
+          let totalThickness = 0;
+
+          // First pass: collect total thickness
+          materialLayerRefs.forEach((layerRef) => {
+            if (layerRef?.ref) {
+              const layerEntity = this.entities[layerRef.ref];
+              if (layerEntity?.type === "IFCMATERIALLAYER") {
+                const thickness = layerEntity.attributes[1] || 0;
+                totalThickness += thickness;
+              }
+            }
+          });
+
+          // Second pass: collect layers with volume fractions
           materialLayerRefs.forEach((layerRef) => {
             if (layerRef && layerRef.ref) {
               const layerEntity = this.entities[layerRef.ref];
               if (layerEntity && layerEntity.type === "IFCMATERIALLAYER") {
                 const materialRef = layerEntity.attributes[0];
-                const thickness = layerEntity.attributes[1];
+                const thickness = layerEntity.attributes[1] || 0;
                 const layerName = layerEntity.attributes[3];
                 let materialName = "Unknown Material";
 
                 if (materialRef && materialRef.ref) {
                   const materialEntity = this.entities[materialRef.ref];
-                  if (materialEntity) {
-                    if (materialEntity.type === "IFCMATERIAL" && materialEntity.attributes[0]) {
-                      materialName = materialEntity.attributes[0];
-                      console.log(` [IFCParser] Found material in layer:`, {
-                        layerSetId: id,
-                        layerId: layerRef.ref,
-                        materialId: materialRef.ref,
-                        materialName,
-                        materialType: materialEntity.type,
-                        thickness
-                      });
-                    } else {
-                      console.log(` [IFCParser] Invalid material entity:`, {
-                        layerSetId: id,
-                        layerId: layerRef.ref,
-                        materialId: materialRef.ref,
-                        materialType: materialEntity.type,
-                        attributes: materialEntity.attributes
-                      });
-                    }
+                  if (materialEntity?.type === "IFCMATERIAL" && materialEntity.attributes[0]) {
+                    materialName = materialEntity.attributes[0];
                   }
-                } else {
-                  console.log(` [IFCParser] Layer missing material reference:`, {
-                    layerSetId: id,
-                    layerId: layerRef.ref,
-                    layerName
-                  });
                 }
+
+                const volumeFraction = totalThickness > 0 ? thickness / totalThickness : 0;
 
                 layers.push({
                   layerId: layerRef.ref,
                   layerName,
                   thickness,
+                  volumeFraction,
                   materialName,
                 });
               }
@@ -308,21 +301,11 @@ export class IFCParser {
           });
 
           if (layers.length > 0) {
-            console.log(` [IFCParser] Found material layer set #${id}:`, {
-              layerSetName,
-              layerCount: layers.length,
-              layers: layers.map(l => ({
-                materialName: l.materialName,
-                thickness: l.thickness,
-                layerName: l.layerName
-              }))
-            });
             this.materialLayers[id] = {
               layerSetName,
+              totalThickness,
               layers,
             };
-          } else {
-            console.log(` [IFCParser] Empty material layer set #${id}`);
           }
         }
       }
@@ -398,66 +381,68 @@ export class IFCParser {
     elementId: string
   ): { materials: string[]; materialLayers: any } {
     if (!materialRef?.ref) {
-      console.log(` [IFCParser] No material reference for element #${elementId}`);
       return { materials: ["Unknown"], materialLayers: null };
     }
 
-    const materialEntity = this.entities[materialRef.ref];
-    if (!materialEntity) {
-      console.log(` [IFCParser] Invalid material reference for element #${elementId}:`, materialRef.ref);
-      return { materials: ["Unknown"], materialLayers: null };
-    }
+    const materials: string[] = [];
+    const queue = [materialRef];
+    const visited = new Set<string>();
 
-    if (materialEntity.type === "IFCMATERIAL") {
-      const materialName = materialEntity.attributes[0] || "Unnamed Material";
-      console.log(` [IFCParser] Found single material for element #${elementId}:`, materialName);
-      return { materials: [materialName], materialLayers: null };
-    }
+    while (queue.length > 0) {
+      const currentRef = queue.shift();
+      if (!currentRef?.ref || visited.has(currentRef.ref)) continue;
 
-    if (materialEntity.type === "IFCMATERIALLAYERSET") {
-      return {
-        materials: [],
-        materialLayers: this.materialLayers[materialRef.ref] || null
-      };
-    }
+      visited.add(currentRef.ref);
+      const entity = this.entities[currentRef.ref];
+      if (!entity) continue;
 
-    if (materialEntity.type === "IFCMATERIALLAYERSETUSAGE") {
-      // Get the reference to the material layer set
-      const layerSetRef = materialEntity.attributes[0];
-      if (layerSetRef && layerSetRef.ref) {
-        const layerSet = this.entities[layerSetRef.ref];
-        if (layerSet && layerSet.type === "IFCMATERIALLAYERSET") {
-          console.log(` [IFCParser] Found material layer set usage for element #${elementId}:`, {
-            layerSetRef: layerSetRef.ref,
-            layerSet: this.materialLayers[layerSetRef.ref]
-          });
-          return {
-            materials: [],
-            materialLayers: this.materialLayers[layerSetRef.ref] || null
-          };
-        }
-      }
-      console.log(` [IFCParser] Invalid layer set reference in usage for element #${elementId}`);
-      return { materials: ["Unknown"], materialLayers: null };
-    }
+      switch (entity.type) {
+        case "IFCMATERIAL":
+          const materialName = entity.attributes[0] || "Unnamed Material";
+          materials.push(materialName);
+          break;
 
-    if (materialEntity.type === "IFCMATERIALLIST") {
-      const materialRefs = materialEntity.attributes[0] || [];
-      const materials = materialRefs
-        .map((ref: { ref: string }) => {
-          if (ref && ref.ref) {
-            const mat = this.entities[ref.ref];
-            return mat && mat.attributes[0] ? mat.attributes[0] : null;
+        case "IFCMATERIALLAYERSET":
+          const layers = entity.attributes[0];
+          if (Array.isArray(layers)) {
+            layers.forEach(layerRef => layerRef?.ref && queue.push(layerRef));
           }
-          return null;
-        })
-        .filter((name: string | null) => name !== null);
+          break;
 
-      console.log(` [IFCParser] Found material list for element #${elementId}:`, materials);
-      return { materials: materials.length ? materials : ["Unknown"], materialLayers: null };
+        case "IFCMATERIALCONSTITUENTSET":
+          const constituents = entity.attributes[2];
+          if (Array.isArray(constituents)) {
+            constituents.forEach(constituentRef => constituentRef?.ref && queue.push(constituentRef));
+          }
+          break;
+
+        case "IFCMATERIALLIST":
+          const materialsList = entity.attributes[0];
+          if (Array.isArray(materialsList)) {
+            materialsList.forEach(matRef => matRef?.ref && queue.push(matRef));
+          }
+          break;
+
+        case "IFCMATERIALLAYER":
+        case "IFCMATERIALCONSTITUENT":
+          if (entity.attributes[2]?.ref) queue.push(entity.attributes[2]);
+          break;
+      }
     }
 
-    console.log(` [IFCParser] Unhandled material type for element #${elementId}:`, materialEntity.type);
-    return { materials: ["Unknown"], materialLayers: null };
+    // Get MaterialLayerSet if available
+    let materialLayers = null;
+    const materialEntity = this.entities[materialRef.ref];
+    if (materialEntity?.type === "IFCMATERIALLAYERSETUSAGE") {
+      const layerSetRef = materialEntity.attributes[0];
+      if (layerSetRef?.ref) {
+        materialLayers = this.materialLayers[layerSetRef.ref];
+      }
+    }
+
+    return {
+      materials: materials.length > 0 ? materials : ["No materials found"],
+      materialLayers
+    };
   }
 }
