@@ -724,12 +724,25 @@ export class MaterialService {
         };
       }
 
-      // Count unmatched materials by checking which materials don't have a KBOB match
-      const unmatchedMaterialCount = materials.filter(m => !m.kbobMatch).length;
+      // Count unmatched materials by checking only for existing matches in DB
+      const unmatchedMaterialCount = await Promise.all(
+        materials.map(async (m) => {
+          // Check if this material already exists in DB with a KBOB match
+          const existingMaterial = await Material.findOne({
+            name: m.name,
+            kbobMatchId: { $exists: true },
+          }).session(session);
+
+          const isUnmatched = existingMaterial ? 0 : 1;
+          console.log(`[DEBUG] Material ${m.name}: ${isUnmatched ? 'no match in DB' : 'found match in DB'}`);
+          return isUnmatched;
+        })
+      ).then(results => results.reduce((a, b) => a + b, 0));
+
       console.log("[DEBUG] Material matching summary:", {
         totalMaterials: materials.length,
-        matchedMaterials: materials.filter(m => m.kbobMatch).length,
-        unmatchedMaterials: unmatchedMaterialCount
+        unmatchedMaterials: unmatchedMaterialCount,
+        matchedMaterials: materials.length - unmatchedMaterialCount
       });
 
       return {

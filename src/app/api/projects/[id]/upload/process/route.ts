@@ -1,8 +1,7 @@
 import { NextResponse } from "next/server";
 import { connectToDatabase } from "@/lib/mongodb";
-import { Project, Upload, Element, Material } from "@/models";
+import { Upload } from "@/models";
 import { MaterialService } from "@/lib/services/material-service";
-import { logger } from "@/lib/logger";
 import mongoose from "mongoose";
 
 export const runtime = "nodejs";
