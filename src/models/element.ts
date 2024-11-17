@@ -23,7 +23,6 @@ interface IElement {
     ubp: number;
     penre: number;
   };
-  // ... other fields
 }
 
 const elementSchema = new mongoose.Schema<IElement>(
@@ -59,7 +58,6 @@ const elementSchema = new mongoose.Schema<IElement>(
       ubp: Number,
       penre: Number,
     },
-    // ... other fields
   },
   {
     timestamps: true,

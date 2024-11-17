@@ -13,59 +13,58 @@ export async function parseIFCFile(
     });
 
     // Create upload record
-    console.log("Creating upload record...");
     const uploadResponse = await fetch(`/api/projects/${projectId}/upload`, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ filename: file.name }),
     });
 
     const responseData = await uploadResponse.json();
     if (!uploadResponse.ok || !responseData.uploadId) {
-      console.error("Failed to create upload record:", responseData);
       throw new Error(responseData.error || "Failed to create upload record");
     }
-    console.log("Upload record created successfully", { uploadId: responseData.uploadId });
 
-    // Read file content
-    console.log("Reading file contents...");
+    // Parse file client-side
     const content = await file.text();
+    const parser = new IFCParser();
+    const parsedElements = await parser.parseContent(content);
 
-    // Send content to server for processing
-    console.log("Sending content to server for processing...");
-    const processResponse = await fetch(`/api/projects/${projectId}/upload/process`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        uploadId: responseData.uploadId,
-        content
-      }),
-    });
-
-    if (!processResponse.ok) {
-      const error = await processResponse.json();
-      console.error("Failed to process upload:", error);
-      throw new Error(error.error || "Failed to process upload");
+    // Send parsed results in chunks to avoid payload size limits
+    const chunkSize = 100;
+    const chunks = [];
+    for (let i = 0; i < parsedElements.length; i += chunkSize) {
+      chunks.push(parsedElements.slice(i, i + chunkSize));
     }
 
-    const processResult = await processResponse.json();
-    console.log("[DEBUG] Process result:", processResult);
+    let totalProcessed = 0;
+    for (const chunk of chunks) {
+      const processResponse = await fetch(
+        `/api/projects/${projectId}/upload/process`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            uploadId: responseData.uploadId,
+            elements: chunk,
+            isLastChunk: chunk === chunks[chunks.length - 1],
+          }),
+        }
+      );
 
-    const result = {
+      if (!processResponse.ok) {
+        throw new Error("Failed to process elements chunk");
+      }
+
+      const chunkResult = await processResponse.json();
+      totalProcessed += chunkResult.elementCount || 0;
+    }
+
+    return {
       uploadId: responseData.uploadId,
-      elementCount: processResult.elementCount || 0,
-      materialCount: processResult.materialCount || 0,
-      unmatchedMaterialCount: processResult.unmatchedMaterialCount || 0,
-      shouldRedirectToLibrary: processResult.unmatchedMaterialCount > 0,
+      elementCount: totalProcessed,
+      materialCount: parsedElements.length,
+      shouldRedirectToLibrary: false,
     };
-
-    console.log("[DEBUG] Returning result:", result);
-    return result;
-
   } catch (error) {
     console.error("Ifc parsing failed:", error);
     throw error;
