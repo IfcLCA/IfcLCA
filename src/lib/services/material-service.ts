@@ -615,12 +615,6 @@ export class MaterialService {
 
       const materials = Object.values(materialsByLayer);
 
-      console.log("📊 Processing materials:", {
-        total: materials.length,
-        sample: materials[0],
-        elementSample: elements[0]?.materialLayers?.layers,
-      });
-
       // Prepare bulk operations for materials
       const materialOps = materials.map((material) => ({
         updateOne: {
@@ -646,19 +640,33 @@ export class MaterialService {
         },
       }));
 
-      // Get existing materials from DB
-      const existingMaterials = await Material.find({
+      // Execute material operations first and wait for them to complete
+      let materialResults = { upserted: 0, modified: 0 };
+      if (materialOps.length > 0) {
+        const materialResult = await Material.bulkWrite(materialOps, {
+          session,
+          ordered: false,
+        });
+        materialResults = {
+          upserted: materialResult.upsertedCount,
+          modified: materialResult.modifiedCount,
+        };
+      }
+
+      // Now get all materials including newly created ones
+      const allMaterials = await Material.find({
         projectId: new mongoose.Types.ObjectId(projectId),
       })
         .select("_id name")
-        .lean();
+        .lean()
+        .session(session);
 
-      // Create material lookup map
+      // Create material lookup map with updated materials
       const materialMap = new Map(
-        existingMaterials.map((m) => [m.name.trim().toLowerCase(), m._id])
+        allMaterials.map((m) => [m.name.trim().toLowerCase(), m._id])
       );
 
-      // Prepare bulk operations for elements
+      // Prepare bulk operations for elements with updated material map
       const elementOps = elements.map((element) => ({
         updateOne: {
           filter: {
@@ -703,41 +711,34 @@ export class MaterialService {
         },
       }));
 
-      // Execute bulk operations using the provided session
-      const results = {
-        materials: { upserted: 0, modified: 0 },
-        elements: { upserted: 0, modified: 0 },
-      };
-
-      if (materialOps.length > 0) {
-        const materialResult = await Material.bulkWrite(materialOps, {
-          session,
-          ordered: false,
-        });
-        results.materials = {
-          upserted: materialResult.upsertedCount,
-          modified: materialResult.modifiedCount,
-        };
-      }
-
+      // Execute element operations
+      let elementResults = { upserted: 0, modified: 0 };
       if (elementOps.length > 0) {
         const elementResult = await Element.bulkWrite(elementOps, {
           session,
           ordered: false,
         });
-        results.elements = {
+        elementResults = {
           upserted: elementResult.upsertedCount,
           modified: elementResult.modifiedCount,
         };
       }
 
+      // Count unmatched materials by checking which materials don't have a KBOB match
+      const unmatchedMaterialCount = materials.filter(m => !m.kbobMatch).length;
+      console.log("[DEBUG] Material matching summary:", {
+        totalMaterials: materials.length,
+        matchedMaterials: materials.filter(m => m.kbobMatch).length,
+        unmatchedMaterials: unmatchedMaterialCount
+      });
+
       return {
-        success: true,
-        materialCount: results.materials.upserted + results.materials.modified,
-        elementCount: results.elements.upserted + results.elements.modified,
+        materialCount: materialResults.upserted + materialResults.modified,
+        elementCount: elementResults.upserted + elementResults.modified,
+        unmatchedMaterialCount,
       };
     } catch (error) {
-      console.error("❌ [Material Service] Error in processMaterials:", error);
+      console.error("Error in processMaterials:", error);
       throw error;
     }
   }

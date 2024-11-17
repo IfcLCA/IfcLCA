@@ -18,6 +18,9 @@ export interface IFCParseResult {
   error?: string;
   elementCount?: number;
   uploadId?: string;
+  materialCount?: number;
+  unmatchedMaterialCount?: number;
+  shouldRedirectToLibrary?: boolean;
 }
 
 export type UploadStatus = "Processing" | "Completed" | "Failed";

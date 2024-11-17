@@ -37,8 +37,14 @@ export function UploadModal({
       try {
         setIsUploading(true);
         const file = acceptedFiles[0];
+        console.log("[DEBUG] Starting file upload...");
         const results = await parseIFCFile(file, projectId);
-        console.log("[DEBUG] Upload results:", results);
+        console.log("[DEBUG] Upload results:", {
+          elementCount: results.elementCount,
+          materialCount: results.materialCount,
+          unmatchedMaterialCount: results.unmatchedMaterialCount,
+          shouldRedirectToLibrary: results.shouldRedirectToLibrary
+        });
 
         toast({
           title: "Upload Successful",

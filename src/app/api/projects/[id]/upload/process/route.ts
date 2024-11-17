@@ -46,14 +46,17 @@ export async function POST(
 
     await connectToDatabase();
 
+    let processResult;
     await session.withTransaction(async () => {
       // Process materials and elements
-      const processResult = await MaterialService.processMaterials(
+      processResult = await MaterialService.processMaterials(
         params.id,
         elements,
         uploadId!,
         session
       );
+
+      console.log("[DEBUG] Material processing result:", processResult);
 
       // Update upload status if this is the last chunk
       if (isLastChunk) {
@@ -63,17 +66,30 @@ export async function POST(
             status: "Completed",
             elementCount: processResult.elementCount,
             materialCount: processResult.materialCount,
+            unmatchedMaterialCount: processResult.unmatchedMaterialCount
           },
           { session }
         );
 
-        console.log("Processing complete", processResult);
+        console.log("[DEBUG] Processing complete", processResult);
       }
 
       return processResult;
     });
 
-    return NextResponse.json({ success: true });
+    console.log("[DEBUG] Sending response:", {
+      success: true,
+      elementCount: processResult.elementCount,
+      materialCount: processResult.materialCount,
+      unmatchedMaterialCount: processResult.unmatchedMaterialCount
+    });
+
+    return NextResponse.json({
+      success: true,
+      elementCount: processResult.elementCount,
+      materialCount: processResult.materialCount,
+      unmatchedMaterialCount: processResult.unmatchedMaterialCount,
+    });
   } catch (error) {
     console.error("Error processing chunk:", error);
 

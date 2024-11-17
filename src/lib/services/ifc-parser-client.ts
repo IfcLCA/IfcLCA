@@ -37,6 +37,7 @@ export async function parseIFCFile(
     }
 
     let totalProcessed = 0;
+    let unmatchedMaterialCount = 0;
     for (const chunk of chunks) {
       const processResponse = await fetch(
         `/api/projects/${projectId}/upload/process`,
@@ -57,13 +58,19 @@ export async function parseIFCFile(
 
       const chunkResult = await processResponse.json();
       totalProcessed += chunkResult.elementCount || 0;
+
+      // Check if we have unmatched materials in the last chunk
+      if (chunk === chunks[chunks.length - 1]) {
+        unmatchedMaterialCount = chunkResult.unmatchedMaterialCount || 0;
+      }
     }
 
     return {
       uploadId: responseData.uploadId,
       elementCount: totalProcessed,
       materialCount: parsedElements.length,
-      shouldRedirectToLibrary: false,
+      unmatchedMaterialCount,
+      shouldRedirectToLibrary: unmatchedMaterialCount > 0,
     };
   } catch (error) {
     console.error("Ifc parsing failed:", error);
