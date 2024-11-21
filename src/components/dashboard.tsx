@@ -143,7 +143,7 @@ export function Dashboard({
   const fetchProjects = useCallback(async () => {
     try {
       const response = await fetch("/api/projects", {
-        cache: 'force-cache',
+        cache: 'no-store'
       });
       const data = await response.json();
       setProjects(data);
@@ -170,18 +170,28 @@ export function Dashboard({
       const [projectsRes, emissionsRes] = await Promise.all([
         fetch("/api/projects", {
           signal: abortControllerRef.current.signal,
-          cache: 'force-cache',
+          cache: 'no-store',
         }),
         fetch("/api/emissions", {
           signal: abortControllerRef.current.signal,
-          cache: 'force-cache',
+          cache: 'no-store',
         })
       ]);
+
+      if (!projectsRes.ok || !emissionsRes.ok) {
+        console.error('API Response not OK:', {
+          projects: projectsRes.status,
+          emissions: emissionsRes.status
+        });
+        throw new Error('Failed to fetch data');
+      }
 
       const [projects, emissions] = await Promise.all([
         projectsRes.json(),
         emissionsRes.json()
       ]);
+
+      console.log('Fetched emissions:', emissions);
 
       const recentProjects = projects.slice(0, 3);
       const totalElements = projects.reduce(
@@ -193,14 +203,17 @@ export function Dashboard({
         0
       );
 
-      setStatistics(prev => ({
-        ...prev,
+      const newStatistics = {
+        ...statistics,
         totalProjects: projects.length,
         totalElements,
         totalMaterials,
-        totalEmissions: emissions,
-      }));
+        totalEmissions: emissions
+      };
 
+      console.log('Setting new statistics:', newStatistics);
+
+      setStatistics(newStatistics);
       setRecentProjects(recentProjects);
       lastFetchRef.current = now;
     } catch (error) {
@@ -210,13 +223,13 @@ export function Dashboard({
     } finally {
       setIsLoadingStatistics(false);
     }
-  }, []);
+  }, [statistics]);
 
   const fetchActivities = useCallback(async () => {
     try {
       setIsLoadingActivities(true);
       const response = await fetch('/api/activities?limit=6', {
-        cache: 'force-cache'
+        cache: 'no-store'
       });
       const data = await response.json();
       setActivities(data.activities);
@@ -238,7 +251,7 @@ export function Dashboard({
       
       fetch(`/api/activities?page=${nextPage}`, {
         signal: prefetchController.signal,
-        cache: 'force-cache'
+        cache: 'no-store'
       }).catch(() => {});
     }
   }, [hasMore, isLoadingActivities, page]);
@@ -284,7 +297,9 @@ export function Dashboard({
 
   const handleUploadClick = async () => {
     try {
-      const response = await fetch("/api/projects");
+      const response = await fetch("/api/projects", {
+        cache: 'no-store'
+      });
       const projects = await response.json();
 
       if (!projects?.length) {

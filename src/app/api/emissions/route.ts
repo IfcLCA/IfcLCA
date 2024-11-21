@@ -10,7 +10,7 @@ export async function GET() {
     const { userId } = await auth();
 
     if (!userId) {
-      return new Response("Unauthorized", { status: 401 });
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     await connectToDatabase();
@@ -20,7 +20,7 @@ export async function GET() {
       { 
         $match: { 
           userId,
-          isArchived: { $ne: true } // Only include non-archived projects
+          isArchived: { $ne: true }
         } 
       },
       {
@@ -28,28 +28,48 @@ export async function GET() {
           from: "elements",
           localField: "_id",
           foreignField: "projectId",
-          as: "elements",
-        },
+          as: "elements"
+        }
       },
       {
         $unwind: {
           path: "$elements",
-          preserveNullAndEmptyArrays: true,
-        },
-      },
-      {
-        $lookup: {
-          from: "materials",
-          localField: "elements.materials.materialId",
-          foreignField: "_id",
-          as: "element.material",
-        },
+          preserveNullAndEmptyArrays: true
+        }
       },
       {
         $unwind: {
           path: "$elements.materials",
-          preserveNullAndEmptyArrays: true,
-        },
+          preserveNullAndEmptyArrays: true
+        }
+      },
+      {
+        $lookup: {
+          from: "materials",
+          localField: "elements.materials.material",
+          foreignField: "_id",
+          as: "material"
+        }
+      },
+      {
+        $unwind: {
+          path: "$material",
+          preserveNullAndEmptyArrays: true
+        }
+      },
+      {
+        $lookup: {
+          from: "indicatorsKBOB",
+          localField: "material.kbobMatchId",
+          foreignField: "_id",
+          as: "kbobMatch"
+        }
+      },
+      {
+        $unwind: {
+          path: "$kbobMatch",
+          preserveNullAndEmptyArrays: true
+        }
       },
       {
         $group: {
@@ -57,51 +77,46 @@ export async function GET() {
           gwp: {
             $sum: {
               $multiply: [
-                { $ifNull: ["$elements.materials.indicators.gwp", 0] },
+                { $ifNull: ["$kbobMatch.GWP", 0] },
                 { $ifNull: ["$elements.materials.volume", 0] },
-                { $ifNull: ["$elements.materials.density", 1] }, // Include density in calculation
-              ],
-            },
+                { $ifNull: ["$material.density", 1] }
+              ]
+            }
           },
           ubp: {
             $sum: {
               $multiply: [
-                { $ifNull: ["$elements.materials.indicators.ubp", 0] },
+                { $ifNull: ["$kbobMatch.UBP", 0] },
                 { $ifNull: ["$elements.materials.volume", 0] },
-                { $ifNull: ["$elements.materials.density", 1] }, // Include density in calculation
-              ],
-            },
+                { $ifNull: ["$material.density", 1] }
+              ]
+            }
           },
           penre: {
             $sum: {
               $multiply: [
-                { $ifNull: ["$elements.materials.indicators.penre", 0] },
+                { $ifNull: ["$kbobMatch.PENRE", 0] },
                 { $ifNull: ["$elements.materials.volume", 0] },
-                { $ifNull: ["$elements.materials.density", 1] }, // Include density in calculation
-              ],
-            },
-          },
-        },
-      },
-    ]);
-
-    console.log('Aggregation result:', projects);
+                { $ifNull: ["$material.density", 1] }
+              ]
+            }
+          }
+        }
+      }
+    ]).exec();
 
     // If no projects or materials found, return zeros
     const totalEmissions = projects[0] || {
       gwp: 0,
       ubp: 0,
-      penre: 0,
+      penre: 0
     };
-
-    // Remove the _id field from the response
-    delete totalEmissions._id;
-
-    console.log('Final emissions:', totalEmissions);
 
     return NextResponse.json(totalEmissions);
   } catch (error) {
-    console.error("Failed to fetch total emissions:", error);
-    return new Response("Failed to fetch total emissions", { status: 500 });
+    return NextResponse.json(
+      { error: "Failed to calculate emissions" },
+      { status: 500 }
+    );
   }
 }

@@ -1,448 +1,707 @@
-interface IFCEntity {
+interface Material {
+  name: string;
+  fraction: number;
+  count: number;
+  layerSetName: string;
+  volume?: number;
+}
+
+interface IFCElement {
+  id: string;
   type: string;
-  attributes: any[];
+  name: string;
+  buildingStory?: string;
+  materials: Material[];
+  volume?: string;
 }
 
-interface IFCRelationship {
-  spatialContainer?: { ref: string };
-  material?: { ref: string };
-  propertySets?: { ref: string }[];
+interface IFCElementCollection {
+  [key: string]: IFCElement[];
 }
 
-interface IFCLayer {
-  ref: string;
+interface IFCMaterial {
+  name: string;
+  volume?: number | string;
 }
 
-export class IFCParser {
-  private entities: Record<string, IFCEntity>;
-  private elements: any[];
-  private relationships: Record<string, IFCRelationship>;
-  private quantities: Record<string, number>;
-  private materialLayers: Record<string, any>;
+interface IFCExtractedElement {
+  id: string;
+  type: string;
+  name?: string;
+  materials?: IFCMaterial[];
+}
 
-  constructor() {
-    this.entities = {};
-    this.elements = [];
-    this.relationships = {};
-    this.quantities = {};
-    this.materialLayers = {};
+export class IFCElementExtractor {
+  private entities: Map<string, any> = new Map();
+  private relationships: Map<string, { materials: any[], spatialStructure?: any }> = new Map();
+  private materialIndex: Map<string, IFCMaterial> = new Map();
+  private entityTypeIndex: Map<string, Set<string>> = new Map();
+  private propertySetIndex: Map<string, any> = new Map();
+  private volumeCache: Map<string, string> = new Map();
+  private state = {
+    currentLine: 0,
+    inDataSection: false,
+    inHeader: false
+  };
+
+  private content: string;
+  private elements: { [key: string]: IFCExtractedElement[] } = {};
+
+  constructor(content: string) {
+    console.log(`[DEBUG] Initializing IFCElementExtractor with content length: ${content.length}`);
+    this.content = content;
+    this.parseIFCFile(content);
+    this.buildPropertySetIndex();
+    this.processMaterialRelationships();
+    this.parseContent();
   }
 
-  parseContent(content: string) {
-    console.log(' [IFCParser] Starting to parse Ifc content...');
-    const dataSectionMatch = content.match(/DATA;([\s\S]*?)ENDSEC;/);
-    if (!dataSectionMatch) {
-      console.error(' [IFCParser] Invalid Ifc file: DATA section not found');
-      throw new Error("Invalid Ifc file: DATA section not found");
-    }
-    const dataSection = dataSectionMatch[1].trim();
-    console.log(' [IFCParser] Found DATA section');
+  private stripHashFromId(id: string): string {
+    return id.startsWith('#') ? id.substring(1) : id;
+  }
 
-    let lineCount = 0;
-    dataSection.split("\n").forEach((line) => {
-      if (line.trim()) {
-        this._parseLine(line.trim());
-        lineCount++;
+  private parseList(list: string): string[] {
+    if (!list) return [];
+    // Handle nested parentheses
+    let result = [];
+    let currentItem = '';
+    let depth = 0;
+    
+    for (let i = 0; i < list.length; i++) {
+      const char = list[i];
+      if (char === '(') {
+        depth++;
+        if (depth === 1 && currentItem === '') continue;
+        currentItem += char;
+      } else if (char === ')') {
+        depth--;
+        if (depth === 0 && currentItem !== '') {
+          result.push(currentItem.trim());
+          currentItem = '';
+        } else {
+          currentItem += char;
+        }
+      } else if (char === ',' && depth === 0) {
+        if (currentItem !== '') {
+          result.push(currentItem.trim());
+          currentItem = '';
+        }
+      } else {
+        currentItem += char;
       }
-    });
-    console.log(` [IFCParser] Parsed ${lineCount} lines`);
-
-    console.log(' [IFCParser] Processing relationships...');
-    this._processRelationships();
-    
-    console.log(' [IFCParser] Collecting net volumes...');
-    this._collectNetVolumes();
-    
-    console.log(' [IFCParser] Collecting material layers...');
-    this._collectMaterialLayers();
-    
-    console.log(' [IFCParser] Processing elements...');
-    this._processElements();
-
-    console.log(` [IFCParser] Parsing complete. Found:`, {
-      entityCount: Object.keys(this.entities).length,
-      elementCount: this.elements.length,
-      relationshipCount: Object.keys(this.relationships).length,
-      quantityCount: Object.keys(this.quantities).length,
-      materialLayerCount: Object.keys(this.materialLayers).length
-    });
-
-    return this.elements;
-  }
-
-  private _parseLine(line: string) {
-    line = line.endsWith(";") ? line.slice(0, -1) : line;
-    const [idPart, content] = line.split("=", 2);
-    if (!idPart || !content) {
-      console.warn(' [IFCParser] Invalid line format:', line);
-      return;
     }
-
-    const entityId = idPart.trim().slice(1);
-    const [entityType, attributes] = this._parseEntity(content.trim());
-
-    this.entities[entityId] = {
-      type: entityType,
-      attributes: attributes,
-    };
-
-    if (entityType === 'IFCRELDEFINESBYPROPERTIES' || 
-        entityType === 'IFCRELCONTAINEDINSPATIALSTRUCTURE' ||
-        entityType === 'IFCRELASSOCIATESMATERIAL') {
-      console.log(` [IFCParser] Found relationship: ${entityType} (#${entityId})`);
+    
+    if (currentItem !== '') {
+      result.push(currentItem.trim());
     }
+    
+    return result;
   }
 
-  private _parseEntity(content: string): [string, any[]] {
-    const entityType = content.substring(0, content.indexOf("(")).trim();
-    const attributesStr = content.substring(
-      content.indexOf("(") + 1,
-      content.lastIndexOf(")")
-    );
-    const attributes = this._parseAttributes(attributesStr);
-    return [entityType, attributes];
+  private parseLine(line: string): { id: string, type: string, attributes: string[] } | null {
+    const match = line.match(/^#(\d+)=\s*(\w+)\((.*)\);?$/);
+    if (!match) return null;
+
+    const [, id, type, attributesStr] = match;
+    const attributes = this.parseList(attributesStr);
+    return { id, type, attributes };
   }
 
-  private _parseAttributes(attributesStr: string): any[] {
-    const attributes = [];
-    let currentAttr = "";
-    let nestLevel = 0;
-    let inString = false;
+  private parseIFCFile(content: string): void {
+    console.log('Starting IFC file parsing...');
+    const lines = content.split('\n');
+    console.log(`Total lines: ${lines.length}`);
+    let entityCount = 0;
 
-    for (let i = 0; i < attributesStr.length; i++) {
-      const char = attributesStr[i];
-      if (char === "'" && attributesStr[i - 1] !== "\\") {
-        inString = !inString;
-      } else if (!inString) {
-        if (char === "(") nestLevel++;
-        if (char === ")") nestLevel--;
-        if (char === "," && nestLevel === 0) {
-          attributes.push(this._cleanAttribute(currentAttr));
-          currentAttr = "";
-          continue;
-        }
+    // Pre-compile regular expressions
+    const lineRegex = /^#(\d+)=\s*(\w+)\((.*)\);?$/;
+    const materialRegex = /'([^']+)'/;
+
+    for (const line of lines) {
+      this.state.currentLine++;
+      const trimmedLine = line.trim();
+      
+      // Skip empty lines and section markers efficiently
+      if (!trimmedLine || trimmedLine === 'ISO-10303-21;' || trimmedLine === 'HEADER;' || trimmedLine === 'ENDSEC;') continue;
+      
+      if (trimmedLine === 'DATA;') {
+        this.state.inDataSection = true;
+        continue;
       }
-      currentAttr += char;
-    }
+      
+      // Only parse entity definitions in the data section
+      if (!this.state.inDataSection) continue;
 
-    if (currentAttr) {
-      attributes.push(this._cleanAttribute(currentAttr));
-    }
+      // Use pre-compiled regex for better performance
+      const match = trimmedLine.match(lineRegex);
+      if (!match) continue;
 
-    return attributes;
-  }
-
-  private _cleanAttribute(attr: string): any {
-    attr = attr.trim();
-    if (attr === "$" || attr === "*") return null;
-    if (attr.startsWith("'") && attr.endsWith("'")) return attr.slice(1, -1);
-    if (attr.startsWith("#")) return { ref: attr.slice(1) };
-    if (!isNaN(attr))
-      return attr.includes(".") ? parseFloat(attr) : parseInt(attr, 10);
-    if (attr.startsWith("(") && attr.endsWith(")"))
-      return this._parseAttributes(attr.slice(1, -1));
-    if (attr.startsWith(".") && attr.endsWith(".")) return attr.slice(1, -1);
-    return attr;
-  }
-
-  private _processRelationships() {
-    Object.entries(this.entities).forEach(([id, entity]) => {
-      if (entity.type === "IFCRELCONTAINEDINSPATIALSTRUCTURE") {
-        const relatedElements = entity.attributes[4];
-        const relatingStructure = entity.attributes[5];
-        if (Array.isArray(relatedElements)) {
-          relatedElements.forEach((element) => {
-            if (element && element.ref) {
-              this.relationships[element.ref] = {
-                ...this.relationships[element.ref],
-                spatialContainer: relatingStructure,
-              };
-            }
-          });
-        }
-      } else if (entity.type === "IFCRELASSOCIATESMATERIAL") {
-        const relatedObjects = entity.attributes[4];
-        const relatingMaterial = entity.attributes[5];
-        if (Array.isArray(relatedObjects)) {
-          relatedObjects.forEach((object) => {
-            if (object && object.ref) {
-              this.relationships[object.ref] = {
-                ...this.relationships[object.ref],
-                material: relatingMaterial,
-              };
-            }
-          });
-        }
-      } else if (entity.type === "IFCRELDEFINESBYPROPERTIES") {
-        const relatedObjects = entity.attributes[4];
-        const relatingPropertyDefinition = entity.attributes[5];
-        if (Array.isArray(relatedObjects)) {
-          relatedObjects.forEach((object) => {
-            if (object && object.ref) {
-              this.relationships[object.ref] = {
-                ...this.relationships[object.ref],
-                propertySets: this.relationships[object.ref]?.propertySets
-                  ? [
-                      ...this.relationships[object.ref].propertySets,
-                      relatingPropertyDefinition,
-                    ]
-                  : [relatingPropertyDefinition],
-              };
-            }
+      const [, id, type, attributesStr] = match;
+      
+      // Index materials during initial parse to avoid second pass
+      if (type === 'IFCMATERIAL') {
+        const nameMatch = attributesStr.match(materialRegex);
+        if (nameMatch) {
+          this.materialIndex.set('#' + id, {
+            name: nameMatch[1],
+            volume: this.extractVolume(trimmedLine)
           });
         }
       }
-    });
+
+      // Index entities by type for faster lookups
+      let typeSet = this.entityTypeIndex.get(type);
+      if (!typeSet) {
+        typeSet = new Set();
+        this.entityTypeIndex.set(type, typeSet);
+      }
+      typeSet.add(id);
+
+      // Clean and store entity
+      const attributes = this.parseList(attributesStr);
+      const cleanAttributes = attributes.map(attr => {
+        return attr === '$' ? '' : 
+               (attr.startsWith("'") && attr.endsWith("'")) ? attr.slice(1, -1) : 
+               attr;
+      });
+
+      this.entities.set(id, {
+        id,
+        type,
+        attributes: cleanAttributes,
+        name: cleanAttributes[1] && cleanAttributes[1] !== '' ? cleanAttributes[1] : ''
+      });
+      entityCount++;
+
+      if (entityCount % 1000 === 0) {
+        console.log(`Parsed ${entityCount} entities...`);
+      }
+    }
+    console.log(`Parsed ${entityCount} entities total`);
+    console.log(`Indexed ${this.materialIndex.size} materials`);
+    console.log(`Created type index with ${this.entityTypeIndex.size} types`);
   }
 
-  private _collectNetVolumes() {
-    Object.entries(this.entities).forEach(([id, entity]) => {
-      if (entity.type === "IFCRELDEFINESBYPROPERTIES") {
-        const relatedObjects = entity.attributes[4];
-        const relatingPropertyDefinition = entity.attributes[5];
+  private buildPropertySetIndex(): void {
+    console.log('[DEBUG] Building property set index...');
+    
+    // Index all property and quantity sets for faster lookup
+    for (const [id, entity] of this.entities.entries()) {
+      if (entity.type === 'IFCRELDEFINESBYPROPERTIES') {
+        const relatedObjects = this.parseList(entity.attributes[4]);
+        const propertySetRef = this.stripHashFromId(entity.attributes[5]);
+        
+        for (const objRef of relatedObjects) {
+          const elementId = this.stripHashFromId(objRef);
+          let elementSets = this.propertySetIndex.get(elementId) || [];
+          elementSets.push(propertySetRef);
+          this.propertySetIndex.set(elementId, elementSets);
+        }
+      }
+    }
+    
+    console.log(`[DEBUG] Indexed property sets for ${this.propertySetIndex.size} elements`);
+  }
 
-        if (relatingPropertyDefinition && relatingPropertyDefinition.ref) {
-          const propDefEntity = this.entities[relatingPropertyDefinition.ref];
-          if (propDefEntity && propDefEntity.type === "IFCELEMENTQUANTITY") {
-            const quantities = propDefEntity.attributes[5];
-            if (Array.isArray(quantities)) {
-              quantities.forEach((quantityRef) => {
-                if (quantityRef && quantityRef.ref) {
-                  const quantityEntity = this.entities[quantityRef.ref];
-                  if (
-                    quantityEntity &&
-                    quantityEntity.type === "IFCQUANTITYVOLUME"
-                  ) {
-                    const quantityName = quantityEntity.attributes[0];
-                    if (quantityName === "NetVolume") {
-                      const volumeValue = quantityEntity.attributes[3];
-                      if (Array.isArray(relatedObjects)) {
-                        relatedObjects.forEach((object) => {
-                          if (object && object.ref) {
-                            this.quantities[object.ref] = volumeValue;
-                          }
-                        });
-                      }
-                    }
-                  }
-                }
-              });
+  private findElementVolume(element: any): string {
+    // Check cache first
+    const cachedVolume = this.volumeCache.get(element.id);
+    if (cachedVolume !== undefined) {
+      return cachedVolume;
+    }
+
+    try {
+      const propertySets = this.propertySetIndex.get(element.id) || [];
+      
+      for (const setRef of propertySets) {
+        const propertySet = this.entities.get(setRef);
+        if (!propertySet) continue;
+
+        // Try quantity set first (more reliable)
+        const quantityVolume = this.checkQuantitySet(element, propertySet);
+        if (quantityVolume) {
+          this.volumeCache.set(element.id, quantityVolume);
+          return quantityVolume;
+        }
+
+        // Fall back to property set
+        const propertyVolume = this.checkPropertySet(propertySet);
+        if (propertyVolume) {
+          this.volumeCache.set(element.id, propertyVolume);
+          return propertyVolume;
+        }
+      }
+    } catch (error) {
+      console.error("Error finding element volume:", error);
+    }
+
+    const defaultVolume = "0.000";
+    this.volumeCache.set(element.id, defaultVolume);
+    return defaultVolume;
+  }
+
+  private processMaterialRelationships(): void {
+    console.log('Processing material relationships...');
+    let spatialCount = 0;
+    let materialCount = 0;
+
+    // Get all material relationships at once
+    const materialRelations = Array.from(this.entities.values())
+      .filter(entity => entity.type === 'IFCRELASSOCIATESMATERIAL');
+
+    // Process spatial relationships first
+    for (const entity of this.entities.values()) {
+      if (entity.type === 'IFCRELCONTAINEDINSPATIALSTRUCTURE') {
+        const relatedElements = this.parseList(entity.attributes[4]);
+        const storeyRef = this.stripHashFromId(entity.attributes[5]);
+        const storey = this.entities.get(storeyRef);
+        spatialCount += relatedElements.length;
+
+        for (const elementRef of relatedElements) {
+          const elementId = this.stripHashFromId(elementRef);
+          const existing = this.relationships.get(elementId) || { materials: [] };
+          existing.spatialStructure = storey;
+          this.relationships.set(elementId, existing);
+        }
+      }
+    }
+
+    // Process material relationships in batches
+    const batchSize = 100;
+    for (let i = 0; i < materialRelations.length; i += batchSize) {
+      const batch = materialRelations.slice(i, i + batchSize);
+      
+      for (const entity of batch) {
+        const relatedElements = this.parseList(entity.attributes[4]);
+        const materialRef = this.stripHashFromId(entity.attributes[5]);
+        const materialEntity = this.entities.get(materialRef);
+        materialCount += relatedElements.length;
+
+        if (!materialEntity) continue;
+
+        let materials: any[] = [];
+        
+        if (materialEntity.type === 'IFCMATERIALLAYERSETUSAGE') {
+          materials = this.processMaterialLayerSet(materialEntity);
+        } else if (materialEntity.type === 'IFCMATERIAL') {
+          materials = [{
+            name: this.removeQuotes(materialEntity.attributes[0] || 'Unknown Material'),
+            fraction: 1.0,
+            layerSetName: 'Single Material',
+            count: 1
+          }];
+        }
+
+        // Process elements in parallel using element volumes
+        const elementVolumes = new Map<string, number>();
+        for (const elementRef of relatedElements) {
+          const elementId = this.stripHashFromId(elementRef);
+          const element = this.entities.get(elementId);
+          if (element) {
+            elementVolumes.set(elementId, parseFloat(this.findElementVolume(element) || '0'));
+          }
+        }
+
+        // Apply volumes to materials
+        for (const [elementId, elementVolume] of elementVolumes) {
+          const materialsWithVolume = materials.map(material => ({
+            ...material,
+            volume: material.fraction * elementVolume
+          }));
+
+          const existing = this.relationships.get(elementId) || { materials: [] };
+          existing.materials = materialsWithVolume;
+          this.relationships.set(elementId, existing);
+        }
+      }
+    }
+
+    console.log(`Processed ${spatialCount} spatial relationships and ${materialCount} material relationships`);
+  }
+
+  private processMaterialLayerSet(materialEntity: any): any[] {
+    const layerSetRef = this.stripHashFromId(materialEntity.attributes[0]);
+    const layerSet = this.entities.get(layerSetRef);
+    
+    if (!layerSet || layerSet.type !== 'IFCMATERIALLAYERSET') {
+      return [];
+    }
+
+    const layers = this.parseList(layerSet.attributes[0]);
+    let totalThickness = 0;
+    const layerThicknesses: number[] = [];
+    
+    // First pass: calculate total thickness
+    for (const layerRef of layers) {
+      const layer = this.entities.get(this.stripHashFromId(layerRef));
+      if (layer) {
+        const thickness = parseFloat(layer.attributes[1] || '0.000');
+        layerThicknesses.push(thickness);
+        if (!isNaN(thickness) && thickness > 0) {
+          totalThickness += thickness;
+        }
+      } else {
+        layerThicknesses.push(0);
+      }
+    }
+
+    // Second pass: create materials with fractions
+    const materials = layers.map((layerRef, index) => {
+      const layer = this.entities.get(this.stripHashFromId(layerRef));
+      if (!layer) return null;
+
+      const materialRef = layer.attributes[0];
+      const material = this.entities.get(this.stripHashFromId(materialRef));
+      
+      if (!material || material.type !== 'IFCMATERIAL') return null;
+
+      const materialName = this.removeQuotes(material.attributes[0] || 'Unknown Material');
+      const thickness = layerThicknesses[index];
+      const fraction = thickness <= 0 ? 0 : totalThickness > 0 ? thickness / totalThickness : 0;
+
+      return {
+        name: materialName,
+        fraction,
+        layerSetName: layerSet.attributes[0] || 'Unknown Layer Set',
+        count: 1
+      };
+    }).filter(Boolean);
+
+    // Normalize fractions if needed
+    const totalFraction = materials.reduce((sum, m) => sum + m.fraction, 0);
+    if (Math.abs(totalFraction) < 0.0001 && materials.length > 0) {
+      const equalFraction = 1.0 / materials.length;
+      materials.forEach(m => m.fraction = equalFraction);
+    } else if (Math.abs(totalFraction - 1.0) > 0.0001 && totalFraction > 0) {
+      materials.forEach(m => m.fraction = m.fraction / totalFraction);
+    }
+
+    return materials;
+  }
+
+  private removeQuotes(str: string): string {
+    if (str.startsWith("'") && str.endsWith("'")) {
+      return str.slice(1, -1);
+    }
+    return str;
+  }
+
+  private getBaseQuantityNames(elementType: string): string[] {
+    return [
+      `Qto_${elementType.toLowerCase()}BaseQuantities`,
+      `Qto_${elementType}BaseQuantities`,
+      `BaseQuantities`,
+      `${elementType.toUpperCase()}BaseQuantities`,
+      `Qto_${elementType}Quantities`
+    ];
+  }
+
+  private checkQuantitySet(element: any, propertySet: any): string | null {
+    if (propertySet.type !== 'IFCELEMENTQUANTITY') return null;
+
+    const elementType = element.type.replace('IFC', '');
+    const baseNames = [
+      `Qto_${elementType.toLowerCase()}BaseQuantities`,
+      `Qto_${elementType}BaseQuantities`,
+      `BaseQuantities`
+    ];
+
+    const setName = this.removeQuotes(propertySet.attributes[2] || '');
+    if (!baseNames.some(name => setName.toLowerCase() === name.toLowerCase())) {
+      return null;
+    }
+
+    const quantities = this.parseList(propertySet.attributes[5] || '');
+    for (const ref of quantities) {
+      const quantity = this.entities.get(this.stripHashFromId(ref));
+      if (!quantity || quantity.type !== 'IFCQUANTITYVOLUME') continue;
+
+      const name = this.removeQuotes(quantity.attributes[0] || '');
+      if (name === 'NetVolume' || name === 'GrossVolume') {
+        console.log(`[DEBUG] Found ${name}:`, quantity.attributes[3]);
+        return quantity.attributes[3];
+      }
+    }
+    return null;
+  }
+
+  private checkPropertySet(propertySet: any): string | null {
+    if (propertySet.type !== 'IFCPROPERTYSET') return null;
+
+    const psetName = this.removeQuotes(propertySet.attributes[2] || '');
+    if (!psetName.includes('Quantity') && !psetName.includes('BaseQuantities')) {
+      return null;
+    }
+
+    const properties = this.parseList(propertySet.attributes[4] || '');
+    for (const ref of properties) {
+      const property = this.entities.get(this.stripHashFromId(ref));
+      if (!property || property.type !== 'IFCPROPERTYSINGLEVALUE') continue;
+
+      const name = this.removeQuotes(property.attributes[0] || '');
+      if (name.toLowerCase().includes('volume')) {
+        console.log("[DEBUG] Found volume in property:", name, property.attributes[2]);
+        return property.attributes[2];
+      }
+    }
+    return null;
+  }
+
+  private findPropertyValue(entity: any, propertyName: string): string | null {
+    // Find relationships pointing to this entity
+    for (const [id, relEntity] of this.entities.entries()) {
+      if (relEntity.type === 'IFCRELDEFINESBYPROPERTIES') {
+        const relatedObjects = relEntity.attributes[4];
+        if (!relatedObjects) continue;
+
+        // Check if this entity is related
+        const objectRefs = relatedObjects.split(',');
+        const entityRef = `#${entity.id}`;
+        if (!objectRefs.includes(entityRef)) continue;
+
+        // Get property set reference
+        const propertySetRef = relEntity.attributes[5];
+        if (!propertySetRef) continue;
+
+        const propertySet = this.entities.get(this.stripHashFromId(propertySetRef));
+        if (!propertySet) continue;
+
+        // Look for property
+        const properties = propertySet.attributes[4];
+        if (!properties) continue;
+
+        const propertyRefs = properties.split(',');
+        for (const ref of propertyRefs) {
+          const property = this.entities.get(this.stripHashFromId(ref));
+          if (!property) continue;
+
+          // Check for property name
+          if (property.type === 'IFCPROPERTYSINGLEVALUE' && 
+              this.removeQuotes(property.attributes[0] || '') === propertyName) {
+            const value = property.attributes[2];
+            if (value) {
+              console.log(`Found ${propertyName} from property set:`, value);
+              return value;
             }
           }
         }
       }
-    });
+    }
+
+    return null;
   }
 
-  private _findElementForQuantity(quantityId: string): string | null {
-    for (const [relId, relationship] of Object.entries(this.entities)) {
-      if (
-        relationship.type === "IFCRELDEFINESBYPROPERTIES" &&
-        relationship.attributes[5]?.ref === quantityId
-      ) {
-        const relatedObjects = relationship.attributes[4];
-        if (Array.isArray(relatedObjects) && relatedObjects[0]?.ref) {
-          return relatedObjects[0].ref;
+  private getUnitScale(): number {
+    console.log('\n[DEBUG] Searching for length unit...');
+    // Find IFCSIUNIT for length
+    for (const entity of this.entities.values()) {
+      if (entity.type === 'IFCSIUNIT') {
+        const attributes = entity.attributes;
+        console.log('[DEBUG] Found IFCSIUNIT:', {
+          attributes,
+          unitType: attributes[2],
+          prefix: attributes[1]
+        });
+        // Check if it's a length unit
+        if (attributes[2] === '.LENGTHUNIT.') {
+          // Check for prefix
+          const prefix = attributes[1];
+          let scale: number;
+          switch (prefix) {
+            case '.MILLI.':
+              scale = 0.001; // Convert millimeters to meters
+              break;
+            case '.CENTI.':
+              scale = 0.01; // Convert centimeters to meters
+              break;
+            case '.DECI.':
+              scale = 0.1; // Convert decimeters to meters
+              break;
+            case null:
+            case '$':
+            case undefined:
+              scale = 1.0; // Already in meters
+              break;
+            default:
+              console.warn(`Unknown length unit prefix: ${prefix}`);
+              scale = 1.0;
+          }
+          console.log(`[DEBUG] Using scale factor: ${scale} for prefix: ${prefix}`);
+          return scale;
+        }
+      }
+    }
+    console.log('[DEBUG] No length unit found, defaulting to meters (scale: 1.0)');
+    return 1.0; // Default to meters if no unit found
+  }
+
+  public extractElements(): IFCElementCollection {
+    console.log('Extracting elements...');
+    const elements: IFCElementCollection = {};
+    const hasGeometry = new Set<string>();
+
+    // First find all entities with geometry
+    for (const entity of this.entities.values()) {
+      if (entity.type === 'IFCPRODUCTDEFINITIONSHAPE') {
+        const elementId = this.findElementForShape(entity.id);
+        if (elementId) {
+          const element = this.entities.get(elementId);
+          if (element) {
+            hasGeometry.add(elementId);
+          }
+        }
+      }
+    }
+
+    console.log(`Found ${hasGeometry.size} elements with geometry`);
+
+    // Process elements with geometry
+    for (const elementId of hasGeometry) {
+      const element = this.entities.get(elementId);
+      const relationship = this.relationships.get(elementId);
+      
+      if (!elements[element.type]) {
+        elements[element.type] = [];
+      }
+
+      const materialsList = relationship?.materials || [];
+      const storey = relationship?.spatialStructure;
+      
+      // Get the building story name
+      let buildingStory = 'Unknown Story';
+      if (storey) {
+        // Get the name from the storey entity's name attribute
+        const storeyName = storey.attributes[2] || storey.attributes[1];
+        if (storeyName) {
+          buildingStory = storeyName;
+          // Remove quotes if present
+          if (buildingStory.startsWith("'") && buildingStory.endsWith("'")) {
+            buildingStory = buildingStory.slice(1, -1);
+          }
+        }
+      }
+
+      // Get the element name
+      let elementName = 'Unknown Element';
+      if (element) {
+        // Get the name from the element's name attribute
+        const name = element.attributes[2] || element.attributes[1];
+        if (name) {
+          elementName = name;
+          // Remove quotes if present
+          if (elementName.startsWith("'") && elementName.endsWith("'")) {
+            elementName = elementName.slice(1, -1);
+          }
+        }
+      }
+
+      const volume = this.findElementVolume(element);
+      elements[element.type].push({
+        id: elementId,
+        type: element.type,
+        name: elementName,
+        buildingStory,
+        materials: materialsList.map(m => ({
+          name: m.name,
+          fraction: m.fraction,
+          volume: m.volume,
+          layerSetName: m.layerSetName,
+          count: m.count
+        })),
+        volume
+      });
+    }
+
+    console.log('Element types found:', Object.keys(elements));
+    for (const [type, list] of Object.entries(elements)) {
+      console.log(`${type}: ${list.length} elements`);
+    }
+
+    return elements;
+  }
+
+  private findElementForShape(shapeId: string): string | null {
+    for (const entity of this.entities.values()) {
+      const attributes = entity.attributes;
+      for (const attr of attributes) {
+        if (attr === `#${shapeId}`) {
+          return entity.id;
         }
       }
     }
     return null;
   }
 
-  private _collectMaterialLayers() {
-    Object.entries(this.entities).forEach(([id, entity]) => {
-      if (entity.type === "IFCMATERIALLAYERSET") {
-        const materialLayerRefs = entity.attributes[0];
-        const layerSetName = entity.attributes[1] || `Unnamed LayerSet ${id}`;
-
-        if (Array.isArray(materialLayerRefs)) {
-          const layers = [];
-          let totalThickness = 0;
-
-          // First pass: collect total thickness
-          materialLayerRefs.forEach((layerRef) => {
-            if (layerRef?.ref) {
-              const layerEntity = this.entities[layerRef.ref];
-              if (layerEntity?.type === "IFCMATERIALLAYER") {
-                const thickness = layerEntity.attributes[1] || 0;
-                totalThickness += thickness;
-              }
-            }
-          });
-
-          // Second pass: collect layers with volume fractions
-          materialLayerRefs.forEach((layerRef) => {
-            if (layerRef && layerRef.ref) {
-              const layerEntity = this.entities[layerRef.ref];
-              if (layerEntity && layerEntity.type === "IFCMATERIALLAYER") {
-                const materialRef = layerEntity.attributes[0];
-                const thickness = layerEntity.attributes[1] || 0;
-                const layerName = layerEntity.attributes[3];
-                let materialName = "Unknown Material";
-
-                if (materialRef && materialRef.ref) {
-                  const materialEntity = this.entities[materialRef.ref];
-                  if (materialEntity?.type === "IFCMATERIAL" && materialEntity.attributes[0]) {
-                    materialName = materialEntity.attributes[0];
-                  }
-                }
-
-                const volumeFraction = totalThickness > 0 ? thickness / totalThickness : 0;
-
-                layers.push({
-                  layerId: layerRef.ref,
-                  layerName,
-                  thickness,
-                  volumeFraction,
-                  materialName,
-                });
-              }
-            }
-          });
-
-          if (layers.length > 0) {
-            this.materialLayers[id] = {
-              layerSetName,
-              totalThickness,
-              layers,
-            };
-          }
+  private parseContent() {
+    console.log('[DEBUG] Starting content parsing');
+    const lines = this.content.split('\n');
+    
+    lines.forEach((line, index) => {
+      try {
+        if (line.includes('IFCWALL') || line.includes('IFCSLAB') || line.includes('IFCWINDOW')) {
+          this.parseElement(line, index);
         }
+      } catch (error) {
+        console.error(`[DEBUG] Error parsing line ${index}:`, error);
       }
     });
   }
 
-  private _processElements() {
-    Object.entries(this.entities).forEach(([id, entity]) => {
-      if (
-        [
-          "IFCWALL",
-          "IFCSLAB",
-          "IFCBEAM",
-          "IFCCOLUMN",
-          "IFCFOOTING",
-          "IFCPILE",
-          "IFCROOF",
-          "IFCSTAIR",
-          "IFCRAMP",
-          "IFCPLATE",
-          "IFCMEMBER",
-          "IFCBUILDINGELEMENTPROXY",
-          "IFCCURTAINWALL",
-        ].includes(entity.type)
-      ) {
-        const globalId = entity.attributes[0] || `No GlobalId`;
-        const name = entity.attributes[2] || `Unnamed ${entity.type}`;
-        const relationships = this.relationships[id] || {};
-        const spatialContainer = this._getEntityName(
-          relationships.spatialContainer
-        );
-        const { materials, materialLayers } = this._getMaterialInfo(
-          relationships.material,
-          id
-        );
-        const netVolume = this.quantities[id] || "Unknown";
+  private parseElement(line: string, lineNumber: number) {
+    const elementMatch = line.match(/#(\d+)=\s*(IFC\w+)/);
+    if (!elementMatch) return;
 
-        const element = {
-          id,
-          globalId,
-          type: entity.type,
-          name,
-          spatialContainer,
-          materials,
-          netVolume,
-          materialLayers,
-        };
+    const [, id, type] = elementMatch;
+    console.log(`[DEBUG] Found element: ${type} with ID: ${id}`);
 
-        if (materialLayers?.layers?.length > 0) {
-          console.log(` [IFCParser] Processed element #${id}:`, {
-            type: element.type,
-            materialCount: element.materialLayers.layers.length,
-            materials: element.materialLayers.layers.map(l => ({
-              name: l.materialName,
-              thickness: l.thickness
-            }))
-          });
-        }
-        this.elements.push(element);
-      }
-    });
-  }
-
-  private _getEntityName(ref: { ref: string } | undefined): string {
-    if (ref && ref.ref && this.entities[ref.ref]) {
-      return this.entities[ref.ref].attributes[2] || "Unnamed";
-    }
-    return "Unknown";
-  }
-
-  private _getMaterialInfo(
-    materialRef: { ref: string } | undefined,
-    elementId: string
-  ): { materials: string[]; materialLayers: any } {
-    if (!materialRef?.ref) {
-      return { materials: ["Unknown"], materialLayers: null };
-    }
-
-    const materials: string[] = [];
-    const queue = [materialRef];
-    const visited = new Set<string>();
-
-    while (queue.length > 0) {
-      const currentRef = queue.shift();
-      if (!currentRef?.ref || visited.has(currentRef.ref)) continue;
-
-      visited.add(currentRef.ref);
-      const entity = this.entities[currentRef.ref];
-      if (!entity) continue;
-
-      switch (entity.type) {
-        case "IFCMATERIAL":
-          const materialName = entity.attributes[0] || "Unnamed Material";
-          materials.push(materialName);
-          break;
-
-        case "IFCMATERIALLAYERSET":
-          const layers = entity.attributes[0];
-          if (Array.isArray(layers)) {
-            layers.forEach(layerRef => layerRef?.ref && queue.push(layerRef));
-          }
-          break;
-
-        case "IFCMATERIALCONSTITUENTSET":
-          const constituents = entity.attributes[2];
-          if (Array.isArray(constituents)) {
-            constituents.forEach(constituentRef => constituentRef?.ref && queue.push(constituentRef));
-          }
-          break;
-
-        case "IFCMATERIALLIST":
-          const materialsList = entity.attributes[0];
-          if (Array.isArray(materialsList)) {
-            materialsList.forEach(matRef => matRef?.ref && queue.push(matRef));
-          }
-          break;
-
-        case "IFCMATERIALLAYER":
-        case "IFCMATERIALCONSTITUENT":
-          if (entity.attributes[2]?.ref) queue.push(entity.attributes[2]);
-          break;
-      }
-    }
-
-    // Get MaterialLayerSet if available
-    let materialLayers = null;
-    const materialEntity = this.entities[materialRef.ref];
-    if (materialEntity?.type === "IFCMATERIALLAYERSETUSAGE") {
-      const layerSetRef = materialEntity.attributes[0];
-      if (layerSetRef?.ref) {
-        materialLayers = this.materialLayers[layerSetRef.ref];
-      }
-    }
-
-    return {
-      materials: materials.length > 0 ? materials : ["No materials found"],
-      materialLayers
+    const element: IFCExtractedElement = {
+      id,
+      type,
+      name: this.extractName(line),
+      materials: this.extractMaterials(line, lineNumber)
     };
+
+    if (!this.elements[type]) {
+      this.elements[type] = [];
+    }
+    this.elements[type].push(element);
+  }
+
+  private extractName(line: string): string | undefined {
+    const nameMatch = line.match(/'([^']+)'/);
+    return nameMatch ? nameMatch[1] : undefined;
+  }
+
+  private extractMaterials(line: string, lineNumber: number): IFCMaterial[] {
+    const materials: IFCMaterial[] = [];
+    
+    // Extract material references
+    const materialRefs = line.match(/#\d+/g) || [];
+    
+    materialRefs.forEach(ref => {
+      const material = this.findMaterialByRef(ref);
+      if (material) {
+        materials.push(material);
+      }
+    });
+
+    return materials;
+  }
+
+  private findMaterialByRef(ref: string): IFCMaterial | null {
+    return this.materialIndex.get(ref) || null;
+  }
+
+  private extractVolume(line: string): number | undefined {
+    const volumeMatch = line.match(/VOLUME\(([^)]+)\)/);
+    if (volumeMatch) {
+      const volume = parseFloat(volumeMatch[1]);
+      return isNaN(volume) ? undefined : volume;
+    }
+    return undefined;
+  }
+
+  public extractElementsDirectly(): { [key: string]: IFCExtractedElement[] } {
+    return this.elements;
   }
 }

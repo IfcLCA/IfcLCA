@@ -1,79 +1,140 @@
-import { IFCParser } from "./ifc-parser";
-import { IFCParseResult } from "../types/ifc";
+import { IFCParserAdapter } from './IFCParserAdapter';
 
-export async function parseIFCFile(
-  file: File,
-  projectId: string
-): Promise<IFCParseResult> {
+export interface IFCParseResult {
+  uploadId: string;
+  elementCount: number;
+  materialCount: number;
+  unmatchedMaterialCount: number;
+  shouldRedirectToLibrary: boolean;
+}
+
+export async function parseIFCFile(file: File, projectId: string): Promise<IFCParseResult> {
+  let responseData;
   try {
-    console.log(`Starting Ifc file parsing for project ${projectId}`, {
+    console.log('[DEBUG] Starting IFC parsing process...', {
       filename: file.name,
       size: file.size,
       type: file.type,
+      projectId
     });
 
     // Create upload record
+    console.log('[DEBUG] Creating upload record...');
     const uploadResponse = await fetch(`/api/projects/${projectId}/upload`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ filename: file.name }),
     });
 
-    const responseData = await uploadResponse.json();
+    console.log('[DEBUG] Upload response status:', uploadResponse.status);
+    responseData = await uploadResponse.json();
+    console.log('[DEBUG] Upload response data:', responseData);
+
     if (!uploadResponse.ok || !responseData.uploadId) {
       throw new Error(responseData.error || "Failed to create upload record");
     }
 
-    // Parse file client-side
+    // Parse file content
     const content = await file.text();
-    const parser = new IFCParser();
-    const parsedElements = await parser.parseContent(content);
+    const parser = new IFCParserAdapter(content);
+    const parsedElements = await parser.parseContent();
+    
+    console.log('[DEBUG] Parsing completed:', {
+      elementCount: parsedElements.length,
+      sampleElement: parsedElements[0]
+    });
 
-    // Send parsed results in chunks to avoid payload size limits
-    const chunkSize = 100;
-    const chunks = [];
-    for (let i = 0; i < parsedElements.length; i += chunkSize) {
-      chunks.push(parsedElements.slice(i, i + chunkSize));
-    }
+    // Pre-process materials before chunking to avoid redundant processing
+    const materialsMap = new Map<string, boolean>();
+    let unmatchedMaterialCount = 0;
+    
+    parsedElements.forEach(element => {
+      if (element.materialLayers?.layers) {
+        element.materialLayers.layers.forEach(layer => {
+          if (layer.materialName) {
+            materialsMap.set(layer.materialName, true);
+          } else {
+            unmatchedMaterialCount++;
+          }
+        });
+      }
+    });
+
+    // Optimize chunk size based on element count
+    const totalElements = parsedElements.length;
+    const chunkSize = Math.min(
+      Math.max(Math.floor(totalElements / 10), 1000), // At least 1000, targeting 10 chunks
+      5000 // But no more than 5000 to avoid timeout issues
+    );
+
+    // Create chunks more efficiently
+    const chunks = Array.from({ length: Math.ceil(totalElements / chunkSize) }, (_, i) =>
+      parsedElements.slice(i * chunkSize, (i + 1) * chunkSize)
+    );
+
+    console.log('[DEBUG] Optimized chunking:', {
+      totalElements,
+      chunkSize,
+      totalChunks: chunks.length,
+      lastChunkSize: chunks[chunks.length - 1]?.length
+    });
 
     let totalProcessed = 0;
-    let unmatchedMaterialCount = 0;
-    for (const chunk of chunks) {
-      const processResponse = await fetch(
-        `/api/projects/${projectId}/upload/process`,
-        {
+    const uploadPromises: Promise<Response>[] = [];
+    const maxConcurrentUploads = 3; // Limit concurrent uploads
+
+    // Process chunks with controlled concurrency
+    for (let i = 0; i < chunks.length; i += maxConcurrentUploads) {
+      const chunkGroup = chunks.slice(i, i + maxConcurrentUploads);
+      const groupPromises = chunkGroup.map((chunk, groupIndex) => {
+        const currentChunkIndex = i + groupIndex;
+        
+        return fetch(`/api/projects/${projectId}/upload/process`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             uploadId: responseData.uploadId,
             elements: chunk,
-            isLastChunk: chunk === chunks[chunks.length - 1],
+            isLastChunk: currentChunkIndex === chunks.length - 1
           }),
-        }
-      );
+        }).then(async response => {
+          if (!response.ok) {
+            throw new Error(`Failed to process chunk ${currentChunkIndex + 1}`);
+          }
+          const result = await response.json();
+          totalProcessed += chunk.length;
+          console.log(`[DEBUG] Chunk ${currentChunkIndex + 1}/${chunks.length} processed:`, {
+            success: true,
+            elementCount: result.elementCount
+          });
+          return response;
+        });
+      });
 
-      if (!processResponse.ok) {
-        throw new Error("Failed to process elements chunk");
-      }
-
-      const chunkResult = await processResponse.json();
-      totalProcessed += chunkResult.elementCount || 0;
-
-      // Check if we have unmatched materials in the last chunk
-      if (chunk === chunks[chunks.length - 1]) {
-        unmatchedMaterialCount = chunkResult.unmatchedMaterialCount || 0;
+      // Wait for current group to complete before processing next group
+      try {
+        await Promise.all(groupPromises);
+      } catch (error) {
+        console.error('[DEBUG] Error in chunk group:', error);
+        throw error;
       }
     }
+
+    console.log('[DEBUG] Processing completed:', {
+      totalProcessed,
+      unmatchedMaterialCount,
+      totalMaterials: materialsMap.size
+    });
 
     return {
       uploadId: responseData.uploadId,
       elementCount: totalProcessed,
-      materialCount: parsedElements.length,
+      materialCount: materialsMap.size,
       unmatchedMaterialCount,
-      shouldRedirectToLibrary: unmatchedMaterialCount > 0,
+      shouldRedirectToLibrary: materialsMap.size > 0
     };
   } catch (error) {
-    console.error("Ifc parsing failed:", error);
+    console.error('[DEBUG] Error in parseIFCFile:', error);
     throw error;
   }
 }

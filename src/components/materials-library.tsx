@@ -41,6 +41,12 @@ import { MaterialChangesPreviewModal } from "@/components/material-changes-previ
 import { StarFilledIcon, StarIcon } from "@radix-ui/react-icons";
 import { ReloadIcon } from "@radix-ui/react-icons";
 import { useRouter } from "next/navigation";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 interface Material {
   id: string;
@@ -119,6 +125,13 @@ export function MaterialLibraryComponent() {
         setMaterials(Array.isArray(materialsData) ? materialsData : []);
         setKbobMaterials(kbobData);
         setProjects(projectsData);
+
+        // Check URL parameters for projectId
+        const urlParams = new URLSearchParams(window.location.search);
+        const projectIdFromUrl = urlParams.get('projectId');
+        if (projectIdFromUrl) {
+          setSelectedProject(projectIdFromUrl);
+        }
       } catch (error) {
         console.error('Error fetching data:', error);
         setError('Failed to load data');
@@ -144,40 +157,15 @@ export function MaterialLibraryComponent() {
           project.materialIds.includes(material.id)
         );
       }
-    } else {
-      // For "All Projects" view, group materials by name and KBOB match
-      const groupedMaterials = new Map<string, Material & { originalIds: string[] }>();
-      
-      filtered.forEach(material => {
-        const key = `${material.name}-${material.kbobMatchId || 'unmatched'}`;
-        
-        if (!groupedMaterials.has(key)) {
-          // Keep the first occurrence of the material with all related IDs
-          groupedMaterials.set(key, {
-            ...material,
-            originalIds: [material.id],
-            projects: projects
-              .filter(p => p.materialIds.includes(material.id))
-              .map(p => p.name)
-          });
-        } else {
-          // Update existing material group
-          const existingMaterial = groupedMaterials.get(key)!;
-          existingMaterial.originalIds.push(material.id);
-          
-          const projectsForThisMaterial = projects
-            .filter(p => p.materialIds.includes(material.id))
-            .map(p => p.name);
-          
-          existingMaterial.projects = Array.from(new Set([
-            ...(existingMaterial.projects || []),
-            ...projectsForThisMaterial
-          ]));
-        }
-      });
-      
-      filtered = Array.from(groupedMaterials.values());
     }
+
+    // Add project names to each material
+    filtered = filtered.map(material => ({
+      ...material,
+      projects: projects
+        .filter(project => project.materialIds.includes(material.id))
+        .map(project => project.name)
+    }));
 
     if (searchTerm) {
       const term = searchTerm.toLowerCase();
@@ -508,22 +496,33 @@ export function MaterialLibraryComponent() {
                       onChange={(e) => setSearchTerm(e.target.value)}
                     />
                   </div>
-                  <Select
-                    value={selectedProject || "all"}
-                    onValueChange={(value) => setSelectedProject(value === "all" ? null : value)}
-                  >
-                    <SelectTrigger className="w-[200px]">
-                      <SelectValue placeholder="Filter by Project" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">All Projects</SelectItem>
-                      {projects.map((project) => (
-                        <SelectItem key={project.id} value={project.id}>
-                          {project.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <div>
+                          <Select
+                            value={selectedProject || "all"}
+                            onValueChange={(value) => setSelectedProject(value === "all" ? null : value)}
+                          >
+                            <SelectTrigger className="w-[200px]">
+                              <SelectValue placeholder="Filter by Project" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="all">All Projects</SelectItem>
+                              {projects.map((project) => (
+                                <SelectItem key={project.id} value={project.id}>
+                                  {project.name}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p>Materials are now shown individually for better accuracy.<br />Select a project to view its specific materials.</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
                 </div>
               </div>
 
