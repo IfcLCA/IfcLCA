@@ -564,169 +564,192 @@ export class MaterialService {
   static async processMaterials(
     projectId: string,
     elements: Array<{
-      id: string;
       globalId: string;
       type: string;
       name: string;
-      spatialContainer: string;
-      netVolume: number;
+      netVolume?: number;
       materialLayers?: {
-        layerSetName: string;
-        totalThickness: number;
+        layerSetName?: string;
         layers: Array<{
-          layerId: string;
-          layerName: string;
-          thickness: number;
-          volumeFraction: number;
           materialName: string;
+          thickness: number;
+          layerId?: string;
+          layerName?: string;
         }>;
       };
     }>,
     uploadId: string,
     session: mongoose.ClientSession
   ) {
-    try {
-      // Convert IFC elements to material structure with correct volume distribution
-      const materialsByLayer = elements.reduce((acc, element) => {
-        if (element.materialLayers?.layers) {
-          element.materialLayers.layers.forEach((layer) => {
-            const materialKey = layer.materialName.trim().toLowerCase();
-            if (!acc[materialKey]) {
-              acc[materialKey] = {
-                name: layer.materialName,
-                category: element.type,
-                volume: 0,
-                elements: [],
-              };
-            }
+    console.log('[DEBUG] Processing materials for project:', projectId);
+    console.log('[DEBUG] Elements to process:', elements.length);
 
-            // Use pre-calculated volume fraction from IFC parser
-            const layerVolume = (element.netVolume || 0) * layer.volumeFraction;
-            acc[materialKey].volume += layerVolume;
-            acc[materialKey].elements.push({
-              id: element.globalId,
-              name: element.name,
-              volume: layerVolume,
-              thickness: layer.thickness,
-            });
+    try {
+      // Group materials by name and accumulate volumes
+      const materialsByName = elements.reduce((acc: { [key: string]: any }, element) => {
+        if (!element.materialLayers?.layers) return acc;
+
+        const totalThickness = element.materialLayers.layers.reduce(
+          (sum, layer) => sum + (layer.thickness || 0),
+          0
+        );
+
+        element.materialLayers.layers.forEach(layer => {
+          if (!layer.materialName) return;
+
+          const materialKey = layer.materialName.trim().toLowerCase();
+          if (!acc[materialKey]) {
+            acc[materialKey] = {
+              name: layer.materialName,
+              volume: 0,
+              elements: []
+            };
+          }
+
+          // Calculate volume fraction for this layer
+          const volumeFraction = totalThickness > 0 ? (layer.thickness || 0) / totalThickness : 0;
+          const layerVolume = (element.netVolume || 0) * volumeFraction;
+
+          acc[materialKey].volume += layerVolume;
+          acc[materialKey].elements.push({
+            globalId: element.globalId,
+            name: element.name,
+            volume: layerVolume,
+            thickness: layer.thickness
           });
-        }
+        });
+
         return acc;
       }, {});
 
-      const materials = Object.values(materialsByLayer);
+      console.log('[DEBUG] Grouped materials:', Object.keys(materialsByName).length);
 
-      // Prepare bulk operations for materials with pre-calculated volumes
-      const materialOps = materials.map((material) => ({
+      // Create/update materials
+      const materialOps = Object.values(materialsByName).map((material: any) => ({
         updateOne: {
           filter: {
             name: material.name,
-            projectId: new mongoose.Types.ObjectId(projectId),
+            projectId: new mongoose.Types.ObjectId(projectId)
           },
           update: {
             $set: {
-              category: material.category,
               volume: material.volume,
-              updatedAt: new Date(),
+              updatedAt: new Date()
             },
             $setOnInsert: {
               name: material.name,
-              projectId: new mongoose.Types.ObjectId(projectId),
-            },
+              projectId: new mongoose.Types.ObjectId(projectId)
+            }
           },
-          upsert: true,
-        },
+          upsert: true
+        }
       }));
 
       // Execute material operations
-      let materialResults = { upserted: 0, modified: 0 };
+      let materialResults = { upsertedCount: 0, modifiedCount: 0 };
       if (materialOps.length > 0) {
-        const materialResult = await Material.bulkWrite(materialOps, {
+        materialResults = await Material.bulkWrite(materialOps, {
           session,
-          ordered: false,
+          ordered: false
         });
-        materialResults = {
-          upserted: materialResult.upsertedCount,
-          modified: materialResult.modifiedCount,
-        };
+        console.log('[DEBUG] Material results:', {
+          upserted: materialResults.upsertedCount,
+          modified: materialResults.modifiedCount
+        });
       }
 
       // Get all materials including newly created ones
       const allMaterials = await Material.find({
-        projectId: new mongoose.Types.ObjectId(projectId),
+        projectId: new mongoose.Types.ObjectId(projectId)
       })
-        .select("_id name")
+        .select('_id name')
         .lean()
         .session(session);
 
       // Create material lookup map
       const materialMap = new Map(
-        allMaterials.map((m) => [m.name.trim().toLowerCase(), m._id])
+        allMaterials.map(m => [m.name.trim().toLowerCase(), m._id])
       );
 
-      // Prepare bulk operations for elements with correct volume distribution
-      const elementOps = elements.map((element) => ({
-        updateOne: {
-          filter: {
-            guid: element.globalId,
-            projectId: new mongoose.Types.ObjectId(projectId),
-          },
-          update: {
-            $set: {
-              name: element.name,
-              type: element.type,
-              volume: element.netVolume || 0,
-              materials:
-                element.materialLayers?.layers.map((layer) => ({
-                  material: new mongoose.Types.ObjectId(
-                    materialMap.get(layer.materialName.trim().toLowerCase())
-                  ),
-                  volume: (element.netVolume || 0) * layer.volumeFraction,
-                  density: 0,
-                  mass: 0,
-                  fraction: layer.volumeFraction,
-                  thickness: layer.thickness,
-                  indicators: {
-                    gwp: 0,
-                    ubp: 0,
-                    penre: 0,
-                  },
-                })) || [],
-              indicators: {
-                gwp: 0,
-                ubp: 0,
-                penre: 0,
-              },
-              updatedAt: new Date(),
-            },
-            $setOnInsert: {
-              projectId: new mongoose.Types.ObjectId(projectId),
+      // Prepare element operations
+      const elementOps = elements.map(element => {
+        const totalThickness = element.materialLayers?.layers.reduce(
+          (sum, layer) => sum + (layer.thickness || 0),
+          0
+        ) || 0;
+
+        return {
+          updateOne: {
+            filter: {
               guid: element.globalId,
+              projectId: new mongoose.Types.ObjectId(projectId)
             },
-          },
-          upsert: true,
-        },
-      }));
+            update: {
+              $set: {
+                name: element.name,
+                type: element.type,
+                volume: element.netVolume || 0,
+                materials: element.materialLayers?.layers.map(layer => {
+                  const volumeFraction = totalThickness > 0 ? (layer.thickness || 0) / totalThickness : 0;
+                  const materialId = materialMap.get(layer.materialName.trim().toLowerCase());
+                  
+                  if (!materialId) {
+                    console.warn('[DEBUG] Material not found:', layer.materialName);
+                    return null;
+                  }
+
+                  return {
+                    material: new mongoose.Types.ObjectId(materialId),
+                    volume: (element.netVolume || 0) * volumeFraction,
+                    density: 0,
+                    mass: 0,
+                    fraction: volumeFraction,
+                    thickness: layer.thickness,
+                    indicators: {
+                      gwp: 0,
+                      ubp: 0,
+                      penre: 0
+                    }
+                  };
+                }).filter(m => m !== null) || [],
+                indicators: {
+                  gwp: 0,
+                  ubp: 0,
+                  penre: 0
+                },
+                updatedAt: new Date()
+              },
+              $setOnInsert: {
+                projectId: new mongoose.Types.ObjectId(projectId),
+                uploadId: new mongoose.Types.ObjectId(uploadId)
+              }
+            },
+            upsert: true
+          }
+        };
+      });
 
       // Execute element operations
-      let elementResults = { upserted: 0, modified: 0 };
+      let elementResults = { upsertedCount: 0, modifiedCount: 0 };
       if (elementOps.length > 0) {
-        const elementResult = await Element.bulkWrite(elementOps, {
+        elementResults = await Element.bulkWrite(elementOps, {
           session,
-          ordered: false,
+          ordered: false
         });
-        elementResults = {
-          upserted: elementResult.upsertedCount,
-          modified: elementResult.modifiedCount,
-        };
+        console.log('[DEBUG] Element results:', {
+          upserted: elementResults.upsertedCount,
+          modified: elementResults.modifiedCount
+        });
       }
 
       return {
-        materialCount: materialResults.upserted + materialResults.modified,
-        elementCount: elementResults.upserted + elementResults.modified,
+        materialResults,
+        elementResults,
+        materialCount: materialOps.length,
+        elementCount: elementOps.length
       };
     } catch (error) {
-      console.error("Error in processMaterials:", error);
+      console.error('[DEBUG] Error in processMaterials:', error);
       throw error;
     }
   }
