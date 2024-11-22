@@ -137,17 +137,40 @@ export async function DELETE(
 
     await connectToDatabase();
 
-    // Verify project ownership before deletion
-    const project = await Project.findOneAndDelete({
-      _id: params.id,
-      userId,
-    });
+    // Start a session for atomic operations
+    const session = await mongoose.startSession();
+    session.startTransaction();
 
-    if (!project) {
-      return new Response("Project not found", { status: 404 });
+    try {
+      // Verify project exists and belongs to user
+      const project = await Project.findOne({
+        _id: params.id,
+        userId,
+      }).session(session);
+
+      if (!project) {
+        await session.abortTransaction();
+        return new Response("Project not found", { status: 404 });
+      }
+
+      // Delete all associated data in order
+      await Upload.deleteMany({ projectId: params.id }).session(session);
+      await Element.deleteMany({ projectId: params.id }).session(session);
+      await Material.deleteMany({ projectId: params.id }).session(session);
+      
+      // Finally delete the project
+      await Project.deleteOne({ _id: params.id }).session(session);
+
+      // Commit the transaction
+      await session.commitTransaction();
+      return new Response(null, { status: 204 });
+    } catch (error) {
+      // If any error occurs, abort the transaction
+      await session.abortTransaction();
+      throw error;
+    } finally {
+      session.endSession();
     }
-
-    return new Response(null, { status: 204 });
   } catch (error) {
     console.error("Failed to delete project:", error);
     return new Response("Internal Server Error", { status: 500 });
