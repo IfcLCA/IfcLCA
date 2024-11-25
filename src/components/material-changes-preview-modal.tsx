@@ -35,19 +35,19 @@ interface MaterialChange {
   oldMatch: {
     Name: string
     Density: number
-    Elements: any[]
+    Elements: number
   } | null
   newMatch: {
     Name: string
     Density: number
-    Elements: any[]
+    Elements: number
     hasDensityRange: boolean
     minDensity?: number
     maxDensity?: number
   }
   projects: string[]
   projectId?: string
-  elements: any[]
+  elements: number
   selectedDensity?: number
 }
 
@@ -165,7 +165,7 @@ export function MaterialChangesPreviewModal({
                       )}
                     </div>
                   </TableCell>
-                  <TableCell>{change.elements?.length || 0}</TableCell>
+                  <TableCell>{change.elements}</TableCell>
                   <TableCell>
                     <div className="max-w-[200px] truncate">
                       {change.projects.join(', ')}

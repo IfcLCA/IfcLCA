@@ -325,7 +325,25 @@ export function MaterialLibraryComponent() {
     setShowPreview(false);
   };
 
-  const getPreviewChanges = () => {
+  const getPreviewChanges = async () => {
+    const materialIds = Object.keys(temporaryMatches);
+
+    // Fetch element counts
+    const elementCountsResponse = await fetch("/api/materials/element-counts", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ materialIds }),
+    });
+
+    if (!elementCountsResponse.ok) {
+      console.error("Failed to fetch element counts");
+      return [];
+    }
+
+    const elementCounts = await elementCountsResponse.json();
+
     return Object.entries(temporaryMatches).map(([materialId, kbobId]) => {
       const material = materials.find(m => m.id === materialId);
       const kbobMaterial = kbobMaterials.find(m => m._id === kbobId);
@@ -337,21 +355,21 @@ export function MaterialLibraryComponent() {
       // Get the first project ID for navigation (assuming one material belongs to one project)
       const projectId = affectedProjects[0]?.id;
 
-      // Get element count from material
-      const elementCount = material.elements?.length || 0;
+      // Get element count from the fetched counts
+      const elementCount = elementCounts[materialId] || 0;
 
       // Get the current material's density from the existing match
       const currentDensity = material.density || 0;
 
       // Check if material has a density range
-      const hasDensityRange = typeof kbobMaterial["min density"] === "number" && 
-                             typeof kbobMaterial["max density"] === "number";
+      const hasDensityRange = typeof kbobMaterial["min density"] === "number" &&
+        typeof kbobMaterial["max density"] === "number";
 
       // Get the new density from the KBOB material
-      const newDensity = typeof kbobMaterial["kg/unit"] === "number" ? 
-        kbobMaterial["kg/unit"] : 
+      const newDensity = typeof kbobMaterial["kg/unit"] === "number" ?
+        kbobMaterial["kg/unit"] :
         hasDensityRange ?
-          (kbobMaterial["min density"] + kbobMaterial["max density"]) / 2 : 
+          (kbobMaterial["min density"] + kbobMaterial["max density"]) / 2 :
           currentDensity;
 
       return {
@@ -376,6 +394,24 @@ export function MaterialLibraryComponent() {
         elements: elementCount
       };
     }).filter(Boolean);
+  };
+
+  const handleShowPreview = async () => {
+    setIsMatchingInProgress(true);
+    try {
+      const changes = await getPreviewChanges();
+      setPreviewChanges(changes);
+      setShowPreview(true);
+    } catch (error) {
+      console.error("Failed to prepare preview:", error);
+      toast({
+        title: "Error",
+        description: "Failed to prepare preview. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsMatchingInProgress(false);
+    }
   };
 
   const handleNavigateToProject = (projectId: string) => {
@@ -537,14 +573,11 @@ export function MaterialLibraryComponent() {
   }
 
   return (
-    <Card className="h-[calc(100vh-6rem)] flex flex-col overflow-hidden">
-      <CardHeader className="pb-2 flex-shrink-0">
+    <Card className="h-[calc(100vh-6rem)] flex flex-col overflow-hidden border-0 -mt-14">
+      <CardHeader className="pb-0 flex-shrink-0 px-0">
         <div className="flex items-center justify-between">
           <div>
-            <CardTitle>Materials Library</CardTitle>
-            <CardDescription>
-              Match your IFC model materials with KBOB environmental impact data
-            </CardDescription>
+
           </div>
           <div className="flex items-center gap-4">
             <Select
@@ -565,7 +598,7 @@ export function MaterialLibraryComponent() {
             </Select>
             <Button
               variant="default"
-              onClick={() => setShowPreview(true)}
+              onClick={handleShowPreview}
               disabled={Object.keys(temporaryMatches).length === 0}
             >
               Review & Apply Matches
@@ -741,7 +774,7 @@ export function MaterialLibraryComponent() {
                   <span>KBOB Materials Database</span>
                   <Badge variant="outline">{kbobMaterials.length} materials</Badge>
                 </h3>
-                <p className="text-sm text-muted-foreground mb-3">
+                <p className="text-sm text-muted-foreground mb-3 pb-[40px]">
                   {activeSearchId ?
                     'Select a KBOB material to match with your highlighted IFC material' :
                     'First select an IFC material on the left to match it'
@@ -846,7 +879,7 @@ export function MaterialLibraryComponent() {
       </CardContent>
       {showPreview && (
         <MaterialChangesPreviewModal
-          changes={getPreviewChanges()}
+          changes={previewChanges}
           isOpen={showPreview}
           onClose={handleCancelMatch}
           onConfirm={handleConfirmMatch}
