@@ -26,16 +26,24 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { ChevronDownIcon } from "@radix-ui/react-icons"
+import { ReloadIcon } from "@radix-ui/react-icons"
 
 interface MaterialChange {
   materialId: string
   materialName: string
-  oldKbobMatch?: string
-  newKbobMatch: string
-  oldDensity?: number
-  newDensity: number
-  affectedElements: number
+  oldMatch: {
+    Name: string
+    Density: number
+    Elements: any[]
+  } | null
+  newMatch: {
+    Name: string
+    Density: number
+    Elements: any[]
+  }
   projects: string[]
+  projectId?: string
+  elements: any[]
 }
 
 interface MaterialChangesPreviewModalProps {
@@ -44,6 +52,7 @@ interface MaterialChangesPreviewModalProps {
   onConfirm: () => void
   onNavigateToProject?: (projectId: string) => void
   changes: MaterialChange[]
+  isLoading?: boolean
 }
 
 export function MaterialChangesPreviewModal({
@@ -52,29 +61,23 @@ export function MaterialChangesPreviewModal({
   onClose,
   onConfirm,
   onNavigateToProject,
+  isLoading = false
 }: MaterialChangesPreviewModalProps) {
   // Check if all materials are from the same project
   const singleProjectId = useMemo(() => {
     if (!changes.length) return null;
     
     // Get all unique project IDs
-    const uniqueProjects = new Set<string>();
+    const uniqueProjectIds = new Set<string>();
     changes.forEach(change => {
-      if (change.projects && change.projects.length > 0) {
-        change.projects.forEach(project => uniqueProjects.add(project));
+      if (change.projectId) {
+        uniqueProjectIds.add(change.projectId);
       }
     });
 
-    // Log for debugging
-    console.log('Changes:', changes);
-    console.log('Unique projects:', Array.from(uniqueProjects));
-
     // Return the project ID if there's exactly one, otherwise null
-    return uniqueProjects.size === 1 ? Array.from(uniqueProjects)[0] : null;
+    return uniqueProjectIds.size === 1 ? Array.from(uniqueProjectIds)[0] : null;
   }, [changes]);
-
-  // Log for debugging
-  console.log('Single project ID:', singleProjectId);
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
@@ -102,22 +105,22 @@ export function MaterialChangesPreviewModal({
                 <TableRow key={change.materialId}>
                   <TableCell>{change.materialName}</TableCell>
                   <TableCell>
-                    {change.oldKbobMatch && (
+                    {change.oldMatch && (
                       <div className="line-through text-muted-foreground">
-                        {change.oldKbobMatch}
+                        {change.oldMatch.Name}
                       </div>
                     )}
-                    <div className="text-green-600">{change.newKbobMatch}</div>
+                    <div className="text-green-600">{change.newMatch.Name}</div>
                   </TableCell>
                   <TableCell>
-                    {change.oldDensity && (
+                    {change.oldMatch && (
                       <div className="line-through text-muted-foreground">
-                        {change.oldDensity}
+                        {change.oldMatch.Density}
                       </div>
                     )}
-                    <div className="text-green-600">{change.newDensity}</div>
+                    <div className="text-green-600">{change.newMatch.Density}</div>
                   </TableCell>
-                  <TableCell>{change.affectedElements}</TableCell>
+                  <TableCell>{change.elements?.length || 0}</TableCell>
                   <TableCell>
                     <div className="max-w-[200px] truncate">
                       {change.projects.join(', ')}
@@ -133,7 +136,12 @@ export function MaterialChangesPreviewModal({
           <Button variant="outline" onClick={onClose}>
             Cancel
           </Button>
-          {singleProjectId && onNavigateToProject ? (
+          {isLoading ? (
+            <Button disabled>
+              <ReloadIcon className="mr-2 h-4 w-4 animate-spin" />
+              Applying Changes...
+            </Button>
+          ) : singleProjectId && onNavigateToProject ? (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button className="gap-2 pr-3">
