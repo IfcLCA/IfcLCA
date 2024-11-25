@@ -1,6 +1,7 @@
 import { Material, Element, Upload } from "@/models";
 import { MaterialService } from "./material-service";
 import mongoose from "mongoose";
+import { logger } from '@/lib/logger';
 
 export class UploadService {
   /**
@@ -25,9 +26,9 @@ export class UploadService {
   ) {
     const session = await mongoose.startSession();
     try {
-      console.log('\n🚀 [IFC Parser] Starting material processing phase...');
-      console.log(`📊 [IFC Parser] Processing ${materials.length} unique materials`);
-      console.log('📋 [IFC Parser] Material categories:', [...new Set(materials.map(m => m.category))]);
+      logger.info('Starting material processing phase');
+      logger.info(`Processing ${materials.length} unique materials`);
+      logger.info('Material categories:', [...new Set(materials.map(m => m.category))]);
 
       // First, get all existing materials with KBOB matches from any project
       const existingMatches = await Material.find({
@@ -40,8 +41,8 @@ export class UploadService {
         select: 'Name GWP UBP PENRE kg/unit min_density max_density'
       });  
 
-      console.log(`✨ [IFC Parser] Found ${existingMatches.length} existing materials with KBOB matches`);
-      console.log('📝 [IFC Parser] Existing material matches:', 
+      logger.info(`Found ${existingMatches.length} existing materials with KBOB matches`);
+      logger.debug('Existing material matches:', 
         existingMatches.map(m => ({
           name: m.name,
           kbobName: m.kbobMatchId?.Name,
@@ -62,19 +63,23 @@ export class UploadService {
 
       // Then try to find matches for any remaining materials
       const unmatchedMaterials = materials.filter(m => !matchMap.has(m.name));
-      console.log(`🔍 [IFC Parser] Looking for KBOB matches for ${unmatchedMaterials.length} new materials...`);
+      logger.info(`Looking for KBOB matches for ${unmatchedMaterials.length} new materials`);
 
       for (const material of unmatchedMaterials) {
-        console.log(`\n📦 [IFC Parser] Processing material "${material.name}"`);
-        console.log(`   Category: ${material.category}`);
-        console.log(`   Used in ${material.elements.length} elements`);
+        logger.debug('Processing material', { 
+          name: material.name,
+          category: material.category,
+          elementCount: material.elements.length
+        });
         
         const bestMatch = await MaterialService.findBestKBOBMatch(material.name);
         
         if (bestMatch && bestMatch.score >= 0.8) {
-          console.log(`✅ [IFC Parser] High confidence match found:`);
-          console.log(`   KBOB Material: ${bestMatch.kbobMaterial.Name}`);
-          console.log(`   Match Score: ${(bestMatch.score * 100).toFixed(1)}%`);
+          logger.info('High confidence match found', {
+            material: material.name,
+            kbobMaterial: bestMatch.kbobMaterial.Name,
+            matchScore: (bestMatch.score * 100).toFixed(1) + '%'
+          });
           
           const density = MaterialService.calculateDensity(bestMatch.kbobMaterial);
           if (density) {
@@ -84,13 +89,15 @@ export class UploadService {
               matchScore: bestMatch.score
             });
           } else {
-            console.warn(`⚠️ [IFC Parser] No density available for "${material.name}"`);
+            logger.warn(`No density available for "${material.name}"`);
           }
         } else {
-          console.warn(`⚠️ [IFC Parser] No high confidence match found for "${material.name}"`);
-          if (bestMatch) {
-            console.log(`   Best match was "${bestMatch.kbobMaterial.Name}" with score ${(bestMatch.score * 100).toFixed(1)}%`);
-          }
+          logger.warn(`No high confidence match found for "${material.name}"`, {
+            bestMatch: bestMatch ? {
+              name: bestMatch.kbobMaterial.Name,
+              score: (bestMatch.score * 100).toFixed(1) + '%'
+            } : null
+          });
         }
       }
 
@@ -102,10 +109,14 @@ export class UploadService {
         matchScore: matchMap.get(material.name)?.matchScore
       }));
 
-      console.log('\n📊 [IFC Parser] Material processing summary:');
-      console.log(`   Total materials: ${materials.length}`);
-      console.log(`   Materials with KBOB matches: ${materialsWithKBOB.filter(m => m.kbobMatch).length}`);
-      console.log(`   Materials without matches: ${materialsWithKBOB.filter(m => !m.kbobMatch).length}`);
+      const matchedCount = materialsWithKBOB.filter(m => m.kbobMatch).length;
+      const unmatchedCount = materialsWithKBOB.filter(m => !m.kbobMatch).length;
+
+      logger.info('Material processing summary', {
+        totalMaterials: materials.length,
+        materialsWithKBOBMatches: matchedCount,
+        materialsWithoutMatches: unmatchedCount
+      });
 
       // Let MaterialService handle the actual material processing
       const result = await MaterialService.processMaterials(projectId, materialsWithKBOB, uploadId);
@@ -122,10 +133,10 @@ export class UploadService {
         { session }
       );
 
-      console.log('✅ [IFC Parser] Material processing phase completed');
+      logger.info('Material processing phase completed');
       return result;
     } catch (error) {
-      console.error('❌ [IFC Parser] Error in material processing:', error);
+      logger.error('Error in material processing', { error });
       throw error;
     } finally {
       await session.endSession();
@@ -152,16 +163,16 @@ export class UploadService {
     const session = await mongoose.startSession();
     try {
       return await session.withTransaction(async () => {
-        console.log('\n🚀 [IFC Parser] Starting element processing phase...');
-        console.log(`📊 [IFC Parser] Processing ${elements.length} elements`);
-        console.log('📋 [IFC Parser] Element categories:', [...new Set(elements.map(e => e.category))]);
+        logger.info('Starting element processing phase');
+        logger.info(`Processing ${elements.length} elements`);
+        logger.info('Element categories:', [...new Set(elements.map(e => e.category))]);
 
         // First, get all materials from DB for this project
         const existingMaterials = await Material.find({ 
           projectId: new mongoose.Types.ObjectId(projectId) 
         }).select('_id name').lean();
 
-        console.log(`📦 [IFC Parser] Found ${existingMaterials.length} materials in database`);
+        logger.info(`Found ${existingMaterials.length} materials in database`);
 
         // Create a map for quick lookups, normalize material names
         const materialMap = new Map(
@@ -184,11 +195,11 @@ export class UploadService {
         let totalMaterialReferences = 0;
         let successfulMaterialReferences = 0;
 
-        console.log(`📦 [IFC Parser] Processing elements in ${batches.length} batches of ${batchSize}`);
+        logger.info(`Processing elements in ${batches.length} batches of ${batchSize}`);
 
         for (let batchIndex = 0; batchIndex < batches.length; batchIndex++) {
           const batch = batches[batchIndex];
-          console.log(`\n🔄 [IFC Parser] Processing batch ${batchIndex + 1}/${batches.length}`);
+          logger.debug(`Processing batch ${batchIndex + 1}/${batches.length}`);
 
           const ops = batch.map(element => {
             // Map material references
@@ -257,14 +268,16 @@ export class UploadService {
           { session }
         );
 
-        console.log('\n📊 [IFC Parser] Element processing summary:');
-        console.log(`   Total elements processed: ${processedElements}`);
-        console.log(`   Elements with missing materials: ${elementsWithMissingMaterials}`);
-        console.log(`   Total material references: ${totalMaterialReferences}`);
-        console.log(`   Successful material references: ${successfulMaterialReferences}`);
-        console.log(`   Material reference success rate: ${((successfulMaterialReferences / totalMaterialReferences) * 100).toFixed(1)}%`);
+        const successRate = ((successfulMaterialReferences / totalMaterialReferences) * 100).toFixed(1);
+        logger.info('Element processing summary', {
+          totalElementsProcessed: processedElements,
+          elementsWithMissingMaterials,
+          totalMaterialReferences,
+          successfulMaterialReferences,
+          materialReferenceSuccessRate: `${successRate}%`
+        });
         
-        console.log('✅ [IFC Parser] Element processing phase completed');
+        logger.info('Element processing phase completed');
 
         return {
           success: true,
@@ -272,7 +285,7 @@ export class UploadService {
         };
       });
     } catch (error) {
-      console.error('❌ [IFC Parser] Error in element processing:', error);
+      logger.error('Error in element processing', { error });
       throw error;
     } finally {
       await session.endSession();

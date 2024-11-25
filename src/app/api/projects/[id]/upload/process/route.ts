@@ -3,6 +3,7 @@ import { connectToDatabase } from "@/lib/mongodb";
 import { Upload } from "@/models";
 import { MaterialService } from "@/lib/services/material-service";
 import mongoose from "mongoose";
+import { logger } from "@/lib/logger";
 
 export const runtime = "nodejs";
 export const maxDuration = 300;
@@ -55,7 +56,7 @@ export async function POST(
         session
       );
 
-      console.log("[DEBUG] Material processing result:", processResult);
+      logger.debug('Material processing result', processResult);
 
       // Update upload status if this is the last chunk
       if (isLastChunk) {
@@ -70,13 +71,13 @@ export async function POST(
           { session }
         );
 
-        console.log("[DEBUG] Processing complete", processResult);
+        logger.debug('Processing complete', processResult);
       }
 
       return processResult;
     });
 
-    console.log("[DEBUG] Sending response:", {
+    logger.debug('Sending response', {
       success: true,
       elementCount: processResult.elementCount,
       materialCount: processResult.materialCount,
@@ -90,7 +91,7 @@ export async function POST(
       unmatchedMaterialCount: processResult.unmatchedMaterialCount,
     });
   } catch (error) {
-    console.error("Error processing chunk:", error);
+    logger.error('Error processing chunk', { error });
 
     if (uploadId) {
       try {
@@ -103,7 +104,7 @@ export async function POST(
           { session }
         );
       } catch (updateError) {
-        console.error("Failed to update upload status:", updateError);
+        logger.error('Failed to update upload status', { updateError });
       }
     }
 

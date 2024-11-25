@@ -1,4 +1,5 @@
 import { IFCParserAdapter } from './IFCParserAdapter';
+import { logger } from '@/lib/logger';
 
 export interface IFCParseResult {
   uploadId: string;
@@ -11,7 +12,7 @@ export interface IFCParseResult {
 export async function parseIFCFile(file: File, projectId: string): Promise<IFCParseResult> {
   let responseData;
   try {
-    console.log('[DEBUG] Starting IFC parsing process...', {
+    logger.debug('Starting IFC parsing process', {
       filename: file.name,
       size: file.size,
       type: file.type,
@@ -19,16 +20,16 @@ export async function parseIFCFile(file: File, projectId: string): Promise<IFCPa
     });
 
     // Create upload record
-    console.log('[DEBUG] Creating upload record...');
+    logger.debug('Creating upload record...');
     const uploadResponse = await fetch(`/api/projects/${projectId}/upload`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ filename: file.name }),
     });
 
-    console.log('[DEBUG] Upload response status:', uploadResponse.status);
+    logger.debug('Upload response status:', uploadResponse.status);
     responseData = await uploadResponse.json();
-    console.log('[DEBUG] Upload response data:', responseData);
+    logger.debug('Upload response data:', responseData);
 
     if (!uploadResponse.ok || !responseData.uploadId) {
       throw new Error(responseData.error || "Failed to create upload record");
@@ -39,7 +40,7 @@ export async function parseIFCFile(file: File, projectId: string): Promise<IFCPa
     const parser = new IFCParserAdapter(content);
     const parsedElements = await parser.parseContent();
     
-    console.log('[DEBUG] Parsing completed:', {
+    logger.debug('Parsing completed', {
       elementCount: parsedElements.length,
       sampleElement: parsedElements[0]
     });
@@ -72,7 +73,7 @@ export async function parseIFCFile(file: File, projectId: string): Promise<IFCPa
       parsedElements.slice(i * chunkSize, (i + 1) * chunkSize)
     );
 
-    console.log('[DEBUG] Optimized chunking:', {
+    logger.debug('Optimized chunking', {
       totalElements,
       chunkSize,
       totalChunks: chunks.length,
@@ -103,7 +104,7 @@ export async function parseIFCFile(file: File, projectId: string): Promise<IFCPa
           }
           const result = await response.json();
           totalProcessed += chunk.length;
-          console.log(`[DEBUG] Chunk ${currentChunkIndex + 1}/${chunks.length} processed:`, {
+          logger.debug(`Chunk ${currentChunkIndex + 1}/${chunks.length} processed`, {
             success: true,
             elementCount: result.elementCount
           });
@@ -115,12 +116,12 @@ export async function parseIFCFile(file: File, projectId: string): Promise<IFCPa
       try {
         await Promise.all(groupPromises);
       } catch (error) {
-        console.error('[DEBUG] Error in chunk group:', error);
+        logger.error('Error in chunk group', { error });
         throw error;
       }
     }
 
-    console.log('[DEBUG] Processing completed:', {
+    logger.debug('Processing completed', {
       totalProcessed,
       unmatchedMaterialCount,
       totalMaterials: materialsMap.size
@@ -134,7 +135,7 @@ export async function parseIFCFile(file: File, projectId: string): Promise<IFCPa
       shouldRedirectToLibrary: materialsMap.size > 0
     };
   } catch (error) {
-    console.error('[DEBUG] Error in parseIFCFile:', error);
+    logger.error('Error in parseIFCFile', { error });
     throw error;
   }
 }

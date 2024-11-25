@@ -48,7 +48,6 @@ export class IFCElementExtractor {
   private elements: { [key: string]: IFCExtractedElement[] } = {};
 
   constructor(content: string) {
-    console.log(`[DEBUG] Initializing IFCElementExtractor with content length: ${content.length}`);
     this.content = content;
     this.parseIFCFile(content);
     this.buildPropertySetIndex();
@@ -66,7 +65,7 @@ export class IFCElementExtractor {
     let result = [];
     let currentItem = '';
     let depth = 0;
-    
+
     for (let i = 0; i < list.length; i++) {
       const char = list[i];
       if (char === '(') {
@@ -90,11 +89,11 @@ export class IFCElementExtractor {
         currentItem += char;
       }
     }
-    
+
     if (currentItem !== '') {
       result.push(currentItem.trim());
     }
-    
+
     return result;
   }
 
@@ -108,9 +107,7 @@ export class IFCElementExtractor {
   }
 
   private parseIFCFile(content: string): void {
-    console.log('Starting IFC file parsing...');
     const lines = content.split('\n');
-    console.log(`Total lines: ${lines.length}`);
     let entityCount = 0;
 
     // Pre-compile regular expressions
@@ -120,15 +117,15 @@ export class IFCElementExtractor {
     for (const line of lines) {
       this.state.currentLine++;
       const trimmedLine = line.trim();
-      
+
       // Skip empty lines and section markers efficiently
       if (!trimmedLine || trimmedLine === 'ISO-10303-21;' || trimmedLine === 'HEADER;' || trimmedLine === 'ENDSEC;') continue;
-      
+
       if (trimmedLine === 'DATA;') {
         this.state.inDataSection = true;
         continue;
       }
-      
+
       // Only parse entity definitions in the data section
       if (!this.state.inDataSection) continue;
 
@@ -137,7 +134,7 @@ export class IFCElementExtractor {
       if (!match) continue;
 
       const [, id, type, attributesStr] = match;
-      
+
       // Index materials during initial parse to avoid second pass
       if (type === 'IFCMATERIAL') {
         const nameMatch = attributesStr.match(materialRegex);
@@ -160,9 +157,9 @@ export class IFCElementExtractor {
       // Clean and store entity
       const attributes = this.parseList(attributesStr);
       const cleanAttributes = attributes.map(attr => {
-        return attr === '$' ? '' : 
-               (attr.startsWith("'") && attr.endsWith("'")) ? attr.slice(1, -1) : 
-               attr;
+        return attr === '$' ? '' :
+          (attr.startsWith("'") && attr.endsWith("'")) ? attr.slice(1, -1) :
+            attr;
       });
 
       this.entities.set(id, {
@@ -183,14 +180,12 @@ export class IFCElementExtractor {
   }
 
   private buildPropertySetIndex(): void {
-    console.log('[DEBUG] Building property set index...');
-    
     // Index all property and quantity sets for faster lookup
     for (const [id, entity] of this.entities.entries()) {
       if (entity.type === 'IFCRELDEFINESBYPROPERTIES') {
         const relatedObjects = this.parseList(entity.attributes[4]);
         const propertySetRef = this.stripHashFromId(entity.attributes[5]);
-        
+
         for (const objRef of relatedObjects) {
           const elementId = this.stripHashFromId(objRef);
           let elementSets = this.propertySetIndex.get(elementId) || [];
@@ -199,8 +194,6 @@ export class IFCElementExtractor {
         }
       }
     }
-    
-    console.log(`[DEBUG] Indexed property sets for ${this.propertySetIndex.size} elements`);
   }
 
   private findElementVolume(element: any): string {
@@ -212,7 +205,7 @@ export class IFCElementExtractor {
 
     try {
       const propertySets = this.propertySetIndex.get(element.id) || [];
-      
+
       for (const setRef of propertySets) {
         const propertySet = this.entities.get(setRef);
         if (!propertySet) continue;
@@ -241,7 +234,6 @@ export class IFCElementExtractor {
   }
 
   private processMaterialRelationships(): void {
-    console.log('Processing material relationships...');
     let spatialCount = 0;
     let materialCount = 0;
 
@@ -270,7 +262,7 @@ export class IFCElementExtractor {
     const batchSize = 100;
     for (let i = 0; i < materialRelations.length; i += batchSize) {
       const batch = materialRelations.slice(i, i + batchSize);
-      
+
       for (const entity of batch) {
         const relatedElements = this.parseList(entity.attributes[4]);
         const materialRef = this.stripHashFromId(entity.attributes[5]);
@@ -280,7 +272,7 @@ export class IFCElementExtractor {
         if (!materialEntity) continue;
 
         let materials: any[] = [];
-        
+
         if (materialEntity.type === 'IFCMATERIALLAYERSETUSAGE') {
           materials = this.processMaterialLayerSet(materialEntity);
         } else if (materialEntity.type === 'IFCMATERIAL') {
@@ -322,7 +314,7 @@ export class IFCElementExtractor {
   private processMaterialLayerSet(materialEntity: any): any[] {
     const layerSetRef = this.stripHashFromId(materialEntity.attributes[0]);
     const layerSet = this.entities.get(layerSetRef);
-    
+
     if (!layerSet || layerSet.type !== 'IFCMATERIALLAYERSET') {
       return [];
     }
@@ -330,7 +322,7 @@ export class IFCElementExtractor {
     const layers = this.parseList(layerSet.attributes[0]);
     let totalThickness = 0;
     const layerThicknesses: number[] = [];
-    
+
     // First pass: calculate total thickness
     for (const layerRef of layers) {
       const layer = this.entities.get(this.stripHashFromId(layerRef));
@@ -352,7 +344,7 @@ export class IFCElementExtractor {
 
       const materialRef = layer.attributes[0];
       const material = this.entities.get(this.stripHashFromId(materialRef));
-      
+
       if (!material || material.type !== 'IFCMATERIAL') return null;
 
       const materialName = this.removeQuotes(material.attributes[0] || 'Unknown Material');
@@ -412,16 +404,29 @@ export class IFCElementExtractor {
     }
 
     const quantities = this.parseList(propertySet.attributes[5] || '');
+    let netVolume = null;
+    let grossVolume = null;
+
     for (const ref of quantities) {
       const quantity = this.entities.get(this.stripHashFromId(ref));
       if (!quantity || quantity.type !== 'IFCQUANTITYVOLUME') continue;
 
       const name = this.removeQuotes(quantity.attributes[0] || '');
-      if (name === 'NetVolume' || name === 'GrossVolume') {
-        console.log(`[DEBUG] Found ${name}:`, quantity.attributes[3]);
-        return quantity.attributes[3];
+      if (name === 'NetVolume') {
+        netVolume = quantity.attributes[3];
+      } else if (name === 'GrossVolume') {
+        grossVolume = quantity.attributes[3];
       }
     }
+
+    // Prefer NetVolume, fallback to GrossVolume
+    if (netVolume !== null) {
+      return netVolume;
+    }
+    if (grossVolume !== null) {
+      return grossVolume;
+    }
+
     return null;
   }
 
@@ -440,7 +445,6 @@ export class IFCElementExtractor {
 
       const name = this.removeQuotes(property.attributes[0] || '');
       if (name.toLowerCase().includes('volume')) {
-        console.log("[DEBUG] Found volume in property:", name, property.attributes[2]);
         return property.attributes[2];
       }
     }
@@ -476,11 +480,10 @@ export class IFCElementExtractor {
           if (!property) continue;
 
           // Check for property name
-          if (property.type === 'IFCPROPERTYSINGLEVALUE' && 
-              this.removeQuotes(property.attributes[0] || '') === propertyName) {
+          if (property.type === 'IFCPROPERTYSINGLEVALUE' &&
+            this.removeQuotes(property.attributes[0] || '') === propertyName) {
             const value = property.attributes[2];
             if (value) {
-              console.log(`Found ${propertyName} from property set:`, value);
               return value;
             }
           }
@@ -492,16 +495,10 @@ export class IFCElementExtractor {
   }
 
   private getUnitScale(): number {
-    console.log('\n[DEBUG] Searching for length unit...');
     // Find IFCSIUNIT for length
     for (const entity of this.entities.values()) {
       if (entity.type === 'IFCSIUNIT') {
         const attributes = entity.attributes;
-        console.log('[DEBUG] Found IFCSIUNIT:', {
-          attributes,
-          unitType: attributes[2],
-          prefix: attributes[1]
-        });
         // Check if it's a length unit
         if (attributes[2] === '.LENGTHUNIT.') {
           // Check for prefix
@@ -526,17 +523,14 @@ export class IFCElementExtractor {
               console.warn(`Unknown length unit prefix: ${prefix}`);
               scale = 1.0;
           }
-          console.log(`[DEBUG] Using scale factor: ${scale} for prefix: ${prefix}`);
           return scale;
         }
       }
     }
-    console.log('[DEBUG] No length unit found, defaulting to meters (scale: 1.0)');
     return 1.0; // Default to meters if no unit found
   }
 
   public extractElements(): IFCElementCollection {
-    console.log('Extracting elements...');
     const elements: IFCElementCollection = {};
     const hasGeometry = new Set<string>();
 
@@ -553,20 +547,18 @@ export class IFCElementExtractor {
       }
     }
 
-    console.log(`Found ${hasGeometry.size} elements with geometry`);
-
     // Process elements with geometry
     for (const elementId of hasGeometry) {
       const element = this.entities.get(elementId);
       const relationship = this.relationships.get(elementId);
-      
+
       if (!elements[element.type]) {
         elements[element.type] = [];
       }
 
       const materialsList = relationship?.materials || [];
       const storey = relationship?.spatialStructure;
-      
+
       // Get the building story name
       let buildingStory = 'Unknown Story';
       if (storey) {
@@ -633,16 +625,15 @@ export class IFCElementExtractor {
   }
 
   private parseContent() {
-    console.log('[DEBUG] Starting content parsing');
     const lines = this.content.split('\n');
-    
+
     lines.forEach((line, index) => {
       try {
         if (line.includes('IFCWALL') || line.includes('IFCSLAB') || line.includes('IFCWINDOW')) {
           this.parseElement(line, index);
         }
       } catch (error) {
-        console.error(`[DEBUG] Error parsing line ${index}:`, error);
+        console.error(`Error parsing line ${index}:`, error);
       }
     });
   }
@@ -652,7 +643,6 @@ export class IFCElementExtractor {
     if (!elementMatch) return;
 
     const [, id, type] = elementMatch;
-    console.log(`[DEBUG] Found element: ${type} with ID: ${id}`);
 
     const element: IFCExtractedElement = {
       id,
@@ -674,10 +664,10 @@ export class IFCElementExtractor {
 
   private extractMaterials(line: string, lineNumber: number): IFCMaterial[] {
     const materials: IFCMaterial[] = [];
-    
+
     // Extract material references
     const materialRefs = line.match(/#\d+/g) || [];
-    
+
     materialRefs.forEach(ref => {
       const material = this.findMaterialByRef(ref);
       if (material) {

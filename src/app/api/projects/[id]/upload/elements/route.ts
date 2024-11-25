@@ -4,6 +4,7 @@ import { auth } from "@clerk/nextjs/server";
 import { connectToDatabase } from "@/lib/mongodb";
 import { Element, Upload } from "@/models";
 import { z } from "zod";
+import { logger } from "@/lib/logger";
 
 // Validation schema
 const elementSchema = z.object({
@@ -58,7 +59,7 @@ export async function saveElements(
           savedCount++;
           return savedElement;
         } catch (error) {
-          console.error("Failed to save element:", error);
+          logger.error('Failed to save element', { error });
           return null;
         }
       });
@@ -81,7 +82,7 @@ export async function saveElements(
       elementCount: savedCount,
     };
   } catch (error) {
-    console.error("Failed to save elements:", error);
+    logger.error('Failed to save elements', { error });
     throw error;
   }
 }

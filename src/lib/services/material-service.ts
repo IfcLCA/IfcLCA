@@ -105,8 +105,7 @@ export class MaterialService {
       console.log("\n📊 [Material Service] Update results:");
       console.log(`   Materials updated: ${updateResult.modifiedCount}`);
       console.log(
-        `   Projects affected: ${
-          new Set(updatedMaterials.map((m) => m.projectId?.name)).size
+        `   Projects affected: ${new Set(updatedMaterials.map((m) => m.projectId?.name)).size
         }`
       );
 
@@ -322,8 +321,8 @@ export class MaterialService {
           newKBOBMaterial["kg/unit"] ||
           (newKBOBMaterial["min density"] && newKBOBMaterial["max density"]
             ? (newKBOBMaterial["min density"] +
-                newKBOBMaterial["max density"]) /
-              2
+              newKBOBMaterial["max density"]) /
+            2
             : 0),
         affectedElements: elementCounts.get(material._id.toString()) || 0,
         projects: Array.from(
@@ -581,8 +580,7 @@ export class MaterialService {
     uploadId: string,
     session: mongoose.ClientSession
   ) {
-    console.log('[DEBUG] Processing materials for project:', projectId);
-    console.log('[DEBUG] Elements to process:', elements.length);
+
 
     try {
       // Group materials by name and accumulate volumes
@@ -622,7 +620,6 @@ export class MaterialService {
         return acc;
       }, {});
 
-      console.log('[DEBUG] Grouped materials:', Object.keys(materialsByName).length);
 
       // Create/update materials
       const materialOps = Object.values(materialsByName).map((material: any) => ({
@@ -651,10 +648,6 @@ export class MaterialService {
         materialResults = await Material.bulkWrite(materialOps, {
           session,
           ordered: false
-        });
-        console.log('[DEBUG] Material results:', {
-          upserted: materialResults.upsertedCount,
-          modified: materialResults.modifiedCount
         });
       }
 
@@ -692,9 +685,8 @@ export class MaterialService {
                 materials: element.materialLayers?.layers.map(layer => {
                   const volumeFraction = totalThickness > 0 ? (layer.thickness || 0) / totalThickness : 0;
                   const materialId = materialMap.get(layer.materialName.trim().toLowerCase());
-                  
+
                   if (!materialId) {
-                    console.warn('[DEBUG] Material not found:', layer.materialName);
                     return null;
                   }
 
@@ -736,10 +728,6 @@ export class MaterialService {
           session,
           ordered: false
         });
-        console.log('[DEBUG] Element results:', {
-          upserted: elementResults.upsertedCount,
-          modified: elementResults.modifiedCount
-        });
       }
 
       return {
@@ -749,7 +737,6 @@ export class MaterialService {
         elementCount: elementOps.length
       };
     } catch (error) {
-      console.error('[DEBUG] Error in processMaterials:', error);
       throw error;
     }
   }

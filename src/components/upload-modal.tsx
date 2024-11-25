@@ -14,6 +14,7 @@ import { ReloadIcon } from "@radix-ui/react-icons";
 import { parseIFCFile } from "@/lib/services/ifc-parser-client";
 import { useToast } from "@/hooks/use-toast";
 import { useRouter } from "next/navigation";
+import { logger } from "@/lib/logger";
 
 interface UploadModalProps {
   projectId: string;
@@ -37,9 +38,9 @@ export function UploadModal({
       try {
         setIsUploading(true);
         const file = acceptedFiles[0];
-        console.log("[DEBUG] Starting file upload...");
+        logger.debug('Starting file upload');
         const results = await parseIFCFile(file, projectId);
-        console.log("[DEBUG] Upload results:", {
+        logger.debug('Upload results', {
           elementCount: results.elementCount,
           materialCount: results.materialCount,
           unmatchedMaterialCount: results.unmatchedMaterialCount,
@@ -57,13 +58,13 @@ export function UploadModal({
         onOpenChange(false);
 
         // If we have unmatched materials, redirect to the materials library
-        console.log("[DEBUG] Should redirect:", results.shouldRedirectToLibrary);
+        logger.debug('Should redirect', { shouldRedirect: results.shouldRedirectToLibrary });
         if (results.shouldRedirectToLibrary) {
-          console.log("[DEBUG] Redirecting to materials library...");
+          logger.debug('Redirecting to materials library');
           router.push(`/materials-library?projectId=${projectId}`);
           router.refresh();
         } else {
-          console.log("[DEBUG] No redirection needed, refreshing page");
+          logger.debug('No redirection needed, refreshing page');
           router.refresh();
           onUploadComplete?.();
         }
