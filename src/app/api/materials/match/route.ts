@@ -6,7 +6,7 @@ import { Element } from "@/models";
 
 export async function POST(request: Request) {
   try {
-    const { materialIds, kbobMaterialId } = await request.json();
+    const { materialIds, kbobMaterialId, density: userDefinedDensity } = await request.json();
     await connectToDatabase();
 
     // First fetch the KBOB material
@@ -19,15 +19,17 @@ export async function POST(request: Request) {
       );
     }
 
-    // Calculate density from KBOB material data
-    let density = null;
-    if (
-      kbobMaterial["kg/unit"] &&
-      typeof kbobMaterial["kg/unit"] === "number"
-    ) {
-      density = kbobMaterial["kg/unit"];
-    } else if (kbobMaterial["min density"] && kbobMaterial["max density"]) {
-      density = (kbobMaterial["min density"] + kbobMaterial["max density"]) / 2;
+    // Use user-defined density if provided, otherwise calculate from KBOB material data
+    let density = userDefinedDensity;
+    if (!density) {
+      if (
+        kbobMaterial["kg/unit"] &&
+        typeof kbobMaterial["kg/unit"] === "number"
+      ) {
+        density = kbobMaterial["kg/unit"];
+      } else if (kbobMaterial["min density"] && kbobMaterial["max density"]) {
+        density = (kbobMaterial["min density"] + kbobMaterial["max density"]) / 2;
+      }
     }
 
     if (!density) {

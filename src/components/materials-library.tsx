@@ -74,6 +74,29 @@ interface Project {
   materialIds: string[];
 }
 
+interface MaterialChange {
+  materialId: string;
+  materialName: string;
+  oldMatch: {
+    Name: string;
+    Density: number;
+    Elements: number;
+  } | null;
+  newMatch: {
+    id: string;
+    Name: string;
+    Density: number;
+    Elements: number;
+    hasDensityRange: boolean;
+    minDensity?: number;
+    maxDensity?: number;
+  };
+  projects: string[];
+  projectId: string | null;
+  elements: number;
+  selectedDensity?: number;
+}
+
 export function MaterialLibraryComponent() {
   const router = useRouter();
   const [materials, setMaterials] = useState<Material[]>([]);
@@ -91,7 +114,7 @@ export function MaterialLibraryComponent() {
   const [projects, setProjects] = useState<Array<{ id: string; name: string; materialIds: string[] }>>([]);
   const [isMatchingInProgress, setIsMatchingInProgress] = useState(false);
   const [isKbobOpen, setIsKbobOpen] = useState(false);
-  const [previewChanges, setPreviewChanges] = useState<any[]>([]);
+  const [previewChanges, setPreviewChanges] = useState<MaterialChange[]>([]);
   const [showPreview, setShowPreview] = useState(false);
   const [favoriteMaterials, setFavoriteMaterials] = useState<string[]>([]);
   const [selectedKbobId, setSelectedKbobId] = useState<string | null>(null);
@@ -241,25 +264,26 @@ export function MaterialLibraryComponent() {
     setTemporaryMatches(newMatches);
   };
 
-  const handleConfirmMatch = async () => {
+  const handleConfirmMatch = async (changesWithDensity: MaterialChange[]) => {
     try {
       setIsMatchingInProgress(true);
 
-      // Convert temporary matches into the format expected by the API
-      const matchPromises = Object.entries(temporaryMatches).map(async ([materialId, kbobId]) => {
+      // Convert changes into the format expected by the API
+      const matchPromises = changesWithDensity.map(async (change) => {
         const response = await fetch("/api/materials/match", {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
-            materialIds: [materialId],
-            kbobMaterialId: kbobId,
+            materialIds: [change.materialId],
+            kbobMaterialId: change.newMatch.id,
+            density: change.selectedDensity || change.newMatch.Density
           }),
         });
 
         if (!response.ok) {
-          throw new Error(`Failed to match material ${materialId}`);
+          throw new Error(`Failed to match material ${change.materialId}`);
         }
       });
 
@@ -316,18 +340,36 @@ export function MaterialLibraryComponent() {
       // Get element count from material
       const elementCount = material.elements?.length || 0;
 
+      // Get the current material's density from the existing match
+      const currentDensity = material.density || 0;
+
+      // Check if material has a density range
+      const hasDensityRange = typeof kbobMaterial["min density"] === "number" && 
+                             typeof kbobMaterial["max density"] === "number";
+
+      // Get the new density from the KBOB material
+      const newDensity = typeof kbobMaterial["kg/unit"] === "number" ? 
+        kbobMaterial["kg/unit"] : 
+        hasDensityRange ?
+          (kbobMaterial["min density"] + kbobMaterial["max density"]) / 2 : 
+          currentDensity;
+
       return {
         materialId,
         materialName: material.name,
         oldMatch: material.kbobMatch ? {
           Name: material.kbobMatch.Name,
-          Density: material.density || 0,
+          Density: currentDensity,
           Elements: elementCount
         } : null,
         newMatch: {
+          id: kbobMaterial._id,
           Name: kbobMaterial.Name,
-          Density: kbobMaterial.Density || 0,
-          Elements: elementCount
+          Density: newDensity,
+          Elements: elementCount,
+          hasDensityRange,
+          minDensity: hasDensityRange ? kbobMaterial["min density"] : undefined,
+          maxDensity: hasDensityRange ? kbobMaterial["max density"] : undefined
         },
         projects: affectedProjects.map(p => p.name),
         projectId,
@@ -802,14 +844,16 @@ export function MaterialLibraryComponent() {
           </div>
         )}
       </CardContent>
-      <MaterialChangesPreviewModal
-        isOpen={showPreview}
-        onClose={handleCancelMatch}
-        onConfirm={handleConfirmMatch}
-        onNavigateToProject={handleNavigateToProject}
-        changes={getPreviewChanges()}
-        isLoading={isMatchingInProgress}
-      />
+      {showPreview && (
+        <MaterialChangesPreviewModal
+          changes={getPreviewChanges()}
+          isOpen={showPreview}
+          onClose={handleCancelMatch}
+          onConfirm={handleConfirmMatch}
+          onNavigateToProject={handleNavigateToProject}
+          isLoading={isMatchingInProgress}
+        />
+      )}
     </Card>
   );
 }
