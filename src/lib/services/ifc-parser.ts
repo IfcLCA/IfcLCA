@@ -391,7 +391,7 @@ export class IFCElementExtractor {
   private checkQuantitySet(element: any, propertySet: any): string | null {
     if (propertySet.type !== 'IFCELEMENTQUANTITY') return null;
 
-    const elementType = element.type.replace('IFC', '');
+    const elementType = element.type.replace('Ifc', '');
     const baseNames = [
       `Qto_${elementType.toLowerCase()}BaseQuantities`,
       `Qto_${elementType}BaseQuantities`,
@@ -639,7 +639,7 @@ export class IFCElementExtractor {
   }
 
   private parseElement(line: string, lineNumber: number) {
-    const elementMatch = line.match(/#(\d+)=\s*(IFC\w+)/);
+    const elementMatch = line.match(/#(\d+)=\s*(Ifc\w+)/);
     if (!elementMatch) return;
 
     const [, id, type] = elementMatch;

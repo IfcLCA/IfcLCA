@@ -558,7 +558,7 @@ export class MaterialService {
   }
 
   /**
-   * Processes materials after IFC upload with validation
+   * Processes materials after Ifc upload with validation
    */
   static async processMaterials(
     projectId: string,

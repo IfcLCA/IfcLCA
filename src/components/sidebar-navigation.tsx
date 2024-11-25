@@ -157,7 +157,7 @@ export function SidebarNavigation({
                   </div>
                 </TooltipTrigger>
                 <TooltipContent side="right">
-                  Add new IFC
+                  Add new Ifc
                 </TooltipContent>
               </Tooltip>
               <Tooltip>

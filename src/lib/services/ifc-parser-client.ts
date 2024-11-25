@@ -12,7 +12,7 @@ export interface IFCParseResult {
 export async function parseIFCFile(file: File, projectId: string): Promise<IFCParseResult> {
   let responseData;
   try {
-    logger.debug('Starting IFC parsing process', {
+    logger.debug('Starting Ifc parsing process', {
       filename: file.name,
       size: file.size,
       type: file.type,
@@ -39,7 +39,7 @@ export async function parseIFCFile(file: File, projectId: string): Promise<IFCPa
     const content = await file.text();
     const parser = new IFCParserAdapter(content);
     const parsedElements = await parser.parseContent();
-    
+
     logger.debug('Parsing completed', {
       elementCount: parsedElements.length,
       sampleElement: parsedElements[0]
@@ -48,7 +48,7 @@ export async function parseIFCFile(file: File, projectId: string): Promise<IFCPa
     // Pre-process materials before chunking to avoid redundant processing
     const materialsMap = new Map<string, boolean>();
     let unmatchedMaterialCount = 0;
-    
+
     parsedElements.forEach(element => {
       if (element.materialLayers?.layers) {
         element.materialLayers.layers.forEach(layer => {
@@ -90,7 +90,7 @@ export async function parseIFCFile(file: File, projectId: string): Promise<IFCPa
       const chunkGroup = chunks.slice(i, i + maxConcurrentUploads);
       const groupPromises = chunkGroup.map((chunk, groupIndex) => {
         const currentChunkIndex = i + groupIndex;
-        
+
         return fetch(`/api/projects/${projectId}/upload/process`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },

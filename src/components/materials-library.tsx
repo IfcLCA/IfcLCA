@@ -221,19 +221,27 @@ export function MaterialLibraryComponent() {
     );
   }, [filteredAndSortedMaterials, currentPage, itemsPerPage]);
 
-  const handleSelect = (material: Material & { originalIds?: string[] }) => {
+  const handleSelect = useCallback((material: Material & { originalIds?: string[] }) => {
     // If material has originalIds (grouped view), select all related IDs
     const idsToSelect = material.originalIds || [material.id];
 
-    setSelectedMaterials((prev) => {
-      const allSelected = idsToSelect.every(id => prev.includes(id));
-      if (allSelected) {
-        return prev.filter(id => !idsToSelect.includes(id));
-      } else {
-        return [...prev, ...idsToSelect.filter(id => !prev.includes(id))];
-      }
-    });
-  };
+    // Use a synchronous update for immediate UI feedback
+    const newSelectedMaterials = new Set(selectedMaterials);
+    const allSelected = idsToSelect.every(id => newSelectedMaterials.has(id));
+
+    if (allSelected) {
+      idsToSelect.forEach(id => newSelectedMaterials.delete(id));
+    } else {
+      idsToSelect.forEach(id => newSelectedMaterials.add(id));
+    }
+
+    setSelectedMaterials(Array.from(newSelectedMaterials));
+  }, [selectedMaterials]);
+
+  const isSelected = useCallback((material: Material & { originalIds?: string[] }) => {
+    const idsToCheck = material.originalIds || [material.id];
+    return idsToCheck.some(id => selectedMaterials.includes(id));
+  }, [selectedMaterials]);
 
   const handleSelectAll = (checked: boolean) => {
     if (checked) {
@@ -245,11 +253,6 @@ export function MaterialLibraryComponent() {
     } else {
       setSelectedMaterials([]);
     }
-  };
-
-  const isSelected = (material: Material & { originalIds?: string[] }) => {
-    const idsToCheck = material.originalIds || [material.id];
-    return idsToCheck.some(id => selectedMaterials.includes(id));
   };
 
   const handleMatch = (materialIds: string[], kbobId: string | null) => {
@@ -614,12 +617,12 @@ export function MaterialLibraryComponent() {
           </div>
         ) : (
           <div className="grid grid-cols-2 gap-6 h-full">
-            {/* Left Column - IFC Model Materials */}
+            {/* Left Column - Ifc Model Materials */}
             <div className="flex flex-col border rounded-lg overflow-hidden h-full">
               <div className="p-4 border-b bg-secondary/10 flex-shrink-0">
                 <div className="flex items-center justify-between mb-2">
                   <h3 className="font-semibold flex items-center gap-2">
-                    <span>IFC Model Materials</span>
+                    <span>Ifc Materials</span>
                     <Badge
                       variant={getMatchingProgress().percentage === 100 ? "success" : "secondary"}
                     >
@@ -634,7 +637,7 @@ export function MaterialLibraryComponent() {
                   />
                 </div>
                 <p className="text-sm text-muted-foreground mb-3">
-                  Select each material from your IFC model and match it with a corresponding KBOB material
+                  Select each material from your Ifc model and match it with a corresponding KBOB material
                 </p>
                 <div className="flex items-center gap-2">
                   <MagnifyingGlassIcon className="h-4 w-4 text-muted-foreground" />
@@ -647,17 +650,39 @@ export function MaterialLibraryComponent() {
                 </div>
               </div>
               <div className="flex-1 overflow-y-auto min-h-0">
-                <div className="divide-y">
+                <div className="divide-y divide-transparent px-2">
                   {paginatedMaterials.map((material) => (
                     <div
                       key={material.id}
-                      className={`p-4 hover:bg-secondary/5 transition-colors cursor-pointer ${material.id === activeSearchId ? 'bg-primary/10 hover:bg-primary/15' : ''
-                        }`}
+                      className={`
+                        relative p-4 cursor-pointer
+                        transition-all duration-300 ease-out
+                        hover:bg-secondary/5 hover:scale-[1.02] hover:z-10
+                        group
+                        ${material.id === activeSearchId ? 
+                          'ring-2 ring-blue-400 ring-offset-2 shadow-lg bg-blue-50/50 scale-[1.03] z-20 my-4' : 
+                          'hover:ring-1 hover:ring-primary/30'
+                        }
+                        ${isSelected(material) ? 
+                          'animate-in fade-in-0 duration-500 ring-2 ring-primary ring-offset-1 shadow-sm z-10' : 
+                          ''
+                        }
+                        ${temporaryMatches[material.id] ? 
+                          'animate-in zoom-in-95 duration-300 ease-bounce' : 
+                          ''
+                        }
+                        rounded-md my-2
+                      `}
                       onClick={() => {
+                        handleSelect(material);
                         setActiveSearchId(material.id === activeSearchId ? null : material.id);
                       }}
                     >
-                      <div className="flex items-start justify-between gap-4">
+                      <div className={`
+                        flex items-start justify-between gap-4
+                        ${temporaryMatches[material.id] ? 'animate-in slide-in-from-left-1 duration-300' : ''}
+                        relative z-10
+                      `}>
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2">
                             <h3 className="font-medium truncate">{material.name}</h3>
@@ -776,8 +801,8 @@ export function MaterialLibraryComponent() {
                 </h3>
                 <p className="text-sm text-muted-foreground mb-3 pb-[40px]">
                   {activeSearchId ?
-                    'Select a KBOB material to match with your highlighted IFC material' :
-                    'First select an IFC material on the left to match it'
+                    'Select a KBOB material to match with your highlighted Ifc material' :
+                    'First select an Ifc material on the left to match it'
                   }
                 </p>
                 <div className="flex flex-col gap-2">

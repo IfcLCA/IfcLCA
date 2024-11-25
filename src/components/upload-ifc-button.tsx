@@ -26,7 +26,7 @@ interface UploadIfcButtonProps {
   showText?: boolean;
 }
 
-export function UploadIfcButton({ 
+export function UploadIfcButton({
   variant = "default",
   className = "",
   showIcon = true,
@@ -54,13 +54,13 @@ export function UploadIfcButton({
 
   return (
     <>
-      <Button 
-        variant={variant} 
+      <Button
+        variant={variant}
         onClick={handleUploadClick}
         className={className}
       >
         {showIcon && <UploadCloud className={showText ? "mr-2 h-4 w-4" : "h-5 w-5"} />}
-        {showText && "Add new IFC"}
+        {showText && "Add new Ifc"}
       </Button>
 
       <Dialog open={showProjectSelect} onOpenChange={setShowProjectSelect}>
@@ -68,7 +68,7 @@ export function UploadIfcButton({
           <DialogHeader>
             <DialogTitle>Select Project</DialogTitle>
             <DialogDescription>
-              Choose a project to upload the IFC file to
+              Choose a project to upload the Ifc file to
             </DialogDescription>
           </DialogHeader>
           <div className="grid gap-4">
@@ -102,7 +102,7 @@ export function UploadIfcButton({
             setSelectedProjectId(null);
             router.push(`/projects/${selectedProjectId}`);
           }}
-          onProgress={(progress: number) => {}}
+          onProgress={(progress: number) => { }}
         />
       )}
     </>

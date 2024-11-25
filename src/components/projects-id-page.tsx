@@ -560,7 +560,7 @@ const ElementsTab = ({
             <DataTable
               columns={elementsColumns}
               data={data}
-              onRowSelectionChange={() => {}}
+              onRowSelectionChange={() => { }}
             />
           </CardContent>
         </Card>
@@ -632,7 +632,7 @@ const MaterialsTab = ({
             <DataTable
               columns={materialsColumns}
               data={data}
-              onRowSelectionChange={() => {}}
+              onRowSelectionChange={() => { }}
             />
           </CardContent>
         </Card>
@@ -679,7 +679,7 @@ const EmissionsTab = ({
         },
       }))
     ).reduce((acc, curr) => {
-      // Group by IFC name, KBOB name, and density
+      // Group by Ifc name, KBOB name, and density
       const key = `${curr.ifcMaterial}-${curr.kbobMaterial}-${curr.density}`;
       if (!acc[key]) {
         acc[key] = { ...curr };
@@ -701,22 +701,22 @@ const EmissionsTab = ({
   }, [project]);
 
   const indicators = [
-    { 
-      value: "gwp", 
+    {
+      value: "gwp",
       label: <div className="flex flex-col">
         <span className="font-bold">GWP</span>
         <span className="text-sm text-muted-foreground">Global Warming Potential (kg CO₂ eq)</span>
       </div>
     },
-    { 
-      value: "ubp", 
+    {
+      value: "ubp",
       label: <div className="flex flex-col">
         <span className="font-bold">UBP</span>
         <span className="text-sm text-muted-foreground">Environmental Impact Points</span>
       </div>
     },
-    { 
-      value: "penre", 
+    {
+      value: "penre",
       label: <div className="flex flex-col">
         <span className="font-bold">PENRE</span>
         <span className="text-sm text-muted-foreground">Primary Energy Non-Renewable (kWh)</span>
@@ -750,8 +750,8 @@ const EmissionsTab = ({
             </SelectTrigger>
             <SelectContent>
               {indicators.map((indicator) => (
-                <SelectItem 
-                  key={indicator.value} 
+                <SelectItem
+                  key={indicator.value}
                   value={indicator.value}
                   className="py-2"
                 >
@@ -768,7 +768,7 @@ const EmissionsTab = ({
             <DataTable
               columns={emissionsColumns(selectedIndicator)}
               data={emissionsData}
-              onRowSelectionChange={() => {}}
+              onRowSelectionChange={() => { }}
             />
           </CardContent>
         </Card>
