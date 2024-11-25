@@ -27,12 +27,7 @@ export async function GET(
       })
       .lean();
 
-    console.log("Materials with KBOB:", materials.map(m => ({ 
-      id: m._id.toString(), 
-      name: m.name,
-      kbob: m.kbobMatchId ? { id: m.kbobMatchId._id, name: m.kbobMatchId.Name } : null
-    })));
-    
+
     // Get elements with their material references
     const elements = await mongoose.models.Element.find({ projectId: project._id })
       .populate({
@@ -46,8 +41,7 @@ export async function GET(
       })
       .lean();
 
-    console.log("Materials in DB:", materials.map(m => ({ id: m._id.toString(), name: m.name })));
-    
+
     // Process elements to ensure material references are properly populated
     const populatedElements = elements.map(element => {
       return {
@@ -85,8 +79,15 @@ export async function GET(
     return NextResponse.json(projectData);
   } catch (error) {
     console.error("Failed to fetch project:", error);
+    if (error instanceof Error) {
+      console.error("Error details:", {
+        message: error.message,
+        stack: error.stack,
+        name: error.name
+      });
+    }
     return NextResponse.json(
-      { error: "Failed to fetch project" },
+      { error: "Failed to fetch project", details: error instanceof Error ? error.message : String(error) },
       { status: 500 }
     );
   }
@@ -120,6 +121,13 @@ export async function PUT(
     return NextResponse.json(project);
   } catch (error) {
     console.error("Failed to update project:", error);
+    if (error instanceof Error) {
+      console.error("Error details:", {
+        message: error.message,
+        stack: error.stack,
+        name: error.name
+      });
+    }
     return new Response("Internal Server Error", { status: 500 });
   }
 }
@@ -157,7 +165,7 @@ export async function DELETE(
       await Upload.deleteMany({ projectId: params.id }).session(session);
       await Element.deleteMany({ projectId: params.id }).session(session);
       await Material.deleteMany({ projectId: params.id }).session(session);
-      
+
       // Finally delete the project
       await Project.deleteOne({ _id: params.id }).session(session);
 
@@ -167,12 +175,27 @@ export async function DELETE(
     } catch (error) {
       // If any error occurs, abort the transaction
       await session.abortTransaction();
+      console.error("Failed to delete project:", error);
+      if (error instanceof Error) {
+        console.error("Error details:", {
+          message: error.message,
+          stack: error.stack,
+          name: error.name
+        });
+      }
       throw error;
     } finally {
       session.endSession();
     }
   } catch (error) {
     console.error("Failed to delete project:", error);
+    if (error instanceof Error) {
+      console.error("Error details:", {
+        message: error.message,
+        stack: error.stack,
+        name: error.name
+      });
+    }
     return new Response("Internal Server Error", { status: 500 });
   }
 }
@@ -203,8 +226,15 @@ export async function PATCH(
     return NextResponse.json(project);
   } catch (error) {
     console.error("Failed to update project:", error);
+    if (error instanceof Error) {
+      console.error("Error details:", {
+        message: error.message,
+        stack: error.stack,
+        name: error.name
+      });
+    }
     return NextResponse.json(
-      { error: "Failed to update project" },
+      { error: "Failed to update project", details: error instanceof Error ? error.message : String(error) },
       { status: 500 }
     );
   }

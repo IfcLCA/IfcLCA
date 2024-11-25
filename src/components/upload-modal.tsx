@@ -39,7 +39,14 @@ export function UploadModal({
         setIsUploading(true);
         const file = acceptedFiles[0];
         logger.debug('Starting file upload');
-        const results = await parseIFCFile(file, projectId);
+
+        const timeoutPromise = new Promise((_, reject) => {
+          setTimeout(() => reject(new Error('Upload timed out after 50 seconds')), 50000);
+        });
+
+        const uploadPromise = parseIFCFile(file, projectId);
+        const results = await Promise.race([uploadPromise, timeoutPromise]) as any;
+
         logger.debug('Upload results', {
           elementCount: results.elementCount,
           materialCount: results.materialCount,
@@ -54,11 +61,8 @@ export function UploadModal({
             : `Successfully processed ${results.elementCount} elements`,
         });
 
-        // Close modal immediately after successful upload
         onOpenChange(false);
 
-        // If we have unmatched materials, redirect to the materials library
-        logger.debug('Should redirect', { shouldRedirect: results.shouldRedirectToLibrary });
         if (results.shouldRedirectToLibrary) {
           logger.debug('Redirecting to materials library');
           router.push(`/materials-library?projectId=${projectId}`);
@@ -69,10 +73,12 @@ export function UploadModal({
           onUploadComplete?.();
         }
       } catch (error) {
+        logger.error('Upload failed:', error);
         toast({
-          title: "Error",
-          description:
-            error instanceof Error ? error.message : "Failed to upload file",
+          title: "Upload Failed",
+          description: error instanceof Error && error.message === 'Upload timed out after 50 seconds'
+            ? "The upload timed out. Please try again with a smaller file."
+            : "There was an error processing your file. Please try again or contact support if the issue persists.",
           variant: "destructive",
         });
         onOpenChange(false);

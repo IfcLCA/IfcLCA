@@ -64,8 +64,8 @@ export async function parseIFCFile(file: File, projectId: string): Promise<IFCPa
     // Optimize chunk size based on element count
     const totalElements = parsedElements.length;
     const chunkSize = Math.min(
-      Math.max(Math.floor(totalElements / 10), 1000), // At least 1000, targeting 10 chunks
-      5000 // But no more than 5000 to avoid timeout issues
+      Math.max(Math.floor(totalElements / 20), 500), // At least 500, targeting 20 chunks
+      2000 // But no more than 2000 to avoid memory issues
     );
 
     // Create chunks more efficiently
@@ -81,6 +81,7 @@ export async function parseIFCFile(file: File, projectId: string): Promise<IFCPa
     });
 
     let totalProcessed = 0;
+    const totalChunks = chunks.length;
     const uploadPromises: Promise<Response>[] = [];
     const maxConcurrentUploads = 3; // Limit concurrent uploads
 
