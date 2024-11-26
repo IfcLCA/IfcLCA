@@ -160,7 +160,7 @@ export function Dashboard({
 
     try {
       setIsLoadingStatistics(true);
-      
+
       // Cancel previous request if it exists
       if (abortControllerRef.current) {
         abortControllerRef.current.abort();
@@ -191,7 +191,6 @@ export function Dashboard({
         emissionsRes.json()
       ]);
 
-      console.log('Fetched emissions:', emissions);
 
       const recentProjects = projects.slice(0, 3);
       const totalElements = projects.reduce(
@@ -211,7 +210,6 @@ export function Dashboard({
         totalEmissions: emissions
       };
 
-      console.log('Setting new statistics:', newStatistics);
 
       setStatistics(newStatistics);
       setRecentProjects(recentProjects);
@@ -248,11 +246,11 @@ export function Dashboard({
     if (hasMore && !isLoadingActivities) {
       const nextPage = page + 1;
       const prefetchController = new AbortController();
-      
+
       fetch(`/api/activities?page=${nextPage}`, {
         signal: prefetchController.signal,
         cache: 'no-store'
-      }).catch(() => {});
+      }).catch(() => { });
     }
   }, [hasMore, isLoadingActivities, page]);
 
@@ -476,7 +474,7 @@ export function Dashboard({
             setSelectedProjectId(null);
             router.push(`/projects/${selectedProjectId}`);
           }}
-          onProgress={(progress: number) => {}}
+          onProgress={(progress: number) => { }}
         />
       )}
     </div>

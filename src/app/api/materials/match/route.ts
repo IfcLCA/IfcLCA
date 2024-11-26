@@ -105,15 +105,14 @@ export async function POST(request: Request) {
       }));
 
       try {
-        const result = await Element.bulkWrite(bulkOps, { 
+        const result = await Element.bulkWrite(bulkOps, {
           ordered: false,
           writeConcern: { w: 1 }
         });
-        
+
         totalModified += result.modifiedCount;
         totalMatched += result.matchedCount;
-        
-        console.log(`Batch processed: Modified ${result.modifiedCount} of ${bulkOps.length} elements`);
+
       } catch (error) {
         console.error("Error in batch:", error);
         // Continue processing other batches
@@ -122,24 +121,23 @@ export async function POST(request: Request) {
 
     // Verify updates by sampling elements from different batches
     const sampleSize = Math.min(5, allElements.length);
-    const sampleIndices = Array.from({length: sampleSize}, () => 
+    const sampleIndices = Array.from({ length: sampleSize }, () =>
       Math.floor(Math.random() * allElements.length)
     );
-    
+
     const sampledElements = await Element.find({
       _id: { $in: sampleIndices.map(i => allElements[i]._id) }
     }).lean();
 
-    console.log("Updated elements sample:", 
-      sampledElements.map(e => ({
-        _id: e._id,
-        materialsCount: e.materials.length,
-        hasIndicators: e.materials.every(m => m.indicators),
-        sampleIndicators: e.materials[0]?.indicators
-      }))
-    );
+    sampledElements.map(e => ({
+      _id: e._id,
+      materialsCount: e.materials.length,
+      hasIndicators: e.materials.every(m => m.indicators),
+      sampleIndicators: e.materials[0]?.indicators
+    }))
 
-    return NextResponse.json({ 
+
+    return NextResponse.json({
       message: "Successfully updated materials and elements",
       totalModified,
       totalMatched,

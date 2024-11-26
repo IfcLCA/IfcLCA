@@ -54,16 +54,17 @@ export class MaterialService {
     materialId: Types.ObjectId,
     kbobMatchId: Types.ObjectId,
     density?: number,
-    session?: ClientSession
+    session?: ClientSession,
+    projectId?: string
   ): Promise<number> {
     const referenceMaterial = await Material.findById(materialId)
       .select("name projectId")
       .session(session)
       .lean();
 
-    if (!referenceMaterial?.name) {
-      console.error("❌ [Material Service] Material not found:", materialId);
-      throw new Error(`Material ${materialId} not found or has no name`);
+    if (!referenceMaterial?.name || !referenceMaterial.projectId) {
+      console.error("❌ [Material Service] Material not found or missing project:", materialId);
+      throw new Error(`Material ${materialId} not found, has no name, or no project`);
     }
 
     console.log(
@@ -80,9 +81,12 @@ export class MaterialService {
     }
 
     try {
-      // Update all materials with this name
+      // Update only materials with this name in the same project
       const updateResult = await Material.updateMany(
-        { name: referenceMaterial.name },
+        {
+          name: referenceMaterial.name,
+          projectId: projectId || referenceMaterial.projectId
+        },
         {
           $set: {
             kbobMatchId,
@@ -438,64 +442,38 @@ export class MaterialService {
   /**
    * Gets projects with materials using efficient queries
    */
-  static async getProjectsWithMaterials(): Promise<
-    Array<{
-      id: string;
-      name: string;
-      materialIds: string[];
-    }>
-  > {
-    try {
-      const [projects, elements] = await Promise.all([
-        Project.find().lean(),
-        Element.find()
-          .select("materials.material projectId")
-          .populate("projectId", "name")
-          .lean(),
-      ]);
+  static async getProjectsWithMaterials(userId: string) {
+    // Get all projects for the user
+    const projects = await Project.find({ userId })
+      .select("_id name")
+      .lean();
 
-      const projectMaterials = new Map<string, Set<string>>();
-      projects.forEach((project) => {
-        projectMaterials.set(project._id.toString(), new Set());
-      });
+    // Get all materials for these projects
+    const projectIds = projects.map((p) => p._id);
+    const materials = await Material.find({
+      projectId: { $in: projectIds },
+    })
+      .select("name projectId")
+      .lean();
 
-      elements.forEach((element) => {
-        if (
-          element.projectId &&
-          typeof element.projectId === "object" &&
-          "_id" in element.projectId
-        ) {
-          const projectId = element.projectId._id.toString();
-          const materialSet = projectMaterials.get(projectId) || new Set();
+    // Group materials by project
+    const materialsByProject = materials.reduce((acc, material) => {
+      const projectId = material.projectId.toString();
+      if (!acc[projectId]) {
+        acc[projectId] = [];
+      }
+      acc[projectId].push(material);
+      return acc;
+    }, {} as Record<string, any[]>);
 
-          element.materials.forEach((mat) => {
-            if (mat.material) {
-              const materialId =
-                typeof mat.material === "string"
-                  ? mat.material
-                  : mat.material.toString();
-              materialSet.add(materialId);
-            }
-          });
-
-          projectMaterials.set(projectId, materialSet);
-        }
-      });
-
-      return projects.map((project) => ({
-        id: project._id.toString(),
-        name: project.name,
-        materialIds: Array.from(
-          projectMaterials.get(project._id.toString()) || new Set()
-        ),
-      }));
-    } catch (error) {
-      console.error(
-        "❌ [Material Service] Error in getProjectsWithMaterials:",
-        error
-      );
-      throw error;
-    }
+    // Combine project info with their materials
+    return projects.map((project) => ({
+      id: project._id.toString(),
+      name: project.name,
+      materialIds: (materialsByProject[project._id.toString()] || []).map(
+        (m) => m._id.toString()
+      ),
+    }));
   }
 
   /**
@@ -574,6 +552,7 @@ export class MaterialService {
           thickness: number;
           layerId?: string;
           layerName?: string;
+          volume: number;
         }>;
       };
     }>,
@@ -581,16 +560,10 @@ export class MaterialService {
     session: mongoose.ClientSession
   ) {
 
-
     try {
       // Group materials by name and accumulate volumes
       const materialsByName = elements.reduce((acc: { [key: string]: any }, element) => {
         if (!element.materialLayers?.layers) return acc;
-
-        const totalThickness = element.materialLayers.layers.reduce(
-          (sum, layer) => sum + (layer.thickness || 0),
-          0
-        );
 
         element.materialLayers.layers.forEach(layer => {
           if (!layer.materialName) return;
@@ -604,10 +577,8 @@ export class MaterialService {
             };
           }
 
-          // Calculate volume fraction for this layer
-          const volumeFraction = totalThickness > 0 ? (layer.thickness || 0) / totalThickness : 0;
-          const layerVolume = (element.netVolume || 0) * volumeFraction;
-
+          // Use the provided layer volume instead of recalculating
+          const layerVolume = layer.volume || 0;
           acc[materialKey].volume += layerVolume;
           acc[materialKey].elements.push({
             globalId: element.globalId,
@@ -619,7 +590,6 @@ export class MaterialService {
 
         return acc;
       }, {});
-
 
       // Create/update materials
       const materialOps = Object.values(materialsByName).map((material: any) => ({
@@ -671,6 +641,25 @@ export class MaterialService {
           0
         ) || 0;
 
+        // Calculate total volume from layers instead of using netVolume
+        const totalVolume = element.materialLayers?.layers.reduce(
+          (sum, layer) => sum + (layer.volume || 0),
+          0
+        ) || 0;
+
+        console.log(`📊 [Material Service] Processing element:`, {
+          guid: element.globalId,
+          type: element.type,
+          netVolume: element.netVolume,
+          totalLayerVolume: totalVolume,
+          layerCount: element.materialLayers?.layers.length || 0,
+          layerVolumes: element.materialLayers?.layers.map(l => ({
+            material: l.materialName,
+            volume: l.volume,
+            thickness: l.thickness
+          }))
+        });
+
         return {
           updateOne: {
             filter: {
@@ -681,22 +670,25 @@ export class MaterialService {
               $set: {
                 name: element.name,
                 type: element.type,
-                volume: element.netVolume || 0,
+                volume: totalVolume,  // Use total volume from layers
                 materials: element.materialLayers?.layers.map(layer => {
-                  const volumeFraction = totalThickness > 0 ? (layer.thickness || 0) / totalThickness : 0;
                   const materialId = materialMap.get(layer.materialName.trim().toLowerCase());
 
                   if (!materialId) {
                     return null;
                   }
 
+                  const volume = layer.volume || 0;
+                  const thickness = layer.thickness || 0;
+                  const fraction = totalThickness > 0 ? thickness / totalThickness : 0;
+
                   return {
                     material: new mongoose.Types.ObjectId(materialId),
-                    volume: (element.netVolume || 0) * volumeFraction,
-                    density: 0,
-                    mass: 0,
-                    fraction: volumeFraction,
-                    thickness: layer.thickness,
+                    volume: volume,
+                    density: 0,  // Will be set by KBOB match
+                    mass: 0,     // Will be calculated after density is set
+                    fraction: fraction,
+                    thickness: thickness,
                     indicators: {
                       gwp: 0,
                       ubp: 0,
@@ -704,11 +696,6 @@ export class MaterialService {
                     }
                   };
                 }).filter(m => m !== null) || [],
-                indicators: {
-                  gwp: 0,
-                  ubp: 0,
-                  penre: 0
-                },
                 updatedAt: new Date()
               },
               $setOnInsert: {

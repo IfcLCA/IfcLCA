@@ -18,11 +18,6 @@ interface IElement {
       penre: number;
     };
   }>;
-  indicators?: {
-    gwp: number;
-    ubp: number;
-    penre: number;
-  };
 }
 
 const elementSchema = new mongoose.Schema<IElement>(
@@ -53,11 +48,6 @@ const elementSchema = new mongoose.Schema<IElement>(
         },
       },
     ],
-    indicators: {
-      gwp: Number,
-      ubp: Number,
-      penre: Number,
-    },
   },
   {
     timestamps: true,

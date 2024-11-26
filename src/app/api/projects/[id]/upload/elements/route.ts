@@ -1,5 +1,6 @@
 "use server";
 
+import { NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import { connectToDatabase } from "@/lib/mongodb";
 import { Element, Upload } from "@/models";
@@ -25,10 +26,9 @@ export async function saveElements(
   data: { elements: any[]; uploadId: string }
 ) {
   try {
-    // Use auth() from server package
-    const { userId } = auth();
+    const { userId } = await auth();
     if (!userId) {
-      throw new Error("Unauthorized");
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     // Validate input

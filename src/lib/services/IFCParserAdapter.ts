@@ -11,6 +11,7 @@ export interface IFCElement {
     layers: Array<{
       materialName: string;
       thickness: number;
+      volume?: number;
       layerId?: string;
       layerName?: string;
     }>;
@@ -31,7 +32,7 @@ export class IFCParserAdapter {
   async parseContent(): Promise<IFCElement[]> {
     try {
       const elements = this.extractor.extractElements();
-      
+
       const transformedElements = Object.values(elements).flat().map(element => ({
         globalId: element.id,
         type: element.type,
@@ -42,7 +43,8 @@ export class IFCParserAdapter {
           layerSetName: `${element.type}_Layers`,
           layers: element.materials.map(material => ({
             materialName: material.name,
-            thickness: material.volume ? parseFloat(material.volume.toString()) : 0,
+            thickness: material.fraction || 0,
+            volume: material.volume || 0,
             layerId: material.id,
             layerName: material.name
           }))

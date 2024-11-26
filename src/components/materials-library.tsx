@@ -1,26 +1,15 @@
 "use client";
 
 import { useState, useMemo, useEffect, useRef, useCallback } from "react";
-import { ArrowUpDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
 import {
   Card,
   CardContent,
-  CardDescription,
   CardHeader,
-  CardTitle,
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+
 import { MagnifyingGlassIcon } from "@radix-ui/react-icons";
 import {
   Select,
@@ -33,7 +22,6 @@ import {
   Pagination,
   PaginationContent,
   PaginationItem,
-  PaginationLink,
   PaginationNext,
   PaginationPrevious,
 } from "@/components/ui/pagination";
@@ -576,7 +564,7 @@ export function MaterialLibraryComponent() {
   }
 
   return (
-    <Card className="h-[calc(100vh-6rem)] flex flex-col overflow-hidden border-0 -mt-14">
+    <Card className="h-[calc(100vh-6rem)] flex flex-col overflow-hidden border-0 shadow-none -mt-14">
       <CardHeader className="pb-0 flex-shrink-0 px-0">
         <div className="flex items-center justify-between">
           <div>
@@ -659,16 +647,16 @@ export function MaterialLibraryComponent() {
                         transition-all duration-300 ease-out
                         hover:bg-secondary/5 hover:scale-[1.02] hover:z-10
                         group
-                        ${material.id === activeSearchId ? 
-                          'ring-2 ring-blue-400 ring-offset-2 shadow-lg bg-blue-50/50 scale-[1.03] z-20 my-4' : 
+                        ${material.id === activeSearchId ?
+                          'ring-2 ring-blue-400 ring-offset-2 shadow-lg bg-blue-50/50 scale-[1.03] z-20 my-4' :
                           'hover:ring-1 hover:ring-primary/30'
                         }
-                        ${isSelected(material) ? 
-                          'animate-in fade-in-0 duration-500 ring-2 ring-primary ring-offset-1 shadow-sm z-10' : 
+                        ${isSelected(material) ?
+                          'animate-in fade-in-0 duration-500 ring-2 ring-primary ring-offset-1 shadow-sm z-10' :
                           ''
                         }
-                        ${temporaryMatches[material.id] ? 
-                          'animate-in zoom-in-95 duration-300 ease-bounce' : 
+                        ${temporaryMatches[material.id] ?
+                          'animate-in zoom-in-95 duration-300 ease-bounce' :
                           ''
                         }
                         rounded-md my-2

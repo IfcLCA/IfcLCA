@@ -48,18 +48,44 @@ export async function parseIFCFile(file: File, projectId: string): Promise<IFCPa
     // Pre-process materials before chunking to avoid redundant processing
     const materialsMap = new Map<string, boolean>();
     let unmatchedMaterialCount = 0;
+    const uniqueMaterialNames: string[] = [];
 
-    parsedElements.forEach(element => {
+    // Collect unique material names
+    for (const element of parsedElements) {
       if (element.materialLayers?.layers) {
-        element.materialLayers.layers.forEach(layer => {
-          if (layer.materialName) {
-            materialsMap.set(layer.materialName, true);
-          } else {
+        for (const layer of element.materialLayers.layers) {
+          if (!layer.materialName) {
             unmatchedMaterialCount++;
+            continue;
           }
-        });
+          
+          if (!materialsMap.has(layer.materialName)) {
+            materialsMap.set(layer.materialName, true);
+            uniqueMaterialNames.push(layer.materialName);
+          }
+        }
       }
-    });
+    }
+
+    // Check for material matches through API
+    if (uniqueMaterialNames.length > 0) {
+      try {
+        const response = await fetch('/api/materials/check-matches', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ materialNames: uniqueMaterialNames })
+        });
+
+        if (response.ok) {
+          const { unmatchedCount } = await response.json();
+          unmatchedMaterialCount += unmatchedCount;
+        } else {
+          logger.error('Failed to check material matches:', await response.text());
+        }
+      } catch (error) {
+        logger.error('Error checking material matches:', error);
+      }
+    }
 
     // Optimize chunk size based on element count
     const totalElements = parsedElements.length;
@@ -133,7 +159,7 @@ export async function parseIFCFile(file: File, projectId: string): Promise<IFCPa
       elementCount: totalProcessed,
       materialCount: materialsMap.size,
       unmatchedMaterialCount,
-      shouldRedirectToLibrary: materialsMap.size > 0
+      shouldRedirectToLibrary: unmatchedMaterialCount > 0
     };
   } catch (error) {
     logger.error('Error in parseIFCFile', { error });

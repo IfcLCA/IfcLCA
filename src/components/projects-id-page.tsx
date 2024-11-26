@@ -148,12 +148,9 @@ export default function ProjectDetailsPage() {
   const fetchProject = async () => {
     try {
       setIsLoading(true);
-      console.log("Fetching project:", projectId);
       const response = await fetch(`/api/projects/${projectId}`);
       const data = await response.json();
-      console.log("Raw project data:", data);
       const transformed = transformProjectData(data);
-      console.log("Transformed project data:", transformed);
       setProject(transformed);
     } catch (err) {
       console.error("Error fetching project:", err);

@@ -171,12 +171,8 @@ export class IFCElementExtractor {
       entityCount++;
 
       if (entityCount % 1000 === 0) {
-        console.log(`Parsed ${entityCount} entities...`);
       }
     }
-    console.log(`Parsed ${entityCount} entities total`);
-    console.log(`Indexed ${this.materialIndex.size} materials`);
-    console.log(`Created type index with ${this.entityTypeIndex.size} types`);
   }
 
   private buildPropertySetIndex(): void {
@@ -197,12 +193,6 @@ export class IFCElementExtractor {
   }
 
   private findElementVolume(element: any): string {
-    // Check cache first
-    const cachedVolume = this.volumeCache.get(element.id);
-    if (cachedVolume !== undefined) {
-      return cachedVolume;
-    }
-
     try {
       const propertySets = this.propertySetIndex.get(element.id) || [];
 
@@ -211,19 +201,33 @@ export class IFCElementExtractor {
         if (!propertySet) continue;
 
         // Try quantity set first (more reliable)
-        const quantityVolume = this.checkQuantitySet(element, propertySet);
-        if (quantityVolume) {
-          this.volumeCache.set(element.id, quantityVolume);
-          return quantityVolume;
+        const quantities = this.parseList(propertySet.attributes[5] || '');
+        let netVolume = null;
+        let grossVolume = null;
+
+        for (const ref of quantities) {
+          const quantity = this.entities.get(this.stripHashFromId(ref));
+          if (!quantity || quantity.type !== 'IFCQUANTITYVOLUME') continue;
+
+          const name = this.removeQuotes(quantity.attributes[0] || '');
+          if (name === 'NetVolume') {
+            netVolume = quantity.attributes[3];
+          } else if (name === 'GrossVolume') {
+            grossVolume = quantity.attributes[3];
+          }
         }
 
-        // Fall back to property set
-        const propertyVolume = this.checkPropertySet(propertySet);
-        if (propertyVolume) {
-          this.volumeCache.set(element.id, propertyVolume);
-          return propertyVolume;
+        // Prefer NetVolume, fallback to GrossVolume
+        if (netVolume !== null) {
+          return netVolume;
+        }
+        if (grossVolume !== null) {
+          return grossVolume;
         }
       }
+
+      console.warn(`Element ID: ${element.id}, Volume not found, defaulting to 0.000`);
+      return '0.000';
     } catch (error) {
       console.error("Error finding element volume:", error);
     }
@@ -308,7 +312,6 @@ export class IFCElementExtractor {
       }
     }
 
-    console.log(`Processed ${spatialCount} spatial relationships and ${materialCount} material relationships`);
   }
 
   private processMaterialLayerSet(materialEntity: any): any[] {
@@ -556,6 +559,8 @@ export class IFCElementExtractor {
         elements[element.type] = [];
       }
 
+      const guid = element ? this.removeQuotes(element.attributes[0]) : 'Unknown GUID';
+
       const materialsList = relationship?.materials || [];
       const storey = relationship?.spatialStructure;
 
@@ -588,8 +593,9 @@ export class IFCElementExtractor {
       }
 
       const volume = this.findElementVolume(element);
+      console.log(`📊 [IFC Parser] Processing element: {\n  guid: '${guid}',\n  type: '${element.type}',\n  netVolume: '${volume}',\n  totalLayerVolume: ${materialsList.reduce((sum, m) => sum + (m.volume || 0), 0)},\n  layerCount: ${materialsList.length},\n  layerVolumes: [\n    ${materialsList.map(m => `{ material: '${m.name}', volume: ${m.volume || 0}, thickness: ${m.fraction || 0} }`).join(',\n    ')}\n  ]\n}`);
       elements[element.type].push({
-        id: elementId,
+        id: guid,
         type: element.type,
         name: elementName,
         buildingStory,

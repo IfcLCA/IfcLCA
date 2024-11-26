@@ -1,11 +1,17 @@
 import { NextResponse } from "next/server";
 import { MaterialService } from "@/lib/services/material-service";
-import dbConnect from "@/lib/db";
+import { connectToDatabase } from "@/lib/mongodb";
+import { auth } from "@clerk/nextjs/server";
 
 export async function GET() {
   try {
-    await dbConnect();
-    const projects = await MaterialService.getProjectsWithMaterials();
+    const { userId } = await auth();
+    if (!userId) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    await connectToDatabase();
+    const projects = await MaterialService.getProjectsWithMaterials(userId);
     return NextResponse.json(projects);
   } catch (error) {
     console.error("Failed to fetch projects:", error);
