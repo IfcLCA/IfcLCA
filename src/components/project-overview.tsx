@@ -133,17 +133,17 @@ export function ProjectOverview({
 
   const calculateTotalEmissions = (project: any) => {
     if (!project.elements?.length) return 0;
-    
+
     return project.elements.reduce((total: number, element: any) => {
       if (!element.materials?.length) return total;
-      
+
       const elementTotal = element.materials.reduce((materialTotal: number, material: any) => {
         if (!material.indicators) return materialTotal;
-        
+
         const value = material.indicators[selectedMetric] || 0;
         return materialTotal + value;
       }, 0);
-      
+
       return total + elementTotal;
     }, 0);
   };

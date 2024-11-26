@@ -43,6 +43,7 @@ import {
 import { emissionsColumns } from "@/components/emissions-columns";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
+import cn from "classnames";
 
 interface KBOBMaterial {
   _id: string;
@@ -517,7 +518,15 @@ const UploadCard = ({ upload }: { upload: ExtendedProject["uploads"][0] }) => (
         </p>
       </div>
       <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
-        <Badge variant={upload.status === "Completed" ? "success" : "warning"}>
+        <Badge 
+          variant={upload.status?.toLowerCase() === "completed" ? "success" : "warning"}
+          className={cn(
+            "transition-colors",
+            upload.status?.toLowerCase() === "completed" 
+              ? "bg-green-100 text-green-800 hover:bg-green-200" 
+              : "bg-yellow-100 text-yellow-800 hover:bg-yellow-200"
+          )}
+        >
           {upload.status}
         </Badge>
       </div>
