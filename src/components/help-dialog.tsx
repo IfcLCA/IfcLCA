@@ -209,7 +209,7 @@ export function HelpDialog() {
                     <div className="space-y-2">
                       <h4 className="font-medium">Upload</h4>
                       <div className="text-sm text-muted-foreground space-y-2">
-                        <p>Drop your IFC file in the upload area or click to browse:</p>
+                        <p>Drop your Ifc file in the upload area or click to browse:</p>
                         <ul className="list-disc list-inside">
                           <li>Files are processed locally</li>
                           <li>Ifc don't get stored on our servers</li>
@@ -285,7 +285,7 @@ export function HelpDialog() {
                         <div>
                           <h5 className="font-medium text-foreground">Common Issues</h5>
                           <ul className="list-disc list-inside">
-                            <li>Missing quantities in IFC</li>
+                            <li>Missing quantities in Ifc</li>
                             <li>Unmatched materials</li>
                             <li>Large file processing</li>
                             <li>Export settings</li>

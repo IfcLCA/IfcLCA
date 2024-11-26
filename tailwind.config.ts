@@ -9,6 +9,9 @@ const config: Config = {
   ],
   theme: {
     extend: {
+      fontFamily: {
+        sans: ['var(--font-nunito-sans)'],
+      },
       colors: {
         border: "hsl(var(--border))",
         input: "hsl(var(--input))",

@@ -1,16 +1,16 @@
-import { useState } from "react";
+import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Dialog,
   DialogContent,
-  DialogHeader,
-  DialogTitle,
   DialogDescription,
   DialogFooter,
+  DialogHeader,
+  DialogTitle,
 } from "@/components/ui/dialog";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import Link from "next/link";
+import { useState } from "react";
 
 interface TermsAcceptanceModalProps {
   open: boolean;
@@ -27,30 +27,74 @@ export function TermsAcceptanceModal({
     <Dialog open={open}>
       <DialogContent className="max-w-2xl">
         <DialogHeader>
-          <DialogTitle>Terms of Service & Privacy Policy</DialogTitle>
+          <DialogTitle>Welcome to IfcLCA!</DialogTitle>
           <DialogDescription>
-            Please read and accept our Terms of Service and Privacy Policy to
-            continue.
+            Here to help you optimize your construction projects through Life Cycle Assessment
           </DialogDescription>
         </DialogHeader>
 
-        <ScrollArea className="h-[280px] rounded-md border p-4">
-          <div className="space-y-4">
-            <h3 className="text-lg font-semibold">Terms of Service</h3>
-            <p className="text-sm text-muted-foreground">
-              By using IfcLCA, you agree to our terms of service which includes
-              the usage of our platform under the AGPL-3.0 license.
-            </p>
+        <ScrollArea className="h-[400px] rounded-md border p-6">
+          <div className="space-y-6">
+            <div>
+              <h3 className="text-lg font-semibold mb-2">What is IfcLCA?</h3>
+              <p className="text-muted-foreground">
+                IfcLCA lets you analyze the environmental impact
+                of your construction projects using Ifc (Industry Foundation Classes) files.
+                It automates the process of material analysis, environmental impact calculations, and report generation.
+              </p>
+            </div>
 
-            <h3 className="text-lg font-semibold">Privacy Policy</h3>
-            <p className="text-sm text-muted-foreground">
-              We collect and process your data as described in our privacy
-              policy to provide and improve our services.
-            </p>
+            <div>
+              <h3 className="text-lg font-semibold mb-2">Getting Started</h3>
+              <ol className="space-y-4 list-decimal pl-6">
+                <li>
+                  <span className="font-medium block">Create a New Project</span>
+                  <p className="text-muted-foreground">
+                    Start by creating a project to organize your LCA calculations
+                  </p>
+                </li>
+                <li>
+                  <span className="font-medium block">Upload Your Ifc Model</span>
+                  <p className="text-muted-foreground">
+                    Import your Ifc model and assign environmental impact data
+                  </p>
+                </li>
+                <li>
+                  <span className="font-medium block">Review Materials</span>
+                  <p className="text-muted-foreground">
+                    Verify the materials detected in your model and their environmental properties
+                  </p>
+                </li>
+                <li>
+                  <span className="font-medium block">Generate Reports</span>
+                  <p className="text-muted-foreground">
+                    Get detailed environmental impact calculations and insights
+                  </p>
+                </li>
+              </ol>
+            </div>
+
+            <div>
+              <h3 className="text-lg font-semibold mb-2">Key Features</h3>
+              <ul className="space-y-2 list-disc pl-6">
+                <li className="text-muted-foreground">
+                  Automatic material detection from Ifc files
+                </li>
+                <li className="text-muted-foreground">
+                  Environmental impact calculations using data from swiss KBOB list through lcadata.ch
+                </li>
+                <li className="text-muted-foreground">
+                  Multiple environmental indicators (GWP, PENRE, UBP), for now without amortization or project area
+                </li>
+                <li className="text-muted-foreground">
+                  Detailed reports and visualizations of absolute emissions
+                </li>
+              </ul>
+            </div>
 
             <div className="pt-4">
               <p className="text-sm text-muted-foreground">
-                For full details, please read our{" "}
+                By using IfcLCA, you agree to our{" "}
                 <Link href="/terms" className="text-primary hover:underline">
                   Terms of Service
                 </Link>{" "}
@@ -79,8 +123,8 @@ export function TermsAcceptanceModal({
         </div>
 
         <DialogFooter>
-          <Button onClick={onAccept} disabled={!accepted}>
-            Continue
+          <Button onClick={onAccept} disabled={!accepted} size="lg">
+            Get Started
           </Button>
         </DialogFooter>
       </DialogContent>
