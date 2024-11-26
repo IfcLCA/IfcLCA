@@ -15,6 +15,7 @@ interface IFCElement {
       thickness?: number;
       layerId?: string;
       layerName?: string;
+      volume?: number;
     }>;
     layerSetName?: string;
   };
@@ -30,14 +31,11 @@ export async function POST(
   { params }: { params: { id: string } }
 ) {
   const session = await mongoose.startSession();
-  let uploadId: string | undefined;
 
   try {
-    const body = await request.json();
-    uploadId = body.uploadId;
-    const { elements, isLastChunk } = body;
-
-    if (!uploadId || !elements) {
+    const { uploadId, elements, isLastChunk } = await request.json();
+    
+    if (!uploadId || !elements || typeof isLastChunk !== 'boolean') {
       return NextResponse.json(
         { error: "Missing required fields" },
         { status: 400 }
@@ -46,70 +44,30 @@ export async function POST(
 
     await connectToDatabase();
 
-    let processResult;
     await session.withTransaction(async () => {
       // Process materials and elements
-      processResult = await MaterialService.processMaterials(
+      await MaterialService.processMaterials(
         params.id,
         elements,
-        uploadId!,
+        uploadId,
         session
       );
 
-      logger.debug('Material processing result', processResult);
-
-      // Update upload status if this is the last chunk
       if (isLastChunk) {
+        // Update upload status when processing is complete
         await Upload.findByIdAndUpdate(
           uploadId,
-          {
-            status: "Completed",
-            elementCount: processResult.elementCount,
-            materialCount: processResult.materialCount,
-            unmatchedMaterialCount: processResult.unmatchedMaterialCount
-          },
+          { status: 'completed' },
           { session }
         );
-
-        logger.debug('Processing complete', processResult);
       }
-
-      return processResult;
     });
 
-    logger.debug('Sending response', {
-      success: true,
-      elementCount: processResult.elementCount,
-      materialCount: processResult.materialCount,
-      unmatchedMaterialCount: processResult.unmatchedMaterialCount
-    });
-
-    return NextResponse.json({
-      success: true,
-      elementCount: processResult.elementCount,
-      materialCount: processResult.materialCount,
-      unmatchedMaterialCount: processResult.unmatchedMaterialCount,
-    });
+    return NextResponse.json({ success: true });
   } catch (error) {
-    logger.error('Error processing chunk', { error });
-
-    if (uploadId) {
-      try {
-        await Upload.findByIdAndUpdate(
-          uploadId,
-          {
-            status: "Failed",
-            error: error.message || "Unknown error occurred",
-          },
-          { session }
-        );
-      } catch (updateError) {
-        logger.error('Failed to update upload status', { updateError });
-      }
-    }
-
+    logger.error("[Process Materials API] Error:", error);
     return NextResponse.json(
-      { error: error.message || "Error processing upload" },
+      { error: "Internal server error" },
       { status: 500 }
     );
   } finally {

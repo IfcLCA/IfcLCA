@@ -67,12 +67,6 @@ export class MaterialService {
       throw new Error(`Material ${materialId} not found, has no name, or no project`);
     }
 
-    console.log(
-      `\n🔄 [Material Service] Updating KBOB match for "${referenceMaterial.name}"`
-    );
-    console.log(`   Material ID: ${materialId}`);
-    console.log(`   KBOB Match ID: ${kbobMatchId}`);
-    if (density) console.log(`   Density: ${density} kg/m³`);
 
     // Use a transaction if one wasn't provided
     const useSession = session || (await mongoose.startSession());
@@ -106,15 +100,7 @@ export class MaterialService {
         .session(useSession)
         .lean();
 
-      console.log("\n📊 [Material Service] Update results:");
-      console.log(`   Materials updated: ${updateResult.modifiedCount}`);
-      console.log(
-        `   Projects affected: ${new Set(updatedMaterials.map((m) => m.projectId?.name)).size
-        }`
-      );
-
       // Recalculate affected elements
-      console.log("\n🔄 [Material Service] Recalculating affected elements...");
       const recalcResult = await this.recalculateElementsForMaterials(
         updatedMaterials.map((m) => m._id),
         useSession
@@ -124,9 +110,6 @@ export class MaterialService {
         await useSession.commitTransaction();
       }
 
-      console.log("\n✅ [Material Service] KBOB match update completed:");
-      console.log(`   Materials updated: ${updateResult.modifiedCount}`);
-      console.log(`   Elements recalculated: ${recalcResult}`);
 
       return updateResult.modifiedCount;
     } catch (error) {
@@ -152,9 +135,6 @@ export class MaterialService {
     const BATCH_SIZE = 500;
     let totalModified = 0;
 
-    console.log(
-      `\n🔄 [Material Service] Starting element recalculation for ${materialIds.length} materials`
-    );
 
     // Get all materials with their KBOB matches in one query
     const materials = await Material.find({ _id: { $in: materialIds } })
@@ -164,13 +144,8 @@ export class MaterialService {
       .lean();
 
     if (!materials.length) {
-      console.log("ℹ️ [Material Service] No materials found to process");
       return 0;
     }
-
-    console.log(
-      `📦 [Material Service] Loaded ${materials.length} materials with KBOB data`
-    );
 
     const materialMap = new Map(materials.map((m) => [m._id.toString(), m]));
 
@@ -180,20 +155,11 @@ export class MaterialService {
         "materials.material": { $in: materialIds },
       }).session(session);
 
-      console.log(
-        `\n📊 [Material Service] Found ${totalElements} elements to process`
-      );
-      console.log(`   Batch size: ${BATCH_SIZE}`);
-      console.log(`   Total batches: ${Math.ceil(totalElements / BATCH_SIZE)}`);
 
       // Process in batches
       for (let skip = 0; skip < totalElements; skip += BATCH_SIZE) {
         const batchNumber = Math.floor(skip / BATCH_SIZE) + 1;
         const totalBatches = Math.ceil(totalElements / BATCH_SIZE);
-
-        console.log(
-          `\n🔄 [Material Service] Processing batch ${batchNumber}/${totalBatches}`
-        );
 
         const elements = await Element.find({
           "materials.material": { $in: materialIds },
@@ -236,15 +202,9 @@ export class MaterialService {
           });
 
           totalModified += result.modifiedCount;
-          console.log(
-            `   ✓ Modified ${result.modifiedCount} elements in this batch`
-          );
-          console.log(`   ✓ Total modified so far: ${totalModified}`);
         }
       }
 
-      console.log("\n✅ [Material Service] Element recalculation completed");
-      console.log(`   Total elements modified: ${totalModified}`);
 
       return totalModified;
     } catch (error) {
@@ -483,13 +443,6 @@ export class MaterialService {
     materialName: string
   ): Promise<Material | null> {
     const cleanedName = materialName.trim().toLowerCase();
-    console.log(
-      `[Material Service] Searching for material match across all projects`,
-      {
-        originalName: materialName,
-        cleanedName,
-      }
-    );
 
     try {
       // Try exact match first
@@ -501,9 +454,6 @@ export class MaterialService {
         .lean();
 
       if (exactMatch) {
-        console.log(
-          `[Material Service] Found exact match for "${materialName}"`
-        );
         return exactMatch;
       }
 
@@ -516,15 +466,9 @@ export class MaterialService {
         .lean();
 
       if (caseInsensitiveMatch) {
-        console.log(
-          `[Material Service] Found case-insensitive match for "${materialName}"`
-        );
         return caseInsensitiveMatch;
       }
 
-      console.log(
-        `[Material Service] No existing material match found for "${materialName}"`
-      );
       return null;
     } catch (error) {
       console.error(
@@ -647,18 +591,7 @@ export class MaterialService {
           0
         ) || 0;
 
-        console.log(`📊 [Material Service] Processing element:`, {
-          guid: element.globalId,
-          type: element.type,
-          netVolume: element.netVolume,
-          totalLayerVolume: totalVolume,
-          layerCount: element.materialLayers?.layers.length || 0,
-          layerVolumes: element.materialLayers?.layers.map(l => ({
-            material: l.materialName,
-            volume: l.volume,
-            thickness: l.thickness
-          }))
-        });
+
 
         return {
           updateOne: {
@@ -724,6 +657,68 @@ export class MaterialService {
         elementCount: elementOps.length
       };
     } catch (error) {
+      throw error;
+    }
+  }
+
+  /**
+   * Creates or updates a material with an existing match
+   */
+  static async createMaterialWithMatch(
+    projectId: string,
+    materialName: string,
+    kbobMatchId: Types.ObjectId,
+    density?: number
+  ): Promise<Material> {
+    try {
+      // Check if material already exists in the project
+      const existingMaterial = await Material.findOne({
+        name: materialName,
+        projectId
+      });
+
+      // Fetch KBOB material data
+      const kbobMaterial = await KBOBMaterial.findById<IKBOBMaterial>(kbobMatchId).lean();
+      if (!kbobMaterial) {
+        throw new Error(`KBOB material not found for id: ${kbobMatchId}`);
+      }
+
+      // Calculate density if not provided
+      const finalDensity = density || this.calculateDensity(kbobMaterial);
+      if (!finalDensity) {
+        throw new Error(`Could not determine density for material: ${materialName}`);
+      }
+
+      // Calculate LCA indicators
+      const indicators = this.calculateIndicators(1, finalDensity, kbobMaterial);
+      if (!indicators) {
+        throw new Error(`Could not calculate indicators for material: ${materialName}`);
+      }
+
+      if (existingMaterial) {
+        // Update existing material
+        existingMaterial.kbobMatchId = kbobMatchId;
+        existingMaterial.density = finalDensity;
+        existingMaterial.gwp = indicators.gwp;
+        existingMaterial.ubp = indicators.ubp;
+        existingMaterial.penre = indicators.penre;
+        await existingMaterial.save();
+        return existingMaterial;
+      } else {
+        // Create new material
+        const newMaterial = await Material.create({
+          name: materialName,
+          projectId,
+          kbobMatchId,
+          density: finalDensity,
+          gwp: indicators.gwp,
+          ubp: indicators.ubp,
+          penre: indicators.penre
+        });
+        return newMaterial;
+      }
+    } catch (error) {
+      console.error("❌ [Material Service] Error in createMaterialWithMatch:", error);
       throw error;
     }
   }

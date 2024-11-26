@@ -61,26 +61,34 @@ export class IFCElementExtractor {
 
   private parseList(list: string): string[] {
     if (!list) return [];
-    // Handle nested parentheses
     let result = [];
     let currentItem = '';
     let depth = 0;
+    let inQuotes = false;
 
     for (let i = 0; i < list.length; i++) {
       const char = list[i];
+
+      // Handle quotes
+      if (char === "'") {
+        inQuotes = !inQuotes;
+        currentItem += char;
+        continue;
+      }
+
       if (char === '(') {
         depth++;
         if (depth === 1 && currentItem === '') continue;
         currentItem += char;
       } else if (char === ')') {
         depth--;
-        if (depth === 0 && currentItem !== '') {
+        if (depth === 0 && !inQuotes && currentItem !== '') {
           result.push(currentItem.trim());
           currentItem = '';
         } else {
           currentItem += char;
         }
-      } else if (char === ',' && depth === 0) {
+      } else if (char === ',' && depth === 0 && !inQuotes) {
         if (currentItem !== '') {
           result.push(currentItem.trim());
           currentItem = '';
@@ -593,7 +601,6 @@ export class IFCElementExtractor {
       }
 
       const volume = this.findElementVolume(element);
-      console.log(`📊 [IFC Parser] Processing element: {\n  guid: '${guid}',\n  type: '${element.type}',\n  netVolume: '${volume}',\n  totalLayerVolume: ${materialsList.reduce((sum, m) => sum + (m.volume || 0), 0)},\n  layerCount: ${materialsList.length},\n  layerVolumes: [\n    ${materialsList.map(m => `{ material: '${m.name}', volume: ${m.volume || 0}, thickness: ${m.fraction || 0} }`).join(',\n    ')}\n  ]\n}`);
       elements[element.type].push({
         id: guid,
         type: element.type,
@@ -608,11 +615,6 @@ export class IFCElementExtractor {
         })),
         volume
       });
-    }
-
-    console.log('Element types found:', Object.keys(elements));
-    for (const [type, list] of Object.entries(elements)) {
-      console.log(`${type}: ${list.length} elements`);
     }
 
     return elements;
@@ -664,8 +666,16 @@ export class IFCElementExtractor {
   }
 
   private extractName(line: string): string | undefined {
-    const nameMatch = line.match(/'([^']+)'/);
-    return nameMatch ? nameMatch[1] : undefined;
+    const match = line.match(/^#\d+=\s*\w+\((.*?)\);?$/);
+    if (!match) return undefined;
+
+    const attributes = this.parseList(match[1]);
+    // Name is typically the third attribute in IFC entities
+    if (attributes.length >= 3) {
+      const name = this.removeQuotes(attributes[2]);
+      return name === '$' ? undefined : name;
+    }
+    return undefined;
   }
 
   private extractMaterials(line: string, lineNumber: number): IFCMaterial[] {
