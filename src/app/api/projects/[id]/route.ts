@@ -12,41 +12,57 @@ export async function GET(
 ) {
   try {
     await connectToDatabase();
-    const project = await Project.findById(params.id).lean();
+    
+    // Validate project ID
+    if (!mongoose.Types.ObjectId.isValid(params.id)) {
+      return NextResponse.json({ error: "Invalid project ID" }, { status: 400 });
+    }
+
+    const projectId = new mongoose.Types.ObjectId(params.id);
+    const project = await Project.findById(projectId).lean();
 
     if (!project) {
       return NextResponse.json({ error: "Project not found" }, { status: 404 });
     }
 
-    // First, get all materials for the project with populated KBOB matches
-    const materials = await mongoose.models.Material.find({ projectId: project._id })
-      .populate({
-        path: 'kbobMatchId',
-        model: 'KBOBMaterial',
-        select: 'Name Category GWP UBP PENRE kg/unit min density max density'
-      })
-      .lean();
-
-
-    // Get elements with their material references
-    const elements = await mongoose.models.Element.find({ projectId: project._id })
-      .populate({
-        path: 'materials.material',
-        model: 'Material',
-        populate: {
+    // Use Promise.all to run queries in parallel
+    const [materials, elements, uploads] = await Promise.all([
+      // Get materials with KBOB matches
+      mongoose.models.Material.find({ projectId })
+        .populate({
           path: 'kbobMatchId',
           model: 'KBOBMaterial',
-          select: 'Name Category GWP UBP PENRE'
-        }
-      })
-      .lean();
+          select: 'Name Category GWP UBP PENRE kg/unit min density max density'
+        })
+        .lean()
+        .exec(),
 
+      // Get elements with material references
+      mongoose.models.Element.find({ projectId })
+        .populate({
+          path: 'materials.material',
+          model: 'Material',
+          populate: {
+            path: 'kbobMatchId',
+            model: 'KBOBMaterial',
+            select: 'Name Category GWP UBP PENRE'
+          }
+        })
+        .lean()
+        .exec(),
+
+      // Get uploads
+      mongoose.models.Upload.find({ projectId })
+        .lean()
+        .exec()
+    ]);
 
     // Process elements to ensure material references are properly populated
     const populatedElements = elements.map(element => {
       return {
         ...element,
-        materials: element.materials.map(mat => {
+        materials: (element.materials || []).map(mat => {
+          if (!mat || !mat.material) return null;
           const materialRef = mat.material;
           const kbobRef = materialRef?.kbobMatchId;
           return {
@@ -55,19 +71,17 @@ export async function GET(
               ...materialRef,
               name: materialRef?.name || 'Unknown',
               kbobMatchId: kbobRef ? {
-                Name: kbobRef.Name,
-                Category: kbobRef.Category,
-                GWP: kbobRef.GWP,
-                UBP: kbobRef.UBP,
-                PENRE: kbobRef.PENRE
+                Name: kbobRef.Name || '',
+                Category: kbobRef.Category || '',
+                GWP: kbobRef.GWP || 0,
+                UBP: kbobRef.UBP || 0,
+                PENRE: kbobRef.PENRE || 0
               } : null
             }
           };
-        }).filter(mat => mat.material !== null)
+        }).filter(mat => mat !== null && mat.material !== null)
       };
     });
-
-    const uploads = await mongoose.models.Upload.find({ projectId: project._id }).lean();
 
     const projectData = {
       ...project,

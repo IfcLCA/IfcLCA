@@ -54,6 +54,11 @@ const elementSchema = new mongoose.Schema<IElement>(
   }
 );
 
+// Add indexes for frequently queried fields
+elementSchema.index({ projectId: 1, guid: 1 });
+elementSchema.index({ "materials.material": 1 });
+elementSchema.index({ uploadId: 1, projectId: 1 });
+
 export const Element =
   (mongoose.models.Element as mongoose.Model<IElement>) ||
   mongoose.model<IElement>("Element", elementSchema);

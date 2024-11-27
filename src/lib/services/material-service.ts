@@ -135,7 +135,6 @@ export class MaterialService {
     const BATCH_SIZE = 500;
     let totalModified = 0;
 
-
     // Get all materials with their KBOB matches in one query
     const materials = await Material.find({ _id: { $in: materialIds } })
       .select("_id name kbobMatchId density")
@@ -154,7 +153,6 @@ export class MaterialService {
       const totalElements = await Element.countDocuments({
         "materials.material": { $in: materialIds },
       }).session(session);
-
 
       // Process in batches
       for (let skip = 0; skip < totalElements; skip += BATCH_SIZE) {
@@ -204,7 +202,6 @@ export class MaterialService {
           totalModified += result.modifiedCount;
         }
       }
-
 
       return totalModified;
     } catch (error) {
@@ -503,9 +500,10 @@ export class MaterialService {
     uploadId: string,
     session: mongoose.ClientSession
   ) {
+    const BATCH_SIZE = 1000; // Increased batch size for better performance
 
     try {
-      // Group materials by name and accumulate volumes
+      // Group materials by name and accumulate volumes with Set for unique elements
       const materialsByName = elements.reduce((acc: { [key: string]: any }, element) => {
         if (!element.materialLayers?.layers) return acc;
 
@@ -517,25 +515,20 @@ export class MaterialService {
             acc[materialKey] = {
               name: layer.materialName,
               volume: 0,
-              elements: []
+              elements: new Set()
             };
           }
 
-          // Use the provided layer volume instead of recalculating
           const layerVolume = layer.volume || 0;
           acc[materialKey].volume += layerVolume;
-          acc[materialKey].elements.push({
-            globalId: element.globalId,
-            name: element.name,
-            volume: layerVolume,
-            thickness: layer.thickness
-          });
+          acc[materialKey].elements.add(element.globalId);
         });
 
         return acc;
       }, {});
 
-      // Create/update materials
+      // Process materials in batches
+      const materialBatches = [];
       const materialOps = Object.values(materialsByName).map((material: any) => ({
         updateOne: {
           filter: {
@@ -545,6 +538,7 @@ export class MaterialService {
           update: {
             $set: {
               volume: material.volume,
+              elementCount: material.elements.size,
               updatedAt: new Date()
             },
             $setOnInsert: {
@@ -556,16 +550,21 @@ export class MaterialService {
         }
       }));
 
-      // Execute material operations
-      let materialResults = { upsertedCount: 0, modifiedCount: 0 };
-      if (materialOps.length > 0) {
-        materialResults = await Material.bulkWrite(materialOps, {
-          session,
-          ordered: false
-        });
+      for (let i = 0; i < materialOps.length; i += BATCH_SIZE) {
+        materialBatches.push(materialOps.slice(i, i + BATCH_SIZE));
       }
 
-      // Get all materials including newly created ones
+      // Execute material batches in parallel with ordered: false
+      const materialResults = await Promise.all(
+        materialBatches.map(batch =>
+          Material.bulkWrite(batch, {
+            session,
+            ordered: false
+          })
+        )
+      );
+
+      // Get all materials including newly created ones - use projection
       const allMaterials = await Material.find({
         projectId: new mongoose.Types.ObjectId(projectId)
       })
@@ -573,25 +572,44 @@ export class MaterialService {
         .lean()
         .session(session);
 
-      // Create material lookup map
+      // Create material lookup map with lowercase keys
       const materialMap = new Map(
         allMaterials.map(m => [m.name.trim().toLowerCase(), m._id])
       );
 
-      // Prepare element operations
+      // Process elements in batches
+      const elementBatches = [];
       const elementOps = elements.map(element => {
         const totalThickness = element.materialLayers?.layers.reduce(
           (sum, layer) => sum + (layer.thickness || 0),
           0
         ) || 0;
 
-        // Calculate total volume from layers instead of using netVolume
         const totalVolume = element.materialLayers?.layers.reduce(
           (sum, layer) => sum + (layer.volume || 0),
           0
         ) || 0;
 
+        const materials = element.materialLayers?.layers
+          .map(layer => {
+            const materialId = materialMap.get(layer.materialName.trim().toLowerCase());
+            if (!materialId) return null;
 
+            const volume = layer.volume || 0;
+            const thickness = layer.thickness || 0;
+            const fraction = totalThickness > 0 ? thickness / totalThickness : 0;
+
+            return {
+              material: new mongoose.Types.ObjectId(materialId),
+              volume,
+              density: 0,
+              mass: 0,
+              fraction,
+              thickness,
+              indicators: { gwp: 0, ubp: 0, penre: 0 }
+            };
+          })
+          .filter(m => m !== null);
 
         return {
           updateOne: {
@@ -603,32 +621,8 @@ export class MaterialService {
               $set: {
                 name: element.name,
                 type: element.type,
-                volume: totalVolume,  // Use total volume from layers
-                materials: element.materialLayers?.layers.map(layer => {
-                  const materialId = materialMap.get(layer.materialName.trim().toLowerCase());
-
-                  if (!materialId) {
-                    return null;
-                  }
-
-                  const volume = layer.volume || 0;
-                  const thickness = layer.thickness || 0;
-                  const fraction = totalThickness > 0 ? thickness / totalThickness : 0;
-
-                  return {
-                    material: new mongoose.Types.ObjectId(materialId),
-                    volume: volume,
-                    density: 0,  // Will be set by KBOB match
-                    mass: 0,     // Will be calculated after density is set
-                    fraction: fraction,
-                    thickness: thickness,
-                    indicators: {
-                      gwp: 0,
-                      ubp: 0,
-                      penre: 0
-                    }
-                  };
-                }).filter(m => m !== null) || [],
+                volume: totalVolume,
+                materials,
                 updatedAt: new Date()
               },
               $setOnInsert: {
@@ -641,21 +635,42 @@ export class MaterialService {
         };
       });
 
-      // Execute element operations
-      let elementResults = { upsertedCount: 0, modifiedCount: 0 };
-      if (elementOps.length > 0) {
-        elementResults = await Element.bulkWrite(elementOps, {
-          session,
-          ordered: false
-        });
+      for (let i = 0; i < elementOps.length; i += BATCH_SIZE) {
+        elementBatches.push(elementOps.slice(i, i + BATCH_SIZE));
       }
 
-      return {
-        materialResults,
-        elementResults,
+      // Execute element batches in parallel with ordered: false
+      const elementResults = await Promise.all(
+        elementBatches.map(batch =>
+          Element.bulkWrite(batch, {
+            session,
+            ordered: false,
+            writeConcern: { w: 1 }
+          })
+        )
+      );
+
+      // Aggregate results
+      const aggregatedResults = {
+        materialResults: materialResults.reduce(
+          (acc, result) => ({
+            upsertedCount: acc.upsertedCount + (result.upsertedCount || 0),
+            modifiedCount: acc.modifiedCount + (result.modifiedCount || 0)
+          }),
+          { upsertedCount: 0, modifiedCount: 0 }
+        ),
+        elementResults: elementResults.reduce(
+          (acc, result) => ({
+            upsertedCount: acc.upsertedCount + (result.upsertedCount || 0),
+            modifiedCount: acc.modifiedCount + (result.modifiedCount || 0)
+          }),
+          { upsertedCount: 0, modifiedCount: 0 }
+        ),
         materialCount: materialOps.length,
         elementCount: elementOps.length
       };
+
+      return aggregatedResults;
     } catch (error) {
       throw error;
     }

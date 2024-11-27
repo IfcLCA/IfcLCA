@@ -67,6 +67,11 @@ const materialSchema = new mongoose.Schema<IMaterial>(
 
 materialSchema.index({ name: 1, projectId: 1 }, { unique: true });
 
+// Add indexes for frequently queried fields
+materialSchema.index({ projectId: 1, name: 1 });
+materialSchema.index({ name: 1, kbobMatchId: 1 });
+materialSchema.index({ projectId: 1, updatedAt: -1 });
+
 materialSchema.post('save', async function(doc) {
   if (this.isModified('kbobMatchId')) {
     // Import here to avoid circular dependency
