@@ -63,10 +63,14 @@ export class MaterialService {
       .lean();
 
     if (!referenceMaterial?.name || !referenceMaterial.projectId) {
-      console.error("❌ [Material Service] Material not found or missing project:", materialId);
-      throw new Error(`Material ${materialId} not found, has no name, or no project`);
+      console.error(
+        "❌ [Material Service] Material not found or missing project:",
+        materialId
+      );
+      throw new Error(
+        `Material ${materialId} not found, has no name, or no project`
+      );
     }
-
 
     // Use a transaction if one wasn't provided
     const useSession = session || (await mongoose.startSession());
@@ -79,7 +83,7 @@ export class MaterialService {
       const updateResult = await Material.updateMany(
         {
           name: referenceMaterial.name,
-          projectId: projectId || referenceMaterial.projectId
+          projectId: projectId || referenceMaterial.projectId,
         },
         {
           $set: {
@@ -109,7 +113,6 @@ export class MaterialService {
       if (!session) {
         await useSession.commitTransaction();
       }
-
 
       return updateResult.modifiedCount;
     } catch (error) {
@@ -282,8 +285,8 @@ export class MaterialService {
           newKBOBMaterial["kg/unit"] ||
           (newKBOBMaterial["min density"] && newKBOBMaterial["max density"]
             ? (newKBOBMaterial["min density"] +
-              newKBOBMaterial["max density"]) /
-            2
+                newKBOBMaterial["max density"]) /
+              2
             : 0),
         affectedElements: elementCounts.get(material._id.toString()) || 0,
         projects: Array.from(
@@ -401,9 +404,7 @@ export class MaterialService {
    */
   static async getProjectsWithMaterials(userId: string) {
     // Get all projects for the user
-    const projects = await Project.find({ userId })
-      .select("_id name")
-      .lean();
+    const projects = await Project.find({ userId }).select("_id name").lean();
 
     // Get all materials for these projects
     const projectIds = projects.map((p) => p._id);
@@ -427,8 +428,8 @@ export class MaterialService {
     return projects.map((project) => ({
       id: project._id.toString(),
       name: project.name,
-      materialIds: (materialsByProject[project._id.toString()] || []).map(
-        (m) => m._id.toString()
+      materialIds: (materialsByProject[project._id.toString()] || []).map((m) =>
+        m._id.toString()
       ),
     }));
   }
@@ -504,51 +505,56 @@ export class MaterialService {
 
     try {
       // Group materials by name and accumulate volumes with Set for unique elements
-      const materialsByName = elements.reduce((acc: { [key: string]: any }, element) => {
-        if (!element.materialLayers?.layers) return acc;
+      const materialsByName = elements.reduce(
+        (acc: { [key: string]: any }, element) => {
+          if (!element.materialLayers?.layers) return acc;
 
-        element.materialLayers.layers.forEach(layer => {
-          if (!layer.materialName) return;
+          element.materialLayers.layers.forEach((layer) => {
+            if (!layer.materialName) return;
 
-          const materialKey = layer.materialName.trim().toLowerCase();
-          if (!acc[materialKey]) {
-            acc[materialKey] = {
-              name: layer.materialName,
-              volume: 0,
-              elements: new Set()
-            };
-          }
+            const materialKey = layer.materialName.trim().toLowerCase();
+            if (!acc[materialKey]) {
+              acc[materialKey] = {
+                name: layer.materialName,
+                volume: 0,
+                elements: new Set(),
+              };
+            }
 
-          const layerVolume = layer.volume || 0;
-          acc[materialKey].volume += layerVolume;
-          acc[materialKey].elements.add(element.globalId);
-        });
+            const layerVolume = layer.volume || 0;
+            acc[materialKey].volume += layerVolume;
+            acc[materialKey].elements.add(element.globalId);
+          });
 
-        return acc;
-      }, {});
+          return acc;
+        },
+        {}
+      );
 
       // Process materials in batches
       const materialBatches = [];
-      const materialOps = Object.values(materialsByName).map((material: any) => ({
-        updateOne: {
-          filter: {
-            name: material.name,
-            projectId: new mongoose.Types.ObjectId(projectId)
-          },
-          update: {
-            $set: {
-              volume: material.volume,
-              elementCount: material.elements.size,
-              updatedAt: new Date()
-            },
-            $setOnInsert: {
+      const materialOps = Object.values(materialsByName).map(
+        (material: any) => ({
+          updateOne: {
+            filter: {
               name: material.name,
-              projectId: new mongoose.Types.ObjectId(projectId)
-            }
+              projectId: new mongoose.Types.ObjectId(projectId),
+            },
+            update: {
+              $set: {
+                volume: material.volume,
+                elementCount: material.elements.size,
+                updatedAt: new Date(),
+              },
+              $setOnInsert: {
+                name: material.name,
+                projectId: new mongoose.Types.ObjectId(projectId),
+              },
+            },
+            upsert: true,
           },
-          upsert: true
-        }
-      }));
+        })
+      );
 
       for (let i = 0; i < materialOps.length; i += BATCH_SIZE) {
         materialBatches.push(materialOps.slice(i, i + BATCH_SIZE));
@@ -556,48 +562,53 @@ export class MaterialService {
 
       // Execute material batches in parallel with ordered: false
       const materialResults = await Promise.all(
-        materialBatches.map(batch =>
+        materialBatches.map((batch) =>
           Material.bulkWrite(batch, {
             session,
-            ordered: false
+            ordered: false,
           })
         )
       );
 
       // Get all materials including newly created ones - use projection
       const allMaterials = await Material.find({
-        projectId: new mongoose.Types.ObjectId(projectId)
+        projectId: new mongoose.Types.ObjectId(projectId),
       })
-        .select('_id name')
+        .select("_id name")
         .lean()
         .session(session);
 
       // Create material lookup map with lowercase keys
       const materialMap = new Map(
-        allMaterials.map(m => [m.name.trim().toLowerCase(), m._id])
+        allMaterials.map((m) => [m.name.trim().toLowerCase(), m._id])
       );
 
       // Process elements in batches
       const elementBatches = [];
-      const elementOps = elements.map(element => {
-        const totalThickness = element.materialLayers?.layers.reduce(
-          (sum, layer) => sum + (layer.thickness || 0),
-          0
-        ) || 0;
+      const elementOps = elements.map((element) => {
+        const totalThickness =
+          element.materialLayers?.layers.reduce(
+            (sum, layer) => sum + (layer.thickness || 0),
+            0
+          ) || 0;
 
-        const totalVolume = element.materialLayers?.layers.reduce(
-          (sum, layer) => sum + (layer.volume || 0),
-          0
-        ) || 0;
+        const totalVolume =
+          element.materialLayers?.layers.reduce(
+            (sum, layer) => sum + (layer.volume || 0),
+            0
+          ) || 0;
 
         const materials = element.materialLayers?.layers
-          .map(layer => {
-            const materialId = materialMap.get(layer.materialName.trim().toLowerCase());
+          .map((layer) => {
+            const materialId = materialMap.get(
+              layer.materialName.trim().toLowerCase()
+            );
             if (!materialId) return null;
 
             const volume = layer.volume || 0;
             const thickness = layer.thickness || 0;
-            const fraction = totalThickness > 0 ? thickness / totalThickness : 0;
+            const fraction =
+              totalThickness > 0 ? thickness / totalThickness : 0;
 
             return {
               material: new mongoose.Types.ObjectId(materialId),
@@ -606,16 +617,16 @@ export class MaterialService {
               mass: 0,
               fraction,
               thickness,
-              indicators: { gwp: 0, ubp: 0, penre: 0 }
+              indicators: { gwp: 0, ubp: 0, penre: 0 },
             };
           })
-          .filter(m => m !== null);
+          .filter((m) => m !== null);
 
         return {
           updateOne: {
             filter: {
               guid: element.globalId,
-              projectId: new mongoose.Types.ObjectId(projectId)
+              projectId: new mongoose.Types.ObjectId(projectId),
             },
             update: {
               $set: {
@@ -623,15 +634,15 @@ export class MaterialService {
                 type: element.type,
                 volume: totalVolume,
                 materials,
-                updatedAt: new Date()
+                updatedAt: new Date(),
               },
               $setOnInsert: {
                 projectId: new mongoose.Types.ObjectId(projectId),
-                uploadId: new mongoose.Types.ObjectId(uploadId)
-              }
+                uploadId: new mongoose.Types.ObjectId(uploadId),
+              },
             },
-            upsert: true
-          }
+            upsert: true,
+          },
         };
       });
 
@@ -641,11 +652,11 @@ export class MaterialService {
 
       // Execute element batches in parallel with ordered: false
       const elementResults = await Promise.all(
-        elementBatches.map(batch =>
+        elementBatches.map((batch) =>
           Element.bulkWrite(batch, {
             session,
             ordered: false,
-            writeConcern: { w: 1 }
+            writeConcern: { w: 1 },
           })
         )
       );
@@ -655,19 +666,19 @@ export class MaterialService {
         materialResults: materialResults.reduce(
           (acc, result) => ({
             upsertedCount: acc.upsertedCount + (result.upsertedCount || 0),
-            modifiedCount: acc.modifiedCount + (result.modifiedCount || 0)
+            modifiedCount: acc.modifiedCount + (result.modifiedCount || 0),
           }),
           { upsertedCount: 0, modifiedCount: 0 }
         ),
         elementResults: elementResults.reduce(
           (acc, result) => ({
             upsertedCount: acc.upsertedCount + (result.upsertedCount || 0),
-            modifiedCount: acc.modifiedCount + (result.modifiedCount || 0)
+            modifiedCount: acc.modifiedCount + (result.modifiedCount || 0),
           }),
           { upsertedCount: 0, modifiedCount: 0 }
         ),
         materialCount: materialOps.length,
-        elementCount: elementOps.length
+        elementCount: elementOps.length,
       };
 
       return aggregatedResults;
@@ -689,11 +700,13 @@ export class MaterialService {
       // Check if material already exists in the project
       const existingMaterial = await Material.findOne({
         name: materialName,
-        projectId
+        projectId,
       });
 
       // Fetch KBOB material data
-      const kbobMaterial = await KBOBMaterial.findById<IKBOBMaterial>(kbobMatchId).lean();
+      const kbobMaterial = await KBOBMaterial.findById<IKBOBMaterial>(
+        kbobMatchId
+      ).lean();
       if (!kbobMaterial) {
         throw new Error(`KBOB material not found for id: ${kbobMatchId}`);
       }
@@ -701,13 +714,21 @@ export class MaterialService {
       // Calculate density if not provided
       const finalDensity = density || this.calculateDensity(kbobMaterial);
       if (!finalDensity) {
-        throw new Error(`Could not determine density for material: ${materialName}`);
+        throw new Error(
+          `Could not determine density for material: ${materialName}`
+        );
       }
 
       // Calculate LCA indicators
-      const indicators = this.calculateIndicators(1, finalDensity, kbobMaterial);
+      const indicators = this.calculateIndicators(
+        1,
+        finalDensity,
+        kbobMaterial
+      );
       if (!indicators) {
-        throw new Error(`Could not calculate indicators for material: ${materialName}`);
+        throw new Error(
+          `Could not calculate indicators for material: ${materialName}`
+        );
       }
 
       if (existingMaterial) {
@@ -728,12 +749,15 @@ export class MaterialService {
           density: finalDensity,
           gwp: indicators.gwp,
           ubp: indicators.ubp,
-          penre: indicators.penre
+          penre: indicators.penre,
         });
         return newMaterial;
       }
     } catch (error) {
-      console.error("❌ [Material Service] Error in createMaterialWithMatch:", error);
+      console.error(
+        "❌ [Material Service] Error in createMaterialWithMatch:",
+        error
+      );
       throw error;
     }
   }

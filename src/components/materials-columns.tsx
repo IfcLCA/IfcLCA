@@ -18,9 +18,7 @@ export const materialsColumns: ColumnDef<MaterialTableItem>[] = [
     size: 200,
     minSize: 100,
     cell: ({ row }) => (
-      <div className="truncate">
-        {row.getValue("ifcMaterial") || "Unknown"}
-      </div>
+      <div className="truncate">{row.getValue("ifcMaterial") || "Unknown"}</div>
     ),
   },
   {
@@ -42,9 +40,7 @@ export const materialsColumns: ColumnDef<MaterialTableItem>[] = [
     size: 200,
     minSize: 100,
     cell: ({ row }) => (
-      <div className="truncate">
-        {row.getValue("category") || "Unknown"}
-      </div>
+      <div className="truncate">{row.getValue("category") || "Unknown"}</div>
     ),
   },
   {
@@ -52,18 +48,10 @@ export const materialsColumns: ColumnDef<MaterialTableItem>[] = [
     enableResizing: true,
     size: 100,
     minSize: 80,
-    header: () => (
-      <div className="text-center">
-        Volume (m³)
-      </div>
-    ),
+    header: () => <div className="text-center">Volume (m³)</div>,
     cell: ({ row }) => {
       const volume = row.getValue("volume") as number;
-      return (
-        <div className="text-center">
-          {volume?.toFixed(2) || "N/A"}
-        </div>
-      );
+      return <div className="text-center">{volume?.toFixed(2) || "N/A"}</div>;
     },
   },
 ];
