@@ -18,13 +18,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import {
-  Trash2,
-  Upload,
-  Layers,
-  UploadCloud,
-  Edit,
-} from "lucide-react";
+import { Trash2, Upload, Layers, UploadCloud, Edit } from "lucide-react";
 import { UploadModal } from "@/components/upload-modal";
 import { DataTable } from "@/components/data-table";
 import { Breadcrumbs } from "@/components/breadcrumbs";
@@ -41,7 +35,13 @@ import {
   PaginationPrevious,
 } from "@/components/ui/pagination";
 import { emissionsColumns } from "@/components/emissions-columns";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import cn from "classnames";
 
@@ -84,7 +84,15 @@ interface MaterialEntry {
 }
 
 interface ElementWithMaterials {
+  _id: string;
+  guid: string;
   name: string;
+  type: string;
+  object_type: string;
+  volume: number;
+  buildingStorey?: string;
+  loadBearing?: boolean;
+  isExternal?: boolean;
   materials: MaterialEntry[];
 }
 
@@ -149,12 +157,30 @@ export default function ProjectDetailsPage() {
   const fetchProject = async () => {
     try {
       setIsLoading(true);
+      console.debug("🔄 Fetching project data...");
+
       const response = await fetch(`/api/projects/${projectId}`);
       const data = await response.json();
+
+      console.debug("📥 Raw project data:", {
+        elementCount: data.elements?.length,
+        materialCount: data.materials?.length,
+        sampleElement: data.elements?.[0],
+        sampleMaterial: data.materials?.[0],
+      });
+
       const transformed = transformProjectData(data);
+
+      console.debug("✨ Transformed project data:", {
+        elementCount: transformed.elements.length,
+        materialCount: transformed.materials.length,
+        sampleElement: transformed.elements[0],
+        sampleMaterial: transformed.materials[0],
+      });
+
       setProject(transformed);
     } catch (err) {
-      console.error("Error fetching project:", err);
+      console.error("❌ Error fetching project:", err);
       setError(
         err instanceof Error ? err.message : "An unknown error occurred"
       );
@@ -518,12 +544,14 @@ const UploadCard = ({ upload }: { upload: ExtendedProject["uploads"][0] }) => (
         </p>
       </div>
       <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
-        <Badge 
-          variant={upload.status?.toLowerCase() === "completed" ? "success" : "warning"}
+        <Badge
+          variant={
+            upload.status?.toLowerCase() === "completed" ? "success" : "warning"
+          }
           className={cn(
             "transition-colors",
-            upload.status?.toLowerCase() === "completed" 
-              ? "bg-green-100 text-green-800 hover:bg-green-200" 
+            upload.status?.toLowerCase() === "completed"
+              ? "bg-green-100 text-green-800 hover:bg-green-200"
               : "bg-yellow-100 text-yellow-800 hover:bg-yellow-200"
           )}
         >
@@ -541,14 +569,30 @@ const ElementsTab = ({
   project: ExtendedProject;
   onUpload: () => void;
 }) => {
-  const data = useMemo(() => {
-    return project.elements.map((element: ElementWithMaterials) => ({
-      id: element._id || "unknown",
-      name: element.name || "Unknown",
-      type: element.type || "Unknown",
+  const elementsData = useMemo(() => {
+    if (!project?.elements) return [];
+
+    console.debug("🏗️ Processing elements for table:", {
+      elementCount: project.elements.length,
+      sampleElement: project.elements[0],
+    });
+
+    const data = project.elements.map((element) => ({
+      id: element._id,
+      name: element.object_type || element.name || "Unknown",
+      type: element.type,
       volume: element.volume || 0,
+      loadBearing: element.loadBearing || false,
+      isExternal: element.isExternal || false,
     }));
-  }, [project.elements]);
+
+    console.debug("📋 Elements table data:", {
+      rowCount: data.length,
+      sampleRow: data[0],
+    });
+
+    return data;
+  }, [project?.elements]);
 
   return (
     <>
@@ -563,11 +607,7 @@ const ElementsTab = ({
       {project?.elements && project.elements.length > 0 ? (
         <Card>
           <CardContent className="p-0">
-            <DataTable
-              columns={elementsColumns}
-              data={data}
-              onRowSelectionChange={() => { }}
-            />
+            <DataTable columns={elementsColumns} data={elementsData} />
           </CardContent>
         </Card>
       ) : (
@@ -597,18 +637,29 @@ const MaterialsTab = ({
   onUpload: () => void;
 }) => {
   const data = useMemo(() => {
-    // First map all materials
-    const materials = project.elements.flatMap((element: ElementWithMaterials) =>
-      element.materials.map((materialEntry: MaterialEntry) => ({
-        id: materialEntry.material?._id || "unknown",
-        ifcMaterial: materialEntry.material?.name || "Unknown",
-        kbobMaterial: materialEntry.material?.kbobMatchId?.Name || "Unknown",
-        category: element.name,
-        volume: materialEntry.volume || 0,
-      }))
+    console.debug("🧱 Processing materials for table:", {
+      elementCount: project.elements.length,
+      sampleElement: project.elements[0]?.materials[0],
+    });
+
+    // Map all materials from elements
+    const materials = project.elements.flatMap(
+      (element: ElementWithMaterials) =>
+        element.materials.map((materialEntry: MaterialEntry) => ({
+          id: materialEntry.material?._id || "unknown",
+          ifcMaterial: materialEntry.material?.name || "Unknown",
+          kbobMaterial: materialEntry.material?.kbobMatchId?.Name || "Unknown",
+          category: element.name,
+          volume: materialEntry.volume || 0,
+        }))
     );
 
-    // Group materials by id to sum up volumes
+    console.debug("🧱 Mapped materials:", {
+      count: materials.length,
+      sampleMaterial: materials[0],
+    });
+
+    // Group materials to sum volumes
     const groupedMaterials = materials.reduce((acc, curr) => {
       const key = `${curr.ifcMaterial}-${curr.kbobMaterial}`;
       if (!acc[key]) {
@@ -617,9 +668,15 @@ const MaterialsTab = ({
         acc[key].volume += curr.volume;
       }
       return acc;
-    }, {} as Record<string, typeof materials[0]>);
+    }, {} as Record<string, (typeof materials)[0]>);
 
-    return Object.values(groupedMaterials);
+    const result = Object.values(groupedMaterials);
+    console.debug("📈 Final materials table data:", {
+      groupCount: result.length,
+      sampleGroup: result[0],
+    });
+
+    return result;
   }, [project]);
 
   return (
@@ -638,7 +695,7 @@ const MaterialsTab = ({
             <DataTable
               columns={materialsColumns}
               data={data}
-              onRowSelectionChange={() => { }}
+              onRowSelectionChange={() => {}}
             />
           </CardContent>
         </Card>
@@ -666,39 +723,44 @@ const EmissionsTab = ({
   project: ExtendedProject;
   onUpload: () => void;
 }) => {
-  const [selectedIndicator, setSelectedIndicator] = useState<IndicatorType>("gwp");
+  const [selectedIndicator, setSelectedIndicator] =
+    useState<IndicatorType>("gwp");
 
   const emissionsData = useMemo(() => {
     // First, create a map to group identical materials
-    const groupedMaterials = project.elements.flatMap((element: ElementWithMaterials) =>
-      element.materials.map((materialEntry: MaterialEntry) => ({
-        id: materialEntry._id,
-        kbobMaterial: materialEntry.material?.kbobMatchId?.Name || "Unknown",
-        ifcMaterial: materialEntry.material?.name || "Unknown",
-        volume: materialEntry.volume || 0,
-        density: materialEntry.material?.density || 0,
-        mass: (materialEntry.volume || 0) * (materialEntry.material?.density || 0),
-        kbobIndicators: {
-          gwp: materialEntry.material?.kbobMatchId?.GWP || 0,
-          ubp: materialEntry.material?.kbobMatchId?.UBP || 0,
-          penre: materialEntry.material?.kbobMatchId?.PENRE || 0,
-        },
-      }))
-    ).reduce((acc, curr) => {
-      // Group by Ifc name, KBOB name, and density
-      const key = `${curr.ifcMaterial}-${curr.kbobMaterial}-${curr.density}`;
-      if (!acc[key]) {
-        acc[key] = { ...curr };
-      } else {
-        // Sum up volumes and recalculate mass and totals
-        acc[key].volume += curr.volume;
-        acc[key].mass = acc[key].volume * acc[key].density;
-      }
-      return acc;
-    }, {} as Record<string, any>);
+    const groupedMaterials = project.elements
+      .flatMap((element: ElementWithMaterials) =>
+        element.materials.map((materialEntry: MaterialEntry) => ({
+          id: materialEntry._id,
+          kbobMaterial: materialEntry.material?.kbobMatchId?.Name || "Unknown",
+          ifcMaterial: materialEntry.material?.name || "Unknown",
+          volume: materialEntry.volume || 0,
+          density: materialEntry.material?.density || 0,
+          mass:
+            (materialEntry.volume || 0) *
+            (materialEntry.material?.density || 0),
+          kbobIndicators: {
+            gwp: materialEntry.material?.kbobMatchId?.GWP || 0,
+            ubp: materialEntry.material?.kbobMatchId?.UBP || 0,
+            penre: materialEntry.material?.kbobMatchId?.PENRE || 0,
+          },
+        }))
+      )
+      .reduce((acc, curr) => {
+        // Group by Ifc name, KBOB name, and density
+        const key = `${curr.ifcMaterial}-${curr.kbobMaterial}-${curr.density}`;
+        if (!acc[key]) {
+          acc[key] = { ...curr };
+        } else {
+          // Sum up volumes and recalculate mass and totals
+          acc[key].volume += curr.volume;
+          acc[key].mass = acc[key].volume * acc[key].density;
+        }
+        return acc;
+      }, {} as Record<string, any>);
 
     // Convert back to array and calculate total emissions
-    return Object.values(groupedMaterials).map(material => ({
+    return Object.values(groupedMaterials).map((material) => ({
       ...material,
       totalGWP: material.mass * material.kbobIndicators.gwp,
       totalUBP: material.mass * material.kbobIndicators.ubp,
@@ -709,24 +771,36 @@ const EmissionsTab = ({
   const indicators = [
     {
       value: "gwp",
-      label: <div className="flex flex-col">
-        <span className="font-bold">GWP</span>
-        <span className="text-sm text-muted-foreground">Global Warming Potential (kg CO₂ eq)</span>
-      </div>
+      label: (
+        <div className="flex flex-col">
+          <span className="font-bold">GWP</span>
+          <span className="text-sm text-muted-foreground">
+            Global Warming Potential (kg CO₂ eq)
+          </span>
+        </div>
+      ),
     },
     {
       value: "ubp",
-      label: <div className="flex flex-col">
-        <span className="font-bold">UBP</span>
-        <span className="text-sm text-muted-foreground">Environmental Impact Points</span>
-      </div>
+      label: (
+        <div className="flex flex-col">
+          <span className="font-bold">UBP</span>
+          <span className="text-sm text-muted-foreground">
+            Environmental Impact Points
+          </span>
+        </div>
+      ),
     },
     {
       value: "penre",
-      label: <div className="flex flex-col">
-        <span className="font-bold">PENRE</span>
-        <span className="text-sm text-muted-foreground">Primary Energy Non-Renewable (kWh)</span>
-      </div>
+      label: (
+        <div className="flex flex-col">
+          <span className="font-bold">PENRE</span>
+          <span className="text-sm text-muted-foreground">
+            Primary Energy Non-Renewable (kWh)
+          </span>
+        </div>
+      ),
     },
   ];
 
@@ -745,13 +819,15 @@ const EmissionsTab = ({
           <Label className="text-sm font-medium">Indicator:</Label>
           <Select
             value={selectedIndicator}
-            onValueChange={(value: IndicatorType) => setSelectedIndicator(value)}
+            onValueChange={(value: IndicatorType) =>
+              setSelectedIndicator(value)
+            }
           >
             <SelectTrigger className="w-[180px]">
               <SelectValue>
-                {selectedIndicator === 'gwp' && "GWP (kg CO₂ eq)"}
-                {selectedIndicator === 'ubp' && "UBP (pts)"}
-                {selectedIndicator === 'penre' && "PENRE (kWh)"}
+                {selectedIndicator === "gwp" && "GWP (kg CO₂ eq)"}
+                {selectedIndicator === "ubp" && "UBP (pts)"}
+                {selectedIndicator === "penre" && "PENRE (kWh)"}
               </SelectValue>
             </SelectTrigger>
             <SelectContent>
@@ -768,13 +844,14 @@ const EmissionsTab = ({
           </Select>
         </div>
       </div>
-      {project?.elements && project.elements.some(e => e.materials?.length > 0) ? (
+      {project?.elements &&
+      project.elements.some((e) => e.materials?.length > 0) ? (
         <Card>
           <CardContent className="p-0">
             <DataTable
               columns={emissionsColumns(selectedIndicator)}
               data={emissionsData}
-              onRowSelectionChange={() => { }}
+              onRowSelectionChange={() => {}}
             />
           </CardContent>
         </Card>
@@ -796,25 +873,30 @@ const EmissionsTab = ({
 };
 
 const GraphTab = ({ project }: { project: ExtendedProject }) => {
-  const materialsData = project.elements.flatMap((element: ElementWithMaterials) =>
-    element.materials.map((materialEntry: MaterialEntry) => {
-      const volume = materialEntry.volume || 0;
-      const density = materialEntry.material?.density || 0;
-      const kbobIndicators = materialEntry.material?.kbobMatchId || { GWP: 0, UBP: 0, PENRE: 0 };
+  const materialsData = project.elements.flatMap(
+    (element: ElementWithMaterials) =>
+      element.materials.map((materialEntry: MaterialEntry) => {
+        const volume = materialEntry.volume || 0;
+        const density = materialEntry.material?.density || 0;
+        const kbobIndicators = materialEntry.material?.kbobMatchId || {
+          GWP: 0,
+          UBP: 0,
+          PENRE: 0,
+        };
 
-      return {
-        name: element.name || "Unknown",
-        volume: volume,
-        indicators: {
-          gwp: volume * density * (kbobIndicators.GWP || 0),
-          ubp: volume * density * (kbobIndicators.UBP || 0),
-          penre: volume * density * (kbobIndicators.PENRE || 0),
-        },
-        category: materialEntry.material?.category,
-        kbobMaterial: materialEntry.material?.kbobMatchId?.Name,
-        ifcMaterial: materialEntry.material?.name,
-      };
-    })
+        return {
+          name: element.name || "Unknown",
+          volume: volume,
+          indicators: {
+            gwp: volume * density * (kbobIndicators.GWP || 0),
+            ubp: volume * density * (kbobIndicators.UBP || 0),
+            penre: volume * density * (kbobIndicators.PENRE || 0),
+          },
+          category: materialEntry.material?.category,
+          kbobMaterial: materialEntry.material?.kbobMatchId?.Name,
+          ifcMaterial: materialEntry.material?.name,
+        };
+      })
   );
 
   return (
@@ -865,10 +947,19 @@ const DeleteProjectDialog = ({
   <AlertDialog open={isOpen} onOpenChange={onClose}>
     <AlertDialogContent>
       <AlertDialogHeader>
-        <AlertDialogTitle>Are you really sure you don't need it anymore?</AlertDialogTitle>
+        <AlertDialogTitle>
+          Are you really sure you don't need it anymore?
+        </AlertDialogTitle>
         <AlertDialogDescription className="space-y-2">
-          <p>We can get it back but it involves us digging into our database, which we would rather avoid. So better be sure you don't need it anymore...</p>
-          <p>This action cannot be undone. This will permanently delete the project and all associated data.</p>
+          <p>
+            We can get it back but it involves us digging into our database,
+            which we would rather avoid. So better be sure you don't need it
+            anymore...
+          </p>
+          <p>
+            This action cannot be undone. This will permanently delete the
+            project and all associated data.
+          </p>
         </AlertDialogDescription>
       </AlertDialogHeader>
       <AlertDialogFooter>

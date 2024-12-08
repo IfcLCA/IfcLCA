@@ -1,14 +1,9 @@
-import {
-  Material,
-  KBOBMaterial,
-  Element,
-  Types,
-  ClientSession,
-  Project,
-} from "@/models";
 import mongoose from "mongoose";
+import { Material, KBOBMaterial, Element, Project } from "@/models";
+import { logger } from "@/lib/logger";
+import type { ClientSession, Types } from "mongoose";
 
-// Interfaces for better type safety
+// Update interfaces with proper types
 interface ILCAIndicators {
   gwp: number;
   ubp: number;
@@ -18,13 +13,14 @@ interface ILCAIndicators {
 interface IKBOBMaterial {
   _id: Types.ObjectId;
   Name: string;
-  Category: string;
+  Category?: string;
   GWP: number;
   UBP: number;
   PENRE: number;
   "kg/unit"?: number;
   "min density"?: number;
   "max density"?: number;
+  KBOB_ID: number;
 }
 
 interface IMaterialChange {
@@ -40,6 +36,28 @@ interface IMaterialChange {
 
 interface IMaterialPreview {
   changes: IMaterialChange[];
+}
+
+// Add type for populated Material document
+interface MaterialWithKBOB {
+  _id: Types.ObjectId;
+  name: string;
+  projectId: Types.ObjectId;
+  density?: number;
+  kbobMatchId?: IKBOBMaterial;
+}
+
+// Add type for populated Element document
+interface ElementWithProject {
+  _id: Types.ObjectId;
+  projectId: {
+    _id: Types.ObjectId;
+    name: string;
+  };
+  materials: Array<{
+    material: Types.ObjectId;
+    volume: number;
+  }>;
 }
 
 export class MaterialService {
@@ -133,25 +151,25 @@ export class MaterialService {
    */
   static async recalculateElementsForMaterials(
     materialIds: Types.ObjectId[],
-    session?: ClientSession
+    session: ClientSession | null = null
   ): Promise<number> {
     const BATCH_SIZE = 500;
     let totalModified = 0;
 
-    // Get all materials with their KBOB matches in one query
-    const materials = await Material.find({ _id: { $in: materialIds } })
-      .select("_id name kbobMatchId density")
-      .populate<{ kbobMatchId: IKBOBMaterial }>("kbobMatchId")
-      .session(session)
-      .lean();
-
-    if (!materials.length) {
-      return 0;
-    }
-
-    const materialMap = new Map(materials.map((m) => [m._id.toString(), m]));
-
     try {
+      // Get all materials with their KBOB matches in one query
+      const materials = await Material.find({ _id: { $in: materialIds } })
+        .select("_id name kbobMatchId density")
+        .populate<{ kbobMatchId: IKBOBMaterial }>("kbobMatchId")
+        .session(session)
+        .lean();
+
+      if (!materials.length) {
+        return 0;
+      }
+
+      const materialMap = new Map(materials.map((m) => [m._id.toString(), m]));
+
       // Count total elements to process
       const totalElements = await Element.countDocuments({
         "materials.material": { $in: materialIds },
@@ -159,9 +177,6 @@ export class MaterialService {
 
       // Process in batches
       for (let skip = 0; skip < totalElements; skip += BATCH_SIZE) {
-        const batchNumber = Math.floor(skip / BATCH_SIZE) + 1;
-        const totalBatches = Math.ceil(totalElements / BATCH_SIZE);
-
         const elements = await Element.find({
           "materials.material": { $in: materialIds },
         })
@@ -208,10 +223,7 @@ export class MaterialService {
 
       return totalModified;
     } catch (error) {
-      console.error(
-        "❌ [Material Service] Error in element recalculation:",
-        error
-      );
+      logger.error("Error in element recalculation:", error);
       throw error;
     }
   }
@@ -486,14 +498,14 @@ export class MaterialService {
       globalId: string;
       type: string;
       name: string;
-      netVolume?: number;
+      netVolume?: number | { net: number; gross: number };
+      properties?: {
+        loadBearing?: boolean;
+        isExternal?: boolean;
+      };
       materialLayers?: {
-        layerSetName?: string;
         layers: Array<{
           materialName: string;
-          thickness: number;
-          layerId?: string;
-          layerName?: string;
           volume: number;
         }>;
       };
@@ -501,128 +513,21 @@ export class MaterialService {
     uploadId: string,
     session: mongoose.ClientSession
   ) {
-    const BATCH_SIZE = 1000; // Increased batch size for better performance
-
     try {
-      // Group materials by name and accumulate volumes with Set for unique elements
-      const materialsByName = elements.reduce(
-        (acc: { [key: string]: any }, element) => {
-          if (!element.materialLayers?.layers) return acc;
+      console.debug("🏗️ Material service processing:", {
+        sampleElement: elements[0],
+        properties: elements[0].properties,
+      });
 
-          element.materialLayers.layers.forEach((layer) => {
-            if (!layer.materialName) return;
-
-            const materialKey = layer.materialName.trim().toLowerCase();
-            if (!acc[materialKey]) {
-              acc[materialKey] = {
-                name: layer.materialName,
-                volume: 0,
-                elements: new Set(),
-              };
-            }
-
-            const layerVolume = layer.volume || 0;
-            acc[materialKey].volume += layerVolume;
-            acc[materialKey].elements.add(element.globalId);
-          });
-
-          return acc;
-        },
-        {}
-      );
-
-      // Process materials in batches
-      const materialBatches = [];
-      const materialOps = Object.values(materialsByName).map(
-        (material: any) => ({
-          updateOne: {
-            filter: {
-              name: material.name,
-              projectId: new mongoose.Types.ObjectId(projectId),
-            },
-            update: {
-              $set: {
-                volume: material.volume,
-                elementCount: material.elements.size,
-                updatedAt: new Date(),
-              },
-              $setOnInsert: {
-                name: material.name,
-                projectId: new mongoose.Types.ObjectId(projectId),
-              },
-            },
-            upsert: true,
-          },
-        })
-      );
-
-      for (let i = 0; i < materialOps.length; i += BATCH_SIZE) {
-        materialBatches.push(materialOps.slice(i, i + BATCH_SIZE));
-      }
-
-      // Execute material batches in parallel with ordered: false
-      const materialResults = await Promise.all(
-        materialBatches.map((batch) =>
-          Material.bulkWrite(batch, {
-            session,
-            ordered: false,
-          })
-        )
-      );
-
-      // Get all materials including newly created ones - use projection
-      const allMaterials = await Material.find({
-        projectId: new mongoose.Types.ObjectId(projectId),
-      })
-        .select("_id name")
-        .lean()
-        .session(session);
-
-      // Create material lookup map with lowercase keys
-      const materialMap = new Map(
-        allMaterials.map((m) => [m.name.trim().toLowerCase(), m._id])
-      );
-
-      // Process elements in batches
-      const elementBatches = [];
+      // Create elements with properties
       const elementOps = elements.map((element) => {
-        const totalThickness =
-          element.materialLayers?.layers.reduce(
-            (sum, layer) => sum + (layer.thickness || 0),
-            0
-          ) || 0;
+        // Extract volume from netVolume object or use direct value
+        const volume =
+          typeof element.netVolume === "object"
+            ? element.netVolume.net
+            : element.netVolume || 0;
 
-        const totalVolume =
-          element.materialLayers?.layers.reduce(
-            (sum, layer) => sum + (layer.volume || 0),
-            0
-          ) || 0;
-
-        const materials = element.materialLayers?.layers
-          .map((layer) => {
-            const materialId = materialMap.get(
-              layer.materialName.trim().toLowerCase()
-            );
-            if (!materialId) return null;
-
-            const volume = layer.volume || 0;
-            const thickness = layer.thickness || 0;
-            const fraction =
-              totalThickness > 0 ? thickness / totalThickness : 0;
-
-            return {
-              material: new mongoose.Types.ObjectId(materialId),
-              volume,
-              density: 0,
-              mass: 0,
-              fraction,
-              thickness,
-              indicators: { gwp: 0, ubp: 0, penre: 0 },
-            };
-          })
-          .filter((m) => m !== null);
-
-        return {
+        const updateOp = {
           updateOne: {
             filter: {
               guid: element.globalId,
@@ -632,56 +537,44 @@ export class MaterialService {
               $set: {
                 name: element.name,
                 type: element.type,
-                volume: totalVolume,
-                materials,
+                volume: volume, // Use extracted volume
+                loadBearing: element.properties?.loadBearing || false,
+                isExternal: element.properties?.isExternal || false,
                 updatedAt: new Date(),
               },
               $setOnInsert: {
                 projectId: new mongoose.Types.ObjectId(projectId),
                 uploadId: new mongoose.Types.ObjectId(uploadId),
+                createdAt: new Date(),
               },
             },
             upsert: true,
           },
         };
+
+        console.debug("📝 Element update operation:", {
+          filter: updateOp.updateOne.filter,
+          update: updateOp.updateOne.update,
+        });
+
+        return updateOp;
       });
 
+      // Execute in batches
+      const BATCH_SIZE = 1000;
       for (let i = 0; i < elementOps.length; i += BATCH_SIZE) {
-        elementBatches.push(elementOps.slice(i, i + BATCH_SIZE));
+        const batch = elementOps.slice(i, i + BATCH_SIZE);
+        const result = await Element.bulkWrite(batch, {
+          session,
+          ordered: false,
+        });
+        console.debug("✅ Batch result:", result);
       }
 
-      // Execute element batches in parallel with ordered: false
-      const elementResults = await Promise.all(
-        elementBatches.map((batch) =>
-          Element.bulkWrite(batch, {
-            session,
-            ordered: false,
-            writeConcern: { w: 1 },
-          })
-        )
-      );
-
-      // Aggregate results
-      const aggregatedResults = {
-        materialResults: materialResults.reduce(
-          (acc, result) => ({
-            upsertedCount: acc.upsertedCount + (result.upsertedCount || 0),
-            modifiedCount: acc.modifiedCount + (result.modifiedCount || 0),
-          }),
-          { upsertedCount: 0, modifiedCount: 0 }
-        ),
-        elementResults: elementResults.reduce(
-          (acc, result) => ({
-            upsertedCount: acc.upsertedCount + (result.upsertedCount || 0),
-            modifiedCount: acc.modifiedCount + (result.modifiedCount || 0),
-          }),
-          { upsertedCount: 0, modifiedCount: 0 }
-        ),
-        materialCount: materialOps.length,
+      return {
+        success: true,
         elementCount: elementOps.length,
       };
-
-      return aggregatedResults;
     } catch (error) {
       throw error;
     }
@@ -759,6 +652,215 @@ export class MaterialService {
         error
       );
       throw error;
+    }
+  }
+
+  /**
+   * Update project emissions
+   */
+  static async updateProjectEmissions(
+    projectId: string | Types.ObjectId,
+    session?: ClientSession
+  ) {
+    try {
+      const totals = await this.calculateProjectTotals(projectId.toString());
+
+      logger.debug("Attempting to update project emissions:", {
+        projectId: projectId.toString(),
+        totals,
+      });
+
+      const projectObjectId =
+        typeof projectId === "string"
+          ? new mongoose.Types.ObjectId(projectId)
+          : projectId;
+
+      // First verify the project exists
+      const project = await Project.findById(projectObjectId).session(session);
+
+      if (!project) {
+        throw new Error(`Project not found: ${projectId}`);
+      }
+
+      // Update with more detailed error handling
+      try {
+        // Use updateOne instead of findByIdAndUpdate for better performance
+        const result = await Project.updateOne(
+          { _id: projectObjectId },
+          {
+            $set: {
+              emissions: {
+                gwp: totals.totalGWP,
+                ubp: totals.totalUBP,
+                penre: totals.totalPENRE,
+                lastCalculated: new Date(),
+              },
+            },
+          },
+          {
+            session,
+            runValidators: true,
+          }
+        );
+
+        if (!result.modifiedCount) {
+          throw new Error(`Project update failed: ${projectId}`);
+        }
+
+        logger.debug("Successfully updated project emissions:", {
+          projectId: projectId.toString(),
+          totals,
+          result: {
+            modifiedCount: result.modifiedCount,
+            matchedCount: result.matchedCount,
+          },
+        });
+
+        return totals;
+      } catch (updateError) {
+        logger.error("Project update operation failed:", {
+          error:
+            updateError instanceof Error
+              ? {
+                  message: updateError.message,
+                  stack: updateError.stack,
+                  name: updateError.name,
+                }
+              : updateError,
+          projectId: projectId.toString(),
+          totals,
+        });
+        throw updateError;
+      }
+    } catch (error) {
+      logger.error("Error in updateProjectEmissions:", {
+        error:
+          error instanceof Error
+            ? {
+                message: error.message,
+                stack: error.stack,
+                name: error.name,
+              }
+            : error,
+        projectId: projectId.toString(),
+      });
+      throw error;
+    }
+  }
+
+  /**
+   * Update elements for material match and recalculate project emissions
+   */
+  static async updateElementsForMaterialMatch(
+    materialId: string,
+    kbobMatchId: string,
+    density: number,
+    session?: ClientSession
+  ) {
+    const useSession = session || (await mongoose.startSession());
+    if (!session) {
+      useSession.startTransaction();
+    }
+
+    try {
+      const processedCount = await this.recalculateElementsForMaterials(
+        [new Types.ObjectId(materialId)],
+        useSession
+      );
+
+      // Get unique project IDs for this material
+      const affectedProjects = await Element.distinct("projectId", {
+        "materials.material": new Types.ObjectId(materialId),
+      }).session(useSession);
+
+      // Update emissions for all affected projects
+      await Promise.all(
+        affectedProjects.map((projectId) =>
+          this.updateProjectEmissions(projectId, useSession)
+        )
+      );
+
+      if (!session) {
+        await useSession.commitTransaction();
+      }
+
+      return processedCount;
+    } catch (error) {
+      if (!session) {
+        await useSession.abortTransaction();
+      }
+      logger.error("Error in material match update:", error);
+      throw error;
+    } finally {
+      if (!session) {
+        await useSession.endSession();
+      }
+    }
+  }
+
+  /**
+   * Calculate total project emissions
+   */
+  static async calculateProjectTotals(projectId: string): Promise<{
+    totalGWP: number;
+    totalUBP: number;
+    totalPENRE: number;
+  }> {
+    try {
+      const elements = await Element.find({
+        projectId: new mongoose.Types.ObjectId(projectId),
+      })
+        .populate({
+          path: "materials.material",
+          select: "density kbobMatchId",
+          populate: {
+            path: "kbobMatchId",
+            select: "GWP UBP PENRE",
+          },
+        })
+        .lean();
+
+      const totals = elements.reduce(
+        (acc, element) => {
+          const elementTotals = element.materials.reduce(
+            (matAcc, material) => {
+              const volume = material.volume || 0;
+              const density = material.material?.density || 0;
+              const kbobMatch = material.material?.kbobMatchId;
+
+              // Calculate mass-based emissions
+              const mass = volume * density;
+              return {
+                gwp: matAcc.gwp + mass * (kbobMatch?.GWP || 0),
+                ubp: matAcc.ubp + mass * (kbobMatch?.UBP || 0),
+                penre: matAcc.penre + mass * (kbobMatch?.PENRE || 0),
+              };
+            },
+            { gwp: 0, ubp: 0, penre: 0 }
+          );
+
+          return {
+            totalGWP: acc.totalGWP + elementTotals.gwp,
+            totalUBP: acc.totalUBP + elementTotals.ubp,
+            totalPENRE: acc.totalPENRE + elementTotals.penre,
+          };
+        },
+        { totalGWP: 0, totalUBP: 0, totalPENRE: 0 }
+      );
+
+      logger.debug("Project totals calculated:", {
+        projectId,
+        totals,
+        elementCount: elements.length,
+      });
+
+      return totals;
+    } catch (error) {
+      logger.error("Error calculating project totals:", {
+        error,
+        projectId,
+      });
+      return { totalGWP: 0, totalUBP: 0, totalPENRE: 0 };
     }
   }
 }

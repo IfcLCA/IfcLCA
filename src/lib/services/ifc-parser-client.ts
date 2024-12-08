@@ -11,9 +11,12 @@ export interface IFCParseResult {
 interface APIElement {
   id: string;
   type: string;
+  object_type: string;
   properties: {
     name: string;
     level?: string;
+    loadBearing?: boolean;
+    isExternal?: boolean;
   };
   volume?: number;
   area?: number;
@@ -143,6 +146,41 @@ export async function parseIFCFile(
     const matchesData = await checkMatchesResponse.json();
     const unmatchedMaterialCount = matchesData.unmatchedMaterials.length;
 
+    // Log initial file info
+    console.debug("📁 Starting IFC parse for file:", {
+      name: file.name,
+      size: file.size,
+      type: file.type,
+    });
+
+    // After parsing elements from stream
+    console.debug("📊 Parsed elements from IFC:", {
+      count: elements.length,
+      firstElement: elements[0],
+      lastElement: elements[elements.length - 1],
+    });
+
+    // After processing materials
+    console.debug("🧱 Extracted materials:", {
+      count: materials.size,
+      materialsList: Array.from(materials),
+    });
+
+    // Before sending to process endpoint
+    console.debug("📤 Element with properties:", {
+      element: elements[0],
+      mappedElement: {
+        globalId: elements[0].id,
+        type: elements[0].type,
+        name: elements[0].object_type,
+        netVolume: elements[0].volume || 0,
+        properties: {
+          loadBearing: elements[0].properties.loadBearing || false,
+          isExternal: elements[0].properties.isExternal || false,
+        },
+      },
+    });
+
     // Process elements
     const processResponse = await fetch(
       `/api/projects/${projectId}/upload/process`,
@@ -154,16 +192,18 @@ export async function parseIFCFile(
           elements: elements.map((element) => ({
             globalId: element.id,
             type: element.type,
-            name: element.properties.name,
+            name: element.object_type,
             netVolume: element.volume || 0,
-            spatialContainer: element.properties.level,
+            properties: {
+              loadBearing: element.properties.loadBearing || false,
+              isExternal: element.properties.isExternal || false,
+            },
             materialLayers: element.material_volumes
               ? {
                   layerSetName: `${element.type}_Layers`,
                   layers: Object.entries(element.material_volumes).map(
                     ([name, data]) => ({
                       materialName: name,
-                      thickness: 0, // API doesn't provide thickness
                       volume: data.volume,
                       fraction: data.fraction,
                     })

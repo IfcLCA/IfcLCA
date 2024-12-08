@@ -58,6 +58,17 @@ export async function GET() {
             uploads: { $size: "$uploads" },
             materials: { $size: "$materials" },
           },
+          emissions: {
+            $ifNull: [
+              "$emissions",
+              {
+                gwp: 0,
+                ubp: 0,
+                penre: 0,
+                lastCalculated: new Date(),
+              },
+            ],
+          },
           elements: {
             $map: {
               input: "$elements",
@@ -76,17 +87,17 @@ export async function GET() {
                       indicators: {
                         gwp: "$$material.indicators.gwp",
                         ubp: "$$material.indicators.ubp",
-                        penre: "$$material.indicators.penre"
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          }
+                        penre: "$$material.indicators.penre",
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
         },
       },
-      { $sort: { lastActivityAt: -1 } }
+      { $sort: { lastActivityAt: -1 } },
     ]);
 
     const transformedProjects = projects.map((project) => ({
@@ -96,11 +107,11 @@ export async function GET() {
       imageUrl: project.imageUrl,
       updatedAt: project.lastActivityAt || project.updatedAt,
       _count: project._count,
-      elements: project.elements.map(element => ({
+      elements: project.elements.map((element) => ({
         ...element,
         _id: element._id.toString(),
-        materials: element.materials || []
-      }))
+        materials: element.materials || [],
+      })),
     }));
 
     return NextResponse.json(transformedProjects);
@@ -113,7 +124,6 @@ export async function GET() {
 export async function POST(req: Request) {
   try {
     const { userId } = await auth();
-
     if (!userId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
@@ -124,8 +134,12 @@ export async function POST(req: Request) {
     const project = await Project.create({
       ...body,
       userId,
-      createdAt: new Date(),
-      updatedAt: new Date(),
+      emissions: {
+        gwp: 0,
+        ubp: 0,
+        penre: 0,
+        lastCalculated: new Date(),
+      },
     });
 
     return NextResponse.json(project);

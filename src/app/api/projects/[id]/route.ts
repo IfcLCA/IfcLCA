@@ -12,10 +12,13 @@ export async function GET(
 ) {
   try {
     await connectToDatabase();
-    
+
     // Validate project ID
     if (!mongoose.Types.ObjectId.isValid(params.id)) {
-      return NextResponse.json({ error: "Invalid project ID" }, { status: 400 });
+      return NextResponse.json(
+        { error: "Invalid project ID" },
+        { status: 400 }
+      );
     }
 
     const projectId = new mongoose.Types.ObjectId(params.id);
@@ -30,9 +33,9 @@ export async function GET(
       // Get materials with KBOB matches
       mongoose.models.Material.find({ projectId })
         .populate({
-          path: 'kbobMatchId',
-          model: 'KBOBMaterial',
-          select: 'Name Category GWP UBP PENRE kg/unit min density max density'
+          path: "kbobMatchId",
+          model: "KBOBMaterial",
+          select: "Name Category GWP UBP PENRE kg/unit min density max density",
         })
         .lean()
         .exec(),
@@ -40,46 +43,48 @@ export async function GET(
       // Get elements with material references
       mongoose.models.Element.find({ projectId })
         .populate({
-          path: 'materials.material',
-          model: 'Material',
+          path: "materials.material",
+          model: "Material",
           populate: {
-            path: 'kbobMatchId',
-            model: 'KBOBMaterial',
-            select: 'Name Category GWP UBP PENRE'
-          }
+            path: "kbobMatchId",
+            model: "KBOBMaterial",
+            select: "Name Category GWP UBP PENRE",
+          },
         })
         .lean()
         .exec(),
 
       // Get uploads
-      mongoose.models.Upload.find({ projectId })
-        .lean()
-        .exec()
+      mongoose.models.Upload.find({ projectId }).lean().exec(),
     ]);
 
     // Process elements to ensure material references are properly populated
-    const populatedElements = elements.map(element => {
+    const populatedElements = elements.map((element) => {
       return {
         ...element,
-        materials: (element.materials || []).map(mat => {
-          if (!mat || !mat.material) return null;
-          const materialRef = mat.material;
-          const kbobRef = materialRef?.kbobMatchId;
-          return {
-            ...mat,
-            material: {
-              ...materialRef,
-              name: materialRef?.name || 'Unknown',
-              kbobMatchId: kbobRef ? {
-                Name: kbobRef.Name || '',
-                Category: kbobRef.Category || '',
-                GWP: kbobRef.GWP || 0,
-                UBP: kbobRef.UBP || 0,
-                PENRE: kbobRef.PENRE || 0
-              } : null
-            }
-          };
-        }).filter(mat => mat !== null && mat.material !== null)
+        materials: (element.materials || [])
+          .map((mat) => {
+            if (!mat || !mat.material) return null;
+            const materialRef = mat.material;
+            const kbobRef = materialRef?.kbobMatchId;
+            return {
+              ...mat,
+              material: {
+                ...materialRef,
+                name: materialRef?.name || "Unknown",
+                kbobMatchId: kbobRef
+                  ? {
+                      Name: kbobRef.Name || "",
+                      Category: kbobRef.Category || "",
+                      GWP: kbobRef.GWP || 0,
+                      UBP: kbobRef.UBP || 0,
+                      PENRE: kbobRef.PENRE || 0,
+                    }
+                  : null,
+              },
+            };
+          })
+          .filter((mat) => mat !== null && mat.material !== null),
       };
     });
 
@@ -97,11 +102,14 @@ export async function GET(
       console.error("Error details:", {
         message: error.message,
         stack: error.stack,
-        name: error.name
+        name: error.name,
       });
     }
     return NextResponse.json(
-      { error: "Failed to fetch project", details: error instanceof Error ? error.message : String(error) },
+      {
+        error: "Failed to fetch project",
+        details: error instanceof Error ? error.message : String(error),
+      },
       { status: 500 }
     );
   }
@@ -139,7 +147,7 @@ export async function PUT(
       console.error("Error details:", {
         message: error.message,
         stack: error.stack,
-        name: error.name
+        name: error.name,
       });
     }
     return new Response("Internal Server Error", { status: 500 });
@@ -194,7 +202,7 @@ export async function DELETE(
         console.error("Error details:", {
           message: error.message,
           stack: error.stack,
-          name: error.name
+          name: error.name,
         });
       }
       throw error;
@@ -207,7 +215,7 @@ export async function DELETE(
       console.error("Error details:", {
         message: error.message,
         stack: error.stack,
-        name: error.name
+        name: error.name,
       });
     }
     return new Response("Internal Server Error", { status: 500 });
@@ -244,11 +252,14 @@ export async function PATCH(
       console.error("Error details:", {
         message: error.message,
         stack: error.stack,
-        name: error.name
+        name: error.name,
       });
     }
     return NextResponse.json(
-      { error: "Failed to update project", details: error instanceof Error ? error.message : String(error) },
+      {
+        error: "Failed to update project",
+        details: error instanceof Error ? error.message : String(error),
+      },
       { status: 500 }
     );
   }

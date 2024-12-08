@@ -9,6 +9,8 @@ import {
   getPaginationRowModel,
   PaginationState,
   ColumnResizeMode,
+  getSortedRowModel,
+  SortingState,
 } from "@tanstack/react-table";
 import {
   Table,
@@ -54,6 +56,7 @@ export function DataTable<TData, TValue>({
 
   const [columnSizing, setColumnSizing] = React.useState({});
   const [firstColumnWidth, setFirstColumnWidth] = React.useState(0);
+  const [sorting, setSorting] = React.useState<SortingState>([]);
 
   const table = useReactTable({
     data,
@@ -70,12 +73,17 @@ export function DataTable<TData, TValue>({
     state: {
       pagination,
       columnSizing,
+      sorting,
     },
     onColumnSizingChange: setColumnSizing,
+    getSortedRowModel: getSortedRowModel(),
+    onSortingChange: setSorting,
   });
 
   const totalColumnsWidth = React.useMemo(() => {
-    return table.getAllColumns().reduce((acc, column) => acc + column.getSize(), 0);
+    return table
+      .getAllColumns()
+      .reduce((acc, column) => acc + column.getSize(), 0);
   }, [table.getAllColumns()]);
 
   const containerRef = React.useRef<HTMLDivElement>(null);
@@ -162,31 +170,35 @@ export function DataTable<TData, TValue>({
                         width: header.getSize(),
                       }}
                     >
-                      {header.isPlaceholder
-                        ? null
-                        : (
-                          <>
-                            <div
-                              className={`select-none ${header.index === 0 ? "whitespace-normal" : ""}`}
-                              ref={header.index === 0 ? firstColumnRef : undefined}
-                            >
-                              {flexRender(
-                                header.column.columnDef.header,
-                                header.getContext()
-                              )}
-                            </div>
-                            {header.column.getCanResize() && (
-                              <div
-                                onMouseDown={header.getResizeHandler()}
-                                onTouchStart={header.getResizeHandler()}
-                                className={`resizer ${
-                                  header.column.getIsResizing() ? "isResizing" : ""
-                                }`}
-                                role="separator"
-                              />
+                      {header.isPlaceholder ? null : (
+                        <>
+                          <div
+                            className={`select-none ${
+                              header.index === 0 ? "whitespace-normal" : ""
+                            }`}
+                            ref={
+                              header.index === 0 ? firstColumnRef : undefined
+                            }
+                          >
+                            {flexRender(
+                              header.column.columnDef.header,
+                              header.getContext()
                             )}
-                          </>
-                        )}
+                          </div>
+                          {header.column.getCanResize() && (
+                            <div
+                              onMouseDown={header.getResizeHandler()}
+                              onTouchStart={header.getResizeHandler()}
+                              className={`resizer ${
+                                header.column.getIsResizing()
+                                  ? "isResizing"
+                                  : ""
+                              }`}
+                              role="separator"
+                            />
+                          )}
+                        </>
+                      )}
                     </TableHead>
                   ))}
                 </TableRow>
@@ -203,7 +215,11 @@ export function DataTable<TData, TValue>({
                           width: cell.column.getSize(),
                         }}
                       >
-                        <div className={cell.column.index === 0 ? "whitespace-normal" : ""}>
+                        <div
+                          className={
+                            cell.column.index === 0 ? "whitespace-normal" : ""
+                          }
+                        >
                           {flexRender(
                             cell.column.columnDef.cell,
                             cell.getContext()

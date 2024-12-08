@@ -6,6 +6,8 @@ interface IElement {
   name: string;
   type: string;
   volume: number;
+  loadBearing: boolean;
+  isExternal: boolean;
   materials: Array<{
     material: mongoose.Types.ObjectId;
     volume: number;
@@ -18,6 +20,7 @@ interface IElement {
       penre: number;
     };
   }>;
+  object_type: string;
 }
 
 const elementSchema = new mongoose.Schema<IElement>(
@@ -30,7 +33,10 @@ const elementSchema = new mongoose.Schema<IElement>(
     guid: String,
     name: String,
     type: String,
+    object_type: String,
     volume: Number,
+    loadBearing: { type: Boolean, default: false },
+    isExternal: { type: Boolean, default: false },
     materials: [
       {
         material: {
