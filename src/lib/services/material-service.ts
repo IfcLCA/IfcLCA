@@ -1,7 +1,7 @@
 import mongoose from "mongoose";
 import { Material, KBOBMaterial, Element, Project } from "@/models";
 import { logger } from "@/lib/logger";
-import type { ClientSession, Types } from "mongoose";
+import { ClientSession, Types } from "mongoose";
 
 // Update interfaces with proper types
 interface ILCAIndicators {
@@ -213,7 +213,7 @@ export class MaterialService {
         if (bulkOps.length) {
           const result = await Element.bulkWrite(bulkOps, {
             ordered: false,
-            session,
+            session: session || undefined,
             writeConcern: { w: 1 },
           });
 
@@ -256,7 +256,10 @@ export class MaterialService {
           .lean(),
         KBOBMaterial.findById<IKBOBMaterial>(kbobObjectId).lean(),
         Element.find({ "materials.material": { $in: objectIds } })
-          .populate("projectId", "name")
+          .populate<{ projectId: { _id: Types.ObjectId; name: string } }>(
+            "projectId",
+            "name"
+          )
           .lean(),
       ]);
 
@@ -292,17 +295,18 @@ export class MaterialService {
         oldKbobMatch: material.kbobMatchId?.Name,
         newKbobMatch: newKBOBMaterial.Name,
         oldDensity: material.density,
-        newDensity:
+        newDensity: Number(
           density ||
-          newKBOBMaterial["kg/unit"] ||
-          (newKBOBMaterial["min density"] && newKBOBMaterial["max density"]
-            ? (newKBOBMaterial["min density"] +
-                newKBOBMaterial["max density"]) /
-              2
-            : 0),
+            newKBOBMaterial["kg/unit"] ||
+            (newKBOBMaterial["min density"] && newKBOBMaterial["max density"]
+              ? (newKBOBMaterial["min density"] +
+                  newKBOBMaterial["max density"]) /
+                2
+              : 0)
+        ),
         affectedElements: elementCounts.get(material._id.toString()) || 0,
         projects: Array.from(
-          projectMap.get(material._id.toString()) || new Set()
+          projectMap.get(material._id.toString()) || new Set<string>()
         ).sort(),
       }));
 
@@ -451,7 +455,7 @@ export class MaterialService {
    */
   static async findExistingMaterial(
     materialName: string
-  ): Promise<Material | null> {
+  ): Promise<(mongoose.Document & IMaterial) | null> {
     const cleanedName = materialName.trim().toLowerCase();
 
     try {
@@ -588,7 +592,7 @@ export class MaterialService {
     materialName: string,
     kbobMatchId: Types.ObjectId,
     density?: number
-  ): Promise<Material> {
+  ): Promise<typeof Material | null> {
     try {
       // Check if material already exists in the project
       const existingMaterial = await Material.findOne({

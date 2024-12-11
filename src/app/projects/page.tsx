@@ -1,10 +1,7 @@
 "use client";
 
-import { Button } from "@/components/ui/button";
 import { ProjectOverview } from "@/components/project-overview";
-import { PlusCircle } from "lucide-react";
-import Link from "next/link";
-import { useState } from "react";
+import { Button } from "@/components/ui/button";
 import {
   Select,
   SelectContent,
@@ -12,6 +9,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { PlusCircle } from "lucide-react";
+import Link from "next/link";
+import { useState } from "react";
 
 export default function ProjectsPage() {
   const [selectedMetric, setSelectedMetric] = useState("gwp");

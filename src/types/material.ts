@@ -27,17 +27,29 @@ export interface IMaterial {
   penre?: number;
 }
 
-export interface IMaterialChange {
+export interface MaterialChange {
   materialId: string;
   materialName: string;
-  oldKbobMatch?: string;
-  newKbobMatch: string;
-  oldDensity?: number;
-  newDensity: number;
-  affectedElements: number;
+  oldMatch: {
+    Name: string;
+    Density: number;
+    Elements: number;
+  } | null;
+  newMatch: {
+    id: string;
+    Name: string;
+    Density: number;
+    Elements: number;
+    hasDensityRange: boolean;
+    minDensity?: number;
+    maxDensity?: number;
+  };
   projects: string[];
+  projectId?: string;
+  elements: number;
+  selectedDensity?: number;
 }
 
 export interface IMaterialPreview {
-  changes: IMaterialChange[];
+  changes: MaterialChange[];
 }

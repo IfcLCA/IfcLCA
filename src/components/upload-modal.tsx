@@ -1,32 +1,34 @@
 "use client";
 
-import { useState, useCallback } from "react";
-import { useDropzone } from "react-dropzone";
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { UploadCloud } from "lucide-react";
-import { ReloadIcon } from "@radix-ui/react-icons";
-import { parseIFCFile } from "@/lib/services/ifc-parser-client";
 import { useToast } from "@/hooks/use-toast";
-import { useRouter } from "next/navigation";
 import { logger } from "@/lib/logger";
+import { parseIFCFile } from "@/lib/services/ifc-parser-client";
+import { ReloadIcon } from "@radix-ui/react-icons";
+import { UploadCloud } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { useCallback, useState } from "react";
+import { useDropzone } from "react-dropzone";
 
 interface UploadModalProps {
   projectId: string;
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onUploadComplete?: () => void;
+  onSuccess?: (upload: { id: string }) => void;
+  onProgress?: (progress: number) => void;
 }
 
 export function UploadModal({
   projectId,
   open,
   onOpenChange,
-  onUploadComplete,
+  onSuccess,
+  onProgress,
 }: UploadModalProps) {
   const [isUploading, setIsUploading] = useState(false);
   const { toast } = useToast();
@@ -37,47 +39,56 @@ export function UploadModal({
       try {
         setIsUploading(true);
         const file = acceptedFiles[0];
-        logger.debug('Starting file upload');
+        logger.debug("Starting file upload");
 
         const timeoutPromise = new Promise((_, reject) => {
-          setTimeout(() => reject(new Error('Upload timed out after 50 seconds')), 50000);
+          setTimeout(
+            () => reject(new Error("Upload timed out after 50 seconds")),
+            50000
+          );
         });
 
         const uploadPromise = parseIFCFile(file, projectId);
-        const results = await Promise.race([uploadPromise, timeoutPromise]) as any;
+        const results = (await Promise.race([
+          uploadPromise,
+          timeoutPromise,
+        ])) as any;
 
-        logger.debug('Upload results', {
+        logger.debug("Upload results", {
           elementCount: results.elementCount,
           materialCount: results.materialCount,
           unmatchedMaterialCount: results.unmatchedMaterialCount,
-          shouldRedirectToLibrary: results.shouldRedirectToLibrary
+          shouldRedirectToLibrary: results.shouldRedirectToLibrary,
         });
 
         toast({
           title: "Upload Successful",
-          description: results.unmatchedMaterialCount > 0
-            ? `Successfully processed ${results.elementCount} elements. Found ${results.unmatchedMaterialCount} materials that need matching.`
-            : `Successfully processed ${results.elementCount} elements`,
+          description:
+            results.unmatchedMaterialCount > 0
+              ? `Successfully processed ${results.elementCount} elements. Found ${results.unmatchedMaterialCount} materials that need matching.`
+              : `Successfully processed ${results.elementCount} elements`,
         });
 
         onOpenChange(false);
 
         if (results.shouldRedirectToLibrary) {
-          logger.debug('Redirecting to materials library');
+          logger.debug("Redirecting to materials library");
           router.push(`/materials-library?projectId=${projectId}`);
           router.refresh();
         } else {
-          logger.debug('No redirection needed, refreshing page');
+          logger.debug("No redirection needed, refreshing page");
           router.refresh();
-          onUploadComplete?.();
+          onSuccess?.({ id: results.id });
         }
       } catch (error) {
-        logger.error('Upload failed:', error);
+        logger.error("Upload failed:", error);
         toast({
           title: "Upload Failed",
-          description: error instanceof Error && error.message === 'Upload timed out after 50 seconds'
-            ? "The upload timed out. Please try again with a smaller file."
-            : "There was an error processing your file. Please try again or contact support if the issue persists.",
+          description:
+            error instanceof Error &&
+            error.message === "Upload timed out after 50 seconds"
+              ? "The upload timed out. Please try again with a smaller file."
+              : "There was an error processing your file. Please try again or contact support if the issue persists.",
           variant: "destructive",
         });
         onOpenChange(false);
@@ -85,7 +96,7 @@ export function UploadModal({
         setIsUploading(false);
       }
     },
-    [projectId, onUploadComplete, onOpenChange, router, toast]
+    [projectId, onSuccess, onOpenChange, router, toast]
   );
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({

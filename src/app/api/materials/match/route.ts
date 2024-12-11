@@ -1,12 +1,15 @@
-import { NextResponse } from "next/server";
 import { connectToDatabase } from "@/lib/mongodb";
-import { Material, KBOBMaterial } from "@/models";
+import { Element, KBOBMaterial, Material } from "@/models";
 import mongoose from "mongoose";
-import { Element } from "@/models";
+import { NextResponse } from "next/server";
 
 export async function POST(request: Request) {
   try {
-    const { materialIds, kbobMaterialId, density: userDefinedDensity } = await request.json();
+    const {
+      materialIds,
+      kbobMaterialId,
+      density: userDefinedDensity,
+    } = await request.json();
     await connectToDatabase();
 
     // First fetch the KBOB material
@@ -28,7 +31,8 @@ export async function POST(request: Request) {
       ) {
         density = kbobMaterial["kg/unit"];
       } else if (kbobMaterial["min density"] && kbobMaterial["max density"]) {
-        density = (kbobMaterial["min density"] + kbobMaterial["max density"]) / 2;
+        density =
+          (kbobMaterial["min density"] + kbobMaterial["max density"]) / 2;
       }
     }
 
@@ -93,26 +97,25 @@ export async function POST(request: Request) {
                       gwp: mat.volume * density * kbobMaterial.GWP,
                       ubp: mat.volume * density * kbobMaterial.UBP,
                       penre: mat.volume * density * kbobMaterial.PENRE,
-                    }
+                    },
                   };
                 }
                 return mat;
               }),
-              updatedAt: new Date()
-            }
-          }
-        }
+              updatedAt: new Date(),
+            },
+          },
+        },
       }));
 
       try {
         const result = await Element.bulkWrite(bulkOps, {
           ordered: false,
-          writeConcern: { w: 1 }
+          writeConcern: { w: 1 },
         });
 
         totalModified += result.modifiedCount;
         totalMatched += result.matchedCount;
-
       } catch (error) {
         console.error("Error in batch:", error);
         // Continue processing other batches
@@ -126,22 +129,21 @@ export async function POST(request: Request) {
     );
 
     const sampledElements = await Element.find({
-      _id: { $in: sampleIndices.map(i => allElements[i]._id) }
+      _id: { $in: sampleIndices.map((i) => allElements[i]._id) },
     }).lean();
 
-    sampledElements.map(e => ({
+    sampledElements.map((e) => ({
       _id: e._id,
       materialsCount: e.materials.length,
-      hasIndicators: e.materials.every(m => m.indicators),
-      sampleIndicators: e.materials[0]?.indicators
-    }))
-
+      hasIndicators: e.materials.every((m) => m.indicators),
+      sampleIndicators: e.materials[0]?.indicators,
+    }));
 
     return NextResponse.json({
       message: "Successfully updated materials and elements",
       totalModified,
       totalMatched,
-      totalElements: allElements.length
+      totalElements: allElements.length,
     });
   } catch (error) {
     console.error("Error matching materials:", error);

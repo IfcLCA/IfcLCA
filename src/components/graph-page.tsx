@@ -1,14 +1,9 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectContent,
@@ -17,43 +12,28 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Label } from "@/components/ui/label";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Input } from "@/components/ui/input";
+import { PrinterIcon } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
 import {
-  Command,
-  CommandEmpty,
-  CommandGroup,
-  CommandInput,
-  CommandItem,
-  CommandList,
-} from "@/components/ui/command";
-import {
-  ChartContainer,
-  ChartTooltip,
-  ChartTooltipContent,
-} from "@/components/ui/chart";
-import {
-  BarChart,
   Bar,
-  XAxis,
-  YAxis,
+  BarChart,
   CartesianGrid,
-  Tooltip,
-  Legend,
-  ResponsiveContainer,
-  Line,
-  LineChart,
-  PieChart,
-  Pie,
   Cell,
   LabelList,
-  ScatterChart,
+  Line,
+  LineChart,
+  Pie,
+  PieChart,
+  ResponsiveContainer,
   Scatter,
-  ComposedChart,
+  ScatterChart,
+  Tooltip,
+  XAxis,
+  YAxis,
   ZAxis,
 } from "recharts";
-import { PrinterIcon } from "lucide-react";
+
+type ColorTheme = "standard" | "bw" | "colorful";
 
 interface MaterialData {
   name: string;
@@ -441,11 +421,23 @@ export function GraphPageComponent({ materialsData }: Props) {
               dataKey="name"
               height={120}
               interval={0}
-              tick={{
-                angle: -45,
-                textAnchor: "end",
-                fontSize: 12,
-                fill: "hsl(var(--foreground))",
+              tick={(props) => {
+                const { x, y, payload } = props;
+                return (
+                  <g transform={`translate(${x},${y})`}>
+                    <text
+                      x={0}
+                      y={0}
+                      dy={16}
+                      textAnchor="end"
+                      fill="hsl(var(--foreground))"
+                      fontSize={12}
+                      transform="rotate(-45)"
+                    >
+                      {payload.value}
+                    </text>
+                  </g>
+                );
               }}
             />
             <YAxis
@@ -878,7 +870,7 @@ export function GraphPageComponent({ materialsData }: Props) {
         <CardContent>
           <div className="h-[500px]">
             <ResponsiveContainer width="100%" height="100%">
-              {renderChart()}
+              {renderChart() || <div>No chart data available</div>}
             </ResponsiveContainer>
           </div>
         </CardContent>

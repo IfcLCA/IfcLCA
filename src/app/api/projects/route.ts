@@ -1,8 +1,7 @@
-import { NextResponse } from "next/server";
 import { connectToDatabase } from "@/lib/mongodb";
 import { Project } from "@/models";
-import mongoose from "mongoose";
 import { auth } from "@clerk/nextjs/server";
+import { NextResponse } from "next/server";
 
 export const runtime = "nodejs";
 

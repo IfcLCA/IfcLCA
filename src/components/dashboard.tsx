@@ -1,23 +1,10 @@
 "use client";
 
-import * as React from "react";
-import Link from "next/link";
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { ActivityFeed } from "@/components/activity-feed";
+import { EmissionsSummaryCard } from "@/components/emissions-summary-card";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import {
-  Building,
-  Box,
-  Layers,
-  UploadCloud,
-  PlusCircle,
-  Activity,
-} from "lucide-react";
-import { UploadModal } from "@/components/upload-modal";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Dialog,
   DialogContent,
@@ -25,14 +12,14 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { useState, useEffect, useCallback, useRef, useMemo } from "react";
-import { useRouter } from "next/navigation";
-import { ActivityFeed } from "@/components/activity-feed";
-import Image from "next/image";
-import { Badge } from "@/components/ui/badge";
-import { EmissionsSummaryCard } from "@/components/emissions-summary-card";
 import { UploadIfcButton } from "@/components/upload-ifc-button";
+import { UploadModal } from "@/components/upload-modal";
 import { Activity as ActivityType } from "@/lib/types/activity";
+import { Box, Building, Layers, PlusCircle, UploadCloud } from "lucide-react";
+import Image from "next/image";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 interface Project {
   id: string;
@@ -41,6 +28,7 @@ interface Project {
   elements: number;
   thumbnail: string;
   updatedAt: string;
+  imageUrl?: string;
   _count: {
     elements: number;
     uploads: number;
@@ -119,31 +107,38 @@ export function Dashboard({
 
   const CACHE_TIMEOUT = 5 * 60 * 1000;
 
-  const metrics = useMemo(() => [
-    {
-      title: "Total Projects",
-      value: statistics.totalProjects,
-      description: "Active projects in your workspace",
-      icon: "Building" as const,
-    },
-    {
-      title: "Total Elements",
-      value: statistics.totalElements,
-      description: "Building elements across all projects",
-      icon: "Box" as const,
-    },
-    {
-      title: "Total Materials",
-      value: statistics.totalMaterials,
-      description: "Unique materials in use",
-      icon: "Layers" as const,
-    },
-  ], [statistics.totalProjects, statistics.totalElements, statistics.totalMaterials]);
+  const metrics = useMemo(
+    () => [
+      {
+        title: "Total Projects",
+        value: statistics.totalProjects,
+        description: "Active projects in your workspace",
+        icon: "Building" as const,
+      },
+      {
+        title: "Total Elements",
+        value: statistics.totalElements,
+        description: "Building elements across all projects",
+        icon: "Box" as const,
+      },
+      {
+        title: "Total Materials",
+        value: statistics.totalMaterials,
+        description: "Unique materials in use",
+        icon: "Layers" as const,
+      },
+    ],
+    [
+      statistics.totalProjects,
+      statistics.totalElements,
+      statistics.totalMaterials,
+    ]
+  );
 
   const fetchProjects = useCallback(async () => {
     try {
       const response = await fetch("/api/projects", {
-        cache: 'no-store'
+        cache: "no-store",
       });
       const data = await response.json();
       setProjects(data);
@@ -152,82 +147,83 @@ export function Dashboard({
     }
   }, []);
 
-  const fetchStatistics = useCallback(async (force = false) => {
-    const now = Date.now();
-    if (!force && now - lastFetchRef.current < CACHE_TIMEOUT) {
-      return; // Use cached data
-    }
-
-    try {
-      setIsLoadingStatistics(true);
-
-      // Cancel previous request if it exists
-      if (abortControllerRef.current) {
-        abortControllerRef.current.abort();
-      }
-      abortControllerRef.current = new AbortController();
-
-      const [projectsRes, emissionsRes] = await Promise.all([
-        fetch("/api/projects", {
-          signal: abortControllerRef.current.signal,
-          cache: 'no-store',
-        }),
-        fetch("/api/emissions", {
-          signal: abortControllerRef.current.signal,
-          cache: 'no-store',
-        })
-      ]);
-
-      if (!projectsRes.ok || !emissionsRes.ok) {
-        console.error('API Response not OK:', {
-          projects: projectsRes.status,
-          emissions: emissionsRes.status
-        });
-        throw new Error('Failed to fetch data');
+  const fetchStatistics = useCallback(
+    async (force = false) => {
+      const now = Date.now();
+      if (!force && now - lastFetchRef.current < CACHE_TIMEOUT) {
+        return; // Use cached data
       }
 
-      const [projects, emissions] = await Promise.all([
-        projectsRes.json(),
-        emissionsRes.json()
-      ]);
+      try {
+        setIsLoadingStatistics(true);
 
+        // Cancel previous request if it exists
+        if (abortControllerRef.current) {
+          abortControllerRef.current.abort();
+        }
+        abortControllerRef.current = new AbortController();
 
-      const recentProjects = projects.slice(0, 3);
-      const totalElements = projects.reduce(
-        (acc: number, project: any) => acc + (project._count?.elements || 0),
-        0
-      );
-      const totalMaterials = projects.reduce(
-        (acc: number, project: any) => acc + (project._count?.materials || 0),
-        0
-      );
+        const [projectsRes, emissionsRes] = await Promise.all([
+          fetch("/api/projects", {
+            signal: abortControllerRef.current.signal,
+            cache: "no-store",
+          }),
+          fetch("/api/emissions", {
+            signal: abortControllerRef.current.signal,
+            cache: "no-store",
+          }),
+        ]);
 
-      const newStatistics = {
-        ...statistics,
-        totalProjects: projects.length,
-        totalElements,
-        totalMaterials,
-        totalEmissions: emissions
-      };
+        if (!projectsRes.ok || !emissionsRes.ok) {
+          console.error("API Response not OK:", {
+            projects: projectsRes.status,
+            emissions: emissionsRes.status,
+          });
+          throw new Error("Failed to fetch data");
+        }
 
+        const [projects, emissions] = await Promise.all([
+          projectsRes.json(),
+          emissionsRes.json(),
+        ]);
 
-      setStatistics(newStatistics);
-      setRecentProjects(recentProjects);
-      lastFetchRef.current = now;
-    } catch (error) {
-      if (error.name !== 'AbortError') {
-        console.error("Failed to fetch statistics:", error);
+        const recentProjects = projects.slice(0, 3);
+        const totalElements = projects.reduce(
+          (acc: number, project: any) => acc + (project._count?.elements || 0),
+          0
+        );
+        const totalMaterials = projects.reduce(
+          (acc: number, project: any) => acc + (project._count?.materials || 0),
+          0
+        );
+
+        const newStatistics = {
+          ...statistics,
+          totalProjects: projects.length,
+          totalElements,
+          totalMaterials,
+          totalEmissions: emissions,
+        };
+
+        setStatistics(newStatistics);
+        setRecentProjects(recentProjects);
+        lastFetchRef.current = now;
+      } catch (error: unknown) {
+        if (error instanceof Error && error.name !== "AbortError") {
+          console.error("Failed to fetch statistics:", error);
+        }
+      } finally {
+        setIsLoadingStatistics(false);
       }
-    } finally {
-      setIsLoadingStatistics(false);
-    }
-  }, [statistics]);
+    },
+    [statistics]
+  );
 
   const fetchActivities = useCallback(async () => {
     try {
       setIsLoadingActivities(true);
-      const response = await fetch('/api/activities?limit=6', {
-        cache: 'no-store'
+      const response = await fetch("/api/activities?limit=6", {
+        cache: "no-store",
       });
       const data = await response.json();
       setActivities(data.activities);
@@ -249,8 +245,8 @@ export function Dashboard({
 
       fetch(`/api/activities?page=${nextPage}`, {
         signal: prefetchController.signal,
-        cache: 'no-store'
-      }).catch(() => { });
+        cache: "no-store",
+      }).catch(() => {});
     }
   }, [hasMore, isLoadingActivities, page]);
 
@@ -276,13 +272,16 @@ export function Dashboard({
 
   useEffect(() => {
     const handleScroll = () => {
-      if ((window.innerHeight + window.scrollY) >= document.documentElement.scrollHeight - 1000) {
+      if (
+        window.innerHeight + window.scrollY >=
+        document.documentElement.scrollHeight - 1000
+      ) {
         prefetchNextPage();
       }
     };
 
-    window.addEventListener('scroll', handleScroll);
-    return () => window.removeEventListener('scroll', handleScroll);
+    window.addEventListener("scroll", handleScroll);
+    return () => window.removeEventListener("scroll", handleScroll);
   }, [prefetchNextPage]);
 
   const handleLoadMore = () => {
@@ -296,7 +295,7 @@ export function Dashboard({
   const handleUploadClick = async () => {
     try {
       const response = await fetch("/api/projects", {
-        cache: 'no-store'
+        cache: "no-store",
       });
       const projects = await response.json();
 
@@ -335,7 +334,10 @@ export function Dashboard({
         {metrics.map((metric) => {
           const Icon = Icons[metric.icon];
           return (
-            <Card key={metric.title} className="group transition-all hover:bg-muted/5">
+            <Card
+              key={metric.title}
+              className="group transition-all hover:bg-muted/5"
+            >
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium">
                   {metric.title}
@@ -343,7 +345,9 @@ export function Dashboard({
                 <Icon className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold group-hover:text-primary transition-colors">{metric.value}</div>
+                <div className="text-2xl font-bold group-hover:text-primary transition-colors">
+                  {metric.value}
+                </div>
                 <p className="text-xs text-muted-foreground">
                   {metric.description}
                 </p>
@@ -474,7 +478,7 @@ export function Dashboard({
             setSelectedProjectId(null);
             router.push(`/projects/${selectedProjectId}`);
           }}
-          onProgress={(progress: number) => { }}
+          onProgress={(progress: number) => {}}
         />
       )}
     </div>

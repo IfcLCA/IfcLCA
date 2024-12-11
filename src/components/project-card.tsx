@@ -1,4 +1,8 @@
 import { MaterialService } from "@/lib/services/material-service";
+import { Badge } from "./ui/badge";
+import { useState } from "react";
+import { useEffect } from "react";
+import { Scale } from "lucide-react";
 
 // Add loading state for emissions
 const [emissions, setEmissions] = useState<{

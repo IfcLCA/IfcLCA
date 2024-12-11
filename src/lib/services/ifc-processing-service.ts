@@ -1,9 +1,8 @@
-import { connectToDatabase } from "@/lib/mongodb";
-import { Element, Material, KBOBMaterial } from "@/models";
-import { MaterialService } from "./material-service";
 import { logger } from "@/lib/logger";
+import { Element, Material } from "@/models";
 import type { ClientSession } from "mongoose";
 import mongoose from "mongoose";
+import { MaterialService } from "./material-service";
 
 interface IFCMaterial {
   name: string;

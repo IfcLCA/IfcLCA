@@ -1,9 +1,9 @@
-import { NextResponse } from "next/server";
-import { connectToDatabase } from "@/lib/mongodb";
-import { Upload } from "@/models";
-import { IFCProcessingService } from "@/lib/services/ifc-processing-service";
-import mongoose from "mongoose";
 import { logger } from "@/lib/logger";
+import { connectToDatabase } from "@/lib/mongodb";
+import { IFCProcessingService } from "@/lib/services/ifc-processing-service";
+import { Upload } from "@/models";
+import mongoose from "mongoose";
+import { NextResponse } from "next/server";
 
 interface IFCMaterial {
   name: string;

@@ -1,13 +1,12 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
-import { useRouter, useParams } from "next/navigation";
-import { ReloadIcon } from "@radix-ui/react-icons";
-import { toast } from "@/hooks/use-toast";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Card, CardContent } from "@/components/ui/card";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Breadcrumbs } from "@/components/breadcrumbs";
+import { DashboardCards } from "@/components/dashboard-cards";
+import { DataTable } from "@/components/data-table";
+import { elementsColumns } from "@/components/elements-columns";
+import { emissionsColumns } from "@/components/emissions-columns";
+import { GraphPageComponent } from "@/components/graph-page";
+import { materialsColumns } from "@/components/materials-columns";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -18,14 +17,10 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Trash2, Upload, Layers, UploadCloud, Edit } from "lucide-react";
-import { UploadModal } from "@/components/upload-modal";
-import { DataTable } from "@/components/data-table";
-import { Breadcrumbs } from "@/components/breadcrumbs";
-import { materialsColumns } from "@/components/materials-columns";
-import { elementsColumns } from "@/components/elements-columns";
-import { GraphPageComponent } from "@/components/graph-page";
-import { DashboardCards } from "@/components/dashboard-cards";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+import { Label } from "@/components/ui/label";
 import {
   Pagination,
   PaginationContent,
@@ -34,7 +29,6 @@ import {
   PaginationNext,
   PaginationPrevious,
 } from "@/components/ui/pagination";
-import { emissionsColumns } from "@/components/emissions-columns";
 import {
   Select,
   SelectContent,
@@ -42,8 +36,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Label } from "@/components/ui/label";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { UploadModal } from "@/components/upload-modal";
+import { toast } from "@/hooks/use-toast";
+import { ReloadIcon } from "@radix-ui/react-icons";
 import cn from "classnames";
+import { Edit, Layers, UploadCloud } from "lucide-react";
+import { useParams, useRouter } from "next/navigation";
+import { useEffect, useMemo, useState } from "react";
 
 interface KBOBMaterial {
   _id: string;
@@ -305,7 +305,7 @@ export default function ProjectDetailsPage() {
         projectId={projectId}
         open={isUploadModalOpen}
         onOpenChange={setIsUploadModalOpen}
-        onUploadComplete={handleUploadComplete}
+        onSuccess={handleUploadComplete}
       />
       <DeleteProjectDialog
         isOpen={isDeleteDialogOpen}
@@ -692,11 +692,7 @@ const MaterialsTab = ({
       {project?.materials && project.materials.length > 0 ? (
         <Card>
           <CardContent className="p-0">
-            <DataTable
-              columns={materialsColumns}
-              data={data}
-              onRowSelectionChange={() => {}}
-            />
+            <DataTable columns={materialsColumns} data={data} />
           </CardContent>
         </Card>
       ) : (
@@ -851,7 +847,6 @@ const EmissionsTab = ({
             <DataTable
               columns={emissionsColumns(selectedIndicator)}
               data={emissionsData}
-              onRowSelectionChange={() => {}}
             />
           </CardContent>
         </Card>

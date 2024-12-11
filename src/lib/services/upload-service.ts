@@ -1,8 +1,6 @@
-import { Material, Element, Upload } from "@/models";
-import { MaterialService } from "./material-service";
-import mongoose from "mongoose";
 import { logger } from "@/lib/logger";
-import { ClientSession } from "mongoose";
+import { Element, Material, Upload } from "@/models";
+import mongoose, { ClientSession } from "mongoose";
 
 export class UploadService {
   /**
@@ -18,7 +16,6 @@ export class UploadService {
       netVolume?: number;
       materialLayers?: any;
       properties?: {
-        // Add properties type
         loadBearing?: boolean;
         isExternal?: boolean;
       };
@@ -35,14 +32,12 @@ export class UploadService {
           name: element.name,
           type: element.type,
           volume: element.netVolume || 0,
-          loadBearing: element.properties?.loadBearing || false, // Add these
-          isExternal: element.properties?.isExternal || false, // Add these
+          loadBearing: element.properties?.loadBearing || false,
+          isExternal: element.properties?.isExternal || false,
           materials: [],
         })),
         { session }
       );
-
-      // ... rest of the function
     } catch (error) {
       logger.error("Error in material processing", { error });
       throw error;

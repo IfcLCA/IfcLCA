@@ -62,19 +62,10 @@ const formatActivityMessage = (activity: Activity) => {
 };
 
 interface ActivityFeedProps {
-  activities: Activity[];
-  isLoading: boolean;
-  hasMore: boolean;
-  onLoadMore: () => void;
+  activities?: Activity[];
 }
 
-export function ActivityFeed({
-  activities,
-  isLoading,
-  hasMore,
-  onLoadMore,
-}: ActivityFeedProps) {
-  // Show only the 6 most recent activities
+export function ActivityFeed({ activities = [] }: ActivityFeedProps) {
   const recentActivities = activities.slice(0, 6);
 
   return (

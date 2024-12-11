@@ -1,7 +1,7 @@
-"use client"
+"use client";
 
-import * as React from "react"
-import { useMemo, useState, useEffect } from "react"
+import * as React from "react";
+import { useMemo, useState, useEffect } from "react";
 import {
   Dialog,
   DialogContent,
@@ -9,8 +9,8 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog"
-import { Button } from "@/components/ui/button"
+} from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
 import {
   Table,
   TableBody,
@@ -18,46 +18,25 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from "@/components/ui/table"
+} from "@/components/ui/table";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
-import { ChevronDownIcon } from "@radix-ui/react-icons"
-import { ReloadIcon } from "@radix-ui/react-icons"
-import { Slider } from "@/components/ui/slider"
-
-interface MaterialChange {
-  materialId: string
-  materialName: string
-  oldMatch: {
-    Name: string
-    Density: number
-    Elements: number
-  } | null
-  newMatch: {
-    Name: string
-    Density: number
-    Elements: number
-    hasDensityRange: boolean
-    minDensity?: number
-    maxDensity?: number
-  }
-  projects: string[]
-  projectId?: string
-  elements: number
-  selectedDensity?: number
-}
+} from "@/components/ui/dropdown-menu";
+import { ChevronDownIcon } from "@radix-ui/react-icons";
+import { ReloadIcon } from "@radix-ui/react-icons";
+import { Slider } from "@/components/ui/slider";
+import { MaterialChange } from "@/types/material";
 
 interface MaterialChangesPreviewModalProps {
-  isOpen: boolean
-  onClose: () => void
-  onConfirm: (changesWithDensity: MaterialChange[]) => void
-  onNavigateToProject?: (projectId: string) => void
-  changes: MaterialChange[]
-  isLoading?: boolean
+  isOpen: boolean;
+  onClose: () => void;
+  onConfirm: (changesWithDensity: MaterialChange[]) => void;
+  onNavigateToProject?: (projectId: string) => void;
+  changes: MaterialChange[];
+  isLoading?: boolean;
 }
 
 export function MaterialChangesPreviewModal({
@@ -66,23 +45,28 @@ export function MaterialChangesPreviewModal({
   onClose,
   onConfirm,
   onNavigateToProject,
-  isLoading = false
+  isLoading = false,
 }: MaterialChangesPreviewModalProps) {
-  const [localChanges, setLocalChanges] = React.useState<MaterialChange[]>(changes);
+  const [localChanges, setLocalChanges] =
+    React.useState<MaterialChange[]>(changes);
 
   React.useEffect(() => {
-    setLocalChanges(changes.map(change => ({
-      ...change,
-      selectedDensity: change.newMatch.Density
-    })));
+    setLocalChanges(
+      changes.map((change) => ({
+        ...change,
+        selectedDensity: change.newMatch.Density,
+      }))
+    );
   }, [changes]);
 
   const handleDensityChange = (materialId: string, newValue: number[]) => {
-    setLocalChanges(prev => prev.map(change => 
-      change.materialId === materialId 
-        ? { ...change, selectedDensity: newValue[0] }
-        : change
-    ));
+    setLocalChanges((prev) =>
+      prev.map((change) =>
+        change.materialId === materialId
+          ? { ...change, selectedDensity: newValue[0] }
+          : change
+      )
+    );
   };
 
   const handleConfirm = () => {
@@ -92,10 +76,10 @@ export function MaterialChangesPreviewModal({
   // Check if all materials are from the same project
   const singleProjectId = useMemo(() => {
     if (!changes.length) return null;
-    
+
     // Get all unique project IDs
     const uniqueProjectIds = new Set<string>();
-    changes.forEach(change => {
+    changes.forEach((change) => {
       if (change.projectId) {
         uniqueProjectIds.add(change.projectId);
       }
@@ -146,29 +130,41 @@ export function MaterialChangesPreviewModal({
                         </div>
                       )}
                       <div className="flex items-center justify-between">
-                        <span className="text-green-600">{change.selectedDensity?.toFixed(0) || change.newMatch.Density.toFixed(0)} kg/m³</span>
+                        <span className="text-green-600">
+                          {change.selectedDensity?.toFixed(0) ||
+                            change.newMatch.Density.toFixed(0)}{" "}
+                          kg/m³
+                        </span>
                       </div>
-                      {change.newMatch.hasDensityRange && change.newMatch.minDensity !== undefined && change.newMatch.maxDensity !== undefined && (
-                        <>
-                          <Slider
-                            value={[change.selectedDensity || change.newMatch.Density]}
-                            min={change.newMatch.minDensity}
-                            max={change.newMatch.maxDensity}
-                            step={1}
-                            onValueChange={(value) => handleDensityChange(change.materialId, value)}
-                            className="w-[120px]"
-                          />
-                          <div className="text-xs text-muted-foreground">
-                            Range: {change.newMatch.minDensity.toFixed(0)} - {change.newMatch.maxDensity.toFixed(0)} kg/m³
-                          </div>
-                        </>
-                      )}
+                      {change.newMatch.hasDensityRange &&
+                        change.newMatch.minDensity !== undefined &&
+                        change.newMatch.maxDensity !== undefined && (
+                          <>
+                            <Slider
+                              value={[
+                                change.selectedDensity ||
+                                  change.newMatch.Density,
+                              ]}
+                              min={change.newMatch.minDensity}
+                              max={change.newMatch.maxDensity}
+                              step={1}
+                              onValueChange={(value) =>
+                                handleDensityChange(change.materialId, value)
+                              }
+                              className="w-[120px]"
+                            />
+                            <div className="text-xs text-muted-foreground">
+                              Range: {change.newMatch.minDensity.toFixed(0)} -{" "}
+                              {change.newMatch.maxDensity.toFixed(0)} kg/m³
+                            </div>
+                          </>
+                        )}
                     </div>
                   </TableCell>
                   <TableCell>{change.elements}</TableCell>
                   <TableCell>
                     <div className="max-w-[200px] truncate">
-                      {change.projects.join(', ')}
+                      {change.projects.join(", ")}
                     </div>
                   </TableCell>
                 </TableRow>
@@ -199,10 +195,12 @@ export function MaterialChangesPreviewModal({
                 <DropdownMenuItem onClick={handleConfirm}>
                   Return to Library
                 </DropdownMenuItem>
-                <DropdownMenuItem onClick={async () => {
-                  await handleConfirm();
-                  onNavigateToProject(singleProjectId);
-                }}>
+                <DropdownMenuItem
+                  onClick={async () => {
+                    await handleConfirm();
+                    onNavigateToProject(singleProjectId);
+                  }}
+                >
                   Go to Project
                 </DropdownMenuItem>
               </DropdownMenuContent>

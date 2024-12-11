@@ -1,16 +1,8 @@
 "use client";
 
-import { ColumnDef } from "@tanstack/react-table";
-import {
-  CheckCircle2,
-  XCircle,
-  ExternalLink,
-  LayoutDashboard,
-  ArrowUpDown,
-  Check,
-  X,
-} from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { ColumnDef } from "@tanstack/react-table";
+import { ArrowUpDown, Check, X } from "lucide-react";
 
 interface ElementTableItem {
   id: string;

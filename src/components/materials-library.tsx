@@ -1,32 +1,12 @@
 "use client";
 
-import { useState, useMemo, useEffect, useRef, useCallback } from "react";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
-import { MagnifyingGlassIcon } from "@radix-ui/react-icons";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
-  Pagination,
-  PaginationContent,
-  PaginationItem,
-  PaginationNext,
-  PaginationPrevious,
-} from "@/components/ui/pagination";
 import { MaterialChangesPreviewModal } from "@/components/material-changes-preview-modal";
-import { StarFilledIcon, StarIcon } from "@radix-ui/react-icons";
-import { ReloadIcon } from "@radix-ui/react-icons";
-import { useRouter } from "next/navigation";
-import { toast } from "@/hooks/use-toast";
-import { Trash2Icon } from "lucide-react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -38,12 +18,37 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import {
+  Pagination,
+  PaginationContent,
+  PaginationItem,
+  PaginationNext,
+  PaginationPrevious,
+} from "@/components/ui/pagination";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { toast } from "@/hooks/use-toast";
+import {
+  MagnifyingGlassIcon,
+  ReloadIcon,
+  StarFilledIcon,
+  StarIcon,
+} from "@radix-ui/react-icons";
+import { Trash2Icon } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { MaterialChange } from "@/types/material";
 
 interface Material {
   id: string;
   name: string;
   category?: string;
   volume?: number;
+  density?: number;
   kbobMatchId?: string;
   kbobMatch?: {
     id: string;
@@ -53,6 +58,7 @@ interface Material {
     PENRE: number;
   };
   projects?: string[];
+  originalIds?: string[];
 }
 
 interface KbobMaterial {
@@ -62,35 +68,15 @@ interface KbobMaterial {
   GWP: number;
   UBP: number;
   PENRE: number;
+  "min density"?: number;
+  "max density"?: number;
+  "kg/unit"?: number;
 }
 
 interface Project {
   id: string;
   name: string;
   materialIds: string[];
-}
-
-interface MaterialChange {
-  materialId: string;
-  materialName: string;
-  oldMatch: {
-    Name: string;
-    Density: number;
-    Elements: number;
-  } | null;
-  newMatch: {
-    id: string;
-    Name: string;
-    Density: number;
-    Elements: number;
-    hasDensityRange: boolean;
-    minDensity?: number;
-    maxDensity?: number;
-  };
-  projects: string[];
-  projectId: string | null;
-  elements: number;
-  selectedDensity?: number;
 }
 
 export function MaterialLibraryComponent() {
@@ -439,7 +425,7 @@ export function MaterialLibraryComponent() {
     setIsMatchingInProgress(true);
     try {
       const changes = await getPreviewChanges();
-      setPreviewChanges(changes);
+      setPreviewChanges(changes as MaterialChange[]);
       setShowPreview(true);
     } catch (error) {
       console.error("Failed to prepare preview:", error);
@@ -981,15 +967,25 @@ export function MaterialLibraryComponent() {
                   <Pagination>
                     <PaginationContent>
                       <PaginationItem>
-                        <PaginationPrevious
+                        <Button
+                          variant="outline"
+                          size="sm"
                           onClick={() =>
                             setCurrentPage((prev) => Math.max(prev - 1, 1))
                           }
-                          disabled={currentPage === 1}
-                        />
+                          className={
+                            currentPage === 1
+                              ? "opacity-50 pointer-events-none"
+                              : ""
+                          }
+                        >
+                          Previous
+                        </Button>
                       </PaginationItem>
                       <PaginationItem>
-                        <PaginationNext
+                        <Button
+                          variant="outline"
+                          size="sm"
                           onClick={() =>
                             setCurrentPage((prev) =>
                               Math.min(
@@ -1001,13 +997,17 @@ export function MaterialLibraryComponent() {
                               )
                             )
                           }
-                          disabled={
+                          className={
                             currentPage ===
                             Math.ceil(
                               filteredAndSortedMaterials.length / itemsPerPage
                             )
+                              ? "opacity-50 pointer-events-none"
+                              : ""
                           }
-                        />
+                        >
+                          Next
+                        </Button>
                       </PaginationItem>
                     </PaginationContent>
                   </Pagination>
