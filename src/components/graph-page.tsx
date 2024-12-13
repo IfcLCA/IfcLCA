@@ -37,21 +37,21 @@ type ColorTheme = "standard" | "bw" | "colorful";
 
 interface MaterialData {
   name: string;
+  ifcMaterial: string;
+  kbobMaterial?: string;
+  category?: string;
   volume: number;
-  indicators?: {
+  indicators: {
     gwp: number;
     ubp: number;
     penre: number;
   };
-  kbobMaterial?: string;
-  ifcMaterial?: string;
-  category?: string;
 }
 
 type GroupingMode = "elements" | "kbobMaterials" | "ifcMaterials";
 
 interface Props {
-  materialsData?: MaterialData[];
+  materialsData: MaterialData[];
 }
 
 export function GraphPageComponent({ materialsData }: Props) {
@@ -149,11 +149,6 @@ export function GraphPageComponent({ materialsData }: Props) {
     selectedIndicator: string
   ) => {
     if (value === null || value === undefined) return "0";
-
-    // Convert PENRE from MJ to kWh if needed
-    if (selectedIndicator === "penre") {
-      value = value / 3.6; // Convert MJ to kWh (1 kWh = 3.6 MJ)
-    }
 
     if (Math.abs(value) >= 1_000_000) {
       return `${(value / 1_000_000).toFixed(1)}M`;

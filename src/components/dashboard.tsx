@@ -20,6 +20,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { DashboardEmissionsCard } from "@/components/dashboard-emissions-card";
 
 interface Project {
   id: string;
@@ -355,9 +356,7 @@ export function Dashboard({
             </Card>
           );
         })}
-        <div className="group transition-all hover:bg-muted/5">
-          <EmissionsSummaryCard emissions={statistics.totalEmissions} />
-        </div>
+        <DashboardEmissionsCard emissions={statistics.totalEmissions} />
       </section>
 
       <section>

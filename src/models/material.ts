@@ -1,99 +1,104 @@
 import mongoose from "mongoose";
 
-// Define the schema type for KBOB reference
 interface IMaterial {
-  name: string;
   projectId: mongoose.Types.ObjectId;
+  name: string;
   category?: string;
-  volume: number;
   density?: number;
   kbobMatchId?: mongoose.Types.ObjectId;
-  gwp?: number;
-  ubp?: number;
-  penre?: number;
-  autoMatched?: boolean;
-  matchScore?: number;
+  lastCalculated?: Date;
 }
 
 const materialSchema = new mongoose.Schema<IMaterial>(
   {
-    name: {
-      type: String,
-      required: true,
-    },
     projectId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Project",
       required: true,
+      index: true,
     },
-    category: String,
-    volume: {
-      type: Number,
-      default: 0,
+    name: {
+      type: String,
+      required: true,
+    },
+    category: {
+      type: String,
     },
     density: {
       type: Number,
+      min: 0,
+      validate: {
+        validator: (v: number) => v === 0 || Number.isFinite(v),
+        message: "Density must be 0 or a finite number",
+      },
     },
     kbobMatchId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "KBOBMaterial",
     },
-    gwp: {
-      type: Number,
-      default: 0,
-    },
-    ubp: {
-      type: Number,
-      default: 0,
-    },
-    penre: {
-      type: Number,
-      default: 0,
-    },
-    autoMatched: {
-      type: Boolean,
-      default: false,
-    },
-    matchScore: {
-      type: Number,
-      min: 0,
-      max: 1,
+    lastCalculated: {
+      type: Date,
     },
   },
   {
     timestamps: true,
+    toJSON: { virtuals: true },
+    toObject: { virtuals: true },
   }
 );
 
-materialSchema.index({ name: 1, projectId: 1 }, { unique: true });
+// Indexes
+materialSchema.index({ projectId: 1, name: 1 }, { unique: true });
+materialSchema.index({ kbobMatchId: 1 });
 
-// Add indexes for frequently queried fields
-materialSchema.index({ projectId: 1, name: 1 });
-materialSchema.index({ name: 1, kbobMatchId: 1 });
-materialSchema.index({ projectId: 1, updatedAt: -1 });
-
-materialSchema.post("save", async function (doc) {
-  if (this.isModified("kbobMatchId")) {
-    // Import here to avoid circular dependency
-    const { MaterialService } = require("@/lib/services/material-service");
-    await MaterialService.recalculateElementsForMaterials([doc._id]);
-  }
+// Virtual for elements using this material
+materialSchema.virtual("elements", {
+  ref: "Element",
+  localField: "_id",
+  foreignField: "materials.material",
 });
 
-materialSchema.post("updateMany", async function (result) {
-  // For bulk updates, we need to get the updated documents
-  const updatedMaterials = await this.model.find(this.getQuery()).select("_id");
-  if (updatedMaterials.length > 0) {
-    const { MaterialService } = require("@/lib/services/material-service");
-    await MaterialService.recalculateElementsForMaterials(
-      updatedMaterials.map((m) => m._id)
-    );
-  }
+// Virtual for total volume across all elements
+materialSchema.virtual("totalVolume").get(async function () {
+  const result = await mongoose.model("Element").aggregate([
+    {
+      $match: {
+        "materials.material": this._id,
+      },
+    },
+    {
+      $unwind: "$materials",
+    },
+    {
+      $match: {
+        "materials.material": this._id,
+      },
+    },
+    {
+      $group: {
+        _id: null,
+        totalVolume: { $sum: "$materials.volume" },
+      },
+    },
+  ]);
+
+  return result[0]?.totalVolume || 0;
 });
 
-// Ensure model is registered only once
-const Material =
-  (mongoose.models.Material as mongoose.Model<IMaterial>) ||
+// Virtual for emissions factors from KBOB match
+materialSchema.virtual("emissionFactors").get(function () {
+  if (!this.populated("kbobMatchId")) return null;
+
+  const kbob = this.kbobMatchId as any;
+  if (!kbob) return null;
+
+  return {
+    gwp: kbob.GWP || 0,
+    ubp: kbob.UBP || 0,
+    penre: kbob.PENRE || 0,
+  };
+});
+
+export const Material =
+  mongoose.models.Material ||
   mongoose.model<IMaterial>("Material", materialSchema);
-
-export { Material };

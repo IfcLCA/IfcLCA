@@ -44,6 +44,7 @@ import cn from "classnames";
 import { Edit, Layers, UploadCloud } from "lucide-react";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
+import { useProjectEmissions } from "@/hooks/use-project-emissions";
 
 interface KBOBMaterial {
   _id: string;
@@ -391,18 +392,15 @@ const ProjectOverview = ({ project }: { project: ExtendedProject }) => (
 const ProjectTabs = ({
   project,
   onUpload,
-  materialsWithCount,
 }: {
-  project: ExtendedProject;
+  project: Project;
   onUpload: () => void;
-  materialsWithCount: any[];
 }) => (
   <Tabs defaultValue="uploads" className="w-full">
-    <TabsList className="grid w-full grid-cols-5">
+    <TabsList className="grid w-full grid-cols-4">
       <TabsTrigger value="uploads">Uploads</TabsTrigger>
       <TabsTrigger value="elements">Elements</TabsTrigger>
       <TabsTrigger value="materials">Materials</TabsTrigger>
-      <TabsTrigger value="emissions">Emissions</TabsTrigger>
       <TabsTrigger value="graph">Charts</TabsTrigger>
     </TabsList>
 
@@ -411,19 +409,11 @@ const ProjectTabs = ({
     </TabsContent>
 
     <TabsContent value="elements" className="space-y-4">
-      <ElementsTab project={project} onUpload={onUpload} />
+      <ElementsTab project={project} />
     </TabsContent>
 
     <TabsContent value="materials" className="space-y-4">
-      <MaterialsTab
-        project={project}
-        materialsWithCount={materialsWithCount}
-        onUpload={onUpload}
-      />
-    </TabsContent>
-
-    <TabsContent value="emissions" className="space-y-4">
-      <EmissionsTab project={project} onUpload={onUpload} />
+      <MaterialsTab project={project} />
     </TabsContent>
 
     <TabsContent value="graph" className="space-y-4">
@@ -436,7 +426,7 @@ const UploadsTab = ({
   project,
   onUpload,
 }: {
-  project: ExtendedProject;
+  project: Project;
   onUpload: () => void;
 }) => {
   const [currentPage, setCurrentPage] = useState(1);
@@ -562,37 +552,13 @@ const UploadCard = ({ upload }: { upload: ExtendedProject["uploads"][0] }) => (
   </Card>
 );
 
-const ElementsTab = ({
-  project,
-  onUpload,
-}: {
-  project: ExtendedProject;
-  onUpload: () => void;
-}) => {
-  const elementsData = useMemo(() => {
-    if (!project?.elements) return [];
-
-    console.debug("🏗️ Processing elements for table:", {
-      elementCount: project.elements.length,
-      sampleElement: project.elements[0],
-    });
-
-    const data = project.elements.map((element) => ({
+const ElementsTab = ({ project }: { project: Project }) => {
+  const data = useMemo(() => {
+    return project.elements.map((element) => ({
+      ...element,
       id: element._id,
-      name: element.object_type || element.name || "Unknown",
-      type: element.type,
-      volume: element.volume || 0,
-      loadBearing: element.loadBearing || false,
-      isExternal: element.isExternal || false,
     }));
-
-    console.debug("📋 Elements table data:", {
-      rowCount: data.length,
-      sampleRow: data[0],
-    });
-
-    return data;
-  }, [project?.elements]);
+  }, [project]);
 
   return (
     <>
@@ -600,299 +566,130 @@ const ElementsTab = ({
         <h2 className="text-2xl font-semibold">
           Elements{" "}
           <Badge variant="secondary" className="ml-2">
-            {project?._count.elements || 0}
+            {data.length}
           </Badge>
         </h2>
       </div>
-      {project?.elements && project.elements.length > 0 ? (
-        <Card>
-          <CardContent className="p-0">
-            <DataTable columns={elementsColumns} data={elementsData} />
-          </CardContent>
-        </Card>
-      ) : (
-        <EmptyState
-          icon={Layers}
-          title="No elements found"
-          description="Elements will be extracted from Ifc files when uploaded."
-          action={
-            <Button onClick={onUpload}>
-              <UploadCloud className="mr-2 h-4 w-4" />
-              Add New Ifc
-            </Button>
-          }
-        />
-      )}
+      <Card>
+        <CardContent className="p-0">
+          <DataTable columns={elementsColumns} data={data} />
+        </CardContent>
+      </Card>
     </>
   );
 };
 
-const MaterialsTab = ({
-  project,
-  materialsWithCount,
-  onUpload,
-}: {
-  project: ExtendedProject;
-  materialsWithCount: any[];
-  onUpload: () => void;
-}) => {
+const MaterialsTab = ({ project }: { project: Project }) => {
+  const { totals, formatted, units } = useProjectEmissions(project);
+
   const data = useMemo(() => {
-    console.debug("🧱 Processing materials for table:", {
-      elementCount: project.elements.length,
-      sampleElement: project.elements[0]?.materials[0],
-    });
-
-    // Map all materials from elements
-    const materials = project.elements.flatMap(
-      (element: ElementWithMaterials) =>
-        element.materials.map((materialEntry: MaterialEntry) => ({
-          id: materialEntry.material?._id || "unknown",
-          ifcMaterial: materialEntry.material?.name || "Unknown",
-          kbobMaterial: materialEntry.material?.kbobMatchId?.Name || "Unknown",
-          category: element.name,
-          volume: materialEntry.volume || 0,
-        }))
-    );
-
-    console.debug("🧱 Mapped materials:", {
-      count: materials.length,
-      sampleMaterial: materials[0],
-    });
-
-    // Group materials to sum volumes
-    const groupedMaterials = materials.reduce((acc, curr) => {
-      const key = `${curr.ifcMaterial}-${curr.kbobMaterial}`;
-      if (!acc[key]) {
-        acc[key] = { ...curr };
-      } else {
-        acc[key].volume += curr.volume;
-      }
-      return acc;
-    }, {} as Record<string, (typeof materials)[0]>);
-
-    const result = Object.values(groupedMaterials);
-    console.debug("📈 Final materials table data:", {
-      groupCount: result.length,
-      sampleGroup: result[0],
-    });
-
-    return result;
-  }, [project]);
-
-  return (
-    <>
-      <div className="flex justify-between items-center mb-4">
-        <h2 className="text-2xl font-semibold">
-          Materials{" "}
-          <Badge variant="secondary" className="ml-2">
-            {project?._count.materials || 0}
-          </Badge>
-        </h2>
-      </div>
-      {project?.materials && project.materials.length > 0 ? (
-        <Card>
-          <CardContent className="p-0">
-            <DataTable columns={materialsColumns} data={data} />
-          </CardContent>
-        </Card>
-      ) : (
-        <EmptyState
-          icon={Layers}
-          title="No materials found"
-          description="Materials will be extracted from Ifc files when uploaded."
-          action={
-            <Button onClick={onUpload}>
-              <UploadCloud className="mr-2 h-4 w-4" />
-              Add New Ifc
-            </Button>
-          }
-        />
-      )}
-    </>
-  );
-};
-
-const EmissionsTab = ({
-  project,
-  onUpload,
-}: {
-  project: ExtendedProject;
-  onUpload: () => void;
-}) => {
-  const [selectedIndicator, setSelectedIndicator] =
-    useState<IndicatorType>("gwp");
-
-  const emissionsData = useMemo(() => {
-    // First, create a map to group identical materials
-    const groupedMaterials = project.elements
-      .flatMap((element: ElementWithMaterials) =>
-        element.materials.map((materialEntry: MaterialEntry) => ({
-          id: materialEntry._id,
-          kbobMaterial: materialEntry.material?.kbobMatchId?.Name || "Unknown",
-          ifcMaterial: materialEntry.material?.name || "Unknown",
-          volume: materialEntry.volume || 0,
-          density: materialEntry.material?.density || 0,
-          mass:
-            (materialEntry.volume || 0) *
-            (materialEntry.material?.density || 0),
-          kbobIndicators: {
-            gwp: materialEntry.material?.kbobMatchId?.GWP || 0,
-            ubp: materialEntry.material?.kbobMatchId?.UBP || 0,
-            penre: materialEntry.material?.kbobMatchId?.PENRE || 0,
-          },
-        }))
-      )
-      .reduce((acc, curr) => {
-        // Group by Ifc name, KBOB name, and density
-        const key = `${curr.ifcMaterial}-${curr.kbobMaterial}-${curr.density}`;
+    // Group materials by name and sum volumes
+    const materialGroups = project.elements.reduce((acc, element) => {
+      element.materials.forEach((mat) => {
+        const key = mat.material._id;
         if (!acc[key]) {
-          acc[key] = { ...curr };
-        } else {
-          // Sum up volumes and recalculate mass and totals
-          acc[key].volume += curr.volume;
-          acc[key].mass = acc[key].volume * acc[key].density;
+          acc[key] = {
+            _id: mat.material._id,
+            material: mat.material,
+            volume: 0,
+            emissions: {
+              gwp: 0,
+              ubp: 0,
+              penre: 0,
+            },
+          };
         }
-        return acc;
-      }, {} as Record<string, any>);
+        acc[key].volume += mat.volume;
+        acc[key].emissions.gwp +=
+          mat.volume *
+          (mat.material.density || 0) *
+          (mat.material.kbobMatch?.GWP || 0);
+        acc[key].emissions.ubp +=
+          mat.volume *
+          (mat.material.density || 0) *
+          (mat.material.kbobMatch?.UBP || 0);
+        acc[key].emissions.penre +=
+          mat.volume *
+          (mat.material.density || 0) *
+          (mat.material.kbobMatch?.PENRE || 0);
+      });
+      return acc;
+    }, {} as Record<string, Material>);
 
-    // Convert back to array and calculate total emissions
-    return Object.values(groupedMaterials).map((material) => ({
-      ...material,
-      totalGWP: material.mass * material.kbobIndicators.gwp,
-      totalUBP: material.mass * material.kbobIndicators.ubp,
-      totalPENRE: material.mass * material.kbobIndicators.penre,
-    }));
+    return Object.values(materialGroups);
   }, [project]);
-
-  const indicators = [
-    {
-      value: "gwp",
-      label: (
-        <div className="flex flex-col">
-          <span className="font-bold">GWP</span>
-          <span className="text-sm text-muted-foreground">
-            Global Warming Potential (kg CO₂ eq)
-          </span>
-        </div>
-      ),
-    },
-    {
-      value: "ubp",
-      label: (
-        <div className="flex flex-col">
-          <span className="font-bold">UBP</span>
-          <span className="text-sm text-muted-foreground">
-            Environmental Impact Points
-          </span>
-        </div>
-      ),
-    },
-    {
-      value: "penre",
-      label: (
-        <div className="flex flex-col">
-          <span className="font-bold">PENRE</span>
-          <span className="text-sm text-muted-foreground">
-            Primary Energy Non-Renewable (kWh)
-          </span>
-        </div>
-      ),
-    },
-  ];
 
   return (
     <>
       <div className="flex justify-between items-center mb-4">
-        <div className="flex items-center gap-2">
+        <div className="space-y-1">
           <h2 className="text-2xl font-semibold">
-            Emissions{" "}
+            Materials{" "}
             <Badge variant="secondary" className="ml-2">
-              LCA
+              {data.length}
             </Badge>
           </h2>
-        </div>
-        <div className="flex items-center gap-4">
-          <Label className="text-sm font-medium">Indicator:</Label>
-          <Select
-            value={selectedIndicator}
-            onValueChange={(value: IndicatorType) =>
-              setSelectedIndicator(value)
-            }
-          >
-            <SelectTrigger className="w-[180px]">
-              <SelectValue>
-                {selectedIndicator === "gwp" && "GWP (kg CO₂ eq)"}
-                {selectedIndicator === "ubp" && "UBP (pts)"}
-                {selectedIndicator === "penre" && "PENRE (kWh)"}
-              </SelectValue>
-            </SelectTrigger>
-            <SelectContent>
-              {indicators.map((indicator) => (
-                <SelectItem
-                  key={indicator.value}
-                  value={indicator.value}
-                  className="py-2"
-                >
-                  {indicator.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <div className="flex gap-2">
+            <Badge variant="outline">
+              GWP: {formatted.gwp} {units.gwp}
+            </Badge>
+            <Badge variant="outline">
+              UBP: {formatted.ubp} {units.ubp}
+            </Badge>
+            <Badge variant="outline">
+              PENRE: {formatted.penre} {units.penre}
+            </Badge>
+          </div>
         </div>
       </div>
-      {project?.elements &&
-      project.elements.some((e) => e.materials?.length > 0) ? (
-        <Card>
-          <CardContent className="p-0">
-            <DataTable
-              columns={emissionsColumns(selectedIndicator)}
-              data={emissionsData}
-            />
-          </CardContent>
-        </Card>
-      ) : (
-        <EmptyState
-          icon={Layers}
-          title="No emissions data found"
-          description="Emissions data will be calculated from materials when an Ifc file is uploaded."
-          action={
-            <Button onClick={onUpload}>
-              <UploadCloud className="mr-2 h-4 w-4" />
-              Add New Ifc
-            </Button>
-          }
-        />
-      )}
+      <Card>
+        <CardContent className="p-0">
+          <DataTable columns={materialsColumns} data={data} />
+        </CardContent>
+      </Card>
     </>
   );
 };
 
-const GraphTab = ({ project }: { project: ExtendedProject }) => {
-  const materialsData = project.elements.flatMap(
-    (element: ElementWithMaterials) =>
-      element.materials.map((materialEntry: MaterialEntry) => {
-        const volume = materialEntry.volume || 0;
-        const density = materialEntry.material?.density || 0;
-        const kbobIndicators = materialEntry.material?.kbobMatchId || {
-          GWP: 0,
-          UBP: 0,
-          PENRE: 0,
-        };
+const GraphTab = ({ project }: { project: Project }) => {
+  const materialsData = useMemo(() => {
+    // Use the same grouping logic as MaterialsTab
+    const materialGroups = project.elements.reduce((acc, element) => {
+      element.materials.forEach((mat) => {
+        const key = mat.material._id;
+        if (!acc[key]) {
+          acc[key] = {
+            name: mat.material.name,
+            ifcMaterial: mat.material.name,
+            kbobMaterial: mat.material.kbobMatch?.Name,
+            category: element.type,
+            volume: 0,
+            indicators: {
+              gwp: 0,
+              ubp: 0,
+              penre: 0,
+            },
+          };
+        }
+        acc[key].volume += mat.volume;
+        acc[key].indicators.gwp +=
+          mat.volume *
+          (mat.material.density || 0) *
+          (mat.material.kbobMatch?.GWP || 0);
+        acc[key].indicators.ubp +=
+          mat.volume *
+          (mat.material.density || 0) *
+          (mat.material.kbobMatch?.UBP || 0);
+        acc[key].indicators.penre +=
+          mat.volume *
+          (mat.material.density || 0) *
+          (mat.material.kbobMatch?.PENRE || 0);
+      });
+      return acc;
+    }, {} as Record<string, any>);
 
-        return {
-          name: element.name || "Unknown",
-          volume: volume,
-          indicators: {
-            gwp: volume * density * (kbobIndicators.GWP || 0),
-            ubp: volume * density * (kbobIndicators.UBP || 0),
-            penre: volume * density * (kbobIndicators.PENRE || 0),
-          },
-          category: materialEntry.material?.category,
-          kbobMaterial: materialEntry.material?.kbobMatchId?.Name,
-          ifcMaterial: materialEntry.material?.name,
-        };
-      })
-  );
+    return Object.values(materialGroups);
+  }, [project]);
 
   return (
     <div className="space-y-4">

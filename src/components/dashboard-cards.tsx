@@ -2,9 +2,16 @@
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { ImageIcon, BoxIcon, FileTextIcon, LayersIcon, GaugeIcon } from "lucide-react";
+import {
+  ImageIcon,
+  BoxIcon,
+  FileTextIcon,
+  LayersIcon,
+  GaugeIcon,
+} from "lucide-react";
 import { EmissionsCard } from "@/components/emissions-card";
 import { ProjectImageUpload } from "@/components/project-image-upload";
+import { EmissionsSummaryCard } from "@/components/emissions-summary-card";
 
 type DashboardCardsProps = {
   elements?: number;
@@ -48,12 +55,18 @@ export function DashboardCards({
         (materialAcc, material) => {
           const volume = material.volume || 0;
           const density = material.material?.density || 0;
-          const kbobIndicators = material.material?.kbobMatchId || { GWP: 0, UBP: 0, PENRE: 0 };
+          const kbobIndicators = material.material?.kbobMatchId || {
+            GWP: 0,
+            UBP: 0,
+            PENRE: 0,
+          };
 
           return {
-            gwp: materialAcc.gwp + (volume * density * (kbobIndicators.GWP || 0)),
-            ubp: materialAcc.ubp + (volume * density * (kbobIndicators.UBP || 0)),
-            penre: materialAcc.penre + (volume * density * (kbobIndicators.PENRE || 0)),
+            gwp: materialAcc.gwp + volume * density * (kbobIndicators.GWP || 0),
+            ubp: materialAcc.ubp + volume * density * (kbobIndicators.UBP || 0),
+            penre:
+              materialAcc.penre +
+              volume * density * (kbobIndicators.PENRE || 0),
           };
         },
         { gwp: 0, ubp: 0, penre: 0 }
@@ -82,12 +95,18 @@ export function DashboardCards({
           <Card className="flex-1 group transition-colors duration-200 hover:border-primary/50">
             <CardContent className="px-4 pt-2 pb-3 flex flex-col">
               <div className="flex flex-row items-start justify-between mb-1">
-                <h3 className="text-sm font-medium group-hover:text-primary transition-colors">Elements</h3>
+                <h3 className="text-sm font-medium group-hover:text-primary transition-colors">
+                  Elements
+                </h3>
                 <BoxIcon className="h-6 w-6 text-foreground mt-1.5 group-hover:text-primary transition-colors" />
               </div>
               <div className="flex flex-col">
-                <p className="text-2xl font-bold leading-none mb-0.5 group-hover:text-primary transition-colors">{elements}</p>
-                <p className="text-xs text-muted-foreground group-hover:text-primary/70 transition-colors">Construction components</p>
+                <p className="text-2xl font-bold leading-none mb-0.5 group-hover:text-primary transition-colors">
+                  {elements}
+                </p>
+                <p className="text-xs text-muted-foreground group-hover:text-primary/70 transition-colors">
+                  Construction components
+                </p>
               </div>
             </CardContent>
           </Card>
@@ -95,12 +114,18 @@ export function DashboardCards({
           <Card className="flex-1 group transition-colors duration-200 hover:border-primary/50">
             <CardContent className="px-4 pt-2 pb-3 flex flex-col">
               <div className="flex flex-row items-start justify-between mb-1">
-                <h3 className="text-sm font-medium group-hover:text-primary transition-colors">Uploads</h3>
+                <h3 className="text-sm font-medium group-hover:text-primary transition-colors">
+                  Uploads
+                </h3>
                 <FileTextIcon className="h-6 w-6 text-foreground mt-1.5 group-hover:text-primary transition-colors" />
               </div>
               <div className="flex flex-col">
-                <p className="text-2xl font-bold leading-none mb-0.5 group-hover:text-primary transition-colors">{uploads}</p>
-                <p className="text-xs text-muted-foreground group-hover:text-primary/70 transition-colors">Files analysed</p>
+                <p className="text-2xl font-bold leading-none mb-0.5 group-hover:text-primary transition-colors">
+                  {uploads}
+                </p>
+                <p className="text-xs text-muted-foreground group-hover:text-primary/70 transition-colors">
+                  Files analysed
+                </p>
               </div>
             </CardContent>
           </Card>
@@ -108,12 +133,18 @@ export function DashboardCards({
           <Card className="flex-1 group transition-colors duration-200 hover:border-primary/50">
             <CardContent className="px-4 pt-2 pb-3 flex flex-col">
               <div className="flex flex-row items-start justify-between mb-1">
-                <h3 className="text-sm font-medium group-hover:text-primary transition-colors">Materials</h3>
+                <h3 className="text-sm font-medium group-hover:text-primary transition-colors">
+                  Materials
+                </h3>
                 <LayersIcon className="h-6 w-6 text-foreground mt-1.5 group-hover:text-primary transition-colors" />
               </div>
               <div className="flex flex-col">
-                <p className="text-2xl font-bold leading-none mb-0.5 group-hover:text-primary transition-colors">{materials}</p>
-                <p className="text-xs text-muted-foreground group-hover:text-primary/70 transition-colors">Unique materials</p>
+                <p className="text-2xl font-bold leading-none mb-0.5 group-hover:text-primary transition-colors">
+                  {materials}
+                </p>
+                <p className="text-xs text-muted-foreground group-hover:text-primary/70 transition-colors">
+                  Unique materials
+                </p>
               </div>
             </CardContent>
           </Card>
@@ -123,10 +154,12 @@ export function DashboardCards({
       <Card className="col-span-12 lg:col-span-4 h-full group transition-colors duration-200 hover:border-primary/50">
         <CardContent className="px-4 pt-4 h-full flex flex-col">
           <div className="flex flex-row items-start justify-between mb-6">
-            <h3 className="text-sm font-medium group-hover:text-primary transition-colors">Total Emissions</h3>
+            <h3 className="text-sm font-medium group-hover:text-primary transition-colors">
+              Total Emissions
+            </h3>
             <GaugeIcon className="h-6 w-6 text-foreground mt-1.5 group-hover:text-primary transition-colors" />
           </div>
-          <EmissionsCard emissions={totalEmissions} />
+          <EmissionsSummaryCard project={project} />
         </CardContent>
       </Card>
     </div>

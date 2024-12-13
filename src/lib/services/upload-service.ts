@@ -13,7 +13,8 @@ export class UploadService {
       name: string;
       type: string;
       globalId: string;
-      netVolume?: number;
+      netVolume?: number | { net: number; gross: number };
+      grossVolume?: number | { net: number; gross: number };
       materialLayers?: any;
       properties?: {
         loadBearing?: boolean;
@@ -26,16 +27,34 @@ export class UploadService {
     try {
       // Create elements
       const processedElements = await Element.create(
-        elements.map((element) => ({
-          projectId,
-          guid: element.globalId,
-          name: element.name,
-          type: element.type,
-          volume: element.netVolume || 0,
-          loadBearing: element.properties?.loadBearing || false,
-          isExternal: element.properties?.isExternal || false,
-          materials: [],
-        })),
+        elements.map((element) => {
+          const volume = (() => {
+            if (typeof element.netVolume === "object") {
+              return element.netVolume.net;
+            }
+            if (typeof element.netVolume === "number") {
+              return element.netVolume;
+            }
+            if (typeof element.grossVolume === "object") {
+              return element.grossVolume.net;
+            }
+            if (typeof element.grossVolume === "number") {
+              return element.grossVolume;
+            }
+            return 0;
+          })();
+
+          return {
+            projectId,
+            guid: element.globalId,
+            name: element.name,
+            type: element.type,
+            volume: volume,
+            loadBearing: element.properties?.loadBearing || false,
+            isExternal: element.properties?.isExternal || false,
+            materials: [],
+          };
+        }),
         { session }
       );
     } catch (error) {

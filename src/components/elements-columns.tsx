@@ -3,136 +3,100 @@
 import { Button } from "@/components/ui/button";
 import { ColumnDef } from "@tanstack/react-table";
 import { ArrowUpDown, Check, X } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
 
-interface ElementTableItem {
-  id: string;
+interface Element {
+  _id: string;
   name: string;
   type: string;
-  volume: number;
-  loadBearing: boolean;
+  totalVolume: number;
+  emissions: {
+    gwp: number;
+    ubp: number;
+    penre: number;
+  };
+  materials: Array<{
+    material: {
+      name: string;
+      kbobMatch?: {
+        Name: string;
+      };
+    };
+    volume: number;
+  }>;
   isExternal: boolean;
+  loadBearing: boolean;
 }
 
-export const elementsColumns: ColumnDef<ElementTableItem>[] = [
+export const elementsColumns: ColumnDef<Element>[] = [
   {
     accessorKey: "name",
-    header: ({ column }) => {
-      return (
-        <Button
-          variant="ghost"
-          onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-          className="-ml-4"
-        >
-          Name
-          <ArrowUpDown className="ml-2 h-4 w-4" />
-        </Button>
-      );
-    },
-    cell: ({ row }) => (
-      <div className="truncate max-w-[300px]" title={row.getValue("name")}>
-        {row.getValue("name")}
-      </div>
-    ),
+    header: "Name",
   },
   {
     accessorKey: "type",
-    header: ({ column }) => {
-      return (
-        <Button
-          variant="ghost"
-          onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-          className="-ml-4"
-        >
-          IFC Type
-          <ArrowUpDown className="ml-2 h-4 w-4" />
-        </Button>
-      );
-    },
-    cell: ({ row }) => <div className="truncate">{row.getValue("type")}</div>,
+    header: "Type",
   },
   {
-    accessorKey: "loadBearing",
-    header: ({ column }) => {
-      return (
-        <Button
-          variant="ghost"
-          onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-        >
-          Load Bearing
-          <ArrowUpDown className="ml-2 h-4 w-4" />
-        </Button>
-      );
-    },
+    accessorKey: "totalVolume",
+    header: "Volume (m³)",
     cell: ({ row }) => {
-      const isLoadBearing = row.getValue("loadBearing");
-      return (
-        <div
-          className="flex justify-center"
-          title={isLoadBearing ? "Yes" : "No"}
-        >
-          {isLoadBearing ? (
-            <Check className="h-4 w-4 text-green-600" />
-          ) : (
-            <X className="h-4 w-4 text-red-400" />
-          )}
-        </div>
-      );
+      const volume = row.original.totalVolume;
+      return volume?.toLocaleString("de-CH", {
+        minimumFractionDigits: 3,
+        maximumFractionDigits: 3,
+      });
     },
   },
   {
-    accessorKey: "isExternal",
-    header: ({ column }) => {
-      return (
-        <Button
-          variant="ghost"
-          onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-        >
-          External
-          <ArrowUpDown className="ml-2 h-4 w-4" />
-        </Button>
-      );
-    },
+    accessorKey: "materials",
+    header: "Materials",
     cell: ({ row }) => {
-      const isExternal = row.getValue("isExternal");
+      const materials = row.original.materials;
       return (
-        <div
-          className="flex justify-center"
-          title={isExternal ? "External" : "Internal"}
-        >
-          {isExternal ? (
-            <Check className="h-4 w-4 text-blue-600" />
-          ) : (
-            <X className="h-4 w-4 text-red-400" />
-          )}
+        <div className="space-y-1">
+          {materials.map((mat, idx) => (
+            <div key={idx} className="text-sm">
+              <span className="font-medium">
+                {mat.material?.kbobMatch?.Name ||
+                  mat.material?.name ||
+                  "Unknown"}
+              </span>
+              <span className="text-muted-foreground ml-2">
+                (
+                {mat.volume.toLocaleString("de-CH", {
+                  minimumFractionDigits: 3,
+                  maximumFractionDigits: 3,
+                })}{" "}
+                m³)
+              </span>
+            </div>
+          ))}
         </div>
       );
     },
   },
   {
-    accessorKey: "volume",
-    header: ({ column }) => {
-      return (
-        <div className="text-right">
-          <Button
-            variant="ghost"
-            onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-          >
-            Volume (m³)
-            <ArrowUpDown className="ml-2 h-4 w-4" />
-          </Button>
-        </div>
-      );
-    },
+    accessorKey: "emissions",
+    header: "GWP (kg CO₂ eq)",
     cell: ({ row }) => {
-      const volume = row.getValue("volume") as number;
-      return (
-        <div className="text-right">
-          {volume?.toLocaleString("de-CH", {
-            minimumFractionDigits: 2,
-            maximumFractionDigits: 2,
-          }) || "N/A"}
-        </div>
-      );
+      const gwp = row.original.emissions?.gwp || 0;
+      return gwp.toLocaleString("de-CH", {
+        minimumFractionDigits: 0,
+        maximumFractionDigits: 0,
+      });
     },
+  },
+  {
+    id: "properties",
+    header: "Properties",
+    cell: ({ row }) => (
+      <div className="space-x-2">
+        {row.original.loadBearing && (
+          <Badge variant="secondary">Load Bearing</Badge>
+        )}
+        {row.original.isExternal && <Badge variant="secondary">External</Badge>}
+      </div>
+    ),
   },
 ];

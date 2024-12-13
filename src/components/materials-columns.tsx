@@ -1,57 +1,96 @@
 "use client";
 
 import { ColumnDef } from "@tanstack/react-table";
+import { Badge } from "@/components/ui/badge";
 
-interface MaterialTableItem {
-  id: string;
-  ifcMaterial: string;
-  kbobMaterial: string;
-  category: string;
+interface Material {
+  _id: string;
+  name: string;
+  material: {
+    name: string;
+    density: number;
+    kbobMatch?: {
+      Name: string;
+      GWP: number;
+      UBP: number;
+      PENRE: number;
+    };
+  };
   volume: number;
+  emissions: {
+    gwp: number;
+    ubp: number;
+    penre: number;
+  };
 }
 
-export const materialsColumns: ColumnDef<MaterialTableItem>[] = [
+export const materialsColumns: ColumnDef<Material>[] = [
   {
-    accessorKey: "ifcMaterial",
-    header: "Ifc Material",
-    enableResizing: true,
-    size: 200,
-    minSize: 100,
-    cell: ({ row }) => (
-      <div className="truncate">{row.getValue("ifcMaterial") || "Unknown"}</div>
-    ),
+    accessorKey: "material.name",
+    header: "IFC Material",
   },
   {
-    accessorKey: "kbobMaterial",
+    accessorKey: "material.kbobMatch.Name",
     header: "KBOB Material",
-    enableResizing: true,
-    size: 200,
-    minSize: 100,
-    cell: ({ row }) => (
-      <div className="truncate">
-        {row.getValue("kbobMaterial") || "Unknown"}
-      </div>
-    ),
-  },
-  {
-    accessorKey: "category",
-    header: "Element",
-    enableResizing: true,
-    size: 200,
-    minSize: 100,
-    cell: ({ row }) => (
-      <div className="truncate">{row.getValue("category") || "Unknown"}</div>
-    ),
+    cell: ({ row }) => {
+      const kbobName = row.original.material?.kbobMatch?.Name;
+      return kbobName || <Badge variant="outline">No Match</Badge>;
+    },
   },
   {
     accessorKey: "volume",
-    enableResizing: true,
-    size: 100,
-    minSize: 80,
-    header: () => <div className="text-center">Volume (m³)</div>,
+    header: "Volume (m³)",
     cell: ({ row }) => {
-      const volume = row.getValue("volume") as number;
-      return <div className="text-center">{volume?.toFixed(2) || "N/A"}</div>;
+      const volume = row.original.volume;
+      return volume.toLocaleString("de-CH", {
+        minimumFractionDigits: 3,
+        maximumFractionDigits: 3,
+      });
+    },
+  },
+  {
+    accessorKey: "material.density",
+    header: "Density (kg/m³)",
+    cell: ({ row }) => {
+      const density = row.original.material?.density;
+      if (!density) return <Badge variant="outline">Not Set</Badge>;
+      return density.toLocaleString("de-CH", {
+        minimumFractionDigits: 0,
+        maximumFractionDigits: 0,
+      });
+    },
+  },
+  {
+    accessorKey: "emissions.gwp",
+    header: "GWP (kg CO₂ eq)",
+    cell: ({ row }) => {
+      const gwp = row.original.emissions?.gwp || 0;
+      return gwp.toLocaleString("de-CH", {
+        minimumFractionDigits: 0,
+        maximumFractionDigits: 0,
+      });
+    },
+  },
+  {
+    accessorKey: "emissions.ubp",
+    header: "UBP",
+    cell: ({ row }) => {
+      const ubp = row.original.emissions?.ubp || 0;
+      return ubp.toLocaleString("de-CH", {
+        minimumFractionDigits: 0,
+        maximumFractionDigits: 0,
+      });
+    },
+  },
+  {
+    accessorKey: "emissions.penre",
+    header: "PENRE (kWh oil-eq)",
+    cell: ({ row }) => {
+      const penre = row.original.emissions?.penre || 0;
+      return penre.toLocaleString("de-CH", {
+        minimumFractionDigits: 0,
+        maximumFractionDigits: 0,
+      });
     },
   },
 ];

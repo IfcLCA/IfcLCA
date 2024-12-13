@@ -10,7 +10,6 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { useProjectEmissions } from "@/hooks/use-project-emissions";
 
 type MetricKey = "gwp" | "ubp" | "penre";
 
@@ -35,18 +34,25 @@ const metrics: Record<
   },
 };
 
-export function EmissionsSummaryCard({ project }: { project?: Project }) {
-  const [metric, setMetric] = useState<MetricKey>("gwp");
-  const { totals, formatted, units } = useProjectEmissions(project);
+interface DashboardEmissionsCardProps {
+  emissions?: {
+    gwp: number;
+    ubp: number;
+    penre: number;
+  };
+}
 
-  if (!project?.elements?.length) {
+export function DashboardEmissionsCard({
+  emissions,
+}: DashboardEmissionsCardProps) {
+  const [metric, setMetric] = useState<MetricKey>("gwp");
+
+  if (!emissions) {
     return (
-      <Card>
+      <Card className="group h-full">
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-sm font-medium">
-            Tracked Emissions
-          </CardTitle>
-          <BarChart2 className="h-4 w-4 text-muted-foreground" />
+          <CardTitle className="text-sm font-medium">Total Emissions</CardTitle>
+          <BarChart2 className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors" />
         </CardHeader>
         <CardContent>
           <div className="text-sm text-muted-foreground">
@@ -57,8 +63,8 @@ export function EmissionsSummaryCard({ project }: { project?: Project }) {
     );
   }
 
-  const currentValue = totals[metric];
-  const unit = units[metric];
+  const currentValue = emissions[metric];
+  const unit = metrics[metric].unit;
 
   const MILLION = 1_000_000;
 
@@ -81,7 +87,7 @@ export function EmissionsSummaryCard({ project }: { project?: Project }) {
   return (
     <Card className="group h-full">
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-        <CardTitle className="text-sm font-medium">Tracked Emissions</CardTitle>
+        <CardTitle className="text-sm font-medium">Total Emissions</CardTitle>
         <BarChart2 className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors" />
       </CardHeader>
       <CardContent>

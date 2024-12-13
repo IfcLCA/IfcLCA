@@ -2,24 +2,10 @@
 
 import { ProjectOverview } from "@/components/project-overview";
 import { Button } from "@/components/ui/button";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { PlusCircle } from "lucide-react";
 import Link from "next/link";
-import { useState } from "react";
 
 export default function ProjectsPage() {
-  const [selectedMetric, setSelectedMetric] = useState("gwp");
-
-  const handleMetricChange = (value: string) => {
-    setSelectedMetric(value);
-  };
-
   return (
     <div className="main-container">
       <section className="space-y-4">
@@ -37,23 +23,9 @@ export default function ProjectsPage() {
                 Create Project
               </Link>
             </Button>
-            <Select value={selectedMetric} onValueChange={handleMetricChange}>
-              <SelectTrigger className="w-[180px]">
-                <SelectValue placeholder="Select metric" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="gwp">Global Warming Potential</SelectItem>
-                <SelectItem value="penre">
-                  Primary Energy Non-Renewable
-                </SelectItem>
-                <SelectItem value="ubp">
-                  UBP (Umweltbelastungspunkte)
-                </SelectItem>
-              </SelectContent>
-            </Select>
           </div>
         </div>
-        <ProjectOverview selectedMetric={selectedMetric} />
+        <ProjectOverview />
       </section>
     </div>
   );

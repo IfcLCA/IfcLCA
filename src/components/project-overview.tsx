@@ -5,13 +5,11 @@ import {
   ChevronRight,
   Plus,
   Upload,
-  BarChart2,
   MoreVertical,
   Trash2,
   Pencil,
   Loader2,
   Box,
-  BarChart2 as BarChart2Icon
 } from "lucide-react";
 import { Card, CardContent, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -46,8 +44,6 @@ import { toast } from "@/hooks/use-toast";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 
-type ImpactMetric = "gwp" | "penre" | "ubp";
-
 type Project = {
   id: string;
   name: string;
@@ -64,13 +60,9 @@ type Project = {
   elements?: any[];
 };
 
-interface ProjectOverviewProps {
-  selectedMetric: ImpactMetric;
-}
+interface ProjectOverviewProps {}
 
-export function ProjectOverview({
-  selectedMetric,
-}: ProjectOverviewProps) {
+export function ProjectOverview() {
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(6);
   const [projects, setProjects] = useState<Project[]>([]);
@@ -124,36 +116,6 @@ export function ProjectOverview({
     indexOfFirstProject,
     indexOfLastProject
   );
-
-  const metrics: Record<ImpactMetric, { label: string; unit: string; description: string }> = {
-    gwp: { label: "GWP", unit: "kg CO₂ eq", description: "Global Warming Potential" },
-    ubp: { label: "UBP", unit: "pts", description: "Environmental Impact Points" },
-    penre: { label: "PENRE", unit: "kWh", description: "Primary Energy Non-Renewable" },
-  };
-
-  const calculateTotalEmissions = (project: any) => {
-    if (!project.elements?.length) return 0;
-
-    return project.elements.reduce((total: number, element: any) => {
-      if (!element.materials?.length) return total;
-
-      const elementTotal = element.materials.reduce((materialTotal: number, material: any) => {
-        if (!material.indicators) return materialTotal;
-
-        const value = material.indicators[selectedMetric] || 0;
-        return materialTotal + value;
-      }, 0);
-
-      return total + elementTotal;
-    }, 0);
-  };
-
-  const formatEmissionValue = (value: number) => {
-    return value.toLocaleString('de-CH', {
-      maximumFractionDigits: 0,
-      useGrouping: true
-    });
-  };
 
   const handleDeleteProject = async (projectId: string) => {
     try {
@@ -336,16 +298,6 @@ export function ProjectOverview({
                         <Upload className="h-3 w-3" />
                         {project._count.uploads} uploads
                       </Badge>
-                      {project.elements?.some(e => e.materials?.length > 0) && (
-                        <Badge
-                          variant="secondary"
-                          className="flex items-center gap-1"
-                        >
-                          <BarChart2Icon className="h-3 w-3" />
-                          <span>{formatEmissionValue(calculateTotalEmissions(project))}</span>
-                          <span className="text-muted-foreground/70">{metrics[selectedMetric].unit}</span>
-                        </Badge>
-                      )}
                     </div>
                   </CardContent>
                 </Card>
@@ -355,7 +307,8 @@ export function ProjectOverview({
           {projects.length >= 3 && (
             <div className="mt-6 text-center">
               <p className="text-sm text-muted-foreground">
-                ⚡️ You've reached the project limit during our BETA phase. More projects coming soon! 🚀
+                ⚡️ You've reached the project limit during our BETA phase. More
+                projects coming soon! 🚀
               </p>
             </div>
           )}
@@ -423,17 +376,28 @@ export function ProjectOverview({
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Are you really sure you don't need it anymore?</AlertDialogTitle>
+            <AlertDialogTitle>
+              Are you really sure you don't need it anymore?
+            </AlertDialogTitle>
             <AlertDialogDescription className="space-y-2">
-              <p>We can get it back but it involves us digging into our database, which we would rather avoid. So better be sure you don't need it anymore...</p>
-              <p>This action cannot be undone. This will permanently delete the project and all associated data.</p>
+              <p>
+                We can get it back but it involves us digging into our database,
+                which we would rather avoid. So better be sure you don't need it
+                anymore...
+              </p>
+              <p>
+                This action cannot be undone. This will permanently delete the
+                project and all associated data.
+              </p>
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-              onClick={() => deleteProjectId && handleDeleteProject(deleteProjectId)}
+              onClick={() =>
+                deleteProjectId && handleDeleteProject(deleteProjectId)
+              }
             >
               Delete Project
             </AlertDialogAction>

@@ -8,14 +8,9 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useState } from "react";
+import { useProjectEmissions } from "@/hooks/use-project-emissions";
 
-type EmissionsProps = {
-  gwp: number;
-  ubp: number;
-  penre: number;
-};
-
-type MetricKey = keyof EmissionsProps;
+type MetricKey = "gwp" | "ubp" | "penre";
 
 const metrics: Record<
   MetricKey,
@@ -38,10 +33,11 @@ const metrics: Record<
   },
 };
 
-export function EmissionsCard({ emissions }: { emissions?: EmissionsProps }) {
+export function EmissionsCard({ project }: { project?: Project }) {
   const [metric, setMetric] = useState<MetricKey>("gwp");
+  const { totals, formatted, units } = useProjectEmissions(project);
 
-  if (!emissions) {
+  if (!project?.elements?.length) {
     return (
       <div className="h-full">
         <div className="text-sm text-muted-foreground">
@@ -51,11 +47,10 @@ export function EmissionsCard({ emissions }: { emissions?: EmissionsProps }) {
     );
   }
 
-  const currentValue = emissions[metric];
-  const MILLION = 1_000_000;
+  const currentValue = totals[metric];
+  const unit = units[metric];
 
   let formattedValue: string;
-  let unit = metrics[metric].unit;
 
   if (currentValue >= MILLION) {
     formattedValue = (currentValue / MILLION).toLocaleString("de-CH", {
