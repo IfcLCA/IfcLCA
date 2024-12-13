@@ -97,6 +97,14 @@ interface ElementWithMaterials {
   materials: MaterialEntry[];
 }
 
+interface Upload {
+  _id: string;
+  filename: string;
+  status: string;
+  elementCount: number;
+  createdAt: string | Date;
+}
+
 interface Project {
   id: string;
   _id?: string;
@@ -105,7 +113,7 @@ interface Project {
   imageUrl?: string;
   createdAt: Date;
   updatedAt: Date;
-  uploads: any[];
+  uploads: Upload[];
   elements: any[];
   materials: {
     id: string;
@@ -161,22 +169,27 @@ export default function ProjectDetailsPage() {
       console.debug("🔄 Fetching project data...");
 
       const response = await fetch(`/api/projects/${projectId}`);
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
       const data = await response.json();
 
       console.debug("📥 Raw project data:", {
+        id: data._id,
+        name: data.name,
+        uploadsCount: data.uploads?.length,
+        uploads: data.uploads,
         elementCount: data.elements?.length,
-        materialCount: data.materials?.length,
-        sampleElement: data.elements?.[0],
-        sampleMaterial: data.materials?.[0],
       });
 
       const transformed = transformProjectData(data);
 
       console.debug("✨ Transformed project data:", {
-        elementCount: transformed.elements.length,
-        materialCount: transformed.materials.length,
-        sampleElement: transformed.elements[0],
-        sampleMaterial: transformed.materials[0],
+        id: transformed.id,
+        name: transformed.name,
+        uploadsCount: transformed.uploads?.length,
+        uploads: transformed.uploads,
+        elementCount: transformed.elements?.length,
       });
 
       setProject(transformed);
@@ -190,42 +203,54 @@ export default function ProjectDetailsPage() {
     }
   };
 
-  const transformProjectData = (data: any): ExtendedProject => ({
-    ...data,
-    id: data.id || data._id,
-    createdAt: new Date(data.createdAt),
-    updatedAt: new Date(data.updatedAt),
-    imageUrl: data.imageUrl,
-    uploads: (data.uploads || []).map((upload: any) => ({
-      ...upload,
-      _id: upload._id,
-      filename: upload.filename,
-      status: upload.status,
-      elementCount: upload.elementCount,
-      createdAt: new Date(upload.createdAt),
-    })),
-    elements: (data.elements || []).map((element: any) => ({
-      ...element,
-      id: element.id || element._id,
-      _id: element._id,
-      materials: element.materials || [],
-    })),
-    materials: (data.materials || []).map((material: any) => ({
-      id: material.id || material._id,
-      name: material.name,
-      category: material.category,
-      volume: material.volume || 0,
-      fraction: material.fraction || 0,
-      gwp: material.gwp || 0,
-      ubp: material.ubp || 0,
-      penre: material.penre || 0,
-    })),
-    _count: {
-      uploads: data.uploads?.length || 0,
-      elements: data.elements?.length || 0,
-      materials: data.materials?.length || 0,
-    },
-  });
+  const transformProjectData = (data: any): ExtendedProject => {
+    // Get unique materials from elements
+    const uniqueMaterials = new Set(
+      data.elements
+        ?.flatMap((element: any) =>
+          element.materials?.map((mat: any) => mat.material?._id)
+        )
+        .filter(Boolean) || []
+    );
+
+    return {
+      ...data,
+      id: data.id || data._id,
+      createdAt: new Date(data.createdAt),
+      updatedAt: new Date(data.updatedAt),
+      imageUrl: data.imageUrl,
+      uploads: Array.isArray(data.uploads)
+        ? data.uploads.map((upload: any) => ({
+            _id: upload._id || upload.id,
+            filename: upload.filename || "Unnamed file",
+            status: upload.status || "unknown",
+            elementCount: upload.elementCount || 0,
+            createdAt: new Date(upload.createdAt),
+          }))
+        : [],
+      elements: (data.elements || []).map((element: any) => ({
+        ...element,
+        id: element.id || element._id,
+        _id: element._id,
+        materials: element.materials || [],
+      })),
+      materials: (data.materials || []).map((material: any) => ({
+        id: material.id || material._id,
+        name: material.name,
+        category: material.category,
+        volume: material.volume || 0,
+        fraction: material.fraction || 0,
+        gwp: material.gwp || 0,
+        ubp: material.ubp || 0,
+        penre: material.penre || 0,
+      })),
+      _count: {
+        uploads: data.uploads?.length || 0,
+        elements: data.elements?.length || 0,
+        materials: uniqueMaterials.size || 0,
+      },
+    };
+  };
 
   const handleDeleteProject = async () => {
     try {
@@ -524,7 +549,7 @@ const UploadsTab = ({
   );
 };
 
-const UploadCard = ({ upload }: { upload: ExtendedProject["uploads"][0] }) => (
+const UploadCard = ({ upload }: { upload: Upload }) => (
   <Card>
     <CardContent className="flex flex-col sm:flex-row justify-between items-start sm:items-center p-4 gap-3">
       <div className="space-y-1">
@@ -532,6 +557,11 @@ const UploadCard = ({ upload }: { upload: ExtendedProject["uploads"][0] }) => (
         <p className="text-sm text-muted-foreground">
           Uploaded on {new Date(upload.createdAt).toLocaleString()}
         </p>
+        {upload.elementCount > 0 && (
+          <p className="text-sm text-muted-foreground">
+            Elements: {upload.elementCount}
+          </p>
+        )}
       </div>
       <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
         <Badge
@@ -580,8 +610,6 @@ const ElementsTab = ({ project }: { project: Project }) => {
 };
 
 const MaterialsTab = ({ project }: { project: Project }) => {
-  const { totals, formatted, units } = useProjectEmissions(project);
-
   const data = useMemo(() => {
     // Group materials by name and sum volumes
     const materialGroups = project.elements.reduce((acc, element) => {
@@ -622,25 +650,12 @@ const MaterialsTab = ({ project }: { project: Project }) => {
   return (
     <>
       <div className="flex justify-between items-center mb-4">
-        <div className="space-y-1">
-          <h2 className="text-2xl font-semibold">
-            Materials{" "}
-            <Badge variant="secondary" className="ml-2">
-              {data.length}
-            </Badge>
-          </h2>
-          <div className="flex gap-2">
-            <Badge variant="outline">
-              GWP: {formatted.gwp} {units.gwp}
-            </Badge>
-            <Badge variant="outline">
-              UBP: {formatted.ubp} {units.ubp}
-            </Badge>
-            <Badge variant="outline">
-              PENRE: {formatted.penre} {units.penre}
-            </Badge>
-          </div>
-        </div>
+        <h2 className="text-2xl font-semibold">
+          Materials{" "}
+          <Badge variant="secondary" className="ml-2">
+            {data.length}
+          </Badge>
+        </h2>
       </div>
       <Card>
         <CardContent className="p-0">

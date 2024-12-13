@@ -152,8 +152,8 @@ export function DashboardCards({
       </div>
 
       <Card className="col-span-12 lg:col-span-4 h-full group transition-colors duration-200 hover:border-primary/50">
-        <CardContent className="px-4 pt-4 h-full flex flex-col">
-          <div className="flex flex-row items-start justify-between mb-6">
+        <CardContent className="px-4 pt-2 pb-3 h-full">
+          <div className="flex flex-row items-start justify-between mb-1">
             <h3 className="text-sm font-medium group-hover:text-primary transition-colors">
               Total Emissions
             </h3>

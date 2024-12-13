@@ -29,6 +29,14 @@ export async function GET(
       },
       {
         $lookup: {
+          from: "uploads",
+          localField: "_id",
+          foreignField: "projectId",
+          as: "uploads",
+        },
+      },
+      {
+        $lookup: {
           from: "elements",
           localField: "_id",
           foreignField: "projectId",
@@ -141,6 +149,7 @@ export async function GET(
       {
         $addFields: {
           elementCount: { $size: "$elements" },
+          uploadCount: { $size: "$uploads" },
           totalEmissions: {
             $reduce: {
               input: "$elements",
