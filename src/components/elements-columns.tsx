@@ -40,7 +40,7 @@ export const elementsColumns: ColumnDef<Element>[] = [
   },
   {
     accessorKey: "type",
-    header: "Type",
+    header: "Ifc Class",
     cell: ({ row }) => (
       <div className="truncate max-w-[150px] lg:max-w-[200px] text-muted-foreground">
         {row.original.type}

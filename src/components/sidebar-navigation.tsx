@@ -27,6 +27,7 @@ import { UploadIfcButton } from "@/components/upload-ifc-button";
 interface SidebarProps {
   currentPage: string;
   projectId?: string;
+  collapsed?: boolean;
 }
 
 interface SidebarItem {
@@ -97,6 +98,7 @@ const projectItems: SidebarItem[] = [
 export function SidebarNavigation({
   currentPage,
   projectId,
+  collapsed,
 }: SidebarProps) {
   const pathname = usePathname();
   const items = projectId ? [...primaryItems, ...projectItems] : primaryItems;
@@ -115,7 +117,9 @@ export function SidebarNavigation({
                       href={item.href}
                       className={cn(
                         "flex items-center justify-center w-10 h-10 rounded-md hover:bg-accent hover:text-accent-foreground transition-colors relative group",
-                        pathname === item.href ? "bg-accent text-accent-foreground" : "transparent",
+                        pathname === item.href
+                          ? "bg-accent text-accent-foreground"
+                          : "transparent",
                         item.href === "#" && "opacity-60 pointer-events-none"
                       )}
                     >
@@ -130,7 +134,10 @@ export function SidebarNavigation({
                       )}
                     </Link>
                   </TooltipTrigger>
-                  <TooltipContent side="right" className="flex items-center gap-2">
+                  <TooltipContent
+                    side="right"
+                    className="flex items-center gap-2"
+                  >
                     <span>{item.title}</span>
                     {item.badge && (
                       <span className="px-1.5 py-0.5 text-xs font-medium bg-secondary text-secondary-foreground rounded">
@@ -156,9 +163,7 @@ export function SidebarNavigation({
                     />
                   </div>
                 </TooltipTrigger>
-                <TooltipContent side="right">
-                  Add new Ifc
-                </TooltipContent>
+                <TooltipContent side="right">Add new Ifc</TooltipContent>
               </Tooltip>
               <Tooltip>
                 <TooltipTrigger asChild>
@@ -169,9 +174,7 @@ export function SidebarNavigation({
                     <PlusCircle className="h-5 w-5" />
                   </Link>
                 </TooltipTrigger>
-                <TooltipContent side="right">
-                  New Project
-                </TooltipContent>
+                <TooltipContent side="right">New Project</TooltipContent>
               </Tooltip>
             </div>
           </nav>

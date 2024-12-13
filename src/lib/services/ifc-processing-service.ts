@@ -29,7 +29,7 @@ interface IFCElement {
 
 export class IFCProcessingService {
   /**
-   * Process elements from IFC file with existing material matches
+   * Process elements from Ifc file with existing material matches
    */
   static async processElements(
     projectId: string,
@@ -42,7 +42,7 @@ export class IFCProcessingService {
         throw new Error("No elements provided for processing");
       }
 
-      logger.debug("Starting IFC element processing", {
+      logger.debug("Starting Ifc element processing", {
         elementCount: elements.length,
         projectId,
         uploadId,

@@ -62,14 +62,14 @@ export async function parseIFCFile(
     const formData = new FormData();
     formData.append("file", file);
 
-    // Process IFC file
+    // Process Ifc file
     const response = await fetch("/api/ifc/process", {
       method: "POST",
       body: formData,
     });
 
     if (!response.ok) {
-      throw new Error("Failed to process IFC file");
+      throw new Error("Failed to process Ifc file");
     }
 
     // Process the streamed response
@@ -147,14 +147,14 @@ export async function parseIFCFile(
     const unmatchedMaterialCount = matchesData.unmatchedMaterials.length;
 
     // Log initial file info
-    console.debug("📁 Starting IFC parse for file:", {
+    console.debug("📁 Starting Ifc parse for file:", {
       name: file.name,
       size: file.size,
       type: file.type,
     });
 
     // After parsing elements from stream
-    console.debug("📊 Parsed elements from IFC:", {
+    console.debug("📊 Parsed elements from Ifc:", {
       count: elements.length,
       firstElement: elements[0],
       lastElement: elements[elements.length - 1],

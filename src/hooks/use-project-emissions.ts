@@ -16,9 +16,21 @@ interface Element {
   materials: Material[];
 }
 
-interface Project {
-  elements?: Element[];
-}
+export type Project = {
+  elements: {
+    materials: {
+      volume: number;
+      material: {
+        density?: number;
+        kbobMatch?: {
+          GWP?: number;
+          UBP?: number;
+          PENRE?: number;
+        };
+      };
+    }[];
+  }[];
+};
 
 export interface ProjectEmissions {
   totals: {

@@ -27,7 +27,7 @@ interface Material {
 export const materialsColumns: ColumnDef<Material>[] = [
   {
     accessorKey: "material.name",
-    header: "IFC Material",
+    header: "Ifc Material",
     cell: ({ row }) => (
       <div className="truncate max-w-[200px] lg:max-w-[300px]">
         {row.original.material?.name}

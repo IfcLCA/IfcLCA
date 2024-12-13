@@ -655,9 +655,9 @@ export function GraphPageComponent({ materialsData }: Props) {
       case "kbobMaterials":
         return "KBOB materials";
       case "ifcMaterials":
-        return "IFC materials";
+        return "Ifc materials";
       case "ifcEntity":
-        return "IFC entities";
+        return "Ifc entities";
       default:
         return "items";
     }

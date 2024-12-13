@@ -1,7 +1,5 @@
 "use client";
 
-import { useState } from "react";
-import { BarChart2 } from "lucide-react";
 import {
   Select,
   SelectContent,
@@ -9,8 +7,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useProjectEmissions } from "@/hooks/use-project-emissions";
+import type { Project } from "@/hooks/use-project-emissions";
+import { useState } from "react";
 
 type MetricKey = "gwp" | "ubp" | "penre";
 

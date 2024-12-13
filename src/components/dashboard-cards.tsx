@@ -62,19 +62,23 @@ export function DashboardCards({
           };
 
           return {
-            gwp: materialAcc.gwp + volume * density * (kbobIndicators.GWP || 0),
-            ubp: materialAcc.ubp + volume * density * (kbobIndicators.UBP || 0),
+            gwp:
+              (materialAcc.gwp || 0) +
+              volume * density * (kbobIndicators.GWP || 0),
+            ubp:
+              (materialAcc.ubp || 0) +
+              volume * density * (kbobIndicators.UBP || 0),
             penre:
-              materialAcc.penre +
+              (materialAcc.penre || 0) +
               volume * density * (kbobIndicators.PENRE || 0),
           };
         },
         { gwp: 0, ubp: 0, penre: 0 }
       );
       return {
-        gwp: acc.gwp + elementTotals.gwp,
-        ubp: acc.ubp + elementTotals.ubp,
-        penre: acc.penre + elementTotals.penre,
+        gwp: (acc.gwp || 0) + elementTotals.gwp,
+        ubp: (acc.ubp || 0) + elementTotals.ubp,
+        penre: (acc.penre || 0) + elementTotals.penre,
       };
     },
     { gwp: 0, ubp: 0, penre: 0 } as Indicators

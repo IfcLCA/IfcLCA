@@ -30,10 +30,10 @@ export default function AuthenticatedLayout({
     <div className="relative flex min-h-screen flex-col">
       {userId ? (
         <>
-          <NavigationBar />
+          <NavigationBar notifications={[]} />
           <div className="flex flex-1">
             <aside className="w-12 flex-shrink-0">
-              <SidebarNavigation currentPage="" collapsed={false} />
+              <SidebarNavigation currentPage="" />
             </aside>
             <div className="flex-1 flex flex-col min-w-0">
               <main className="flex-1 w-full">

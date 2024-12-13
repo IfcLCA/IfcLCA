@@ -11,11 +11,13 @@ import { useState } from "react";
 interface ProjectImageUploadProps {
   projectId: string;
   imageUrl?: string;
+  className?: string;
 }
 
 export function ProjectImageUpload({
   projectId,
   imageUrl,
+  className,
 }: ProjectImageUploadProps) {
   const [isUploading, setIsUploading] = useState(false);
   const [currentImageUrl, setCurrentImageUrl] = useState(imageUrl);

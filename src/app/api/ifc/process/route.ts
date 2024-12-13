@@ -13,7 +13,7 @@ export async function POST(request: Request) {
     }
 
     const formData = await request.formData();
-    const file = formData.get("file") as Blob;
+    const file = formData.get("file") as File;
 
     if (!file) {
       return NextResponse.json({ error: "No file provided" }, { status: 400 });
@@ -42,7 +42,7 @@ export async function POST(request: Request) {
         statusText: response.statusText,
         error: errorText,
       });
-      throw new Error("Failed to process IFC file");
+      throw new Error("Failed to process Ifc file");
     }
 
     // Stream the response back to the client
@@ -53,9 +53,9 @@ export async function POST(request: Request) {
       },
     });
   } catch (error) {
-    logger.error("Error in IFC processing:", error);
+    logger.error("Error in Ifc processing:", error);
     return NextResponse.json(
-      { error: "Failed to process IFC file" },
+      { error: "Failed to process Ifc file" },
       { status: 500 }
     );
   }

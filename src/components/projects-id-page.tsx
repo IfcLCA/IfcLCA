@@ -132,7 +132,7 @@ interface Project {
   };
 }
 
-interface ExtendedProject extends Project {
+export interface ExtendedProject extends Project {
   elements: ElementWithMaterials[];
 }
 
@@ -146,6 +146,21 @@ const formatNumber = (value: number, decimalPlaces: number = 2) => {
     }) ?? "N/A"
   );
 };
+
+interface MaterialWithVolume {
+  material: {
+    _id: string;
+    name: string;
+    density?: number;
+    kbobMatch?: {
+      Name?: string;
+      GWP?: number;
+      UBP?: number;
+      PENRE?: number;
+    };
+  };
+  volume: number;
+}
 
 export default function ProjectDetailsPage() {
   const router = useRouter();
@@ -417,9 +432,16 @@ const ProjectOverview = ({ project }: { project: ExtendedProject }) => (
 const ProjectTabs = ({
   project,
   onUpload,
+  materialsWithCount,
 }: {
   project: Project;
   onUpload: () => void;
+  materialsWithCount: {
+    id: string;
+    name: string;
+    category?: string;
+    volume?: number;
+  }[];
 }) => (
   <Tabs defaultValue="uploads" className="w-full">
     <TabsList className="grid w-full grid-cols-4">
@@ -613,7 +635,7 @@ const MaterialsTab = ({ project }: { project: Project }) => {
   const data = useMemo(() => {
     // Group materials by name and sum volumes
     const materialGroups = project.elements.reduce((acc, element) => {
-      element.materials.forEach((mat) => {
+      element.materials.forEach((mat: MaterialWithVolume) => {
         const key = mat.material._id;
         if (!acc[key]) {
           acc[key] = {
@@ -659,7 +681,7 @@ const MaterialsTab = ({ project }: { project: Project }) => {
       </div>
       <Card>
         <CardContent className="p-0">
-          <DataTable columns={materialsColumns} data={data} />
+          <DataTable columns={materialsColumns} data={data as any[]} />
         </CardContent>
       </Card>
     </>
@@ -669,12 +691,12 @@ const MaterialsTab = ({ project }: { project: Project }) => {
 const GraphTab = ({ project }: { project: Project }) => {
   const materialsData = project.elements.flatMap((element) =>
     // Create one entry per element-material combination
-    element.materials.map((material) => ({
+    element.materials.map((material: MaterialWithVolume) => ({
       name: element.name, // Element name from elements table
       elementName: element.name, // Explicit element name for grouping
       ifcMaterial: material.material?.name || "Unknown",
       kbobMaterial: material.material?.kbobMatch?.Name,
-      category: element.type, // IFC entity type
+      category: element.type, // Ifc entity type
       volume: material.volume, // Use individual material volume
       indicators: {
         gwp:
