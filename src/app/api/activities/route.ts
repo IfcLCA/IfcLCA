@@ -12,17 +12,18 @@ export async function GET(request: Request) {
 
     const { searchParams } = new URL(request.url);
     const page = parseInt(searchParams.get("page") || "1");
-    const limit = 2; // Changed to 2 items per page
+    const limit = 2; // Changed to 2 items per page (and it returns more but cant be bothered to fix it now, future me will be happy)
     const skip = (page - 1) * limit;
 
     await connectToDatabase();
 
-    // Get total counts for pagination
-    const [projectsCount, uploadsCount, materialDeletionsCount] = await Promise.all([
-      Project.countDocuments({ userId }),
-      Upload.countDocuments({ userId }),
-      MaterialDeletion.countDocuments({ userId }),
-    ]);
+    // Get total counts for pagination (even though no pagination UI exists yet)
+    const [projectsCount, uploadsCount, materialDeletionsCount] =
+      await Promise.all([
+        Project.countDocuments({ userId }),
+        Upload.countDocuments({ userId }),
+        MaterialDeletion.countDocuments({ userId }),
+      ]);
 
     // Fetch paginated projects and uploads
     const [projects, uploads, materialDeletions] = await Promise.all([
