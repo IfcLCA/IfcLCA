@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useRouter, usePathname, useBeforeUnload } from "next/navigation";
 
 import { MaterialChangesPreviewModal } from "@/components/material-changes-preview-modal";
 import {
@@ -33,7 +34,6 @@ import {
   StarIcon,
 } from "@radix-ui/react-icons";
 import { Trash2Icon } from "lucide-react";
-import { useRouter } from "next/navigation";
 import { MaterialChange } from "@/types/material";
 import Fuse from "fuse.js";
 import { Label } from "@/components/ui/label";
@@ -86,6 +86,7 @@ interface AutoSuggestedMatch {
 
 export function MaterialLibraryComponent() {
   const router = useRouter();
+  const pathname = usePathname();
   const [materials, setMaterials] = useState<Material[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -121,6 +122,10 @@ export function MaterialLibraryComponent() {
   >({});
   const fuseRef = useRef<Fuse<KbobMaterial> | null>(null);
   const [autoScrollEnabled, setAutoScrollEnabled] = useState(true);
+  const [showLeaveWarning, setShowLeaveWarning] = useState(false);
+  const [pendingNavigation, setPendingNavigation] = useState<string | null>(
+    null
+  );
 
   useEffect(() => {
     if (kbobMaterials.length > 0) {
@@ -545,9 +550,12 @@ export function MaterialLibraryComponent() {
   };
 
   const handleNavigateToProject = (projectId: string) => {
-    if (!projectId) return;
-    router.push(`/projects/${projectId}`);
-    setShowPreview(false);
+    if (hasUnappliedMatches()) {
+      setPendingNavigation(`/projects/${projectId}`);
+      setShowLeaveWarning(true);
+    } else {
+      router.push(`/projects/${projectId}`);
+    }
   };
 
   const toggleSort = (column: "name" | "projects") => {
@@ -812,6 +820,70 @@ export function MaterialLibraryComponent() {
     [selectedMaterials, handleMatch, triggerMatchConfetti]
   );
 
+  // Modify the hasUnappliedMatches function to check for preview modal
+  const hasUnappliedMatches = () => {
+    // Don't show warning if preview modal is open
+    if (showPreview) return false;
+    return Object.keys(temporaryMatches).length > 0;
+  };
+
+  // Add this effect to handle Next.js navigation
+  useEffect(() => {
+    if (!hasUnappliedMatches()) return;
+
+    const handleWindowClose = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      return (e.returnValue = "");
+    };
+
+    const handlePushState = () => {
+      if (hasUnappliedMatches()) {
+        // Prevent navigation and show warning
+        window.history.pushState(null, "", pathname);
+        setShowLeaveWarning(true);
+      }
+    };
+
+    window.addEventListener("beforeunload", handleWindowClose);
+    window.addEventListener("popstate", handlePushState);
+
+    // Intercept all navigation attempts
+    const handleClick = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      const link = target.closest("a");
+
+      if (link?.getAttribute("href")?.startsWith("/")) {
+        e.preventDefault();
+        e.stopPropagation();
+        setPendingNavigation(link.getAttribute("href"));
+        setShowLeaveWarning(true);
+      }
+    };
+
+    document.addEventListener("click", handleClick, true);
+
+    return () => {
+      window.removeEventListener("beforeunload", handleWindowClose);
+      window.removeEventListener("popstate", handlePushState);
+      document.removeEventListener("click", handleClick, true);
+    };
+  }, [hasUnappliedMatches, pathname]);
+
+  // Modify handleConfirmNavigation
+  const handleConfirmNavigation = () => {
+    if (pendingNavigation) {
+      setShowLeaveWarning(false);
+      setPendingNavigation(null);
+      router.push(pendingNavigation);
+    }
+  };
+
+  // Add this function to handle showing preview from warning
+  const handleShowPreviewFromWarning = () => {
+    setShowLeaveWarning(false);
+    handleShowPreview();
+  };
+
   if (error) {
     return <div className="text-red-500">Error: {error}</div>;
   }
@@ -840,13 +912,17 @@ export function MaterialLibraryComponent() {
                 ))}
               </SelectContent>
             </Select>
-            <Button
-              variant="default"
-              onClick={handleShowPreview}
-              disabled={Object.keys(temporaryMatches).length === 0}
-            >
-              Review & Apply Matches
-            </Button>
+            <div className="flex items-center gap-2">
+              <Button onClick={handleShowPreview}>Preview Changes</Button>
+              {Object.keys(temporaryMatches).length > 0 && (
+                <Badge
+                  variant="secondary"
+                  className="bg-yellow-100 text-yellow-800"
+                >
+                  {Object.keys(temporaryMatches).length} unapplied matches
+                </Badge>
+              )}
+            </div>
           </div>
         </div>
       </CardHeader>
@@ -1302,6 +1378,48 @@ export function MaterialLibraryComponent() {
           isLoading={isMatchingInProgress}
         />
       )}
+      {/* Add the warning dialog */}
+      <AlertDialog open={showLeaveWarning} onOpenChange={setShowLeaveWarning}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Are you sure you want to leave?</AlertDialogTitle>
+            <AlertDialogDescription className="space-y-2">
+              <p>
+                You have {Object.keys(temporaryMatches).length} material matches
+                that haven't been applied yet. These changes will be lost if you
+                leave without confirming them.
+              </p>
+              <p>
+                You can review and apply your changes now, or leave without
+                saving.
+              </p>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="flex gap-2">
+            <AlertDialogCancel
+              onClick={() => {
+                setShowLeaveWarning(false);
+                setPendingNavigation(null);
+              }}
+            >
+              Stay
+            </AlertDialogCancel>
+            <Button
+              variant="outline"
+              onClick={handleShowPreviewFromWarning}
+              className="bg-primary text-primary-foreground hover:bg-primary/90"
+            >
+              Review Changes
+            </Button>
+            <AlertDialogAction
+              onClick={handleConfirmNavigation}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Leave Without Saving
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Card>
   );
 }
