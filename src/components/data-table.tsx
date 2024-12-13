@@ -60,7 +60,11 @@ export function DataTable<TData, TValue>({
 
   const table = useReactTable({
     data,
-    columns,
+    columns: columns.map((col) => ({
+      ...col,
+      // Enable sorting for all columns by default unless explicitly disabled
+      enableSorting: col.enableSorting !== false,
+    })),
     getCoreRowModel: getCoreRowModel(),
     getPaginationRowModel: getPaginationRowModel(),
     onPaginationChange: setPagination,
@@ -173,16 +177,29 @@ export function DataTable<TData, TValue>({
                       {header.isPlaceholder ? null : (
                         <>
                           <div
-                            className={`select-none ${
+                            className={`select-none flex items-center ${
                               header.index === 0 ? "whitespace-normal" : ""
+                            } ${
+                              header.column.getCanSort() ? "cursor-pointer" : ""
                             }`}
                             ref={
                               header.index === 0 ? firstColumnRef : undefined
                             }
+                            onClick={header.column.getToggleSortingHandler()}
                           >
-                            {flexRender(
-                              header.column.columnDef.header,
-                              header.getContext()
+                            <div className="flex-1">
+                              {flexRender(
+                                header.column.columnDef.header,
+                                header.getContext()
+                              )}
+                            </div>
+                            {header.column.getCanSort() && (
+                              <span className="ml-2">
+                                {{
+                                  asc: "↑",
+                                  desc: "↓",
+                                }[header.column.getIsSorted() as string] ?? "↕"}
+                              </span>
                             )}
                           </div>
                           {header.column.getCanResize() && (

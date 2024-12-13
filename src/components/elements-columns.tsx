@@ -31,12 +31,7 @@ interface Element {
 export const elementsColumns: ColumnDef<Element>[] = [
   {
     accessorKey: "name",
-    header: "Name",
-    cell: ({ row }) => (
-      <div className="truncate max-w-[200px] lg:max-w-[300px] font-medium">
-        {row.original.name}
-      </div>
-    ),
+    header: ({ column }) => <div className="flex items-center">Name</div>,
   },
   {
     accessorKey: "type",
@@ -92,7 +87,12 @@ export const elementsColumns: ColumnDef<Element>[] = [
   },
   {
     id: "properties",
-    header: "Properties",
+    header: ({ column }) => <div className="flex items-center">Properties</div>,
+    accessorFn: (row) => {
+      // Create a string that can be sorted based on the properties
+      // Format: "1_1" for both true, "1_0" for loadBearing only, "0_1" for external only, "0_0" for none
+      return `${row.loadBearing ? "1" : "0"}_${row.isExternal ? "1" : "0"}`;
+    },
     cell: ({ row }) => (
       <div className="flex flex-wrap gap-2">
         {row.original.loadBearing && (
@@ -101,5 +101,11 @@ export const elementsColumns: ColumnDef<Element>[] = [
         {row.original.isExternal && <Badge variant="secondary">External</Badge>}
       </div>
     ),
+    sortingFn: (rowA, rowB, columnId) => {
+      // Custom sorting function to handle the string format we created
+      const valueA = rowA.getValue(columnId) as string;
+      const valueB = rowB.getValue(columnId) as string;
+      return valueA.localeCompare(valueB);
+    },
   },
 ];
