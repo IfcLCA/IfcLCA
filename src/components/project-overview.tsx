@@ -189,7 +189,7 @@ export function ProjectOverview() {
       )}
 
       {!isLoading && !error && projects.length === 0 && (
-        <div className="col-span-full text-center py-12 bg-gray-50 rounded-lg">
+        <div className="col-span-full text-center py-12 bg-muted rounded-lg">
           <h2 className="text-2xl font-semibold mb-2 text-primary">
             No Projects Yet
           </h2>
