@@ -18,14 +18,12 @@ export default function AuthenticatedLayout({
     setMounted(true);
   }, []);
 
-  // Show nothing until client-side hydration completes
   if (!mounted) {
     return null;
   }
 
-  // After mounting, wait for auth to load
   if (!isLoaded) {
-    return <div className="min-h-screen" />; // Empty container to maintain layout
+    return <div className="min-h-screen" />;
   }
 
   return (
@@ -34,8 +32,16 @@ export default function AuthenticatedLayout({
         <>
           <NavigationBar />
           <div className="flex flex-1">
-            <SidebarNavigation currentPage="" collapsed={false} />
-            <main className="flex-1 p-6">{children}</main>
+            <aside className="w-12 flex-shrink-0">
+              <SidebarNavigation currentPage="" collapsed={false} />
+            </aside>
+            <div className="flex-1 flex flex-col min-w-0">
+              <main className="flex-1 w-full">
+                <div className="max-w-[2000px] mx-auto w-full px-6">
+                  {children}
+                </div>
+              </main>
+            </div>
           </div>
           <Footer />
         </>

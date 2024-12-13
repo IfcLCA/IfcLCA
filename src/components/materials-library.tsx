@@ -19,13 +19,6 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import {
-  Pagination,
-  PaginationContent,
-  PaginationItem,
-  PaginationNext,
-  PaginationPrevious,
-} from "@/components/ui/pagination";
-import {
   Select,
   SelectContent,
   SelectItem,
@@ -42,6 +35,11 @@ import {
 import { Trash2Icon } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { MaterialChange } from "@/types/material";
+import Fuse from "fuse.js";
+import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
+import confetti from "canvas-confetti";
+import { CheckIcon } from "@radix-ui/react-icons";
 
 interface Material {
   id: string;
@@ -79,6 +77,13 @@ interface Project {
   materialIds: string[];
 }
 
+// Add this new type for auto-suggested matches
+interface AutoSuggestedMatch {
+  kbobId: string;
+  score: number;
+  name: string;
+}
+
 export function MaterialLibraryComponent() {
   const router = useRouter();
   const [materials, setMaterials] = useState<Material[]>([]);
@@ -88,8 +93,6 @@ export function MaterialLibraryComponent() {
   const [searchTerm, setSearchTerm] = useState("");
   const [sortColumn, setSortColumn] = useState<"name" | "projects">("name");
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
-  const [currentPage, setCurrentPage] = useState(1);
-  const [itemsPerPage, setItemsPerPage] = useState(10);
   const [kbobMaterials, setKbobMaterials] = useState<KbobMaterial[]>([]);
   const [kbobSearchTerm, setKbobSearchTerm] = useState("");
   const [selectedProject, setSelectedProject] = useState<string | null>(null);
@@ -112,6 +115,129 @@ export function MaterialLibraryComponent() {
   );
   const [isDeletingMaterial, setIsDeletingMaterial] = useState(false);
   const [elementCount, setElementCount] = useState<number>(0);
+  const kbobListRef = useRef<HTMLDivElement>(null);
+  const [autoSuggestedMatches, setAutoSuggestedMatches] = useState<
+    Record<string, AutoSuggestedMatch>
+  >({});
+  const fuseRef = useRef<Fuse<KbobMaterial> | null>(null);
+  const [autoScrollEnabled, setAutoScrollEnabled] = useState(true);
+
+  useEffect(() => {
+    if (kbobMaterials.length > 0) {
+      fuseRef.current = new Fuse(kbobMaterials, {
+        keys: ["Name"],
+        threshold: 0.8,
+        ignoreLocation: true,
+        findAllMatches: true,
+        getFn: (obj, path) => {
+          const value = Fuse.config.getFn(obj, path);
+          if (!value) return "";
+          return value
+            .toString()
+            .toLowerCase()
+            .normalize("NFKD")
+            .replace(/[\u0300-\u036f]/g, "")
+            .replace(/[^a-z0-9\s]/g, " ")
+            .replace(/\s+/g, " ")
+            .trim();
+        },
+      });
+
+      // Generate suggestions for unmatched materials
+      generateSuggestions();
+    }
+  }, [kbobMaterials, materials]);
+
+  // Add function to generate suggestions
+  const generateSuggestions = useCallback(() => {
+    if (!fuseRef.current) return;
+
+    const suggestions: Record<string, AutoSuggestedMatch> = {};
+
+    materials.forEach((material) => {
+      // Skip if material already has a match
+      if (material.kbobMatchId || temporaryMatches[material.id]) return;
+
+      const searchTerm = material.name
+        .toLowerCase()
+        .replace(/[_-]/g, " ")
+        .replace(/\d+/g, "")
+        .trim();
+
+      const results = fuseRef.current.search(searchTerm);
+      if (results.length > 0) {
+        const bestMatch = results[0];
+        suggestions[material.id] = {
+          kbobId: bestMatch.item._id,
+          score: bestMatch.score || 1,
+          name: bestMatch.item.Name,
+        };
+      }
+    });
+
+    setAutoSuggestedMatches(suggestions);
+  }, [materials, temporaryMatches]);
+
+  const scrollToMatchingKbob = useCallback(
+    (ifcMaterialName: string) => {
+      if (
+        !autoScrollEnabled ||
+        !fuseRef.current ||
+        !ifcMaterialName ||
+        !kbobListRef.current
+      )
+        return;
+
+      // Preprocess the search term
+      const searchTerm = ifcMaterialName
+        .toLowerCase()
+        .replace(/[_-]/g, " ") // Replace underscores and hyphens with spaces
+        .replace(/\d+/g, "") // Remove numbers
+        .trim();
+
+      console.log("🔍 Searching for match for:", ifcMaterialName);
+      console.log("🔍 Preprocessed search term:", searchTerm);
+
+      const results = fuseRef.current.search(searchTerm);
+
+      console.log(
+        "📊 Top matches:",
+        results.slice(0, 3).map((result) => ({
+          name: result.item.Name,
+          score: result.score,
+          refId: result.item._id,
+          searchTerm: searchTerm,
+          normalizedName: result.item.Name.toLowerCase()
+            .normalize("NFKD")
+            .replace(/[\u0300-\u036f]/g, "")
+            .replace(/[^a-z0-9\s]/g, " ")
+            .trim(),
+        }))
+      );
+
+      if (results.length > 0) {
+        const bestMatch = results[0].item;
+        console.log("✅ Best match:", {
+          name: bestMatch.Name,
+          id: bestMatch._id,
+          score: results[0].score,
+        });
+
+        const element = kbobListRef.current.querySelector(
+          `[data-kbob-id="${bestMatch._id}"]`
+        );
+        if (element) {
+          element.scrollIntoView({ behavior: "smooth", block: "center" });
+          console.log("📜 Scrolled to element");
+        } else {
+          console.log("❌ Element not found in DOM");
+        }
+      } else {
+        console.log("❌ No matches found");
+      }
+    },
+    [autoScrollEnabled]
+  );
 
   useEffect(() => {
     async function fetchData() {
@@ -215,35 +341,14 @@ export function MaterialLibraryComponent() {
     [projects]
   );
 
-  const paginatedMaterials = useMemo(() => {
-    const startIndex = (currentPage - 1) * itemsPerPage;
-    return filteredAndSortedMaterials.slice(
-      startIndex,
-      startIndex + itemsPerPage
-    );
-  }, [filteredAndSortedMaterials, currentPage, itemsPerPage]);
-
-  const handleSelect = useCallback(
-    (material: Material & { originalIds?: string[] }) => {
-      // If material has originalIds (grouped view), select all related IDs
-      const idsToSelect = material.originalIds || [material.id];
-
-      // Use a synchronous update for immediate UI feedback
-      const newSelectedMaterials = new Set(selectedMaterials);
-      const allSelected = idsToSelect.every((id) =>
-        newSelectedMaterials.has(id)
-      );
-
-      if (allSelected) {
-        idsToSelect.forEach((id) => newSelectedMaterials.delete(id));
-      } else {
-        idsToSelect.forEach((id) => newSelectedMaterials.add(id));
-      }
-
-      setSelectedMaterials(Array.from(newSelectedMaterials));
-    },
-    [selectedMaterials]
-  );
+  const handleSelect = useCallback((material: Material) => {
+    setSelectedMaterials((prev) => {
+      const isCurrentlySelected = prev.includes(material.id);
+      return isCurrentlySelected
+        ? prev.filter((id) => id !== material.id)
+        : [...prev, material.id];
+    });
+  }, []);
 
   const isSelected = useCallback(
     (material: Material & { originalIds?: string[] }) => {
@@ -256,7 +361,7 @@ export function MaterialLibraryComponent() {
   const handleSelectAll = (checked: boolean) => {
     if (checked) {
       // Get all IDs including those from grouped materials
-      const allIds = paginatedMaterials.flatMap(
+      const allIds = filteredAndSortedMaterials.flatMap(
         (material) => material.originalIds || [material.id]
       );
       setSelectedMaterials(allIds);
@@ -665,6 +770,48 @@ export function MaterialLibraryComponent() {
     }
   };
 
+  // Add this function to trigger confetti
+  const triggerMatchConfetti = useCallback(() => {
+    confetti({
+      particleCount: 100,
+      spread: 70,
+      origin: { y: 0.6 },
+      colors: [
+        "#2563eb", // Blue
+        "#4f46e5", // Indigo
+        "#6366f1", // Primary blue
+        "#7c3aed", // Violet
+        "#8b5cf6", // Purple
+        "#a855f7", // Purple/Pink
+        "#d946ef", // Pink
+        "#ec4899", // Pink/Red
+        "#f97316", // Orange accent
+      ],
+    });
+  }, []);
+
+  // Modify handleBulkMatch to include animation and confetti
+  const handleBulkMatch = useCallback(
+    (kbobId: string) => {
+      if (selectedMaterials.length === 0) return;
+
+      handleMatch(selectedMaterials, kbobId);
+
+      // Trigger confetti for successful match
+      if (selectedMaterials.length >= 3) {
+        // More confetti for bulk matches
+        triggerMatchConfetti();
+        setTimeout(triggerMatchConfetti, 150);
+      } else {
+        triggerMatchConfetti();
+      }
+
+      setSelectedMaterials([]);
+      setActiveSearchId(null);
+    },
+    [selectedMaterials, handleMatch, triggerMatchConfetti]
+  );
+
   if (error) {
     return <div className="text-red-500">Error: {error}</div>;
   }
@@ -717,27 +864,42 @@ export function MaterialLibraryComponent() {
                 <div className="flex items-center justify-between mb-2">
                   <h3 className="font-semibold flex items-center gap-2">
                     <span>Ifc Materials</span>
-                    <Badge
-                      variant={
-                        getMatchingProgress().percentage === 100
-                          ? "success"
-                          : "secondary"
-                      }
-                    >
-                      {getMatchingProgress().matchedCount} /{" "}
-                      {getMatchingProgress().totalMaterials} matched
-                    </Badge>
+                    {selectedMaterials.length > 0 && (
+                      <Badge variant="secondary" className="animate-in fade-in">
+                        {selectedMaterials.length} selected
+                      </Badge>
+                    )}
                   </h3>
-                </div>
-                <div className="w-full bg-secondary/20 rounded-full h-2 mb-3">
-                  <div
-                    className="bg-primary h-2 rounded-full transition-all duration-300"
-                    style={{ width: `${getMatchingProgress().percentage}%` }}
-                  />
+                  <div className="flex items-center gap-4">
+                    <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-1.5">
+                        <div className="w-24 h-2 bg-secondary/20 rounded-full overflow-hidden">
+                          <div
+                            className="h-full bg-primary rounded-full transition-all duration-300"
+                            style={{
+                              width: `${getMatchingProgress().percentage}%`,
+                            }}
+                          />
+                        </div>
+                        <Badge
+                          variant={
+                            getMatchingProgress().percentage === 100
+                              ? "success"
+                              : "secondary"
+                          }
+                          className="text-xs"
+                        >
+                          {getMatchingProgress().matchedCount}/
+                          {getMatchingProgress().totalMaterials}
+                        </Badge>
+                      </div>
+                    </div>
+                  </div>
                 </div>
                 <p className="text-sm text-muted-foreground mb-3">
-                  Select each material from your Ifc model and match it with a
-                  corresponding KBOB material
+                  {selectedMaterials.length > 0
+                    ? `Select a KBOB material to match with ${selectedMaterials.length} selected materials`
+                    : "Select materials from the left to match them with KBOB materials"}
                 </p>
                 <div className="flex items-center gap-2">
                   <MagnifyingGlassIcon className="h-4 w-4 text-muted-foreground" />
@@ -751,7 +913,7 @@ export function MaterialLibraryComponent() {
               </div>
               <div className="flex-1 overflow-y-auto min-h-0">
                 <div className="divide-y divide-transparent px-2">
-                  {paginatedMaterials.map((material) => (
+                  {filteredAndSortedMaterials.map((material) => (
                     <div
                       key={material.id}
                       className={`
@@ -760,29 +922,122 @@ export function MaterialLibraryComponent() {
                         hover:bg-secondary/5 hover:scale-[1.02] hover:z-10
                         group
                         ${
-                          material.id === activeSearchId
-                            ? "ring-2 ring-blue-400 ring-offset-2 shadow-lg bg-blue-50/50 scale-[1.03] z-20 my-4"
+                          isSelected(material)
+                            ? "ring-2 ring-primary/50 ring-offset-1 shadow-sm bg-primary/5 z-10"
                             : "hover:ring-1 hover:ring-primary/30"
                         }
                         ${
-                          isSelected(material)
-                            ? "animate-in fade-in-0 duration-500 ring-2 ring-primary ring-offset-1 shadow-sm z-10"
-                            : ""
-                        }
-                        ${
                           temporaryMatches[material.id]
-                            ? "animate-in zoom-in-95 duration-300 ease-bounce"
+                            ? "animate-in zoom-in-95 duration-500 ease-spring slide-in-from-left-5"
                             : ""
                         }
                         rounded-md my-2
                       `}
                       onClick={() => {
                         handleSelect(material);
-                        setActiveSearchId(
-                          material.id === activeSearchId ? null : material.id
-                        );
+                        if (selectedMaterials.length === 0) {
+                          scrollToMatchingKbob(material.name);
+                        }
                       }}
                     >
+                      {temporaryMatches[material.id] && (
+                        <div
+                          className="absolute inset-0 bg-primary/5 
+                            animate-in fade-in duration-500 ease-spring"
+                        >
+                          <div
+                            className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2
+                            animate-in zoom-in-50 duration-300 ease-spring"
+                          >
+                            <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center">
+                              <CheckIcon className="w-6 h-6 text-primary animate-in zoom-in duration-300 delay-150" />
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                      <div className="absolute top-2 right-2 z-20">
+                        <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="opacity-0 group-hover:opacity-100 transition-opacity h-8 w-8"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setMaterialToDelete(material);
+                                // Fetch and set element count when opening dialog
+                                getElementCount(material.id).then(
+                                  setElementCount
+                                );
+                              }}
+                            >
+                              <Trash2Icon className="h-4 w-4 text-destructive" />
+                            </Button>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent>
+                            <AlertDialogHeader>
+                              <AlertDialogTitle>
+                                Delete Material
+                              </AlertDialogTitle>
+                              <AlertDialogDescription className="space-y-2">
+                                <p>
+                                  Are you sure you want to delete{" "}
+                                  <span className="font-medium">
+                                    {material.name}
+                                  </span>
+                                  ?
+                                </p>
+                                <div className="text-sm text-muted-foreground mt-2">
+                                  <p>This will affect:</p>
+                                  <ul className="list-disc list-inside mt-1">
+                                    {material.projects &&
+                                      material.projects[0] && (
+                                        <li>Project: {material.projects[0]}</li>
+                                      )}
+                                    <li>
+                                      <span className="font-medium">
+                                        {elementCount} element
+                                        {elementCount !== 1 ? "s" : ""}
+                                      </span>{" "}
+                                      will be affected
+                                    </li>
+                                  </ul>
+                                </div>
+                                <p className="text-sm text-destructive mt-4">
+                                  This action cannot be undone.
+                                </p>
+                              </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setMaterialToDelete(null);
+                                }}
+                              >
+                                Cancel
+                              </AlertDialogCancel>
+                              <AlertDialogAction
+                                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleDeleteMaterial(material);
+                                }}
+                                disabled={isDeletingMaterial}
+                              >
+                                {isDeletingMaterial ? (
+                                  <>
+                                    <ReloadIcon className="mr-2 h-4 w-4 animate-spin" />
+                                    Deleting...
+                                  </>
+                                ) : (
+                                  "Delete"
+                                )}
+                              </AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
+                      </div>
                       <div
                         className={`
                         flex items-start justify-between gap-4
@@ -855,6 +1110,40 @@ export function MaterialLibraryComponent() {
                                 </Button>
                               )}
                             </div>
+                          ) : autoSuggestedMatches[material.id] ? (
+                            <div className="mt-2 flex items-center justify-between gap-2 p-2 bg-yellow-500/10 rounded-md">
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center gap-2">
+                                  <p className="font-medium text-sm truncate text-yellow-700">
+                                    Suggested:{" "}
+                                    {autoSuggestedMatches[material.id].name}
+                                  </p>
+                                  <Badge
+                                    variant="outline"
+                                    className="text-yellow-600 border-yellow-400"
+                                  >
+                                    Auto
+                                  </Badge>
+                                </div>
+                                <p className="text-sm text-yellow-600">
+                                  Click to review and confirm this suggestion
+                                </p>
+                              </div>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="shrink-0 border-yellow-400 text-yellow-700 hover:bg-yellow-50"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleMatch(
+                                    [material.id],
+                                    autoSuggestedMatches[material.id].kbobId
+                                  );
+                                }}
+                              >
+                                Accept
+                              </Button>
+                            </div>
                           ) : (
                             <div className="mt-2 p-2 bg-yellow-500/10 text-yellow-600 rounded-md text-sm">
                               Click to match with KBOB material
@@ -862,155 +1151,8 @@ export function MaterialLibraryComponent() {
                           )}
                         </div>
                       </div>
-                      <AlertDialog>
-                        <AlertDialogTrigger asChild>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
-                            onClick={async (e) => {
-                              e.stopPropagation();
-                              setMaterialToDelete(material);
-                              // Fetch and set element count when opening dialog
-                              const count = await getElementCount(material.id);
-                              setElementCount(count);
-                            }}
-                          >
-                            <Trash2Icon className="h-4 w-4 text-destructive" />
-                          </Button>
-                        </AlertDialogTrigger>
-                        <AlertDialogContent>
-                          <AlertDialogHeader>
-                            <AlertDialogTitle>Delete Material</AlertDialogTitle>
-                            <AlertDialogDescription className="space-y-2">
-                              <p>
-                                Are you sure you want to delete{" "}
-                                <span className="font-medium">
-                                  {material.name}
-                                </span>
-                                ?
-                              </p>
-                              <div className="text-sm text-muted-foreground mt-2">
-                                <p>This will affect:</p>
-                                <ul className="list-disc list-inside mt-1">
-                                  {material.projects &&
-                                    material.projects[0] && (
-                                      <li>Project: {material.projects[0]}</li>
-                                    )}
-                                  <li>
-                                    <span className="font-medium">
-                                      {elementCount} element
-                                      {elementCount !== 1 ? "s" : ""}
-                                    </span>{" "}
-                                    will be affected
-                                  </li>
-                                </ul>
-                              </div>
-                              <p className="text-sm text-destructive mt-4">
-                                This action cannot be undone.
-                              </p>
-                            </AlertDialogDescription>
-                          </AlertDialogHeader>
-                          <AlertDialogFooter>
-                            <AlertDialogCancel
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setMaterialToDelete(null);
-                              }}
-                            >
-                              Cancel
-                            </AlertDialogCancel>
-                            <AlertDialogAction
-                              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleDeleteMaterial(material);
-                              }}
-                              disabled={isDeletingMaterial}
-                            >
-                              {isDeletingMaterial ? (
-                                <>
-                                  <ReloadIcon className="mr-2 h-4 w-4 animate-spin" />
-                                  Deleting...
-                                </>
-                              ) : (
-                                "Delete"
-                              )}
-                            </AlertDialogAction>
-                          </AlertDialogFooter>
-                        </AlertDialogContent>
-                      </AlertDialog>
                     </div>
                   ))}
-                </div>
-              </div>
-              <div className="p-4 border-t bg-secondary/5 flex-shrink-0">
-                <div className="flex items-center justify-between">
-                  <Select
-                    value={itemsPerPage.toString()}
-                    onValueChange={(value) => {
-                      setItemsPerPage(Number(value));
-                      setCurrentPage(1);
-                    }}
-                  >
-                    <SelectTrigger className="w-[80px]">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {[10, 20, 50].map((size) => (
-                        <SelectItem key={size} value={size.toString()}>
-                          {size}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <Pagination>
-                    <PaginationContent>
-                      <PaginationItem>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() =>
-                            setCurrentPage((prev) => Math.max(prev - 1, 1))
-                          }
-                          className={
-                            currentPage === 1
-                              ? "opacity-50 pointer-events-none"
-                              : ""
-                          }
-                        >
-                          Previous
-                        </Button>
-                      </PaginationItem>
-                      <PaginationItem>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() =>
-                            setCurrentPage((prev) =>
-                              Math.min(
-                                prev + 1,
-                                Math.ceil(
-                                  filteredAndSortedMaterials.length /
-                                    itemsPerPage
-                                )
-                              )
-                            )
-                          }
-                          className={
-                            currentPage ===
-                            Math.ceil(
-                              filteredAndSortedMaterials.length / itemsPerPage
-                            )
-                              ? "opacity-50 pointer-events-none"
-                              : ""
-                          }
-                        >
-                          Next
-                        </Button>
-                      </PaginationItem>
-                    </PaginationContent>
-                  </Pagination>
                 </div>
               </div>
             </div>
@@ -1018,61 +1160,74 @@ export function MaterialLibraryComponent() {
             {/* Right Column - KBOB Materials */}
             <div className="flex flex-col border rounded-lg overflow-hidden h-full">
               <div className="p-4 border-b bg-secondary/10 flex-shrink-0">
-                <h3 className="font-semibold mb-2 flex items-center gap-2">
-                  <span>KBOB Materials Database</span>
-                  <Badge variant="outline">
-                    {kbobMaterials.length} materials
-                  </Badge>
-                </h3>
-                <p className="text-sm text-muted-foreground mb-3 pb-[40px]">
+                <div className="flex items-center justify-between mb-2">
+                  <h3 className="font-semibold flex items-center gap-2">
+                    <span>KBOB Materials Database</span>
+                    <Badge variant="outline">
+                      {kbobMaterials.length} materials
+                    </Badge>
+                  </h3>
+                  <div className="flex items-center gap-2">
+                    <Label
+                      htmlFor="auto-scroll"
+                      className="text-sm text-muted-foreground"
+                    >
+                      Auto-scroll
+                    </Label>
+                    <Switch
+                      id="auto-scroll"
+                      checked={autoScrollEnabled}
+                      onCheckedChange={setAutoScrollEnabled}
+                    />
+                  </div>
+                </div>
+                <p className="text-sm text-muted-foreground mb-3">
                   {activeSearchId
                     ? "Select a KBOB material to match with your highlighted Ifc material"
                     : "First select an Ifc material on the left to match it"}
                 </p>
-                <div className="flex flex-col gap-2">
-                  <div className="flex items-center gap-2">
-                    <MagnifyingGlassIcon className="h-4 w-4 text-muted-foreground" />
-                    <Input
-                      placeholder="Search KBOB materials..."
-                      value={kbobSearchTerm}
-                      onChange={(e) => setKbobSearchTerm(e.target.value)}
-                      className="flex-1"
-                    />
-                  </div>
-                  {kbobSearchTerm.length >= 2 && (
-                    <div className="flex flex-wrap gap-1">
-                      {getSuggestions(kbobSearchTerm).map(
-                        ({ type, text, id }) => (
-                          <Badge
-                            key={`${type}-${text}`}
-                            variant="secondary"
-                            className={`cursor-pointer hover:bg-secondary/20 ${
-                              !activeSearchId ? "opacity-50" : ""
-                            }`}
-                            onClick={() => {
-                              if (id && activeSearchId) {
-                                handleMatch([activeSearchId], id);
-                                setActiveSearchId(null);
-                              } else {
-                                setKbobSearchTerm(text);
-                              }
-                            }}
-                          >
-                            {type === "favorite" && (
-                              <StarFilledIcon className="w-3 h-3 text-yellow-400 mr-1" />
-                            )}
-                            {type === "phrase" && (
-                              <MagnifyingGlassIcon className="w-3 h-3 text-muted-foreground mr-1" />
-                            )}
-                            {text}
-                          </Badge>
-                        )
-                      )}
-                    </div>
-                  )}
+                <div className="flex items-center gap-2">
+                  <MagnifyingGlassIcon className="h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Search KBOB materials..."
+                    value={kbobSearchTerm}
+                    onChange={(e) => setKbobSearchTerm(e.target.value)}
+                    className="flex-1"
+                  />
                 </div>
+                {kbobSearchTerm.length >= 2 && (
+                  <div className="flex flex-wrap gap-1 mt-2">
+                    {getSuggestions(kbobSearchTerm).map(
+                      ({ type, text, id }) => (
+                        <Badge
+                          key={`${type}-${text}`}
+                          variant="secondary"
+                          className={`cursor-pointer hover:bg-secondary/20 ${
+                            !activeSearchId ? "opacity-50" : ""
+                          }`}
+                          onClick={() => {
+                            if (id && activeSearchId) {
+                              handleBulkMatch(id);
+                              setActiveSearchId(null);
+                            } else {
+                              setKbobSearchTerm(text);
+                            }
+                          }}
+                        >
+                          {type === "favorite" && (
+                            <StarFilledIcon className="w-3 h-3 text-yellow-400 mr-1" />
+                          )}
+                          {type === "phrase" && (
+                            <MagnifyingGlassIcon className="w-3 h-3 text-muted-foreground mr-1" />
+                          )}
+                          {text}
+                        </Badge>
+                      )
+                    )}
+                  </div>
+                )}
               </div>
-              <div className="flex-1 overflow-y-auto min-h-0">
+              <div className="flex-1 overflow-y-auto min-h-0" ref={kbobListRef}>
                 <div className="divide-y">
                   {sortedKbobMaterials
                     .filter((material) => {
@@ -1084,15 +1239,15 @@ export function MaterialLibraryComponent() {
                     .map((material) => (
                       <div
                         key={material._id}
+                        data-kbob-id={material._id}
                         className={`p-4 transition-colors ${
-                          activeSearchId
+                          selectedMaterials.length > 0
                             ? "hover:bg-primary/5 cursor-pointer"
                             : "opacity-75"
                         }`}
                         onClick={() => {
-                          if (activeSearchId) {
-                            handleMatch([activeSearchId], material._id);
-                            setActiveSearchId(null);
+                          if (selectedMaterials.length > 0) {
+                            handleBulkMatch(material._id);
                           }
                         }}
                       >

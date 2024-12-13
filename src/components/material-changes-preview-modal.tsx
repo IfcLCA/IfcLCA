@@ -192,9 +192,6 @@ export function MaterialChangesPreviewModal({
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
-                <DropdownMenuItem onClick={handleConfirm}>
-                  Return to Library
-                </DropdownMenuItem>
                 <DropdownMenuItem
                   onClick={async () => {
                     await handleConfirm();
@@ -202,6 +199,9 @@ export function MaterialChangesPreviewModal({
                   }}
                 >
                   Go to Project
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={handleConfirm}>
+                  Return to Library
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
