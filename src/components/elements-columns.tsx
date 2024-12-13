@@ -98,7 +98,7 @@ export const elementsColumns: ColumnDef<Element>[] = [
         {row.original.loadBearing && (
           <Badge
             variant="secondary"
-            className="bg-primary/10 text-primary border-primary/20"
+            className="bg-blue-500/10 text-blue-500 border-blue-500/20"
           >
             Load Bearing
           </Badge>
@@ -106,7 +106,7 @@ export const elementsColumns: ColumnDef<Element>[] = [
         {row.original.isExternal && (
           <Badge
             variant="secondary"
-            className="bg-primary/10 text-primary border-primary/20"
+            className="bg-green-500/10 text-green-500 border-green-500/20"
           >
             External
           </Badge>

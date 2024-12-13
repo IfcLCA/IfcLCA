@@ -42,7 +42,7 @@ export const materialsColumns: ColumnDef<Material>[] = [
         </div>
       ) : (
         <Badge
-          variant="outline"
+          variant="secondary"
           className="bg-primary/10 text-primary border-primary/20"
         >
           No Match
@@ -69,7 +69,7 @@ export const materialsColumns: ColumnDef<Material>[] = [
       if (!density)
         return (
           <Badge
-            variant="outline"
+            variant="secondary"
             className="bg-primary/10 text-primary border-primary/20"
           >
             Not Set
