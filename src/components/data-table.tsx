@@ -1,24 +1,5 @@
 "use client";
 
-import React from "react";
-import {
-  ColumnDef,
-  flexRender,
-  getCoreRowModel,
-  useReactTable,
-  getPaginationRowModel,
-  PaginationState,
-  ColumnResizeMode,
-} from "@tanstack/react-table";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import {
   Select,
@@ -27,12 +8,33 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Skeleton } from "@/components/ui/skeleton";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import {
+  ColumnDef,
+  ColumnResizeMode,
+  flexRender,
+  getCoreRowModel,
+  getPaginationRowModel,
+  getSortedRowModel,
+  PaginationState,
+  SortingState,
+  useReactTable,
+} from "@tanstack/react-table";
 import {
   ChevronLeft,
   ChevronRight,
   ChevronsLeft,
   ChevronsRight,
 } from "lucide-react";
+import React from "react";
 
 interface DataTableProps<TData, TValue> {
   columns: ColumnDef<TData, TValue>[];
@@ -54,10 +56,15 @@ export function DataTable<TData, TValue>({
 
   const [columnSizing, setColumnSizing] = React.useState({});
   const [firstColumnWidth, setFirstColumnWidth] = React.useState(0);
+  const [sorting, setSorting] = React.useState<SortingState>([]);
 
   const table = useReactTable({
     data,
-    columns,
+    columns: columns.map((col) => ({
+      ...col,
+      // Enable sorting for all columns by default unless explicitly disabled
+      enableSorting: col.enableSorting !== false,
+    })),
     getCoreRowModel: getCoreRowModel(),
     getPaginationRowModel: getPaginationRowModel(),
     onPaginationChange: setPagination,
@@ -70,12 +77,17 @@ export function DataTable<TData, TValue>({
     state: {
       pagination,
       columnSizing,
+      sorting,
     },
     onColumnSizingChange: setColumnSizing,
+    getSortedRowModel: getSortedRowModel(),
+    onSortingChange: setSorting,
   });
 
   const totalColumnsWidth = React.useMemo(() => {
-    return table.getAllColumns().reduce((acc, column) => acc + column.getSize(), 0);
+    return table
+      .getAllColumns()
+      .reduce((acc, column) => acc + column.getSize(), 0);
   }, [table.getAllColumns()]);
 
   const containerRef = React.useRef<HTMLDivElement>(null);
@@ -162,31 +174,48 @@ export function DataTable<TData, TValue>({
                         width: header.getSize(),
                       }}
                     >
-                      {header.isPlaceholder
-                        ? null
-                        : (
-                          <>
-                            <div
-                              className={`select-none ${header.index === 0 ? "whitespace-normal" : ""}`}
-                              ref={header.index === 0 ? firstColumnRef : undefined}
-                            >
+                      {header.isPlaceholder ? null : (
+                        <>
+                          <div
+                            className={`select-none flex items-center ${
+                              header.index === 0 ? "whitespace-normal" : ""
+                            } ${
+                              header.column.getCanSort() ? "cursor-pointer" : ""
+                            }`}
+                            ref={
+                              header.index === 0 ? firstColumnRef : undefined
+                            }
+                            onClick={header.column.getToggleSortingHandler()}
+                          >
+                            <div className="flex-1">
                               {flexRender(
                                 header.column.columnDef.header,
                                 header.getContext()
                               )}
                             </div>
-                            {header.column.getCanResize() && (
-                              <div
-                                onMouseDown={header.getResizeHandler()}
-                                onTouchStart={header.getResizeHandler()}
-                                className={`resizer ${
-                                  header.column.getIsResizing() ? "isResizing" : ""
-                                }`}
-                                role="separator"
-                              />
+                            {header.column.getCanSort() && (
+                              <span className="ml-2">
+                                {{
+                                  asc: "↑",
+                                  desc: "↓",
+                                }[header.column.getIsSorted() as string] ?? "↕"}
+                              </span>
                             )}
-                          </>
-                        )}
+                          </div>
+                          {header.column.getCanResize() && (
+                            <div
+                              onMouseDown={header.getResizeHandler()}
+                              onTouchStart={header.getResizeHandler()}
+                              className={`resizer ${
+                                header.column.getIsResizing()
+                                  ? "isResizing"
+                                  : ""
+                              }`}
+                              role="separator"
+                            />
+                          )}
+                        </>
+                      )}
                     </TableHead>
                   ))}
                 </TableRow>
@@ -203,7 +232,11 @@ export function DataTable<TData, TValue>({
                           width: cell.column.getSize(),
                         }}
                       >
-                        <div className={cell.column.index === 0 ? "whitespace-normal" : ""}>
+                        <div
+                          className={
+                            cell.column.id === "name" ? "whitespace-normal" : ""
+                          }
+                        >
                           {flexRender(
                             cell.column.columnDef.cell,
                             cell.getContext()

@@ -1,156 +1,112 @@
 "use client";
 
 import { ColumnDef } from "@tanstack/react-table";
+import { Badge } from "@/components/ui/badge";
 
 interface EmissionRow {
-  id: string;
-  kbobMaterial: string;
-  ifcMaterial: string;
-  volume: number;
-  density: number;
-  indicators: {
+  _id: string;
+  name: string;
+  type: string;
+  totalVolume: number;
+  emissions: {
     gwp: number;
     ubp: number;
     penre: number;
   };
-  kbobIndicators: {
-    gwp: number;
-    ubp: number;
-    penre: number;
-  };
+  materials: Array<{
+    material: {
+      name: string;
+      density: number;
+      kbobMatch?: {
+        Name: string;
+        GWP: number;
+        UBP: number;
+        PENRE: number;
+      };
+    };
+    volume: number;
+  }>;
 }
 
-const formatNumber = (value: number, decimalPlaces: number = 2) => {
-  return (
-    value?.toLocaleString("de-CH", {
-      minimumFractionDigits: decimalPlaces,
-      maximumFractionDigits: decimalPlaces,
-    }) ?? "N/A"
-  );
-};
-
-type IndicatorType = "gwp" | "ubp" | "penre";
-
-const indicatorLabels = {
-  gwp: {
-    name: "GWP",
-    unit: "kg CO₂ eq",
-    kbobUnit: "kg CO₂ eq/kg",
-    decimals: 3,
-  },
-  ubp: {
-    name: "UBP",
-    unit: "UBP",
-    kbobUnit: "UBP/kg",
-    decimals: 0,
-  },
-  penre: {
-    name: "PENRE",
-    unit: "MJ",
-    kbobUnit: "MJ/kg",
-    decimals: 3,
-  },
-};
-
-export const emissionsColumns = (selectedIndicator: IndicatorType): ColumnDef<EmissionRow>[] => [
+export const emissionsColumns = (
+  indicator: "gwp" | "ubp" | "penre"
+): ColumnDef<EmissionRow>[] => [
   {
-    accessorKey: "kbobMaterial",
-    header: "KBOB Material",
-    enableResizing: true,
-    size: 250,
-    minSize: 150,
-    cell: ({ row }) => (
-      <div className="truncate">
-        {row.getValue("kbobMaterial") || "Unknown"}
-      </div>
-    ),
+    accessorKey: "name",
+    header: "Element",
   },
   {
-    accessorKey: "ifcMaterial",
-    header: "Ifc Material",
-    enableResizing: true,
-    size: 250,
-    minSize: 150,
-    cell: ({ row }) => (
-      <div className="truncate">
-        {row.getValue("ifcMaterial") || "Unknown"}
-      </div>
-    ),
-  },
-  {
-    accessorKey: "volume",
-    enableResizing: true,
-    size: 130,
-    minSize: 100,
-    header: () => (
-      <div className="text-center">
-        Volume (m³)
-      </div>
-    ),
-    cell: ({ row }) => (
-      <div className="text-center">
-        {formatNumber(row.getValue("volume"), 2)}
-      </div>
-    ),
-  },
-  {
-    accessorKey: "density",
-    enableResizing: true,
-    size: 130,
-    minSize: 100,
-    header: () => (
-      <div className="text-center">
-        Density (kg/m³)
-      </div>
-    ),
-    cell: ({ row }) => (
-      <div className="text-center">
-        {formatNumber(row.getValue("density"), 0)}
-      </div>
-    ),
-  },
-  {
-    accessorKey: "kbobIndicators",
-    id: "kbob_indicator",
-    enableResizing: true,
-    size: 200,
-    minSize: 150,
-    header: () => (
-      <div className="text-center">
-        KBOB {indicatorLabels[selectedIndicator].name} ({indicatorLabels[selectedIndicator].kbobUnit})
-      </div>
-    ),
-    cell: ({ row }) => (
-      <div className="text-center">
-        {formatNumber(
-          row.original.kbobIndicators[selectedIndicator],
-          indicatorLabels[selectedIndicator].decimals
-        )}
-      </div>
-    ),
-  },
-  {
-    accessorKey: "indicators",
-    id: "total_indicator",
-    enableResizing: true,
-    size: 200,
-    minSize: 150,
-    header: () => (
-      <div className="text-center">
-        Total {indicatorLabels[selectedIndicator].name} ({indicatorLabels[selectedIndicator].unit})
-      </div>
-    ),
+    accessorKey: "totalVolume",
+    header: "Volume (m³)",
     cell: ({ row }) => {
-      const volume = row.getValue("volume") as number;
-      const density = row.getValue("density") as number;
-      const indicatorPerKg = row.original.kbobIndicators[selectedIndicator];
-      const total = volume * density * indicatorPerKg;
-      
-      return (
-        <div className="text-center">
-          {formatNumber(total, 0)}
-        </div>
-      );
+      const volume = row.original.totalVolume;
+      return volume.toLocaleString("de-CH", {
+        minimumFractionDigits: 3,
+        maximumFractionDigits: 3,
+      });
+    },
+  },
+  {
+    accessorKey: "materials",
+    header: "Materials",
+    cell: ({ row }) => (
+      <div className="space-y-1">
+        {row.original.materials.map((mat, idx) => {
+          // Calculate emission for this material
+          const volume = mat.volume || 0;
+          const density = mat.material?.density || 0;
+          const kbobValue =
+            mat.material?.kbobMatch?.[
+              indicator === "gwp"
+                ? "GWP"
+                : indicator === "ubp"
+                ? "UBP"
+                : "PENRE"
+            ] || 0;
+          const emission = volume * density * kbobValue;
+
+          return (
+            <div key={idx} className="text-sm">
+              <span className="font-medium">
+                {mat.material?.kbobMatch?.Name ||
+                  mat.material?.name ||
+                  "Unknown"}
+              </span>
+              <span className="text-muted-foreground ml-2">
+                (
+                {emission.toLocaleString("de-CH", {
+                  minimumFractionDigits: 0,
+                  maximumFractionDigits: 0,
+                })}{" "}
+                {indicator === "gwp"
+                  ? "kg CO₂ eq"
+                  : indicator === "ubp"
+                  ? "UBP"
+                  : "kWh oil-eq"}
+                )
+              </span>
+            </div>
+          );
+        })}
+      </div>
+    ),
+  },
+  {
+    accessorKey: `emissions.${indicator}`,
+    header: () => {
+      const label = {
+        gwp: "GWP (kg CO₂ eq)",
+        ubp: "UBP",
+        penre: "PENRE (kWh oil-eq)",
+      }[indicator];
+      return label;
+    },
+    cell: ({ row }) => {
+      const value = row.original.emissions[indicator];
+      return value.toLocaleString("de-CH", {
+        minimumFractionDigits: 0,
+        maximumFractionDigits: 0,
+      });
     },
   },
 ];

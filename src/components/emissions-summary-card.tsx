@@ -1,7 +1,5 @@
 "use client";
 
-import { useState } from "react";
-import { BarChart2 } from "lucide-react";
 import {
   Select,
   SelectContent,
@@ -9,20 +7,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { useProjectEmissions } from "@/hooks/use-project-emissions";
+import type { Project } from "@/hooks/use-project-emissions";
+import { useState } from "react";
 
-type EmissionsProps = {
-  gwp: number;
-  ubp: number;
-  penre: number;
-};
-
-type MetricKey = keyof EmissionsProps;
+type MetricKey = "gwp" | "ubp" | "penre";
 
 const metrics: Record<
   MetricKey,
@@ -45,40 +34,35 @@ const metrics: Record<
   },
 };
 
-export function EmissionsSummaryCard({ emissions }: { emissions?: EmissionsProps }) {
+export function EmissionsSummaryCard({ project }: { project?: Project }) {
   const [metric, setMetric] = useState<MetricKey>("gwp");
+  const { totals, formatted, units } = useProjectEmissions(project);
 
-
-  if (!emissions) {
+  if (!project?.elements?.length) {
     return (
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-sm font-medium">Tracked Emissions</CardTitle>
-          <BarChart2 className="h-4 w-4 text-muted-foreground" />
-        </CardHeader>
-        <CardContent>
-          <div className="text-sm text-muted-foreground">
-            No emissions data available
-          </div>
-        </CardContent>
-      </Card>
+      <div className="flex flex-col justify-center text-center py-4">
+        <div className="text-sm text-muted-foreground">
+          No emissions data available
+        </div>
+      </div>
     );
   }
 
-  const currentValue = emissions[metric];
+  const currentValue = totals[metric];
+  const unit = units[metric];
+  const currentMetric = metrics[metric];
 
   const MILLION = 1_000_000;
-  
   let formattedValue: string;
-  let unit = metrics[metric].unit;
-  
+  let displayUnit = unit;
+
   if (currentValue >= MILLION) {
     formattedValue = (currentValue / MILLION).toLocaleString("de-CH", {
       maximumFractionDigits: 3,
       minimumFractionDigits: 1,
       useGrouping: true,
     });
-    formattedValue = `${formattedValue} Mio.`;
+    displayUnit = `Mio. ${unit}`;
   } else {
     formattedValue = currentValue.toLocaleString("de-CH", {
       maximumFractionDigits: 0,
@@ -86,39 +70,46 @@ export function EmissionsSummaryCard({ emissions }: { emissions?: EmissionsProps
     });
   }
 
+  // Calculate dynamic text size based on number length
+  const getTextSize = (value: string) => {
+    const length = value.length;
+    if (length <= 4) return "text-[clamp(3rem,min(16vw,12vh),8rem)]";
+    if (length <= 6) return "text-[clamp(2.5rem,min(14vw,10vh),7rem)]";
+    if (length <= 8) return "text-[clamp(2rem,min(12vw,8vh),6rem)]";
+    return "text-[clamp(1.75rem,min(10vw,6vh),5rem)]";
+  };
+
   return (
-    <Card className="group h-full">
-      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-        <CardTitle className="text-sm font-medium">Tracked Emissions</CardTitle>
-        <BarChart2 className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors" />
-      </CardHeader>
-      <CardContent>
-        <div className="flex flex-col h-full">
-          <div className="flex flex-col justify-center flex-1 min-h-0">
-            <p className="text-2xl font-bold group-hover:text-primary transition-colors">
-              {formattedValue}
-              <span className="text-sm font-normal text-muted-foreground ml-1">
-                {unit}
-              </span>
-            </p>
-          </div>
-          <Select
-          value={metric}
-          onValueChange={(value) => setMetric(value as MetricKey)}
+    <div className="flex flex-col h-[calc(100%-2rem)]">
+      <div className="flex-1 flex flex-col justify-center min-h-0">
+        <p
+          className={`${getTextSize(
+            formattedValue
+          )} font-bold leading-[0.9] mb-1 group-hover:text-primary transition-colors text-center`}
         >
-          <SelectTrigger className="w-full mt-2">
-            <SelectValue placeholder="Select metric" />
-          </SelectTrigger>
-            <SelectContent>
-              {Object.entries(metrics).map(([key, { description }]) => (
-                <SelectItem key={key} value={key}>
-                  {description}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-      </CardContent>
-    </Card>
+          {formattedValue}
+        </p>
+        <p className="text-sm text-muted-foreground/80 group-hover:text-primary/70 transition-colors text-center">
+          {displayUnit}
+        </p>
+      </div>
+      <Select
+        value={metric}
+        onValueChange={(value) => setMetric(value as MetricKey)}
+      >
+        <SelectTrigger className="w-full text-sm">
+          <SelectValue placeholder="Select metric">
+            {currentMetric.description}
+          </SelectValue>
+        </SelectTrigger>
+        <SelectContent>
+          {Object.entries(metrics).map(([key, { description }]) => (
+            <SelectItem key={key} value={key} className="text-sm">
+              {description}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+    </div>
   );
 }

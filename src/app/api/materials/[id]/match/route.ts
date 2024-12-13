@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { connectToDatabase } from "@/lib/mongodb";
-import { Material } from "@/models";
+import { Material, Project } from "@/models";
 import mongoose from "mongoose";
 import { auth } from "@clerk/nextjs/server";
 
@@ -17,7 +17,33 @@ export async function POST(
     await connectToDatabase();
     const { kbobId } = await request.json();
 
-    const material = await Material.findByIdAndUpdate(
+    // Get the material first to check project ownership
+    const material = await Material.findById(params.id)
+      .select("projectId")
+      .lean();
+
+    if (!material) {
+      return NextResponse.json(
+        { error: "Material not found" },
+        { status: 404 }
+      );
+    }
+
+    // Verify user has access to this project
+    const project = await Project.findOne({
+      _id: material.projectId,
+      userId
+    }).lean();
+
+    if (!project) {
+      return NextResponse.json(
+        { error: "Not authorized to modify this material" },
+        { status: 403 }
+      );
+    }
+
+    // Update the material with KBOB match
+    const updatedMaterial = await Material.findByIdAndUpdate(
       params.id,
       {
         $set: {
@@ -27,28 +53,28 @@ export async function POST(
       { new: true }
     ).populate("kbobMatchId");
 
-    if (!material) {
+    if (!updatedMaterial) {
       return NextResponse.json(
-        { error: "Material not found" },
-        { status: 404 }
+        { error: "Failed to update material" },
+        { status: 500 }
       );
     }
 
     return NextResponse.json({
-      id: material._id.toString(),
-      name: material.name,
-      category: material.category,
-      volume: material.volume,
-      kbobMatch: material.kbobMatchId
+      id: updatedMaterial._id.toString(),
+      name: updatedMaterial.name,
+      category: updatedMaterial.category,
+      volume: updatedMaterial.volume,
+      kbobMatch: updatedMaterial.kbobMatchId
         ? {
-            id: material.kbobMatchId._id.toString(),
-            name: material.kbobMatchId.Name,
-            indicators: {
-              gwp: material.kbobMatchId.GWP,
-              ubp: material.kbobMatchId.UBP,
-              penre: material.kbobMatchId.PENRE,
-            },
-          }
+          id: updatedMaterial.kbobMatchId._id.toString(),
+          name: updatedMaterial.kbobMatchId.Name,
+          indicators: {
+            gwp: updatedMaterial.kbobMatchId.GWP,
+            ubp: updatedMaterial.kbobMatchId.UBP,
+            penre: updatedMaterial.kbobMatchId.PENRE,
+          },
+        }
         : null,
     });
   } catch (error) {

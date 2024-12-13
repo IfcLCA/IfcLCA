@@ -1,14 +1,9 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectContent,
@@ -17,73 +12,59 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Label } from "@/components/ui/label";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Input } from "@/components/ui/input";
+import { PrinterIcon } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
 import {
-  Command,
-  CommandEmpty,
-  CommandGroup,
-  CommandInput,
-  CommandItem,
-  CommandList,
-} from "@/components/ui/command";
-import {
-  ChartContainer,
-  ChartTooltip,
-  ChartTooltipContent,
-} from "@/components/ui/chart";
-import {
-  BarChart,
   Bar,
-  XAxis,
-  YAxis,
+  BarChart,
   CartesianGrid,
-  Tooltip,
-  Legend,
-  ResponsiveContainer,
-  Line,
-  LineChart,
-  PieChart,
-  Pie,
   Cell,
   LabelList,
-  ScatterChart,
+  Line,
+  LineChart,
+  Pie,
+  PieChart,
+  ResponsiveContainer,
   Scatter,
-  ComposedChart,
-  ZAxis
+  ScatterChart,
+  Tooltip,
+  XAxis,
+  YAxis,
+  ZAxis,
 } from "recharts";
-import { PrinterIcon } from "lucide-react";
+
+type ColorTheme = "standard" | "bw" | "colorful";
 
 interface MaterialData {
   name: string;
+  elementName: string;
+  ifcMaterial: string;
+  kbobMaterial?: string;
+  category?: string;
   volume: number;
-  indicators?: {
+  indicators: {
     gwp: number;
     ubp: number;
     penre: number;
   };
-  kbobMaterial?: string;
-  ifcMaterial?: string;
-  category?: string;
 }
 
-type GroupingMode = 'elements' | 'kbobMaterials' | 'ifcMaterials';
+type GroupingMode = "elements" | "kbobMaterials" | "ifcMaterials" | "ifcEntity";
 
 interface Props {
-  materialsData?: MaterialData[];
+  materialsData: MaterialData[];
 }
 
-export function GraphPageComponent({
-  materialsData,
-}: Props) {
+export function GraphPageComponent({ materialsData }: Props) {
   const [selectedIndicator, setSelectedIndicator] = useState<string>("gwp");
   const [selectedMaterials, setSelectedMaterials] = useState<string[]>([]);
-  const [chartType, setChartType] = useState<"bar" | "line" | "pie" | "bubble">("bar");
+  const [chartType, setChartType] = useState<"bar" | "line" | "pie" | "bubble">(
+    "bar"
+  );
   const [groupingMode, setGroupingMode] = useState<GroupingMode>("elements");
   const [chartData, setChartData] = useState<any[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
-  const [colorTheme, setColorTheme] = useState<ColorTheme>('standard');
+  const [colorTheme, setColorTheme] = useState<ColorTheme>("colorful");
 
   // Memoize the unique materials to prevent unnecessary recalculations
   const uniqueMaterials = useMemo(() => {
@@ -92,14 +73,17 @@ export function GraphPageComponent({
     const materials = new Map<string, MaterialData>();
     materialsData.forEach((material) => {
       // Determine the key based on grouping mode
-      const key = groupingMode === 'kbobMaterials' ? 
-        (material.kbobMaterial || 'Unknown KBOB Material') :
-        groupingMode === 'ifcMaterials' ? 
-        (material.ifcMaterial || 'Unknown Ifc Material') :
-        material.name;
+      const key =
+        groupingMode === "kbobMaterials"
+          ? material.kbobMaterial || "Unknown KBOB Material"
+          : groupingMode === "ifcMaterials"
+          ? material.ifcMaterial || "Unknown Ifc Material"
+          : groupingMode === "ifcEntity"
+          ? material.category || "Unknown Entity Type"
+          : material.name || "Unnamed Element";
 
       const existingMaterial = materials.get(key);
-      
+
       if (!existingMaterial) {
         materials.set(key, {
           name: key,
@@ -107,22 +91,28 @@ export function GraphPageComponent({
           indicators: {
             gwp: material.indicators?.gwp || 0,
             ubp: material.indicators?.ubp || 0,
-            penre: material.indicators?.penre || 0
+            penre: material.indicators?.penre || 0,
           },
           category: material.category,
           kbobMaterial: material.kbobMaterial,
-          ifcMaterial: material.ifcMaterial
+          ifcMaterial: material.ifcMaterial,
         });
       } else {
-        // Aggregate volumes and indicators
+        // Aggregate volumes and indicators for the same element
         materials.set(key, {
           ...existingMaterial,
           volume: (existingMaterial.volume || 0) + (material.volume || 0),
           indicators: {
-            gwp: (existingMaterial.indicators?.gwp || 0) + (material.indicators?.gwp || 0),
-            ubp: (existingMaterial.indicators?.ubp || 0) + (material.indicators?.ubp || 0),
-            penre: (existingMaterial.indicators?.penre || 0) + (material.indicators?.penre || 0)
-          }
+            gwp:
+              (existingMaterial.indicators?.gwp || 0) +
+              (material.indicators?.gwp || 0),
+            ubp:
+              (existingMaterial.indicators?.ubp || 0) +
+              (material.indicators?.ubp || 0),
+            penre:
+              (existingMaterial.indicators?.penre || 0) +
+              (material.indicators?.penre || 0),
+          },
         });
       }
     });
@@ -142,7 +132,7 @@ export function GraphPageComponent({
 
     const filteredData = Array.from(uniqueMaterials.values())
       .filter((material) => selectedMaterials.includes(material.name))
-      .map(material => ({
+      .map((material) => ({
         name: material.name,
         volume: material.volume || 0,
         gwp: material.indicators?.gwp || 0,
@@ -150,20 +140,18 @@ export function GraphPageComponent({
         penre: material.indicators?.penre || 0,
         category: material.category,
         kbobMaterial: material.kbobMaterial,
-        ifcMaterial: material.ifcMaterial
+        ifcMaterial: material.ifcMaterial,
       }))
       .sort((a, b) => b[selectedIndicator] - a[selectedIndicator]);
 
     setChartData(filteredData);
   }, [uniqueMaterials, selectedMaterials, selectedIndicator]);
 
-  const formatValue = (value: number | null | undefined, selectedIndicator: string) => {
-    if (value === null || value === undefined) return '0';
-
-    // Convert PENRE from MJ to kWh if needed
-    if (selectedIndicator === 'penre') {
-      value = value / 3.6; // Convert MJ to kWh (1 kWh = 3.6 MJ)
-    }
+  const formatValue = (
+    value: number | null | undefined,
+    selectedIndicator: string
+  ) => {
+    if (value === null || value === undefined) return "0";
 
     if (Math.abs(value) >= 1_000_000) {
       return `${(value / 1_000_000).toFixed(1)}M`;
@@ -175,14 +163,14 @@ export function GraphPageComponent({
 
   const getIndicatorUnit = (indicator: string) => {
     switch (indicator) {
-      case 'gwp':
-        return 'kg CO₂ eq';
-      case 'ubp':
-        return 'UBP';
-      case 'penre':
-        return 'kWh';
+      case "gwp":
+        return "kg CO₂ eq";
+      case "ubp":
+        return "UBP";
+      case "penre":
+        return "kWh";
       default:
-        return '';
+        return "";
     }
   };
 
@@ -195,18 +183,18 @@ export function GraphPageComponent({
   };
 
   const handlePrint = () => {
-    const printWindow = window.open('', '_blank');
+    const printWindow = window.open("", "_blank");
     if (!printWindow) return;
 
-    const chartContainer = document.querySelector('.recharts-wrapper');
+    const chartContainer = document.querySelector(".recharts-wrapper");
     if (!chartContainer) return;
 
-    const chartSvg = chartContainer.querySelector('svg')?.outerHTML;
+    const chartSvg = chartContainer.querySelector("svg")?.outerHTML;
     if (!chartSvg) return;
 
     const date = new Date().toLocaleDateString();
     const time = new Date().toLocaleTimeString();
-    
+
     printWindow.document.write(`
       <html>
         <head>
@@ -305,10 +293,18 @@ export function GraphPageComponent({
           </div>
 
           <div class="metadata">
-            <div><strong>Indicator:</strong> ${selectedIndicator.toUpperCase()} (${getIndicatorUnit(selectedIndicator)})</div>
-            <div><strong>Chart Type:</strong> ${chartType.charAt(0).toUpperCase() + chartType.slice(1)} Chart</div>
-            <div><strong>Materials Selected:</strong> ${selectedMaterials.length}</div>
-            <div><strong>Total Volume:</strong> ${chartData.reduce((sum, item) => sum + item.volume, 0).toFixed(2)} m³</div>
+            <div><strong>Indicator:</strong> ${selectedIndicator.toUpperCase()} (${getIndicatorUnit(
+      selectedIndicator
+    )})</div>
+            <div><strong>Chart Type:</strong> ${
+              chartType.charAt(0).toUpperCase() + chartType.slice(1)
+            } Chart</div>
+            <div><strong>Materials Selected:</strong> ${
+              selectedMaterials.length
+            }</div>
+            <div><strong>Total Volume:</strong> ${chartData
+              .reduce((sum, item) => sum + item.volume, 0)
+              .toFixed(2)} m³</div>
           </div>
 
           <div class="chart-container">
@@ -320,19 +316,27 @@ export function GraphPageComponent({
               <tr>
                 <th>Material</th>
                 <th style="text-align: right">Volume (m³)</th>
-                <th style="text-align: right">${selectedIndicator.toUpperCase()} (${getIndicatorUnit(selectedIndicator)})</th>
+                <th style="text-align: right">${selectedIndicator.toUpperCase()} (${getIndicatorUnit(
+      selectedIndicator
+    )})</th>
               </tr>
             </thead>
             <tbody>
               ${chartData
                 .sort((a, b) => b[selectedIndicator] - a[selectedIndicator])
-                .map(item => `
+                .map(
+                  (item) => `
                   <tr>
                     <td>${item.name}</td>
                     <td style="text-align: right">${item.volume.toFixed(2)}</td>
-                    <td style="text-align: right">${formatValue(item[selectedIndicator], selectedIndicator)}</td>
+                    <td style="text-align: right">${formatValue(
+                      item[selectedIndicator],
+                      selectedIndicator
+                    )}</td>
                   </tr>
-                `).join('')}
+                `
+                )
+                .join("")}
             </tbody>
           </table>
 
@@ -348,7 +352,7 @@ export function GraphPageComponent({
   const renderChart = () => {
     const commonProps = {
       data: chartData,
-      margin: { top: 20, right: 30, left: 60, bottom: 120 }
+      margin: { top: 20, right: 30, left: 60, bottom: 120 },
     };
 
     const commonTooltip = {
@@ -358,41 +362,70 @@ export function GraphPageComponent({
           return (
             <div className="rounded-lg border bg-background p-2 shadow-md">
               <p className="font-semibold">{data.name}</p>
-              <p>{`${selectedIndicator.toUpperCase()}: ${formatValue(data[selectedIndicator], selectedIndicator)} ${getIndicatorUnit(selectedIndicator)}`}</p>
+              <p>{`${selectedIndicator.toUpperCase()}: ${formatValue(
+                data[selectedIndicator],
+                selectedIndicator
+              )} ${getIndicatorUnit(selectedIndicator)}`}</p>
               <p>{`Volume: ${data.volume.toFixed(2)} m³`}</p>
             </div>
           );
         }
         return null;
-      }
+      },
     };
 
     // Get color based on theme and index
     const getColor = (index: number, value?: number) => {
       switch (colorTheme) {
-        case 'standard':
-          return 'hsl(var(--primary))'; // Orange theme color
-        case 'bw':
-          return '#000000';
-        case 'colorful':
-          // Get the value for gradient calculation
+        case "standard":
+          // Use fixed opacity steps for better visibility
+          const opacitySteps = [
+            1, 0.9, 0.8, 0.7, 0.6, 0.5, 0.4, 0.35, 0.3, 0.25,
+          ];
+
+          if (chartType === "bubble" && value !== undefined) {
+            // For bubble chart, calculate opacity based on the emission value
+            const minValue = Math.min(
+              ...chartData.map((item) => item[selectedIndicator] || 0)
+            );
+            const maxValue = Math.max(
+              ...chartData.map((item) => item[selectedIndicator] || 0)
+            );
+            const normalizedValue = (value - minValue) / (maxValue - minValue);
+            const opacity = 0.25 + normalizedValue * 0.75; // Scale between 0.25 and 1.0
+            return `rgba(255, 100, 0, ${opacity})`;
+          }
+
+          // For other chart types, use the index-based opacity steps
+          const opacity =
+            opacitySteps[index] || opacitySteps[opacitySteps.length - 1];
+          return `rgba(255, 100, 0, ${opacity})`;
+        case "bw":
+          const isDarkMode =
+            document.documentElement.classList.contains("dark");
+          return isDarkMode ? "#FFFFFF" : "#000000";
+        case "colorful":
+          // Rest of the colorful theme code remains the same
           let gradientValue: number;
           if (value !== undefined) {
             gradientValue = value;
           } else if (chartData[index]) {
             gradientValue = chartData[index][selectedIndicator] || 0;
           } else {
-            return '#ff7f0e'; // Fallback to orange if no value available
+            return "#1f77b4";
           }
 
-          // Calculate gradient color based on emission value
-          const minValue = Math.min(...chartData.map(item => item[selectedIndicator] || 0));
-          const maxValue = Math.max(...chartData.map(item => item[selectedIndicator] || 0));
-          const normalizedValue = (gradientValue - minValue) / (maxValue - minValue);
-          
-          // Interpolate from red (high emissions) to more muted green (low emissions)
+          const minValue = Math.min(
+            ...chartData.map((item) => item[selectedIndicator] || 0)
+          );
+          const maxValue = Math.max(
+            ...chartData.map((item) => item[selectedIndicator] || 0)
+          );
+          const normalizedValue =
+            (gradientValue - minValue) / (maxValue - minValue);
+
           const red = Math.round(255 * normalizedValue);
-          const green = Math.round(120 + (30 * (1 - normalizedValue)));
+          const green = Math.round(120 + 30 * (1 - normalizedValue));
           const blue = Math.round(90 * (1 - normalizedValue));
           return `rgb(${red}, ${green}, ${blue})`;
       }
@@ -407,19 +440,46 @@ export function GraphPageComponent({
               dataKey="name"
               height={120}
               interval={0}
-              tick={{ angle: -45, textAnchor: 'end', fontSize: 12, fill: '#000000' }}
+              tick={(props) => {
+                const { x, y, payload } = props;
+                if (chartData.length > 50) return null;
+
+                return (
+                  <g transform={`translate(${x},${y})`}>
+                    <text
+                      x={0}
+                      y={0}
+                      dy={16}
+                      textAnchor="end"
+                      fill="hsl(var(--foreground))"
+                      fontSize={12}
+                      transform="rotate(-45)"
+                    >
+                      {payload.value}
+                    </text>
+                  </g>
+                );
+              }}
             />
             <YAxis
               tickFormatter={(value) => formatValue(value, selectedIndicator)}
               width={60}
-              tick={{ fontSize: 12, fill: '#000000' }}
+              tick={{
+                fontSize: 12,
+                fill: "hsl(var(--foreground))",
+              }}
             />
             <YAxis
               yAxisId="right"
               orientation="right"
               tick={false}
               axisLine={false}
-              label={{ value: getIndicatorUnit(selectedIndicator), angle: -90, position: 'insideRight', fill: '#000000' }}
+              label={{
+                value: getIndicatorUnit(selectedIndicator),
+                angle: -90,
+                position: "insideRight",
+                fill: "hsl(var(--foreground))",
+              }}
             />
             <Tooltip {...commonTooltip} />
             <Bar
@@ -428,7 +488,10 @@ export function GraphPageComponent({
               radius={[4, 4, 0, 0]}
             >
               {chartData.map((entry, index) => (
-                <Cell key={`cell-${index}`} fill={getColor(index, entry[selectedIndicator])} />
+                <Cell
+                  key={`cell-${index}`}
+                  fill={getColor(index, entry[selectedIndicator])}
+                />
               ))}
             </Bar>
           </BarChart>
@@ -438,18 +501,43 @@ export function GraphPageComponent({
         return (
           <LineChart {...commonProps}>
             <CartesianGrid strokeDasharray="3 3" />
-            <XAxis dataKey="name" />
+            <XAxis
+              dataKey="name"
+              height={120}
+              interval={0}
+              tick={(props) => {
+                const { x, y, payload } = props;
+                if (chartData.length > 50) return null;
+
+                return (
+                  <g transform={`translate(${x},${y})`}>
+                    <text
+                      x={0}
+                      y={0}
+                      dy={16}
+                      textAnchor="end"
+                      fill="hsl(var(--foreground))"
+                      fontSize={12}
+                      transform="rotate(-45)"
+                    >
+                      {payload.value}
+                    </text>
+                  </g>
+                );
+              }}
+            />
             <YAxis
-              tickFormatter={(value) =>
-                formatValue(value, selectedIndicator)
-              }
+              tickFormatter={(value) => formatValue(value, selectedIndicator)}
+              tick={{
+                fill: "hsl(var(--foreground))",
+              }}
               label={{
                 value: `${selectedIndicator.toUpperCase()} (${getIndicatorUnit(
                   selectedIndicator
                 )})`,
                 angle: -90,
                 position: "left",
-                fill: "#000000",
+                fill: "hsl(var(--foreground))",
                 offset: 5,
               }}
             />
@@ -457,8 +545,20 @@ export function GraphPageComponent({
             <Line
               type="monotone"
               dataKey={selectedIndicator}
-              stroke={colorTheme === 'bw' ? '#000000' : getColor(0, chartData[0] && chartData[0][selectedIndicator])}
-              dot={{ fill: colorTheme === 'bw' ? '#000000' : getColor(0, chartData[0] && chartData[0][selectedIndicator]) }}
+              stroke={
+                colorTheme === "bw"
+                  ? "#000000"
+                  : getColor(0, chartData[0] && chartData[0][selectedIndicator])
+              }
+              dot={{
+                fill:
+                  colorTheme === "bw"
+                    ? "#000000"
+                    : getColor(
+                        0,
+                        chartData[0] && chartData[0][selectedIndicator]
+                      ),
+              }}
               activeDot={{ r: 8 }}
             />
           </LineChart>
@@ -474,7 +574,29 @@ export function GraphPageComponent({
               cx="50%"
               cy="50%"
               outerRadius={150}
-              label={({ name, percent }) => `${name} (${(percent * 100).toFixed(1)}%)`}
+              labelLine={({ percent }) => {
+                // Hide label lines for the same conditions as labels
+                const minPercent =
+                  chartData.length > 50
+                    ? 0.01
+                    : chartData.length > 20
+                    ? 0.02
+                    : 0;
+                return percent > minPercent;
+              }}
+              label={({ name, percent }) => {
+                // Only show label if the slice is more than 2% of the total for datasets > 20 items
+                // or more than 1% for datasets > 50 items
+                const minPercent =
+                  chartData.length > 50
+                    ? 0.01
+                    : chartData.length > 20
+                    ? 0.02
+                    : 0;
+                return percent > minPercent
+                  ? `${name} (${(percent * 100).toFixed(1)}%)`
+                  : "";
+              }}
             >
               {chartData.map((entry, index) => (
                 <Cell
@@ -489,20 +611,23 @@ export function GraphPageComponent({
 
       case "bubble":
         // Transform data for bubble chart
-        const bubbleData = chartData.map(item => ({
+        const bubbleData = chartData.map((item) => ({
           name: item.name,
-          x: item.volume || 0,  // X-axis is always volume
-          y: item[selectedIndicator] || 0,  // Y-axis is the selected indicator
-          z: item.volume || 0,  // Z-axis (bubble size) is volume
-          label: `${item.name}\n${formatValue(item[selectedIndicator] || 0, selectedIndicator)}`
+          x: item.volume || 0, // X-axis is always volume
+          y: item[selectedIndicator] || 0, // Y-axis is the selected indicator
+          z: item.volume || 0, // Z-axis (bubble size) is volume
+          label: `${item.name}\n${formatValue(
+            item[selectedIndicator] || 0,
+            selectedIndicator
+          )}`,
         }));
 
         // Calculate domain for bubble sizing
         const volumeDomain = [
-          Math.min(...bubbleData.map(item => item.z)),
-          Math.max(...bubbleData.map(item => item.z))
+          Math.min(...bubbleData.map((item) => item.z)),
+          Math.max(...bubbleData.map((item) => item.z)),
         ];
-        const sizeRange = [400, 4000];  // Min and max bubble sizes in pixels
+        const sizeRange = [400, 4000]; // Min and max bubble sizes in pixels
 
         return (
           <ScatterChart {...commonProps}>
@@ -512,11 +637,14 @@ export function GraphPageComponent({
               type="number"
               name="Volume"
               tickFormatter={(value) => `${value.toFixed(1)}`}
-              label={{ 
+              tick={{
+                fill: "hsl(var(--foreground))",
+              }}
+              label={{
                 value: "Volume (m³)",
-                position: 'bottom',
-                fill: '#000000',
-                offset: 5
+                position: "bottom",
+                fill: "hsl(var(--foreground))",
+                offset: 5,
               }}
             />
             <YAxis
@@ -524,18 +652,23 @@ export function GraphPageComponent({
               type="number"
               name={selectedIndicator}
               tickFormatter={(value) => formatValue(value, selectedIndicator)}
-              label={{ 
-                value: `${selectedIndicator.toUpperCase()} (${getIndicatorUnit(selectedIndicator)})`,
+              tick={{
+                fill: "hsl(var(--foreground))",
+              }}
+              label={{
+                value: `${selectedIndicator.toUpperCase()} (${getIndicatorUnit(
+                  selectedIndicator
+                )})`,
                 angle: -90,
-                position: 'left',
-                fill: '#000000',
-                offset: 5
+                position: "left",
+                fill: "hsl(var(--foreground))",
+                offset: 5,
               }}
             />
-            <ZAxis 
-              dataKey="z" 
-              type="number" 
-              range={sizeRange} 
+            <ZAxis
+              dataKey="z"
+              type="number"
+              range={sizeRange}
               domain={volumeDomain}
             />
             <Tooltip
@@ -546,30 +679,26 @@ export function GraphPageComponent({
                     <div className="rounded-lg border bg-background p-2 shadow-md">
                       <p className="font-semibold">{data.name}</p>
                       <p>{`Volume: ${data.z.toFixed(2)} m³`}</p>
-                      <p>{`${selectedIndicator.toUpperCase()}: ${formatValue(data.y, selectedIndicator)} ${getIndicatorUnit(selectedIndicator)}`}</p>
+                      <p>{`${selectedIndicator.toUpperCase()}: ${formatValue(
+                        data.y,
+                        selectedIndicator
+                      )} ${getIndicatorUnit(selectedIndicator)}`}</p>
                     </div>
                   );
                 }
                 return null;
               }}
             />
-            <Scatter 
-              name="Materials" 
-              data={bubbleData}
-              fillOpacity={0.7}
-            >
+            <Scatter name="Materials" data={bubbleData} fillOpacity={0.7}>
               {bubbleData.map((entry, index) => (
-                <Cell 
-                  key={`cell-${index}`} 
-                  fill={getColor(index, entry.y)}
-                />
+                <Cell key={`cell-${index}`} fill={getColor(index, entry.y)} />
               ))}
-              {window.matchMedia('print').matches && (
+              {window.matchMedia("print").matches && (
                 <LabelList
                   dataKey="label"
                   position="center"
                   fill="#000000"
-                  style={{ fontSize: '12px', fontWeight: 'bold' }}
+                  style={{ fontSize: "12px", fontWeight: "bold" }}
                 />
               )}
             </Scatter>
@@ -577,6 +706,22 @@ export function GraphPageComponent({
         );
       default:
         return null;
+    }
+  };
+
+  // Add a helper function to get the appropriate label
+  const getSelectionLabel = (groupingMode: GroupingMode) => {
+    switch (groupingMode) {
+      case "elements":
+        return "elements";
+      case "kbobMaterials":
+        return "KBOB materials";
+      case "ifcMaterials":
+        return "Ifc materials";
+      case "ifcEntity":
+        return "Ifc entities";
+      default:
+        return "items";
     }
   };
 
@@ -598,17 +743,20 @@ export function GraphPageComponent({
           <div className="flex flex-col gap-4">
             <div className="flex gap-4 items-start">
               <div className="flex-1">
-                <Label className="mb-2 block">Materials</Label>
+                <Label className="mb-2 block">Selection</Label>
                 <Select
                   value={JSON.stringify(selectedMaterials)}
                   onValueChange={(value) => {
                     const materials = JSON.parse(value);
-                    setSelectedMaterials(Array.isArray(materials) ? materials : [materials]);
+                    setSelectedMaterials(
+                      Array.isArray(materials) ? materials : [materials]
+                    );
                   }}
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="Select materials">
-                      {selectedMaterials.length} material{selectedMaterials.length !== 1 ? 's' : ''} selected
+                      {selectedMaterials.length}{" "}
+                      {getSelectionLabel(groupingMode)} selected
                     </SelectValue>
                   </SelectTrigger>
                   <SelectContent>
@@ -625,21 +773,37 @@ export function GraphPageComponent({
                         <div
                           className="relative flex cursor-default select-none items-center rounded-sm px-2 py-1.5 text-sm outline-none hover:bg-accent hover:text-accent-foreground"
                           onClick={() => {
-                            const allMaterials = Array.from(uniqueMaterials.keys());
+                            const allMaterials = Array.from(
+                              uniqueMaterials.keys()
+                            );
                             setSelectedMaterials(
-                              selectedMaterials.length === allMaterials.length ? [] : allMaterials
+                              selectedMaterials.length === allMaterials.length
+                                ? []
+                                : allMaterials
                             );
                           }}
                         >
                           <Checkbox
-                            checked={selectedMaterials.length === Array.from(uniqueMaterials.keys()).length}
+                            checked={
+                              selectedMaterials.length ===
+                              Array.from(uniqueMaterials.keys()).length
+                            }
                             className="mr-2"
                           />
-                          <span>Select All</span>
+                          <span>
+                            Select All {getSelectionLabel(groupingMode)}
+                          </span>
                         </div>
                         {Array.from(uniqueMaterials.entries())
                           .sort((a, b) => b[1].volume - a[1].volume)
-                          .filter(([name]) => name.toLowerCase().includes(searchTerm.toLowerCase()))
+                          .filter(
+                            ([name]) =>
+                              name &&
+                              typeof name === "string" &&
+                              name
+                                .toLowerCase()
+                                .includes(searchTerm.toLowerCase())
+                          )
                           .map(([name, material]) => (
                             <div
                               key={name}
@@ -650,7 +814,9 @@ export function GraphPageComponent({
                                 checked={selectedMaterials.includes(name)}
                                 className="mr-2"
                               />
-                              <span className="flex-1 truncate">{name}</span>
+                              <span className="flex-1 truncate">
+                                {name || "Unnamed Element"}
+                              </span>
                               {material.volume > 0 && (
                                 <span className="ml-2 text-muted-foreground">
                                   ({material.volume.toFixed(2)} m³)
@@ -673,14 +839,15 @@ export function GraphPageComponent({
                     <SelectValue placeholder="Select indicator" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="gwp">Global Warming Potential</SelectItem>
-                    <SelectItem value="odp">Ozone Depletion Potential</SelectItem>
-                    <SelectItem value="ap">Acidification Potential</SelectItem>
-                    <SelectItem value="ep">Eutrophication Potential</SelectItem>
-                    <SelectItem value="pocp">Photochemical Ozone Creation Potential</SelectItem>
-                    <SelectItem value="penrt">Total Non-Renewable Primary Energy</SelectItem>
-                    <SelectItem value="pert">Total Renewable Primary Energy</SelectItem>
-                    <SelectItem value="ubp">Environmental Impact Points</SelectItem>
+                    <SelectItem value="gwp">
+                      Global Warming Potential (kg CO₂ eq)
+                    </SelectItem>
+                    <SelectItem value="ubp">
+                      Environmental Impact Points (UBP)
+                    </SelectItem>
+                    <SelectItem value="penre">
+                      Primary Energy Non-Renewable (kWh oil-eq)
+                    </SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -711,8 +878,15 @@ export function GraphPageComponent({
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="elements">Group by Elements</SelectItem>
-                    <SelectItem value="kbobMaterials">Group by KBOB Materials</SelectItem>
-                    <SelectItem value="ifcMaterials">Group by Ifc Materials</SelectItem>
+                    <SelectItem value="kbobMaterials">
+                      Group by KBOB Materials
+                    </SelectItem>
+                    <SelectItem value="ifcMaterials">
+                      Group by Ifc Materials
+                    </SelectItem>
+                    <SelectItem value="ifcEntity">
+                      Group by Ifc Entity
+                    </SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -728,25 +902,25 @@ export function GraphPageComponent({
             <div className="flex items-center gap-4">
               <div className="flex items-center rounded-md border bg-muted p-1">
                 <Button
-                  variant={colorTheme === 'standard' ? 'default' : 'ghost'}
+                  variant={colorTheme === "standard" ? "default" : "ghost"}
                   size="sm"
-                  onClick={() => setColorTheme('standard')}
+                  onClick={() => setColorTheme("standard")}
                   className="px-3"
                 >
                   <div className="h-4 w-4 rounded-full bg-primary" />
                 </Button>
                 <Button
-                  variant={colorTheme === 'bw' ? 'default' : 'ghost'}
+                  variant={colorTheme === "bw" ? "default" : "ghost"}
                   size="sm"
-                  onClick={() => setColorTheme('bw')}
+                  onClick={() => setColorTheme("bw")}
                   className="px-3"
                 >
                   <div className="h-4 w-4 rounded-full bg-black" />
                 </Button>
                 <Button
-                  variant={colorTheme === 'colorful' ? 'default' : 'ghost'}
+                  variant={colorTheme === "colorful" ? "default" : "ghost"}
                   size="sm"
-                  onClick={() => setColorTheme('colorful')}
+                  onClick={() => setColorTheme("colorful")}
                   className="px-3"
                 >
                   <div className="flex h-4 w-4">
@@ -757,7 +931,12 @@ export function GraphPageComponent({
                 </Button>
               </div>
 
-              <Button variant="outline" size="icon" onClick={handlePrint} title="Print Chart">
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={handlePrint}
+                title="Print Chart"
+              >
                 <PrinterIcon className="h-4 w-4" />
               </Button>
             </div>
@@ -766,7 +945,7 @@ export function GraphPageComponent({
         <CardContent>
           <div className="h-[500px]">
             <ResponsiveContainer width="100%" height="100%">
-              {renderChart()}
+              {renderChart() || <div>No chart data available</div>}
             </ResponsiveContainer>
           </div>
         </CardContent>

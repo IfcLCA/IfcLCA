@@ -1,7 +1,6 @@
-import { Material, Element, Upload } from "@/models";
-import { MaterialService } from "./material-service";
-import mongoose from "mongoose";
-import { logger } from '@/lib/logger';
+import { logger } from "@/lib/logger";
+import { Element, Material, Upload } from "@/models";
+import mongoose, { ClientSession } from "mongoose";
 
 export class UploadService {
   /**
@@ -9,134 +8,57 @@ export class UploadService {
    */
   static async processMaterials(
     projectId: string,
-    materials: Array<{
+    elements: Array<{
+      id: string;
       name: string;
-      category: string;
-      elements: Array<{
-        id: string;
-        name: string;
-        volume: number;
-        materials: Array<{
-          name: string;
-          thickness: number;
-        }>;
-      }>;
+      type: string;
+      globalId: string;
+      netVolume?: number | { net: number; gross: number };
+      grossVolume?: number | { net: number; gross: number };
+      materialLayers?: any;
+      properties?: {
+        loadBearing?: boolean;
+        isExternal?: boolean;
+      };
     }>,
-    uploadId: string
+    uploadId: string,
+    session: ClientSession
   ) {
-    const session = await mongoose.startSession();
     try {
-      logger.info('Starting material processing phase');
-      logger.info(`Processing ${materials.length} unique materials`);
-      logger.info('Material categories:', [...new Set(materials.map(m => m.category))]);
+      // Create elements
+      const processedElements = await Element.create(
+        elements.map((element) => {
+          const volume = (() => {
+            if (typeof element.netVolume === "object") {
+              return element.netVolume.net;
+            }
+            if (typeof element.netVolume === "number") {
+              return element.netVolume;
+            }
+            if (typeof element.grossVolume === "object") {
+              return element.grossVolume.net;
+            }
+            if (typeof element.grossVolume === "number") {
+              return element.grossVolume;
+            }
+            return 0;
+          })();
 
-      // First, get all existing materials with KBOB matches from any project
-      const existingMatches = await Material.find({
-        name: { $in: materials.map(m => m.name) },
-        kbobMatchId: { $exists: true }
-      })
-      .select('name kbobMatchId density')
-      .populate({
-        path: 'kbobMatchId',
-        select: 'Name GWP UBP PENRE kg/unit min_density max_density'
-      });  
-
-      logger.info(`Found ${existingMatches.length} existing materials with KBOB matches`);
-      logger.debug('Existing material matches:', 
-        existingMatches.map(m => ({
-          name: m.name,
-          kbobName: m.kbobMatchId?.Name,
-          density: m.density
-        }))
-      );
-
-      // Create a map of material names to their KBOB matches
-      const matchMap = new Map();
-      
-      // First add existing matches
-      for (const match of existingMatches) {
-        matchMap.set(match.name, {
-          kbobMatchId: match.kbobMatchId,  
-          density: match.density || (match.kbobMatchId && MaterialService.calculateDensity(match.kbobMatchId))
-        });
-      }
-
-      // Then try to find matches for any remaining materials
-      const unmatchedMaterials = materials.filter(m => !matchMap.has(m.name));
-      logger.info(`Looking for KBOB matches for ${unmatchedMaterials.length} new materials`);
-
-      for (const material of unmatchedMaterials) {
-        logger.debug('Processing material', { 
-          name: material.name,
-          category: material.category,
-          elementCount: material.elements.length
-        });
-        
-        const bestMatch = await MaterialService.findBestKBOBMatch(material.name);
-        
-        if (bestMatch && bestMatch.score >= 0.8) {
-          logger.info('High confidence match found', {
-            material: material.name,
-            kbobMaterial: bestMatch.kbobMaterial.Name,
-            matchScore: (bestMatch.score * 100).toFixed(1) + '%'
-          });
-          
-          const density = MaterialService.calculateDensity(bestMatch.kbobMaterial);
-          if (density) {
-            matchMap.set(material.name, {
-              kbobMatchId: bestMatch.kbobMaterial,
-              density,
-              matchScore: bestMatch.score
-            });
-          } else {
-            logger.warn(`No density available for "${material.name}"`);
-          }
-        } else {
-          logger.warn(`No high confidence match found for "${material.name}"`, {
-            bestMatch: bestMatch ? {
-              name: bestMatch.kbobMaterial.Name,
-              score: (bestMatch.score * 100).toFixed(1) + '%'
-            } : null
-          });
-        }
-      }
-
-      // Add KBOB match information to materials
-      const materialsWithKBOB = materials.map(material => ({
-        ...material,
-        kbobMatch: matchMap.get(material.name)?.kbobMatchId,
-        density: matchMap.get(material.name)?.density,
-        matchScore: matchMap.get(material.name)?.matchScore
-      }));
-
-      const matchedCount = materialsWithKBOB.filter(m => m.kbobMatch).length;
-      const unmatchedCount = materialsWithKBOB.filter(m => !m.kbobMatch).length;
-
-      logger.info('Material processing summary', {
-        totalMaterials: materials.length,
-        materialsWithKBOBMatches: matchedCount,
-        materialsWithoutMatches: unmatchedCount
-      });
-
-      // Let MaterialService handle the actual material processing
-      const result = await MaterialService.processMaterials(projectId, materialsWithKBOB, uploadId);
-
-      // Update upload status
-      await Upload.findByIdAndUpdate(
-        uploadId,
-        {
-          $set: {
-            materialCount: result.materialCount,
-            status: 'ProcessingElements'
-          }
-        },
+          return {
+            projectId,
+            guid: element.globalId,
+            name: element.name,
+            type: element.type,
+            volume: volume,
+            loadBearing: element.properties?.loadBearing || false,
+            isExternal: element.properties?.isExternal || false,
+            materials: [],
+          };
+        }),
         { session }
       );
-
-      logger.info('Material processing phase completed');
-      return result;
     } catch (error) {
-      logger.error('Error in material processing', { error });
+      logger.error("Error in material processing", { error });
       throw error;
     } finally {
       await session.endSession();
@@ -163,20 +85,24 @@ export class UploadService {
     const session = await mongoose.startSession();
     try {
       return await session.withTransaction(async () => {
-        logger.info('Starting element processing phase');
+        logger.info("Starting element processing phase");
         logger.info(`Processing ${elements.length} elements`);
-        logger.info('Element categories:', [...new Set(elements.map(e => e.category))]);
+        logger.info("Element categories:", [
+          ...new Set(elements.map((e) => e.category)),
+        ]);
 
         // First, get all materials from DB for this project
-        const existingMaterials = await Material.find({ 
-          projectId: new mongoose.Types.ObjectId(projectId) 
-        }).select('_id name').lean();
+        const existingMaterials = await Material.find({
+          projectId: new mongoose.Types.ObjectId(projectId),
+        })
+          .select("_id name")
+          .lean();
 
         logger.info(`Found ${existingMaterials.length} materials in database`);
 
         // Create a map for quick lookups, normalize material names
         const materialMap = new Map(
-          existingMaterials.map(m => [m.name.trim().toLowerCase(), m._id])
+          existingMaterials.map((m) => [m.name.trim().toLowerCase(), m._id])
         );
 
         // Process elements in batches to avoid memory issues
@@ -195,20 +121,22 @@ export class UploadService {
         let totalMaterialReferences = 0;
         let successfulMaterialReferences = 0;
 
-        logger.info(`Processing elements in ${batches.length} batches of ${batchSize}`);
+        logger.info(
+          `Processing elements in ${batches.length} batches of ${batchSize}`
+        );
 
         for (let batchIndex = 0; batchIndex < batches.length; batchIndex++) {
           const batch = batches[batchIndex];
           logger.debug(`Processing batch ${batchIndex + 1}/${batches.length}`);
 
-          const ops = batch.map(element => {
+          const ops = batch.map((element) => {
             // Map material references
             const materialRefs = element.materials
-              .map(material => {
+              .map((material) => {
                 totalMaterialReferences++;
                 const normalizedName = material.name.trim().toLowerCase();
                 const materialId = materialMap.get(normalizedName);
-                
+
                 if (!materialId) {
                   return null;
                 }
@@ -216,10 +144,13 @@ export class UploadService {
                 successfulMaterialReferences++;
                 return {
                   materialId,
-                  thickness: material.thickness
+                  thickness: material.thickness,
                 };
               })
-              .filter((ref): ref is { materialId: any; thickness: number } => ref !== null);
+              .filter(
+                (ref): ref is { materialId: any; thickness: number } =>
+                  ref !== null
+              );
 
             if (materialRefs.length === 0) {
               elementsWithMissingMaterials++;
@@ -229,24 +160,24 @@ export class UploadService {
               updateOne: {
                 filter: {
                   projectId: new mongoose.Types.ObjectId(projectId),
-                  elementId: element.id
+                  elementId: element.id,
                 },
                 update: {
                   $setOnInsert: {
                     projectId: new mongoose.Types.ObjectId(projectId),
                     elementId: element.id,
-                    createdAt: new Date()
+                    createdAt: new Date(),
                   },
                   $set: {
                     name: element.name,
                     category: element.category,
                     volume: element.volume,
                     materials: materialRefs,
-                    updatedAt: new Date()
-                  }
+                    updatedAt: new Date(),
+                  },
                 },
-                upsert: true
-              }
+                upsert: true,
+              },
             };
           });
 
@@ -262,30 +193,33 @@ export class UploadService {
           {
             $set: {
               elementCount: processedElements,
-              status: 'Completed'
-            }
+              status: "Completed",
+            },
           },
           { session }
         );
 
-        const successRate = ((successfulMaterialReferences / totalMaterialReferences) * 100).toFixed(1);
-        logger.info('Element processing summary', {
+        const successRate = (
+          (successfulMaterialReferences / totalMaterialReferences) *
+          100
+        ).toFixed(1);
+        logger.info("Element processing summary", {
           totalElementsProcessed: processedElements,
           elementsWithMissingMaterials,
           totalMaterialReferences,
           successfulMaterialReferences,
-          materialReferenceSuccessRate: `${successRate}%`
+          materialReferenceSuccessRate: `${successRate}%`,
         });
-        
-        logger.info('Element processing phase completed');
+
+        logger.info("Element processing phase completed");
 
         return {
           success: true,
-          elementCount: processedElements
+          elementCount: processedElements,
         };
       });
     } catch (error) {
-      logger.error('Error in element processing', { error });
+      logger.error("Error in element processing", { error });
       throw error;
     } finally {
       await session.endSession();

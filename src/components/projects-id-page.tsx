@@ -1,13 +1,12 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
-import { useRouter, useParams } from "next/navigation";
-import { ReloadIcon } from "@radix-ui/react-icons";
-import { toast } from "@/hooks/use-toast";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Card, CardContent } from "@/components/ui/card";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Breadcrumbs } from "@/components/breadcrumbs";
+import { DashboardCards } from "@/components/dashboard-cards";
+import { DataTable } from "@/components/data-table";
+import { elementsColumns } from "@/components/elements-columns";
+import { emissionsColumns } from "@/components/emissions-columns";
+import { GraphPageComponent } from "@/components/graph-page";
+import { materialsColumns } from "@/components/materials-columns";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -18,20 +17,10 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import {
-  Trash2,
-  Upload,
-  Layers,
-  UploadCloud,
-  Edit,
-} from "lucide-react";
-import { UploadModal } from "@/components/upload-modal";
-import { DataTable } from "@/components/data-table";
-import { Breadcrumbs } from "@/components/breadcrumbs";
-import { materialsColumns } from "@/components/materials-columns";
-import { elementsColumns } from "@/components/elements-columns";
-import { GraphPageComponent } from "@/components/graph-page";
-import { DashboardCards } from "@/components/dashboard-cards";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+import { Label } from "@/components/ui/label";
 import {
   Pagination,
   PaginationContent,
@@ -40,9 +29,22 @@ import {
   PaginationNext,
   PaginationPrevious,
 } from "@/components/ui/pagination";
-import { emissionsColumns } from "@/components/emissions-columns";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { UploadModal } from "@/components/upload-modal";
+import { toast } from "@/hooks/use-toast";
+import { ReloadIcon } from "@radix-ui/react-icons";
+import cn from "classnames";
+import { Edit, Layers, UploadCloud } from "lucide-react";
+import { useParams, useRouter } from "next/navigation";
+import { useEffect, useMemo, useState } from "react";
+import { useProjectEmissions } from "@/hooks/use-project-emissions";
 
 interface KBOBMaterial {
   _id: string;
@@ -83,8 +85,24 @@ interface MaterialEntry {
 }
 
 interface ElementWithMaterials {
+  _id: string;
+  guid: string;
   name: string;
+  type: string;
+  object_type: string;
+  volume: number;
+  buildingStorey?: string;
+  loadBearing?: boolean;
+  isExternal?: boolean;
   materials: MaterialEntry[];
+}
+
+interface Upload {
+  _id: string;
+  filename: string;
+  status: string;
+  elementCount: number;
+  createdAt: string | Date;
 }
 
 interface Project {
@@ -95,7 +113,7 @@ interface Project {
   imageUrl?: string;
   createdAt: Date;
   updatedAt: Date;
-  uploads: any[];
+  uploads: Upload[];
   elements: any[];
   materials: {
     id: string;
@@ -114,7 +132,7 @@ interface Project {
   };
 }
 
-interface ExtendedProject extends Project {
+export interface ExtendedProject extends Project {
   elements: ElementWithMaterials[];
 }
 
@@ -128,6 +146,21 @@ const formatNumber = (value: number, decimalPlaces: number = 2) => {
     }) ?? "N/A"
   );
 };
+
+interface MaterialWithVolume {
+  material: {
+    _id: string;
+    name: string;
+    density?: number;
+    kbobMatch?: {
+      Name?: string;
+      GWP?: number;
+      UBP?: number;
+      PENRE?: number;
+    };
+  };
+  volume: number;
+}
 
 export default function ProjectDetailsPage() {
   const router = useRouter();
@@ -148,15 +181,35 @@ export default function ProjectDetailsPage() {
   const fetchProject = async () => {
     try {
       setIsLoading(true);
-      console.log("Fetching project:", projectId);
+      console.debug("🔄 Fetching project data...");
+
       const response = await fetch(`/api/projects/${projectId}`);
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
       const data = await response.json();
-      console.log("Raw project data:", data);
+
+      console.debug("📥 Raw project data:", {
+        id: data._id,
+        name: data.name,
+        uploadsCount: data.uploads?.length,
+        uploads: data.uploads,
+        elementCount: data.elements?.length,
+      });
+
       const transformed = transformProjectData(data);
-      console.log("Transformed project data:", transformed);
+
+      console.debug("✨ Transformed project data:", {
+        id: transformed.id,
+        name: transformed.name,
+        uploadsCount: transformed.uploads?.length,
+        uploads: transformed.uploads,
+        elementCount: transformed.elements?.length,
+      });
+
       setProject(transformed);
     } catch (err) {
-      console.error("Error fetching project:", err);
+      console.error("❌ Error fetching project:", err);
       setError(
         err instanceof Error ? err.message : "An unknown error occurred"
       );
@@ -165,42 +218,54 @@ export default function ProjectDetailsPage() {
     }
   };
 
-  const transformProjectData = (data: any): ExtendedProject => ({
-    ...data,
-    id: data.id || data._id,
-    createdAt: new Date(data.createdAt),
-    updatedAt: new Date(data.updatedAt),
-    imageUrl: data.imageUrl,
-    uploads: (data.uploads || []).map((upload: any) => ({
-      ...upload,
-      _id: upload._id,
-      filename: upload.filename,
-      status: upload.status,
-      elementCount: upload.elementCount,
-      createdAt: new Date(upload.createdAt),
-    })),
-    elements: (data.elements || []).map((element: any) => ({
-      ...element,
-      id: element.id || element._id,
-      _id: element._id,
-      materials: element.materials || [],
-    })),
-    materials: (data.materials || []).map((material: any) => ({
-      id: material.id || material._id,
-      name: material.name,
-      category: material.category,
-      volume: material.volume || 0,
-      fraction: material.fraction || 0,
-      gwp: material.gwp || 0,
-      ubp: material.ubp || 0,
-      penre: material.penre || 0,
-    })),
-    _count: {
-      uploads: data.uploads?.length || 0,
-      elements: data.elements?.length || 0,
-      materials: data.materials?.length || 0,
-    },
-  });
+  const transformProjectData = (data: any): ExtendedProject => {
+    // Get unique materials from elements
+    const uniqueMaterials = new Set(
+      data.elements
+        ?.flatMap((element: any) =>
+          element.materials?.map((mat: any) => mat.material?._id)
+        )
+        .filter(Boolean) || []
+    );
+
+    return {
+      ...data,
+      id: data.id || data._id,
+      createdAt: new Date(data.createdAt),
+      updatedAt: new Date(data.updatedAt),
+      imageUrl: data.imageUrl,
+      uploads: Array.isArray(data.uploads)
+        ? data.uploads.map((upload: any) => ({
+            _id: upload._id || upload.id,
+            filename: upload.filename || "Unnamed file",
+            status: upload.status || "unknown",
+            elementCount: upload.elementCount || 0,
+            createdAt: new Date(upload.createdAt),
+          }))
+        : [],
+      elements: (data.elements || []).map((element: any) => ({
+        ...element,
+        id: element.id || element._id,
+        _id: element._id,
+        materials: element.materials || [],
+      })),
+      materials: (data.materials || []).map((material: any) => ({
+        id: material.id || material._id,
+        name: material.name,
+        category: material.category,
+        volume: material.volume || 0,
+        fraction: material.fraction || 0,
+        gwp: material.gwp || 0,
+        ubp: material.ubp || 0,
+        penre: material.penre || 0,
+      })),
+      _count: {
+        uploads: data.uploads?.length || 0,
+        elements: data.elements?.length || 0,
+        materials: uniqueMaterials.size || 0,
+      },
+    };
+  };
 
   const handleDeleteProject = async () => {
     try {
@@ -281,7 +346,7 @@ export default function ProjectDetailsPage() {
         projectId={projectId}
         open={isUploadModalOpen}
         onOpenChange={setIsUploadModalOpen}
-        onUploadComplete={handleUploadComplete}
+        onSuccess={handleUploadComplete}
       />
       <DeleteProjectDialog
         isOpen={isDeleteDialogOpen}
@@ -369,16 +434,20 @@ const ProjectTabs = ({
   onUpload,
   materialsWithCount,
 }: {
-  project: ExtendedProject;
+  project: Project;
   onUpload: () => void;
-  materialsWithCount: any[];
+  materialsWithCount: {
+    id: string;
+    name: string;
+    category?: string;
+    volume?: number;
+  }[];
 }) => (
   <Tabs defaultValue="uploads" className="w-full">
-    <TabsList className="grid w-full grid-cols-5">
+    <TabsList className="grid w-full grid-cols-4">
       <TabsTrigger value="uploads">Uploads</TabsTrigger>
       <TabsTrigger value="elements">Elements</TabsTrigger>
       <TabsTrigger value="materials">Materials</TabsTrigger>
-      <TabsTrigger value="emissions">Emissions</TabsTrigger>
       <TabsTrigger value="graph">Charts</TabsTrigger>
     </TabsList>
 
@@ -387,19 +456,11 @@ const ProjectTabs = ({
     </TabsContent>
 
     <TabsContent value="elements" className="space-y-4">
-      <ElementsTab project={project} onUpload={onUpload} />
+      <ElementsTab project={project} />
     </TabsContent>
 
     <TabsContent value="materials" className="space-y-4">
-      <MaterialsTab
-        project={project}
-        materialsWithCount={materialsWithCount}
-        onUpload={onUpload}
-      />
-    </TabsContent>
-
-    <TabsContent value="emissions" className="space-y-4">
-      <EmissionsTab project={project} onUpload={onUpload} />
+      <MaterialsTab project={project} />
     </TabsContent>
 
     <TabsContent value="graph" className="space-y-4">
@@ -412,7 +473,7 @@ const UploadsTab = ({
   project,
   onUpload,
 }: {
-  project: ExtendedProject;
+  project: Project;
   onUpload: () => void;
 }) => {
   const [currentPage, setCurrentPage] = useState(1);
@@ -510,7 +571,7 @@ const UploadsTab = ({
   );
 };
 
-const UploadCard = ({ upload }: { upload: ExtendedProject["uploads"][0] }) => (
+const UploadCard = ({ upload }: { upload: Upload }) => (
   <Card>
     <CardContent className="flex flex-col sm:flex-row justify-between items-start sm:items-center p-4 gap-3">
       <div className="space-y-1">
@@ -518,9 +579,24 @@ const UploadCard = ({ upload }: { upload: ExtendedProject["uploads"][0] }) => (
         <p className="text-sm text-muted-foreground">
           Uploaded on {new Date(upload.createdAt).toLocaleString()}
         </p>
+        {upload.elementCount > 0 && (
+          <p className="text-sm text-muted-foreground">
+            Elements: {upload.elementCount}
+          </p>
+        )}
       </div>
       <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
-        <Badge variant={upload.status === "Completed" ? "success" : "warning"}>
+        <Badge
+          variant={
+            upload.status?.toLowerCase() === "completed" ? "success" : "warning"
+          }
+          className={cn(
+            "transition-colors",
+            upload.status?.toLowerCase() === "completed"
+              ? "bg-green-100 text-green-800 hover:bg-green-200"
+              : "bg-yellow-100 text-yellow-800 hover:bg-yellow-200"
+          )}
+        >
           {upload.status}
         </Badge>
       </div>
@@ -528,21 +604,13 @@ const UploadCard = ({ upload }: { upload: ExtendedProject["uploads"][0] }) => (
   </Card>
 );
 
-const ElementsTab = ({
-  project,
-  onUpload,
-}: {
-  project: ExtendedProject;
-  onUpload: () => void;
-}) => {
+const ElementsTab = ({ project }: { project: Project }) => {
   const data = useMemo(() => {
-    return project.elements.map((element: ElementWithMaterials) => ({
-      id: element._id || "unknown",
-      name: element.name || "Unknown",
-      type: element.type || "Unknown",
-      volume: element.volume || 0,
+    return project.elements.map((element) => ({
+      ...element,
+      id: element._id,
     }));
-  }, [project.elements]);
+  }, [project]);
 
   return (
     <>
@@ -550,70 +618,55 @@ const ElementsTab = ({
         <h2 className="text-2xl font-semibold">
           Elements{" "}
           <Badge variant="secondary" className="ml-2">
-            {project?._count.elements || 0}
+            {data.length}
           </Badge>
         </h2>
       </div>
-      {project?.elements && project.elements.length > 0 ? (
-        <Card>
-          <CardContent className="p-0">
-            <DataTable
-              columns={elementsColumns}
-              data={data}
-              onRowSelectionChange={() => { }}
-            />
-          </CardContent>
-        </Card>
-      ) : (
-        <EmptyState
-          icon={Layers}
-          title="No elements found"
-          description="Elements will be extracted from Ifc files when uploaded."
-          action={
-            <Button onClick={onUpload}>
-              <UploadCloud className="mr-2 h-4 w-4" />
-              Add New Ifc
-            </Button>
-          }
-        />
-      )}
+      <Card>
+        <CardContent className="p-0">
+          <DataTable columns={elementsColumns} data={data} />
+        </CardContent>
+      </Card>
     </>
   );
 };
 
-const MaterialsTab = ({
-  project,
-  materialsWithCount,
-  onUpload,
-}: {
-  project: ExtendedProject;
-  materialsWithCount: any[];
-  onUpload: () => void;
-}) => {
+const MaterialsTab = ({ project }: { project: Project }) => {
   const data = useMemo(() => {
-    // First map all materials
-    const materials = project.elements.flatMap((element: ElementWithMaterials) =>
-      element.materials.map((materialEntry: MaterialEntry) => ({
-        id: materialEntry.material?._id || "unknown",
-        ifcMaterial: materialEntry.material?.name || "Unknown",
-        kbobMaterial: materialEntry.material?.kbobMatchId?.Name || "Unknown",
-        category: element.name,
-        volume: materialEntry.volume || 0,
-      }))
-    );
-
-    // Group materials by id to sum up volumes
-    const groupedMaterials = materials.reduce((acc, curr) => {
-      const key = `${curr.ifcMaterial}-${curr.kbobMaterial}`;
-      if (!acc[key]) {
-        acc[key] = { ...curr };
-      } else {
-        acc[key].volume += curr.volume;
-      }
+    // Group materials by name and sum volumes
+    const materialGroups = project.elements.reduce((acc, element) => {
+      element.materials.forEach((mat: MaterialWithVolume) => {
+        const key = mat.material._id;
+        if (!acc[key]) {
+          acc[key] = {
+            _id: mat.material._id,
+            material: mat.material,
+            volume: 0,
+            emissions: {
+              gwp: 0,
+              ubp: 0,
+              penre: 0,
+            },
+          };
+        }
+        acc[key].volume += mat.volume;
+        acc[key].emissions.gwp +=
+          mat.volume *
+          (mat.material.density || 0) *
+          (mat.material.kbobMatch?.GWP || 0);
+        acc[key].emissions.ubp +=
+          mat.volume *
+          (mat.material.density || 0) *
+          (mat.material.kbobMatch?.UBP || 0);
+        acc[key].emissions.penre +=
+          mat.volume *
+          (mat.material.density || 0) *
+          (mat.material.kbobMatch?.PENRE || 0);
+      });
       return acc;
-    }, {} as Record<string, typeof materials[0]>);
+    }, {} as Record<string, Material>);
 
-    return Object.values(groupedMaterials);
+    return Object.values(materialGroups);
   }, [project]);
 
   return (
@@ -622,193 +675,44 @@ const MaterialsTab = ({
         <h2 className="text-2xl font-semibold">
           Materials{" "}
           <Badge variant="secondary" className="ml-2">
-            {project?._count.materials || 0}
+            {data.length}
           </Badge>
         </h2>
       </div>
-      {project?.materials && project.materials.length > 0 ? (
-        <Card>
-          <CardContent className="p-0">
-            <DataTable
-              columns={materialsColumns}
-              data={data}
-              onRowSelectionChange={() => { }}
-            />
-          </CardContent>
-        </Card>
-      ) : (
-        <EmptyState
-          icon={Layers}
-          title="No materials found"
-          description="Materials will be extracted from Ifc files when uploaded."
-          action={
-            <Button onClick={onUpload}>
-              <UploadCloud className="mr-2 h-4 w-4" />
-              Add New Ifc
-            </Button>
-          }
-        />
-      )}
+      <Card>
+        <CardContent className="p-0">
+          <DataTable columns={materialsColumns} data={data as any[]} />
+        </CardContent>
+      </Card>
     </>
   );
 };
 
-const EmissionsTab = ({
-  project,
-  onUpload,
-}: {
-  project: ExtendedProject;
-  onUpload: () => void;
-}) => {
-  const [selectedIndicator, setSelectedIndicator] = useState<IndicatorType>("gwp");
-
-  const emissionsData = useMemo(() => {
-    // First, create a map to group identical materials
-    const groupedMaterials = project.elements.flatMap((element: ElementWithMaterials) =>
-      element.materials.map((materialEntry: MaterialEntry) => ({
-        id: materialEntry._id,
-        kbobMaterial: materialEntry.material?.kbobMatchId?.Name || "Unknown",
-        ifcMaterial: materialEntry.material?.name || "Unknown",
-        volume: materialEntry.volume || 0,
-        density: materialEntry.material?.density || 0,
-        mass: (materialEntry.volume || 0) * (materialEntry.material?.density || 0),
-        kbobIndicators: {
-          gwp: materialEntry.material?.kbobMatchId?.GWP || 0,
-          ubp: materialEntry.material?.kbobMatchId?.UBP || 0,
-          penre: materialEntry.material?.kbobMatchId?.PENRE || 0,
-        },
-      }))
-    ).reduce((acc, curr) => {
-      // Group by Ifc name, KBOB name, and density
-      const key = `${curr.ifcMaterial}-${curr.kbobMaterial}-${curr.density}`;
-      if (!acc[key]) {
-        acc[key] = { ...curr };
-      } else {
-        // Sum up volumes and recalculate mass and totals
-        acc[key].volume += curr.volume;
-        acc[key].mass = acc[key].volume * acc[key].density;
-      }
-      return acc;
-    }, {} as Record<string, any>);
-
-    // Convert back to array and calculate total emissions
-    return Object.values(groupedMaterials).map(material => ({
-      ...material,
-      totalGWP: material.mass * material.kbobIndicators.gwp,
-      totalUBP: material.mass * material.kbobIndicators.ubp,
-      totalPENRE: material.mass * material.kbobIndicators.penre,
-    }));
-  }, [project]);
-
-  const indicators = [
-    {
-      value: "gwp",
-      label: <div className="flex flex-col">
-        <span className="font-bold">GWP</span>
-        <span className="text-sm text-muted-foreground">Global Warming Potential (kg CO₂ eq)</span>
-      </div>
-    },
-    {
-      value: "ubp",
-      label: <div className="flex flex-col">
-        <span className="font-bold">UBP</span>
-        <span className="text-sm text-muted-foreground">Environmental Impact Points</span>
-      </div>
-    },
-    {
-      value: "penre",
-      label: <div className="flex flex-col">
-        <span className="font-bold">PENRE</span>
-        <span className="text-sm text-muted-foreground">Primary Energy Non-Renewable (kWh)</span>
-      </div>
-    },
-  ];
-
-  return (
-    <>
-      <div className="flex justify-between items-center mb-4">
-        <div className="flex items-center gap-2">
-          <h2 className="text-2xl font-semibold">
-            Emissions{" "}
-            <Badge variant="secondary" className="ml-2">
-              LCA
-            </Badge>
-          </h2>
-        </div>
-        <div className="flex items-center gap-4">
-          <Label className="text-sm font-medium">Indicator:</Label>
-          <Select
-            value={selectedIndicator}
-            onValueChange={(value: IndicatorType) => setSelectedIndicator(value)}
-          >
-            <SelectTrigger className="w-[180px]">
-              <SelectValue>
-                {selectedIndicator === 'gwp' && "GWP (kg CO₂ eq)"}
-                {selectedIndicator === 'ubp' && "UBP (pts)"}
-                {selectedIndicator === 'penre' && "PENRE (kWh)"}
-              </SelectValue>
-            </SelectTrigger>
-            <SelectContent>
-              {indicators.map((indicator) => (
-                <SelectItem
-                  key={indicator.value}
-                  value={indicator.value}
-                  className="py-2"
-                >
-                  {indicator.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-      </div>
-      {project?.elements && project.elements.some(e => e.materials?.length > 0) ? (
-        <Card>
-          <CardContent className="p-0">
-            <DataTable
-              columns={emissionsColumns(selectedIndicator)}
-              data={emissionsData}
-              onRowSelectionChange={() => { }}
-            />
-          </CardContent>
-        </Card>
-      ) : (
-        <EmptyState
-          icon={Layers}
-          title="No emissions data found"
-          description="Emissions data will be calculated from materials when an Ifc file is uploaded."
-          action={
-            <Button onClick={onUpload}>
-              <UploadCloud className="mr-2 h-4 w-4" />
-              Add New Ifc
-            </Button>
-          }
-        />
-      )}
-    </>
-  );
-};
-
-const GraphTab = ({ project }: { project: ExtendedProject }) => {
-  const materialsData = project.elements.flatMap((element: ElementWithMaterials) =>
-    element.materials.map((materialEntry: MaterialEntry) => {
-      const volume = materialEntry.volume || 0;
-      const density = materialEntry.material?.density || 0;
-      const kbobIndicators = materialEntry.material?.kbobMatchId || { GWP: 0, UBP: 0, PENRE: 0 };
-
-      return {
-        name: element.name || "Unknown",
-        volume: volume,
-        indicators: {
-          gwp: volume * density * (kbobIndicators.GWP || 0),
-          ubp: volume * density * (kbobIndicators.UBP || 0),
-          penre: volume * density * (kbobIndicators.PENRE || 0),
-        },
-        category: materialEntry.material?.category,
-        kbobMaterial: materialEntry.material?.kbobMatchId?.Name,
-        ifcMaterial: materialEntry.material?.name,
-      };
-    })
+const GraphTab = ({ project }: { project: Project }) => {
+  const materialsData = project.elements.flatMap((element) =>
+    // Create one entry per element-material combination
+    element.materials.map((material: MaterialWithVolume) => ({
+      name: element.name, // Element name from elements table
+      elementName: element.name, // Explicit element name for grouping
+      ifcMaterial: material.material?.name || "Unknown",
+      kbobMaterial: material.material?.kbobMatch?.Name,
+      category: element.type, // Ifc entity type
+      volume: material.volume, // Use individual material volume
+      indicators: {
+        gwp:
+          material.volume *
+          (material.material?.density || 0) *
+          (material.material?.kbobMatch?.GWP || 0),
+        ubp:
+          material.volume *
+          (material.material?.density || 0) *
+          (material.material?.kbobMatch?.UBP || 0),
+        penre:
+          material.volume *
+          (material.material?.density || 0) *
+          (material.material?.kbobMatch?.PENRE || 0),
+      },
+    }))
   );
 
   return (
@@ -859,10 +763,19 @@ const DeleteProjectDialog = ({
   <AlertDialog open={isOpen} onOpenChange={onClose}>
     <AlertDialogContent>
       <AlertDialogHeader>
-        <AlertDialogTitle>Are you really sure you don't need it anymore?</AlertDialogTitle>
+        <AlertDialogTitle>
+          Are you really sure you don't need it anymore?
+        </AlertDialogTitle>
         <AlertDialogDescription className="space-y-2">
-          <p>We can get it back but it involves us digging into our database, which we would rather avoid. So better be sure you don't need it anymore...</p>
-          <p>This action cannot be undone. This will permanently delete the project and all associated data.</p>
+          <p>
+            We can get it back but it involves us digging into our database,
+            which we would rather avoid. So better be sure you don't need it
+            anymore...
+          </p>
+          <p>
+            This action cannot be undone. This will permanently delete the
+            project and all associated data.
+          </p>
         </AlertDialogDescription>
       </AlertDialogHeader>
       <AlertDialogFooter>

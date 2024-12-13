@@ -1,8 +1,8 @@
-import { NextResponse } from "next/server";
 import { connectToDatabase } from "@/lib/mongodb";
-import { Project, Upload, Element, Material } from "@/models";
-import mongoose from "mongoose";
+import { Element, Material, Project, Upload } from "@/models";
 import { auth } from "@clerk/nextjs/server";
+import mongoose from "mongoose";
+import { NextResponse } from "next/server";
 
 export const runtime = "nodejs";
 
@@ -12,82 +12,168 @@ export async function GET(
 ) {
   try {
     await connectToDatabase();
-    const project = await Project.findById(params.id).lean();
+
+    if (!mongoose.Types.ObjectId.isValid(params.id)) {
+      return NextResponse.json(
+        { error: "Invalid project ID" },
+        { status: 400 }
+      );
+    }
+
+    const projectId = new mongoose.Types.ObjectId(params.id);
+
+    // Use aggregation pipeline to get all data in one query
+    const [project] = await Project.aggregate([
+      {
+        $match: { _id: projectId },
+      },
+      {
+        $lookup: {
+          from: "uploads",
+          localField: "_id",
+          foreignField: "projectId",
+          as: "uploads",
+        },
+      },
+      {
+        $lookup: {
+          from: "elements",
+          localField: "_id",
+          foreignField: "projectId",
+          as: "elements",
+          pipeline: [
+            {
+              $lookup: {
+                from: "materials",
+                localField: "materials.material",
+                foreignField: "_id",
+                as: "materialRefs",
+                pipeline: [
+                  {
+                    $lookup: {
+                      from: "indicatorsKBOB",
+                      localField: "kbobMatchId",
+                      foreignField: "_id",
+                      as: "kbobMatch",
+                    },
+                  },
+                  {
+                    $unwind: {
+                      path: "$kbobMatch",
+                      preserveNullAndEmptyArrays: true,
+                    },
+                  },
+                ],
+              },
+            },
+            {
+              $addFields: {
+                materials: {
+                  $map: {
+                    input: "$materials",
+                    as: "mat",
+                    in: {
+                      $mergeObjects: [
+                        "$$mat",
+                        {
+                          material: {
+                            $arrayElemAt: [
+                              {
+                                $filter: {
+                                  input: "$materialRefs",
+                                  cond: {
+                                    $eq: ["$$this._id", "$$mat.material"],
+                                  },
+                                },
+                              },
+                              0,
+                            ],
+                          },
+                        },
+                      ],
+                    },
+                  },
+                },
+                totalVolume: { $sum: "$materials.volume" },
+                emissions: {
+                  $reduce: {
+                    input: "$materials",
+                    initialValue: { gwp: 0, ubp: 0, penre: 0 },
+                    in: {
+                      gwp: {
+                        $add: [
+                          "$$value.gwp",
+                          {
+                            $multiply: [
+                              "$$this.volume",
+                              { $ifNull: ["$$this.material.density", 0] },
+                              { $ifNull: ["$$this.material.kbobMatch.GWP", 0] },
+                            ],
+                          },
+                        ],
+                      },
+                      ubp: {
+                        $add: [
+                          "$$value.ubp",
+                          {
+                            $multiply: [
+                              "$$this.volume",
+                              { $ifNull: ["$$this.material.density", 0] },
+                              { $ifNull: ["$$this.material.kbobMatch.UBP", 0] },
+                            ],
+                          },
+                        ],
+                      },
+                      penre: {
+                        $add: [
+                          "$$value.penre",
+                          {
+                            $multiply: [
+                              "$$this.volume",
+                              { $ifNull: ["$$this.material.density", 0] },
+                              {
+                                $ifNull: ["$$this.material.kbobMatch.PENRE", 0],
+                              },
+                            ],
+                          },
+                        ],
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          ],
+        },
+      },
+      {
+        $addFields: {
+          elementCount: { $size: "$elements" },
+          uploadCount: { $size: "$uploads" },
+          totalEmissions: {
+            $reduce: {
+              input: "$elements",
+              initialValue: { gwp: 0, ubp: 0, penre: 0 },
+              in: {
+                gwp: { $add: ["$$value.gwp", "$$this.emissions.gwp"] },
+                ubp: { $add: ["$$value.ubp", "$$this.emissions.ubp"] },
+                penre: { $add: ["$$value.penre", "$$this.emissions.penre"] },
+              },
+            },
+          },
+        },
+      },
+    ]);
 
     if (!project) {
       return NextResponse.json({ error: "Project not found" }, { status: 404 });
     }
 
-    // First, get all materials for the project with populated KBOB matches
-    const materials = await mongoose.models.Material.find({ projectId: project._id })
-      .populate({
-        path: 'kbobMatchId',
-        model: 'KBOBMaterial',
-        select: 'Name Category GWP UBP PENRE kg/unit min density max density'
-      })
-      .lean();
-
-
-    // Get elements with their material references
-    const elements = await mongoose.models.Element.find({ projectId: project._id })
-      .populate({
-        path: 'materials.material',
-        model: 'Material',
-        populate: {
-          path: 'kbobMatchId',
-          model: 'KBOBMaterial',
-          select: 'Name Category GWP UBP PENRE'
-        }
-      })
-      .lean();
-
-
-    // Process elements to ensure material references are properly populated
-    const populatedElements = elements.map(element => {
-      return {
-        ...element,
-        materials: element.materials.map(mat => {
-          const materialRef = mat.material;
-          const kbobRef = materialRef?.kbobMatchId;
-          return {
-            ...mat,
-            material: {
-              ...materialRef,
-              name: materialRef?.name || 'Unknown',
-              kbobMatchId: kbobRef ? {
-                Name: kbobRef.Name,
-                Category: kbobRef.Category,
-                GWP: kbobRef.GWP,
-                UBP: kbobRef.UBP,
-                PENRE: kbobRef.PENRE
-              } : null
-            }
-          };
-        }).filter(mat => mat.material !== null)
-      };
-    });
-
-    const uploads = await mongoose.models.Upload.find({ projectId: project._id }).lean();
-
-    const projectData = {
-      ...project,
-      uploads: uploads || [],
-      elements: populatedElements || [],
-      materials: materials || [],
-    };
-
-    return NextResponse.json(projectData);
+    return NextResponse.json(project);
   } catch (error) {
     console.error("Failed to fetch project:", error);
-    if (error instanceof Error) {
-      console.error("Error details:", {
-        message: error.message,
-        stack: error.stack,
-        name: error.name
-      });
-    }
     return NextResponse.json(
-      { error: "Failed to fetch project", details: error instanceof Error ? error.message : String(error) },
+      { error: "Failed to fetch project" },
       { status: 500 }
     );
   }
@@ -125,7 +211,7 @@ export async function PUT(
       console.error("Error details:", {
         message: error.message,
         stack: error.stack,
-        name: error.name
+        name: error.name,
       });
     }
     return new Response("Internal Server Error", { status: 500 });
@@ -180,7 +266,7 @@ export async function DELETE(
         console.error("Error details:", {
           message: error.message,
           stack: error.stack,
-          name: error.name
+          name: error.name,
         });
       }
       throw error;
@@ -193,7 +279,7 @@ export async function DELETE(
       console.error("Error details:", {
         message: error.message,
         stack: error.stack,
-        name: error.name
+        name: error.name,
       });
     }
     return new Response("Internal Server Error", { status: 500 });
@@ -230,11 +316,14 @@ export async function PATCH(
       console.error("Error details:", {
         message: error.message,
         stack: error.stack,
-        name: error.name
+        name: error.name,
       });
     }
     return NextResponse.json(
-      { error: "Failed to update project", details: error instanceof Error ? error.message : String(error) },
+      {
+        error: "Failed to update project",
+        details: error instanceof Error ? error.message : String(error),
+      },
       { status: 500 }
     );
   }

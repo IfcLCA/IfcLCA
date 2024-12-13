@@ -1,28 +1,25 @@
-import { NextResponse } from "next/server";
-import { connectToDatabase } from "@/lib/mongodb";
-import { Upload } from "@/models";
-import { MaterialService } from "@/lib/services/material-service";
-import mongoose from "mongoose";
 import { logger } from "@/lib/logger";
+import { connectToDatabase } from "@/lib/mongodb";
+import { IFCProcessingService } from "@/lib/services/ifc-processing-service";
+import { Upload } from "@/models";
+import mongoose from "mongoose";
+import { NextResponse } from "next/server";
 
-export const runtime = "nodejs";
-export const maxDuration = 300;
+interface IFCMaterial {
+  name: string;
+  volume: number;
+}
 
 interface IFCElement {
-  materialLayers?: {
-    layers?: Array<{
-      materialName?: string;
-      thickness?: number;
-      layerId?: string;
-      layerName?: string;
-    }>;
-    layerSetName?: string;
-  };
   globalId: string;
-  name: string;
   type: string;
-  netVolume?: number;
-  spatialContainer?: string;
+  name: string;
+  volume: number;
+  properties: {
+    loadBearing?: boolean;
+    isExternal?: boolean;
+  };
+  materials: IFCMaterial[];
 }
 
 export async function POST(
@@ -30,86 +27,62 @@ export async function POST(
   { params }: { params: { id: string } }
 ) {
   const session = await mongoose.startSession();
-  let uploadId: string | undefined;
 
   try {
-    const body = await request.json();
-    uploadId = body.uploadId;
-    const { elements, isLastChunk } = body;
-
-    if (!uploadId || !elements) {
-      return NextResponse.json(
-        { error: "Missing required fields" },
-        { status: 400 }
-      );
-    }
+    const { uploadId, elements } = (await request.json()) as {
+      uploadId: string;
+      elements: IFCElement[];
+    };
 
     await connectToDatabase();
 
-    let processResult;
     await session.withTransaction(async () => {
-      // Process materials and elements
-      processResult = await MaterialService.processMaterials(
-        params.id,
-        elements,
-        uploadId!,
-        session
-      );
+      // Process elements and find automatic matches
+      const uniqueMaterialNames = [
+        ...new Set(
+          elements.flatMap(
+            (e: IFCElement) =>
+              e.materials?.map((m: IFCMaterial) => m.name) || []
+          )
+        ),
+      ];
 
-      logger.debug('Material processing result', processResult);
-
-      // Update upload status if this is the last chunk
-      if (isLastChunk) {
-        await Upload.findByIdAndUpdate(
+      // Run both operations in parallel
+      const [elementResult, matchResult] = await Promise.all([
+        IFCProcessingService.processElements(
+          params.id,
+          elements,
           uploadId,
-          {
-            status: "Completed",
-            elementCount: processResult.elementCount,
-            materialCount: processResult.materialCount,
-            unmatchedMaterialCount: processResult.unmatchedMaterialCount
-          },
-          { session }
-        );
+          session
+        ),
+        IFCProcessingService.findAutomaticMatches(
+          params.id,
+          uniqueMaterialNames,
+          session
+        ),
+      ]);
 
-        logger.debug('Processing complete', processResult);
-      }
-
-      return processResult;
-    });
-
-    logger.debug('Sending response', {
-      success: true,
-      elementCount: processResult.elementCount,
-      materialCount: processResult.materialCount,
-      unmatchedMaterialCount: processResult.unmatchedMaterialCount
+      // Update upload status
+      await Upload.findByIdAndUpdate(
+        uploadId,
+        {
+          status: "completed",
+          elementCount: elementResult.elementCount,
+          materialCount: elementResult.materialCount,
+          matchedMaterialCount: matchResult.matchedCount,
+        },
+        { session }
+      );
     });
 
     return NextResponse.json({
       success: true,
-      elementCount: processResult.elementCount,
-      materialCount: processResult.materialCount,
-      unmatchedMaterialCount: processResult.unmatchedMaterialCount,
+      shouldRedirectToLibrary: true,
     });
   } catch (error) {
-    logger.error('Error processing chunk', { error });
-
-    if (uploadId) {
-      try {
-        await Upload.findByIdAndUpdate(
-          uploadId,
-          {
-            status: "Failed",
-            error: error.message || "Unknown error occurred",
-          },
-          { session }
-        );
-      } catch (updateError) {
-        logger.error('Failed to update upload status', { updateError });
-      }
-    }
-
+    logger.error("Error processing upload:", error);
     return NextResponse.json(
-      { error: error.message || "Error processing upload" },
+      { error: "Failed to process upload" },
       { status: 500 }
     );
   } finally {

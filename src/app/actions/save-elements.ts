@@ -1,8 +1,8 @@
 "use server";
 
+import { Element, Material, Upload } from "@/models";
 import { auth } from "@clerk/nextjs/server";
 import mongoose from "mongoose";
-import { Element, Material, Upload } from "@/models";
 import { z } from "zod";
 import { connectToDatabase } from "../../lib/mongoose";
 
@@ -20,6 +20,12 @@ const elementSchema = z.object({
   type: z.string(),
   netVolume: z.number().optional(),
   spatialContainer: z.string().optional(),
+  properties: z
+    .object({
+      loadBearing: z.boolean().optional(),
+      isExternal: z.boolean().optional(),
+    })
+    .optional(),
   materialLayers: z
     .object({
       layerSetName: z.string().optional(),
@@ -92,8 +98,10 @@ export async function saveElements(
                     ? 0
                     : Number(element.netVolume) || 0,
                 buildingStorey: element.spatialContainer,
+                loadBearing: element.properties?.loadBearing || false,
+                isExternal: element.properties?.isExternal || false,
                 materials,
-                updatedAt: new Date()
+                updatedAt: new Date(),
               },
             },
             upsert: true,
@@ -102,7 +110,6 @@ export async function saveElements(
 
         const result = await Element.bulkWrite(operations);
         savedCount += result.upsertedCount + result.modifiedCount;
-
       } catch (batchError) {
         errors.push({
           batch: i / batchSize,
@@ -124,7 +131,6 @@ export async function saveElements(
     };
 
     return result;
-
   } catch (error) {
     if (data?.uploadId) {
       try {
@@ -163,9 +169,10 @@ async function processMaterials(
         try {
           const layerThickness = Number(layer.thickness) || 0;
           // Calculate volume fraction based on thickness ratio
-          const volumeFraction = totalThickness > 0
-            ? layerThickness / totalThickness
-            : 1 / element.materialLayers.layers.length;
+          const volumeFraction =
+            totalThickness > 0
+              ? layerThickness / totalThickness
+              : 1 / element.materialLayers.layers.length;
 
           const savedMaterial = await Material.findOneAndUpdate(
             {

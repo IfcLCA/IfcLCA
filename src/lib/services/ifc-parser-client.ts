@@ -1,5 +1,4 @@
-import { IFCParserAdapter } from './IFCParserAdapter';
-import { logger } from '@/lib/logger';
+import { logger } from "@/lib/logger";
 
 export interface IFCParseResult {
   uploadId: string;
@@ -9,134 +8,227 @@ export interface IFCParseResult {
   shouldRedirectToLibrary: boolean;
 }
 
-export async function parseIFCFile(file: File, projectId: string): Promise<IFCParseResult> {
+interface APIElement {
+  id: string;
+  type: string;
+  object_type: string;
+  properties: {
+    name: string;
+    level?: string;
+    loadBearing?: boolean;
+    isExternal?: boolean;
+  };
+  volume?: number;
+  area?: number;
+  materials?: string[];
+  material_volumes?: {
+    [key: string]: {
+      volume: number;
+      fraction: number;
+    };
+  };
+}
+
+export async function parseIFCFile(
+  file: File,
+  projectId: string
+): Promise<IFCParseResult> {
   let responseData;
   try {
-    logger.debug('Starting Ifc parsing process', {
+    logger.debug("Starting Ifc parsing process", {
       filename: file.name,
       size: file.size,
       type: file.type,
-      projectId
+      projectId,
     });
 
     // Create upload record
-    logger.debug('Creating upload record...');
+    logger.debug("Creating upload record...");
     const uploadResponse = await fetch(`/api/projects/${projectId}/upload`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ filename: file.name }),
     });
 
-    logger.debug('Upload response status:', uploadResponse.status);
+    logger.debug("Upload response status:", uploadResponse.status);
     responseData = await uploadResponse.json();
-    logger.debug('Upload response data:', responseData);
+    logger.debug("Upload response data:", responseData);
 
     if (!uploadResponse.ok || !responseData.uploadId) {
       throw new Error(responseData.error || "Failed to create upload record");
     }
 
-    // Parse file content
-    const content = await file.text();
-    const parser = new IFCParserAdapter(content);
-    const parsedElements = await parser.parseContent();
+    // Create FormData for file upload
+    const formData = new FormData();
+    formData.append("file", file);
 
-    logger.debug('Parsing completed', {
-      elementCount: parsedElements.length,
-      sampleElement: parsedElements[0]
+    // Process Ifc file
+    const response = await fetch("/api/ifc/process", {
+      method: "POST",
+      body: formData,
     });
 
-    // Pre-process materials before chunking to avoid redundant processing
-    const materialsMap = new Map<string, boolean>();
-    let unmatchedMaterialCount = 0;
+    if (!response.ok) {
+      throw new Error("Failed to process Ifc file");
+    }
 
-    parsedElements.forEach(element => {
-      if (element.materialLayers?.layers) {
-        element.materialLayers.layers.forEach(layer => {
-          if (layer.materialName) {
-            materialsMap.set(layer.materialName, true);
-          } else {
-            unmatchedMaterialCount++;
+    // Process the streamed response
+    const reader = response.body!.getReader();
+    const decoder = new TextDecoder();
+    let elements: APIElement[] = [];
+    let materials = new Set<string>();
+    let buffer = "";
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      // Append new chunk to buffer and split by newlines
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split("\n");
+
+      // Keep the last partial line in buffer
+      buffer = lines.pop() || "";
+
+      for (const line of lines) {
+        if (!line.trim()) continue;
+
+        try {
+          const data = JSON.parse(line);
+
+          if (data.status === "complete" && data.elements) {
+            elements = data.elements;
+            // Extract unique materials
+            elements.forEach((element) => {
+              if (element.materials) {
+                element.materials.forEach((material) =>
+                  materials.add(material)
+                );
+              }
+            });
           }
-        });
-      }
-    });
-
-    // Optimize chunk size based on element count
-    const totalElements = parsedElements.length;
-    const chunkSize = Math.min(
-      Math.max(Math.floor(totalElements / 20), 500), // At least 500, targeting 20 chunks
-      2000 // But no more than 2000 to avoid memory issues
-    );
-
-    // Create chunks more efficiently
-    const chunks = Array.from({ length: Math.ceil(totalElements / chunkSize) }, (_, i) =>
-      parsedElements.slice(i * chunkSize, (i + 1) * chunkSize)
-    );
-
-    logger.debug('Optimized chunking', {
-      totalElements,
-      chunkSize,
-      totalChunks: chunks.length,
-      lastChunkSize: chunks[chunks.length - 1]?.length
-    });
-
-    let totalProcessed = 0;
-    const totalChunks = chunks.length;
-    const uploadPromises: Promise<Response>[] = [];
-    const maxConcurrentUploads = 3; // Limit concurrent uploads
-
-    // Process chunks with controlled concurrency
-    for (let i = 0; i < chunks.length; i += maxConcurrentUploads) {
-      const chunkGroup = chunks.slice(i, i + maxConcurrentUploads);
-      const groupPromises = chunkGroup.map((chunk, groupIndex) => {
-        const currentChunkIndex = i + groupIndex;
-
-        return fetch(`/api/projects/${projectId}/upload/process`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            uploadId: responseData.uploadId,
-            elements: chunk,
-            isLastChunk: currentChunkIndex === chunks.length - 1
-          }),
-        }).then(async response => {
-          if (!response.ok) {
-            throw new Error(`Failed to process chunk ${currentChunkIndex + 1}`);
-          }
-          const result = await response.json();
-          totalProcessed += chunk.length;
-          logger.debug(`Chunk ${currentChunkIndex + 1}/${chunks.length} processed`, {
-            success: true,
-            elementCount: result.elementCount
-          });
-          return response;
-        });
-      });
-
-      // Wait for current group to complete before processing next group
-      try {
-        await Promise.all(groupPromises);
-      } catch (error) {
-        logger.error('Error in chunk group', { error });
-        throw error;
+        } catch (e) {
+          logger.error("Error parsing JSON line:", { line, error: e });
+          continue;
+        }
       }
     }
 
-    logger.debug('Processing completed', {
-      totalProcessed,
-      unmatchedMaterialCount,
-      totalMaterials: materialsMap.size
+    // Process any remaining buffer
+    if (buffer.trim()) {
+      try {
+        const data = JSON.parse(buffer);
+        if (data.status === "complete" && data.elements) {
+          elements = data.elements;
+          elements.forEach((element) => {
+            if (element.materials) {
+              element.materials.forEach((material) => materials.add(material));
+            }
+          });
+        }
+      } catch (e) {
+        logger.error("Error parsing final JSON buffer:", { buffer, error: e });
+      }
+    }
+
+    // Process materials
+    const materialNames = Array.from(materials);
+    const checkMatchesResponse = await fetch("/api/materials/check-matches", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ materialNames, projectId }),
     });
+
+    if (!checkMatchesResponse.ok) {
+      throw new Error("Failed to check material matches");
+    }
+
+    const matchesData = await checkMatchesResponse.json();
+    const unmatchedMaterialCount = matchesData.unmatchedMaterials.length;
+
+    // Log initial file info
+    console.debug("📁 Starting Ifc parse for file:", {
+      name: file.name,
+      size: file.size,
+      type: file.type,
+    });
+
+    // After parsing elements from stream
+    console.debug("📊 Parsed elements from Ifc:", {
+      count: elements.length,
+      firstElement: elements[0],
+      lastElement: elements[elements.length - 1],
+    });
+
+    // After processing materials
+    console.debug("🧱 Extracted materials:", {
+      count: materials.size,
+      materialsList: Array.from(materials),
+    });
+
+    // Before sending to process endpoint
+    console.debug("📤 Element with properties:", {
+      element: elements[0],
+      mappedElement: {
+        globalId: elements[0].id,
+        type: elements[0].type,
+        name: elements[0].object_type,
+        netVolume: elements[0].volume || 0,
+        properties: {
+          loadBearing: elements[0].properties.loadBearing || false,
+          isExternal: elements[0].properties.isExternal || false,
+        },
+      },
+    });
+
+    // Process elements
+    const processResponse = await fetch(
+      `/api/projects/${projectId}/upload/process`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          uploadId: responseData.uploadId,
+          elements: elements.map((element) => ({
+            globalId: element.id,
+            type: element.type,
+            name: element.object_type,
+            netVolume: element.volume || 0,
+            properties: {
+              loadBearing: element.properties.loadBearing || false,
+              isExternal: element.properties.isExternal || false,
+            },
+            materialLayers: element.material_volumes
+              ? {
+                  layerSetName: `${element.type}_Layers`,
+                  layers: Object.entries(element.material_volumes).map(
+                    ([name, data]) => ({
+                      materialName: name,
+                      volume: data.volume,
+                      fraction: data.fraction,
+                    })
+                  ),
+                }
+              : undefined,
+          })),
+          isLastChunk: true,
+        }),
+      }
+    );
+
+    if (!processResponse.ok) {
+      throw new Error("Failed to process elements");
+    }
 
     return {
       uploadId: responseData.uploadId,
-      elementCount: totalProcessed,
-      materialCount: materialsMap.size,
+      elementCount: elements.length,
+      materialCount: materials.size,
       unmatchedMaterialCount,
-      shouldRedirectToLibrary: materialsMap.size > 0
+      shouldRedirectToLibrary: unmatchedMaterialCount > 0,
     };
   } catch (error) {
-    logger.error('Error in parseIFCFile', { error });
+    logger.error("Error in parseIFCFile", { error });
     throw error;
   }
 }

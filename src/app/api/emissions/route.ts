@@ -1,7 +1,7 @@
-import { NextResponse } from "next/server";
 import { connectToDatabase } from "@/lib/mongodb";
 import { Project } from "@/models";
 import { auth } from "@clerk/nextjs/server";
+import { NextResponse } from "next/server";
 
 export const runtime = "nodejs";
 
@@ -17,59 +17,59 @@ export async function GET() {
 
     // Aggregate emissions across all active projects for the user
     const projects = await Project.aggregate([
-      { 
-        $match: { 
+      {
+        $match: {
           userId,
-          isArchived: { $ne: true }
-        } 
+          isArchived: { $ne: true },
+        },
       },
       {
         $lookup: {
           from: "elements",
           localField: "_id",
           foreignField: "projectId",
-          as: "elements"
-        }
+          as: "elements",
+        },
       },
       {
         $unwind: {
           path: "$elements",
-          preserveNullAndEmptyArrays: true
-        }
+          preserveNullAndEmptyArrays: true,
+        },
       },
       {
         $unwind: {
           path: "$elements.materials",
-          preserveNullAndEmptyArrays: true
-        }
+          preserveNullAndEmptyArrays: true,
+        },
       },
       {
         $lookup: {
           from: "materials",
           localField: "elements.materials.material",
           foreignField: "_id",
-          as: "material"
-        }
+          as: "material",
+        },
       },
       {
         $unwind: {
           path: "$material",
-          preserveNullAndEmptyArrays: true
-        }
+          preserveNullAndEmptyArrays: true,
+        },
       },
       {
         $lookup: {
           from: "indicatorsKBOB",
           localField: "material.kbobMatchId",
           foreignField: "_id",
-          as: "kbobMatch"
-        }
+          as: "kbobMatch",
+        },
       },
       {
         $unwind: {
           path: "$kbobMatch",
-          preserveNullAndEmptyArrays: true
-        }
+          preserveNullAndEmptyArrays: true,
+        },
       },
       {
         $group: {
@@ -79,37 +79,37 @@ export async function GET() {
               $multiply: [
                 { $ifNull: ["$kbobMatch.GWP", 0] },
                 { $ifNull: ["$elements.materials.volume", 0] },
-                { $ifNull: ["$material.density", 1] }
-              ]
-            }
+                { $ifNull: ["$material.density", 1] },
+              ],
+            },
           },
           ubp: {
             $sum: {
               $multiply: [
                 { $ifNull: ["$kbobMatch.UBP", 0] },
                 { $ifNull: ["$elements.materials.volume", 0] },
-                { $ifNull: ["$material.density", 1] }
-              ]
-            }
+                { $ifNull: ["$material.density", 1] },
+              ],
+            },
           },
           penre: {
             $sum: {
               $multiply: [
                 { $ifNull: ["$kbobMatch.PENRE", 0] },
                 { $ifNull: ["$elements.materials.volume", 0] },
-                { $ifNull: ["$material.density", 1] }
-              ]
-            }
-          }
-        }
-      }
+                { $ifNull: ["$material.density", 1] },
+              ],
+            },
+          },
+        },
+      },
     ]).exec();
 
     // If no projects or materials found, return zeros
     const totalEmissions = projects[0] || {
       gwp: 0,
       ubp: 0,
-      penre: 0
+      penre: 0,
     };
 
     return NextResponse.json(totalEmissions);

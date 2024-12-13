@@ -1,21 +1,23 @@
 "use client";
 
-import { useState } from "react";
-import { ImageIcon } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { useToast } from "@/hooks/use-toast";
-import Image from "next/image";
 import { uploadProjectImage } from "@/app/actions/upload-image";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+import { useToast } from "@/hooks/use-toast";
+import { ImageIcon } from "lucide-react";
+import Image from "next/image";
+import { useState } from "react";
 
 interface ProjectImageUploadProps {
   projectId: string;
   imageUrl?: string;
+  className?: string;
 }
 
 export function ProjectImageUpload({
   projectId,
   imageUrl,
+  className,
 }: ProjectImageUploadProps) {
   const [isUploading, setIsUploading] = useState(false);
   const [currentImageUrl, setCurrentImageUrl] = useState(imageUrl);
@@ -56,7 +58,6 @@ export function ProjectImageUpload({
 
   return (
     <Card className="h-full flex flex-col">
-
       <CardContent className="flex-1 p-0">
         <div className="h-full flex flex-col items-center justify-center w-full rounded-xl bg-muted/5 hover:bg-muted/10 transition-colors">
           {currentImageUrl ? (

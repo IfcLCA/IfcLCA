@@ -2,7 +2,6 @@ import { NextResponse } from "next/server";
 import { connectToDatabase } from "@/lib/mongodb";
 import { Material, MaterialDeletion } from "@/models";
 import { auth } from "@clerk/nextjs/server";
-import mongoose from "mongoose";
 
 export async function DELETE(
   request: Request,
