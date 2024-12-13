@@ -64,7 +64,7 @@ export function GraphPageComponent({ materialsData }: Props) {
   const [groupingMode, setGroupingMode] = useState<GroupingMode>("elements");
   const [chartData, setChartData] = useState<any[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
-  const [colorTheme, setColorTheme] = useState<ColorTheme>("standard");
+  const [colorTheme, setColorTheme] = useState<ColorTheme>("colorful");
 
   // Memoize the unique materials to prevent unnecessary recalculations
   const uniqueMaterials = useMemo(() => {
@@ -80,7 +80,7 @@ export function GraphPageComponent({ materialsData }: Props) {
           ? material.ifcMaterial || "Unknown Ifc Material"
           : groupingMode === "ifcEntity"
           ? material.category || "Unknown Entity Type"
-          : material.name;
+          : material.name || "Unnamed Element";
 
       const existingMaterial = materials.get(key);
 
@@ -378,21 +378,43 @@ export function GraphPageComponent({ materialsData }: Props) {
     const getColor = (index: number, value?: number) => {
       switch (colorTheme) {
         case "standard":
-          return "hsl(var(--primary))"; // Orange theme color
+          // Use fixed opacity steps for better visibility
+          const opacitySteps = [
+            1, 0.9, 0.8, 0.7, 0.6, 0.5, 0.4, 0.35, 0.3, 0.25,
+          ];
+
+          if (chartType === "bubble" && value !== undefined) {
+            // For bubble chart, calculate opacity based on the emission value
+            const minValue = Math.min(
+              ...chartData.map((item) => item[selectedIndicator] || 0)
+            );
+            const maxValue = Math.max(
+              ...chartData.map((item) => item[selectedIndicator] || 0)
+            );
+            const normalizedValue = (value - minValue) / (maxValue - minValue);
+            const opacity = 0.25 + normalizedValue * 0.75; // Scale between 0.25 and 1.0
+            return `rgba(255, 100, 0, ${opacity})`;
+          }
+
+          // For other chart types, use the index-based opacity steps
+          const opacity =
+            opacitySteps[index] || opacitySteps[opacitySteps.length - 1];
+          return `rgba(255, 100, 0, ${opacity})`;
         case "bw":
-          return "#000000";
+          const isDarkMode =
+            document.documentElement.classList.contains("dark");
+          return isDarkMode ? "#FFFFFF" : "#000000";
         case "colorful":
-          // Get the value for gradient calculation
+          // Rest of the colorful theme code remains the same
           let gradientValue: number;
           if (value !== undefined) {
             gradientValue = value;
           } else if (chartData[index]) {
             gradientValue = chartData[index][selectedIndicator] || 0;
           } else {
-            return "#ff7f0e"; // Fallback to orange if no value available
+            return "#1f77b4";
           }
 
-          // Calculate gradient color based on emission value
           const minValue = Math.min(
             ...chartData.map((item) => item[selectedIndicator] || 0)
           );
@@ -402,7 +424,6 @@ export function GraphPageComponent({ materialsData }: Props) {
           const normalizedValue =
             (gradientValue - minValue) / (maxValue - minValue);
 
-          // Interpolate from red (high emissions) to more muted green (low emissions)
           const red = Math.round(255 * normalizedValue);
           const green = Math.round(120 + 30 * (1 - normalizedValue));
           const blue = Math.round(90 * (1 - normalizedValue));
@@ -421,6 +442,8 @@ export function GraphPageComponent({ materialsData }: Props) {
               interval={0}
               tick={(props) => {
                 const { x, y, payload } = props;
+                if (chartData.length > 50) return null;
+
                 return (
                   <g transform={`translate(${x},${y})`}>
                     <text
@@ -480,8 +503,27 @@ export function GraphPageComponent({ materialsData }: Props) {
             <CartesianGrid strokeDasharray="3 3" />
             <XAxis
               dataKey="name"
-              tick={{
-                fill: "hsl(var(--foreground))",
+              height={120}
+              interval={0}
+              tick={(props) => {
+                const { x, y, payload } = props;
+                if (chartData.length > 50) return null;
+
+                return (
+                  <g transform={`translate(${x},${y})`}>
+                    <text
+                      x={0}
+                      y={0}
+                      dy={16}
+                      textAnchor="end"
+                      fill="hsl(var(--foreground))"
+                      fontSize={12}
+                      transform="rotate(-45)"
+                    >
+                      {payload.value}
+                    </text>
+                  </g>
+                );
               }}
             />
             <YAxis
@@ -532,9 +574,29 @@ export function GraphPageComponent({ materialsData }: Props) {
               cx="50%"
               cy="50%"
               outerRadius={150}
-              label={({ name, percent }) =>
-                `${name} (${(percent * 100).toFixed(1)}%)`
-              }
+              labelLine={({ percent }) => {
+                // Hide label lines for the same conditions as labels
+                const minPercent =
+                  chartData.length > 50
+                    ? 0.01
+                    : chartData.length > 20
+                    ? 0.02
+                    : 0;
+                return percent > minPercent;
+              }}
+              label={({ name, percent }) => {
+                // Only show label if the slice is more than 2% of the total for datasets > 20 items
+                // or more than 1% for datasets > 50 items
+                const minPercent =
+                  chartData.length > 50
+                    ? 0.01
+                    : chartData.length > 20
+                    ? 0.02
+                    : 0;
+                return percent > minPercent
+                  ? `${name} (${(percent * 100).toFixed(1)}%)`
+                  : "";
+              }}
             >
               {chartData.map((entry, index) => (
                 <Cell
@@ -734,10 +796,13 @@ export function GraphPageComponent({ materialsData }: Props) {
                         </div>
                         {Array.from(uniqueMaterials.entries())
                           .sort((a, b) => b[1].volume - a[1].volume)
-                          .filter(([name]) =>
-                            name
-                              .toLowerCase()
-                              .includes(searchTerm.toLowerCase())
+                          .filter(
+                            ([name]) =>
+                              name &&
+                              typeof name === "string" &&
+                              name
+                                .toLowerCase()
+                                .includes(searchTerm.toLowerCase())
                           )
                           .map(([name, material]) => (
                             <div
@@ -749,7 +814,9 @@ export function GraphPageComponent({ materialsData }: Props) {
                                 checked={selectedMaterials.includes(name)}
                                 className="mr-2"
                               />
-                              <span className="flex-1 truncate">{name}</span>
+                              <span className="flex-1 truncate">
+                                {name || "Unnamed Element"}
+                              </span>
                               {material.volume > 0 && (
                                 <span className="ml-2 text-muted-foreground">
                                   ({material.volume.toFixed(2)} m³)

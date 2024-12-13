@@ -96,9 +96,21 @@ export const elementsColumns: ColumnDef<Element>[] = [
     cell: ({ row }) => (
       <div className="flex flex-wrap gap-2">
         {row.original.loadBearing && (
-          <Badge variant="secondary">Load Bearing</Badge>
+          <Badge
+            variant="secondary"
+            className="bg-primary/10 text-primary border-primary/20"
+          >
+            Load Bearing
+          </Badge>
         )}
-        {row.original.isExternal && <Badge variant="secondary">External</Badge>}
+        {row.original.isExternal && (
+          <Badge
+            variant="secondary"
+            className="bg-primary/10 text-primary border-primary/20"
+          >
+            External
+          </Badge>
+        )}
       </div>
     ),
     sortingFn: (rowA, rowB, columnId) => {

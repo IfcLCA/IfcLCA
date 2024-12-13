@@ -41,7 +41,12 @@ export const materialsColumns: ColumnDef<Material>[] = [
           {kbobName}
         </div>
       ) : (
-        <Badge variant="outline">No Match</Badge>
+        <Badge
+          variant="outline"
+          className="bg-primary/10 text-primary border-primary/20"
+        >
+          No Match
+        </Badge>
       );
     },
   },
@@ -61,7 +66,15 @@ export const materialsColumns: ColumnDef<Material>[] = [
     header: "Density (kg/m³)",
     cell: ({ row }) => {
       const density = row.original.material?.density;
-      if (!density) return <Badge variant="outline">Not Set</Badge>;
+      if (!density)
+        return (
+          <Badge
+            variant="outline"
+            className="bg-primary/10 text-primary border-primary/20"
+          >
+            Not Set
+          </Badge>
+        );
       return density.toLocaleString("de-CH", {
         minimumFractionDigits: 0,
         maximumFractionDigits: 0,
