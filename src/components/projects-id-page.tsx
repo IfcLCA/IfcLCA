@@ -652,44 +652,31 @@ const MaterialsTab = ({ project }: { project: Project }) => {
 };
 
 const GraphTab = ({ project }: { project: Project }) => {
-  const materialsData = useMemo(() => {
-    // Use the same grouping logic as MaterialsTab
-    const materialGroups = project.elements.reduce((acc, element) => {
-      element.materials.forEach((mat) => {
-        const key = mat.material._id;
-        if (!acc[key]) {
-          acc[key] = {
-            name: mat.material.name,
-            ifcMaterial: mat.material.name,
-            kbobMaterial: mat.material.kbobMatch?.Name,
-            category: element.type,
-            volume: 0,
-            indicators: {
-              gwp: 0,
-              ubp: 0,
-              penre: 0,
-            },
-          };
-        }
-        acc[key].volume += mat.volume;
-        acc[key].indicators.gwp +=
-          mat.volume *
-          (mat.material.density || 0) *
-          (mat.material.kbobMatch?.GWP || 0);
-        acc[key].indicators.ubp +=
-          mat.volume *
-          (mat.material.density || 0) *
-          (mat.material.kbobMatch?.UBP || 0);
-        acc[key].indicators.penre +=
-          mat.volume *
-          (mat.material.density || 0) *
-          (mat.material.kbobMatch?.PENRE || 0);
-      });
-      return acc;
-    }, {} as Record<string, any>);
-
-    return Object.values(materialGroups);
-  }, [project]);
+  const materialsData = project.elements.flatMap((element) =>
+    // Create one entry per element-material combination
+    element.materials.map((material) => ({
+      name: element.name, // Element name from elements table
+      elementName: element.name, // Explicit element name for grouping
+      ifcMaterial: material.material?.name || "Unknown",
+      kbobMaterial: material.material?.kbobMatch?.Name,
+      category: element.type, // IFC entity type
+      volume: material.volume, // Use individual material volume
+      indicators: {
+        gwp:
+          material.volume *
+          (material.material?.density || 0) *
+          (material.material?.kbobMatch?.GWP || 0),
+        ubp:
+          material.volume *
+          (material.material?.density || 0) *
+          (material.material?.kbobMatch?.UBP || 0),
+        penre:
+          material.volume *
+          (material.material?.density || 0) *
+          (material.material?.kbobMatch?.PENRE || 0),
+      },
+    }))
+  );
 
   return (
     <div className="space-y-4">

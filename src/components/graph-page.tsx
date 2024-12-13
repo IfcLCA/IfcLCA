@@ -37,6 +37,7 @@ type ColorTheme = "standard" | "bw" | "colorful";
 
 interface MaterialData {
   name: string;
+  elementName: string;
   ifcMaterial: string;
   kbobMaterial?: string;
   category?: string;
@@ -48,7 +49,7 @@ interface MaterialData {
   };
 }
 
-type GroupingMode = "elements" | "kbobMaterials" | "ifcMaterials";
+type GroupingMode = "elements" | "kbobMaterials" | "ifcMaterials" | "ifcEntity";
 
 interface Props {
   materialsData: MaterialData[];
@@ -77,6 +78,8 @@ export function GraphPageComponent({ materialsData }: Props) {
           ? material.kbobMaterial || "Unknown KBOB Material"
           : groupingMode === "ifcMaterials"
           ? material.ifcMaterial || "Unknown Ifc Material"
+          : groupingMode === "ifcEntity"
+          ? material.category || "Unknown Entity Type"
           : material.name;
 
       const existingMaterial = materials.get(key);
@@ -95,7 +98,7 @@ export function GraphPageComponent({ materialsData }: Props) {
           ifcMaterial: material.ifcMaterial,
         });
       } else {
-        // Aggregate volumes and indicators
+        // Aggregate volumes and indicators for the same element
         materials.set(key, {
           ...existingMaterial,
           volume: (existingMaterial.volume || 0) + (material.volume || 0),
@@ -644,6 +647,22 @@ export function GraphPageComponent({ materialsData }: Props) {
     }
   };
 
+  // Add a helper function to get the appropriate label
+  const getSelectionLabel = (groupingMode: GroupingMode) => {
+    switch (groupingMode) {
+      case "elements":
+        return "elements";
+      case "kbobMaterials":
+        return "KBOB materials";
+      case "ifcMaterials":
+        return "IFC materials";
+      case "ifcEntity":
+        return "IFC entities";
+      default:
+        return "items";
+    }
+  };
+
   if (!materialsData?.length) {
     return (
       <div className="flex items-center justify-center h-[400px]">
@@ -662,7 +681,7 @@ export function GraphPageComponent({ materialsData }: Props) {
           <div className="flex flex-col gap-4">
             <div className="flex gap-4 items-start">
               <div className="flex-1">
-                <Label className="mb-2 block">Materials</Label>
+                <Label className="mb-2 block">Selection</Label>
                 <Select
                   value={JSON.stringify(selectedMaterials)}
                   onValueChange={(value) => {
@@ -674,8 +693,8 @@ export function GraphPageComponent({ materialsData }: Props) {
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="Select materials">
-                      {selectedMaterials.length} material
-                      {selectedMaterials.length !== 1 ? "s" : ""} selected
+                      {selectedMaterials.length}{" "}
+                      {getSelectionLabel(groupingMode)} selected
                     </SelectValue>
                   </SelectTrigger>
                   <SelectContent>
@@ -709,7 +728,9 @@ export function GraphPageComponent({ materialsData }: Props) {
                             }
                             className="mr-2"
                           />
-                          <span>Select All</span>
+                          <span>
+                            Select All {getSelectionLabel(groupingMode)}
+                          </span>
                         </div>
                         {Array.from(uniqueMaterials.entries())
                           .sort((a, b) => b[1].volume - a[1].volume)
@@ -752,24 +773,13 @@ export function GraphPageComponent({ materialsData }: Props) {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="gwp">
-                      Global Warming Potential
-                    </SelectItem>
-                    <SelectItem value="odp">
-                      Ozone Depletion Potential
-                    </SelectItem>
-                    <SelectItem value="ap">Acidification Potential</SelectItem>
-                    <SelectItem value="ep">Eutrophication Potential</SelectItem>
-                    <SelectItem value="pocp">
-                      Photochemical Ozone Creation Potential
-                    </SelectItem>
-                    <SelectItem value="penrt">
-                      Total Non-Renewable Primary Energy
-                    </SelectItem>
-                    <SelectItem value="pert">
-                      Total Renewable Primary Energy
+                      Global Warming Potential (kg CO₂ eq)
                     </SelectItem>
                     <SelectItem value="ubp">
-                      Environmental Impact Points
+                      Environmental Impact Points (UBP)
+                    </SelectItem>
+                    <SelectItem value="penre">
+                      Primary Energy Non-Renewable (kWh oil-eq)
                     </SelectItem>
                   </SelectContent>
                 </Select>
@@ -806,6 +816,9 @@ export function GraphPageComponent({ materialsData }: Props) {
                     </SelectItem>
                     <SelectItem value="ifcMaterials">
                       Group by Ifc Materials
+                    </SelectItem>
+                    <SelectItem value="ifcEntity">
+                      Group by Ifc Entity
                     </SelectItem>
                   </SelectContent>
                 </Select>

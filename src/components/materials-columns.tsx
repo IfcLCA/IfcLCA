@@ -28,13 +28,24 @@ export const materialsColumns: ColumnDef<Material>[] = [
   {
     accessorKey: "material.name",
     header: "IFC Material",
+    cell: ({ row }) => (
+      <div className="truncate max-w-[200px] lg:max-w-[300px]">
+        {row.original.material?.name}
+      </div>
+    ),
   },
   {
     accessorKey: "material.kbobMatch.Name",
     header: "KBOB Material",
     cell: ({ row }) => {
       const kbobName = row.original.material?.kbobMatch?.Name;
-      return kbobName || <Badge variant="outline">No Match</Badge>;
+      return kbobName ? (
+        <div className="truncate max-w-[200px] lg:max-w-[300px]">
+          {kbobName}
+        </div>
+      ) : (
+        <Badge variant="outline">No Match</Badge>
+      );
     },
   },
   {
