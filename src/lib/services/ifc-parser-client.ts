@@ -1,4 +1,5 @@
 import { logger } from "@/lib/logger";
+import { parseIfcWithWasm, APIElement } from "./ifc-wasm-parser";
 
 export interface IFCParseResult {
   uploadId: string;
@@ -6,27 +7,6 @@ export interface IFCParseResult {
   materialCount: number;
   unmatchedMaterialCount: number;
   shouldRedirectToLibrary: boolean;
-}
-
-interface APIElement {
-  id: string;
-  type: string;
-  object_type: string;
-  properties: {
-    name: string;
-    level?: string;
-    loadBearing?: boolean;
-    isExternal?: boolean;
-  };
-  volume?: number;
-  area?: number;
-  materials?: string[];
-  material_volumes?: {
-    [key: string]: {
-      volume: number;
-      fraction: number;
-    };
-  };
 }
 
 export async function parseIFCFile(
@@ -58,78 +38,15 @@ export async function parseIFCFile(
       throw new Error(responseData.error || "Failed to create upload record");
     }
 
-    // Create FormData for file upload
-    const formData = new FormData();
-    formData.append("file", file);
-
-    // Process Ifc file
-    const response = await fetch("/api/ifc/process", {
-      method: "POST",
-      body: formData,
+    // Parse the Ifc file locally using IfcOpenShell WASM
+    logger.debug("Parsing Ifc file locally using IfcOpenShell WASM");
+    const elements: APIElement[] = await parseIfcWithWasm(file);
+    const materials = new Set<string>();
+    elements.forEach((element) => {
+      if (element.materials) {
+        element.materials.forEach((m) => materials.add(m));
+      }
     });
-
-    if (!response.ok) {
-      throw new Error("Failed to process Ifc file");
-    }
-
-    // Process the streamed response
-    const reader = response.body!.getReader();
-    const decoder = new TextDecoder();
-    let elements: APIElement[] = [];
-    let materials = new Set<string>();
-    let buffer = "";
-
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-
-      // Append new chunk to buffer and split by newlines
-      buffer += decoder.decode(value, { stream: true });
-      const lines = buffer.split("\n");
-
-      // Keep the last partial line in buffer
-      buffer = lines.pop() || "";
-
-      for (const line of lines) {
-        if (!line.trim()) continue;
-
-        try {
-          const data = JSON.parse(line);
-
-          if (data.status === "complete" && data.elements) {
-            elements = data.elements;
-            // Extract unique materials
-            elements.forEach((element) => {
-              if (element.materials) {
-                element.materials.forEach((material) =>
-                  materials.add(material)
-                );
-              }
-            });
-          }
-        } catch (e) {
-          logger.error("Error parsing JSON line:", { line, error: e });
-          continue;
-        }
-      }
-    }
-
-    // Process any remaining buffer
-    if (buffer.trim()) {
-      try {
-        const data = JSON.parse(buffer);
-        if (data.status === "complete" && data.elements) {
-          elements = data.elements;
-          elements.forEach((element) => {
-            if (element.materials) {
-              element.materials.forEach((material) => materials.add(material));
-            }
-          });
-        }
-      } catch (e) {
-        logger.error("Error parsing final JSON buffer:", { buffer, error: e });
-      }
-    }
 
     // Process materials
     const materialNames = Array.from(materials);
