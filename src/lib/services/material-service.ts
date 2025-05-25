@@ -411,14 +411,22 @@ export class MaterialService {
    * Finds existing material match across all projects
    */
   static async findExistingMaterial(
-    materialName: string
+    materialName: string,
+    userId: string
   ): Promise<(mongoose.Document & IMaterial) | null> {
     const cleanedName = materialName.trim().toLowerCase();
 
     try {
-      // Try exact match first
+      // Get projects belonging to the user
+      const userProjects = await Project.find({ userId })
+        .select("_id")
+        .lean();
+      const projectIds = userProjects.map((p) => p._id);
+
+      // Try exact match first within user's projects
       const exactMatch = await Material.findOne({
         name: materialName,
+        projectId: { $in: projectIds },
         kbobMatchId: { $exists: true },
       })
         .populate("kbobMatchId")
@@ -431,6 +439,7 @@ export class MaterialService {
       // Try case-insensitive match
       const caseInsensitiveMatch = await Material.findOne({
         name: { $regex: `^${cleanedName}$`, $options: "i" },
+        projectId: { $in: projectIds },
         kbobMatchId: { $exists: true },
       })
         .populate("kbobMatchId")
