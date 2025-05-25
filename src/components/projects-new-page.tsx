@@ -33,9 +33,7 @@ const formSchema = z.object({
   name: z.string().min(2, {
     message: "Project name must be at least 2 characters.",
   }),
-  description: z.string().min(10, {
-    message: "Description must be at least 10 characters.",
-  }),
+  description: z.string().optional(),
 });
 
 export default function ProjectsNewPage() {
@@ -203,10 +201,10 @@ export default function ProjectsNewPage() {
                 name="description"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Description</FormLabel>
+                    <FormLabel>Description (optional)</FormLabel>
                     <FormControl>
                       <Textarea
-                        placeholder="Enter project description"
+                        placeholder="Enter project description (optional)"
                         {...field}
                       />
                     </FormControl>
