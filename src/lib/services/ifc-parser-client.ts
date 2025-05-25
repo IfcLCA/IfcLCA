@@ -110,11 +110,24 @@ export async function parseIFCFile(
             globalId: element.id,
             type: element.type,
             name: element.object_type,
-            netVolume: element.volume || 0,
+            volume: element.volume || 0,
             properties: {
               loadBearing: element.properties.loadBearing || false,
               isExternal: element.properties.isExternal || false,
             },
+            materials:
+              element.materials?.map((materialName) => {
+                const materialVolumeData =
+                  element.material_volumes?.[materialName];
+                const materialVolume =
+                  materialVolumeData?.volume ||
+                  (element.volume || 0) / (element.materials?.length || 1);
+
+                return {
+                  name: materialName,
+                  volume: materialVolume,
+                };
+              }) || [],
             materialLayers: element.material_volumes
               ? {
                   layerSetName: `${element.type}_Layers`,

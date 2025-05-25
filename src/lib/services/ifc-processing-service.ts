@@ -58,6 +58,11 @@ export class IFCProcessingService {
         })
       );
 
+      logger.debug("Unique materials found", {
+        count: uniqueMaterialNames.size,
+        materials: Array.from(uniqueMaterialNames),
+      });
+
       // Create materials first
       const materialOps = Array.from(uniqueMaterialNames).map((name) => ({
         updateOne: {
@@ -79,7 +84,13 @@ export class IFCProcessingService {
         },
       }));
 
-      await Material.bulkWrite(materialOps, { session });
+      const materialResult = await Material.bulkWrite(materialOps, { session });
+
+      logger.debug("Material creation result", {
+        upsertedCount: materialResult.upsertedCount,
+        modifiedCount: materialResult.modifiedCount,
+        matchedCount: materialResult.matchedCount,
+      });
 
       // Get all materials with their matches
       const materials = await Material.find({
@@ -254,10 +265,25 @@ export class IFCProcessingService {
     session: ClientSession
   ) {
     try {
+      logger.debug("Starting automatic material matching", {
+        materialCount: materialNames.length,
+        materials: materialNames,
+      });
+
       const matches = await Promise.all(
         materialNames.map(async (name) => {
           const bestMatch = await MaterialService.findBestKBOBMatch(name);
-          if (!bestMatch || bestMatch.score < 0.9) return null;
+          if (!bestMatch || bestMatch.score < 0.9) {
+            logger.debug(`No good match found for material: ${name}`, {
+              score: bestMatch?.score || 0,
+            });
+            return null;
+          }
+
+          logger.debug(`Found match for material: ${name}`, {
+            kbobMaterial: bestMatch.kbobMaterial.Name,
+            score: bestMatch.score,
+          });
 
           return {
             name,
@@ -269,16 +295,41 @@ export class IFCProcessingService {
         })
       );
 
-      // Filter out failed matches and create materials
+      // Filter out failed matches and update materials with matches
       const validMatches = matches.filter((m) => m !== null);
+
+      logger.debug("Automatic matching results", {
+        totalMaterials: materialNames.length,
+        validMatches: validMatches.length,
+        matchedMaterials: validMatches.map((m) => m.name),
+      });
+
       if (validMatches.length > 0) {
-        await Material.insertMany(
-          validMatches.map((match) => ({
-            ...match,
-            projectId,
-          })),
-          { session }
-        );
+        const matchOps = validMatches.map((match) => ({
+          updateOne: {
+            filter: {
+              name: match.name,
+              projectId: new mongoose.Types.ObjectId(projectId),
+            },
+            update: {
+              $set: {
+                kbobMatchId: match.kbobMatchId,
+                density: match.density,
+                matchScore: match.matchScore,
+                autoMatched: match.autoMatched,
+                updatedAt: new Date(),
+              },
+            },
+            upsert: false, // Don't create new materials, only update existing ones
+          },
+        }));
+
+        const matchResult = await Material.bulkWrite(matchOps, { session });
+
+        logger.debug("Material matching update result", {
+          modifiedCount: matchResult.modifiedCount,
+          matchedCount: matchResult.matchedCount,
+        });
       }
 
       return {
