@@ -147,6 +147,113 @@ export async function GET(
         },
       },
       {
+        $lookup: {
+          from: "materials",
+          localField: "_id",
+          foreignField: "projectId",
+          as: "materials",
+          pipeline: [
+            {
+              $lookup: {
+                from: "indicatorsKBOB",
+                localField: "kbobMatchId",
+                foreignField: "_id",
+                as: "kbobMatch",
+              },
+            },
+            {
+              $unwind: {
+                path: "$kbobMatch",
+                preserveNullAndEmptyArrays: true,
+              },
+            },
+            {
+              $lookup: {
+                from: "elements",
+                let: { materialId: "$_id" },
+                pipeline: [
+                  {
+                    $match: {
+                      $expr: {
+                        $in: ["$$materialId", "$materials.material"],
+                      },
+                    },
+                  },
+                  {
+                    $unwind: "$materials",
+                  },
+                  {
+                    $match: {
+                      $expr: {
+                        $eq: ["$materials.material", "$$materialId"],
+                      },
+                    },
+                  },
+                  {
+                    $group: {
+                      _id: null,
+                      totalVolume: { $sum: "$materials.volume" },
+                    },
+                  },
+                ],
+                as: "volumeData",
+              },
+            },
+            {
+              $addFields: {
+                volume: {
+                  $ifNull: [
+                    { $arrayElemAt: ["$volumeData.totalVolume", 0] },
+                    0,
+                  ],
+                },
+                gwp: {
+                  $multiply: [
+                    {
+                      $ifNull: [
+                        { $arrayElemAt: ["$volumeData.totalVolume", 0] },
+                        0,
+                      ],
+                    },
+                    { $ifNull: ["$density", 0] },
+                    { $ifNull: ["$kbobMatch.GWP", 0] },
+                  ],
+                },
+                ubp: {
+                  $multiply: [
+                    {
+                      $ifNull: [
+                        { $arrayElemAt: ["$volumeData.totalVolume", 0] },
+                        0,
+                      ],
+                    },
+                    { $ifNull: ["$density", 0] },
+                    { $ifNull: ["$kbobMatch.UBP", 0] },
+                  ],
+                },
+                penre: {
+                  $multiply: [
+                    {
+                      $ifNull: [
+                        { $arrayElemAt: ["$volumeData.totalVolume", 0] },
+                        0,
+                      ],
+                    },
+                    { $ifNull: ["$density", 0] },
+                    { $ifNull: ["$kbobMatch.PENRE", 0] },
+                  ],
+                },
+              },
+            },
+            {
+              $project: {
+                volumeData: 0,
+              },
+            },
+          ],
+        },
+      },
+      {
         $addFields: {
           elementCount: { $size: "$elements" },
           uploadCount: { $size: "$uploads" },

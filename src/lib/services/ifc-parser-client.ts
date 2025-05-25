@@ -1,4 +1,9 @@
 import { logger } from "@/lib/logger";
+import {
+  parseIfcWithWasm,
+  IFCParseResult as WASMParseResult,
+  APIElement,
+} from "./ifc-wasm-parser";
 
 export interface IFCParseResult {
   uploadId: string;
@@ -6,27 +11,6 @@ export interface IFCParseResult {
   materialCount: number;
   unmatchedMaterialCount: number;
   shouldRedirectToLibrary: boolean;
-}
-
-interface APIElement {
-  id: string;
-  type: string;
-  object_type: string;
-  properties: {
-    name: string;
-    level?: string;
-    loadBearing?: boolean;
-    isExternal?: boolean;
-  };
-  volume?: number;
-  area?: number;
-  materials?: string[];
-  material_volumes?: {
-    [key: string]: {
-      volume: number;
-      fraction: number;
-    };
-  };
 }
 
 export async function parseIFCFile(
@@ -58,78 +42,96 @@ export async function parseIFCFile(
       throw new Error(responseData.error || "Failed to create upload record");
     }
 
-    // Create FormData for file upload
-    const formData = new FormData();
-    formData.append("file", file);
+    // Parse the Ifc file locally using IfcOpenShell WASM
+    logger.debug("Parsing Ifc file locally using IfcOpenShell WASM");
+    const parseResult: WASMParseResult = await parseIfcWithWasm(file);
+    const elements = parseResult.elements;
 
-    // Process Ifc file
-    const response = await fetch("/api/ifc/process", {
-      method: "POST",
-      body: formData,
+    // Debug: Log the parse result structure
+    logger.debug("WASM Parse Result", {
+      totalElements: parseResult.total_elements,
+      totalMaterialsFound: parseResult.total_materials_found,
+      totalMaterialVolumesFound: parseResult.total_material_volumes_found,
+      debugInfo: parseResult.debug,
     });
 
-    if (!response.ok) {
-      throw new Error("Failed to process Ifc file");
-    }
-
-    // Process the streamed response
-    const reader = response.body!.getReader();
-    const decoder = new TextDecoder();
-    let elements: APIElement[] = [];
-    let materials = new Set<string>();
-    let buffer = "";
-
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-
-      // Append new chunk to buffer and split by newlines
-      buffer += decoder.decode(value, { stream: true });
-      const lines = buffer.split("\n");
-
-      // Keep the last partial line in buffer
-      buffer = lines.pop() || "";
-
-      for (const line of lines) {
-        if (!line.trim()) continue;
-
-        try {
-          const data = JSON.parse(line);
-
-          if (data.status === "complete" && data.elements) {
-            elements = data.elements;
-            // Extract unique materials
-            elements.forEach((element) => {
-              if (element.materials) {
-                element.materials.forEach((material) =>
-                  materials.add(material)
-                );
-              }
-            });
+    // Debug: Log the structure of the first few elements
+    logger.debug("Parsed elements structure", {
+      elementCount: elements.length,
+      firstElement: elements[0]
+        ? {
+            id: elements[0].id,
+            type: elements[0].type,
+            object_type: elements[0].object_type,
+            volume: elements[0].volume,
+            materials: elements[0].materials,
+            material_volumes: elements[0].material_volumes,
+            hasDirectMaterials: !!elements[0].materials,
+            hasMaterialVolumes: !!elements[0].material_volumes,
+            materialVolumesKeys: elements[0].material_volumes
+              ? Object.keys(elements[0].material_volumes)
+              : [],
           }
-        } catch (e) {
-          logger.error("Error parsing JSON line:", { line, error: e });
-          continue;
-        }
-      }
-    }
+        : null,
+      secondElement: elements[1]
+        ? {
+            id: elements[1].id,
+            type: elements[1].type,
+            materials: elements[1].materials,
+            material_volumes: elements[1].material_volumes,
+            hasDirectMaterials: !!elements[1].materials,
+            hasMaterialVolumes: !!elements[1].material_volumes,
+            materialVolumesKeys: elements[1].material_volumes
+              ? Object.keys(elements[1].material_volumes)
+              : [],
+          }
+        : null,
+    });
 
-    // Process any remaining buffer
-    if (buffer.trim()) {
-      try {
-        const data = JSON.parse(buffer);
-        if (data.status === "complete" && data.elements) {
-          elements = data.elements;
-          elements.forEach((element) => {
-            if (element.materials) {
-              element.materials.forEach((material) => materials.add(material));
-            }
-          });
-        }
-      } catch (e) {
-        logger.error("Error parsing final JSON buffer:", { buffer, error: e });
+    const materials = new Set<string>();
+    let directMaterialCount = 0;
+    let layerMaterialCount = 0;
+
+    elements.forEach((element: APIElement, index: number) => {
+      // Extract materials from direct materials array
+      if (element.materials) {
+        element.materials.forEach((m: string) => {
+          materials.add(m);
+          directMaterialCount++;
+        });
       }
-    }
+      // Also extract materials from material_volumes (material layers)
+      if (element.material_volumes) {
+        Object.keys(element.material_volumes).forEach(
+          (materialName: string) => {
+            materials.add(materialName);
+            layerMaterialCount++;
+          }
+        );
+      }
+
+      // Debug each element
+      if (index < 3) {
+        // Log first 3 elements
+        logger.debug(`Element ${index} material analysis`, {
+          elementId: element.id,
+          type: element.type,
+          directMaterials: element.materials || [],
+          materialVolumes: element.material_volumes || {},
+          foundMaterials: element.materials?.length || 0,
+          foundMaterialVolumes: element.material_volumes
+            ? Object.keys(element.material_volumes).length
+            : 0,
+        });
+      }
+    });
+
+    logger.debug("Material extraction summary", {
+      totalUniqueMaterials: materials.size,
+      directMaterialReferences: directMaterialCount,
+      layerMaterialReferences: layerMaterialCount,
+      materials: Array.from(materials),
+    });
 
     // Process materials
     const materialNames = Array.from(materials);
@@ -189,15 +191,28 @@ export async function parseIFCFile(
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           uploadId: responseData.uploadId,
-          elements: elements.map((element) => ({
+          elements: elements.map((element: APIElement) => ({
             globalId: element.id,
             type: element.type,
             name: element.object_type,
-            netVolume: element.volume || 0,
+            volume: element.volume || 0,
             properties: {
               loadBearing: element.properties.loadBearing || false,
               isExternal: element.properties.isExternal || false,
             },
+            materials:
+              element.materials?.map((materialName: string) => {
+                const materialVolumeData =
+                  element.material_volumes?.[materialName];
+                const materialVolume =
+                  materialVolumeData?.volume ||
+                  (element.volume || 0) / (element.materials?.length || 1);
+
+                return {
+                  name: materialName,
+                  volume: materialVolume,
+                };
+              }) || [],
             materialLayers: element.material_volumes
               ? {
                   layerSetName: `${element.type}_Layers`,
