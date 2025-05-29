@@ -267,20 +267,24 @@ export default function LandingPage() {
           </div>
           <nav className="flex flex-wrap justify-center gap-4 mb-4 md:mb-0">
             <Link
-              href="#"
+              href="https://github.com/IfcLCA/IfcLCA"
               className="text-sm text-gray-600 hover:text-gray-800 dark:text-gray-300 dark:hover:text-white"
+              target="_blank"
+              rel="noopener noreferrer"
             >
               GitHub
             </Link>
             <Link
-              href="#"
+              href="/documentation"
               className="text-sm text-gray-600 hover:text-gray-800 dark:text-gray-300 dark:hover:text-white"
             >
               Documentation
             </Link>
             <Link
-              href="#"
+              href="https://www.lt.plus"
               className="text-sm text-gray-600 hover:text-gray-800 dark:text-gray-300 dark:hover:text-white"
+              target="_blank"
+              rel="noopener noreferrer"
             >
               Contact
             </Link>
