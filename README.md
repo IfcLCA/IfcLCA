@@ -40,3 +40,4 @@ IfcLCA leverages **openBIM** and **Open Data Standards** to analyze environmenta
 
 ## 🌍 Open Source
 IfcLCA is and will always be Open Source. Sustainability is a team effort and requires trust and transparency. The project is released under the **AGPL-3.0** license.
+
