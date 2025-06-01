@@ -13,6 +13,7 @@ import { ReloadIcon } from "@radix-ui/react-icons";
 import { UploadCloud } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useCallback, useState } from "react";
+import { useLoadingMessage } from "@/hooks/use-loading-message";
 import { useDropzone } from "react-dropzone";
 
 interface UploadModalProps {
@@ -109,6 +110,8 @@ export function UploadModal({
     disabled: isUploading,
   });
 
+  const loadingMessage = useLoadingMessage(isUploading);
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
@@ -118,8 +121,8 @@ export function UploadModal({
         {isUploading ? (
           <div className="flex flex-col items-center justify-center py-8">
             <ReloadIcon className="h-8 w-8 animate-spin text-primary mb-4" />
-            <p className="text-sm text-muted-foreground">
-              Processing Ifc file...
+            <p className="text-sm text-muted-foreground text-center">
+              {loadingMessage}
             </p>
           </div>
         ) : (
