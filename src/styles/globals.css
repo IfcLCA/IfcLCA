@@ -1,0 +1,368 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 0 0% 100%;
+    --foreground: 20 14.3% 4.1%;
+
+    --muted: 60 4.8% 95.9%;
+    --muted-foreground: 25 5.3% 44.7%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 20 14.3% 4.1%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 20 14.3% 4.1%;
+
+    --border: 20 5.9% 90%;
+    --input: 20 5.9% 90%;
+
+    --primary: 24.6 95% 53.1%;
+    --primary-foreground: 60 9.1% 97.8%;
+
+    --secondary: 60 4.8% 95.9%;
+    --secondary-foreground: 24 9.8% 10%;
+
+    --accent: 24.6 95% 53.1%;
+    --accent-foreground: 60 9.1% 97.8%;
+
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 60 9.1% 97.8%;
+
+    --ring: 24.6 95% 53.1%;
+
+    --radius: 0.5rem;
+  }
+
+  .dark {
+    --background: 20 14.3% 4.1%;
+    --foreground: 60 9.1% 97.8%;
+
+    --muted: 12 6.5% 15.1%;
+    --muted-foreground: 24 5.4% 63.9%;
+
+    --popover: 20 14.3% 4.1%;
+    --popover-foreground: 60 9.1% 97.8%;
+
+    --card: 20 14.3% 4.1%;
+    --card-foreground: 60 9.1% 97.8%;
+
+    --border: 12 6.5% 15.1%;
+    --input: 12 6.5% 15.1%;
+
+    --primary: 20.5 90.2% 48.2%;
+    --primary-foreground: 60 9.1% 97.8%;
+
+    --secondary: 12 6.5% 15.1%;
+    --secondary-foreground: 60 9.1% 97.8%;
+
+    --accent: 20.5 90.2% 48.2%;
+    --accent-foreground: 60 9.1% 97.8%;
+
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 60 9.1% 97.8%;
+
+    --ring: 20.5 90.2% 48.2%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+}
+
+/* Custom styles for IfcLCA application */
+
+@layer components {
+  .sidebar-nav {
+    @apply w-64 bg-secondary dark:bg-gray-800 h-full overflow-y-auto;
+  }
+
+  .sidebar-nav-item {
+    @apply flex items-center px-4 py-2 text-foreground dark:text-gray-200 hover:bg-accent hover:text-accent-foreground dark:hover:bg-orange-700;
+  }
+
+  .sidebar-nav-item.active {
+    @apply bg-accent text-accent-foreground dark:bg-orange-700;
+  }
+
+  .main-content {
+    @apply flex-1 p-8 overflow-y-auto;
+  }
+
+  .dashboard-card {
+    @apply bg-card text-card-foreground dark:bg-gray-800 rounded-lg shadow-md p-6;
+  }
+
+  .dashboard-stat {
+    @apply text-3xl font-bold text-primary dark:text-orange-400;
+  }
+
+  .project-card {
+    @apply bg-card text-card-foreground dark:bg-gray-800 rounded-lg shadow-md p-6 hover:shadow-lg transition-shadow duration-300;
+  }
+
+  .data-table {
+    @apply w-full border-collapse;
+  }
+
+  .data-table th,
+  .data-table td {
+    @apply border px-4 py-2 text-left;
+  }
+
+  .data-table th {
+    @apply bg-muted dark:bg-gray-700 font-semibold;
+  }
+
+  .data-table tr:nth-child(even) {
+    @apply bg-muted dark:bg-gray-900;
+  }
+
+  .data-table-cell {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .data-table-cell-first {
+    white-space: normal;
+    word-break: break-word;
+  }
+
+  .button-primary {
+    @apply bg-primary hover:bg-primary/90 text-primary-foreground font-bold py-2 px-4 rounded;
+  }
+
+  .button-secondary {
+    @apply bg-secondary hover:bg-secondary/80 text-secondary-foreground font-bold py-2 px-4 rounded;
+  }
+
+  .input-field {
+    @apply w-full px-3 py-2 text-foreground bg-background border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary;
+  }
+
+  .label {
+    @apply block text-foreground text-sm font-bold mb-2;
+  }
+
+  .modal {
+    @apply fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center;
+  }
+
+  .modal-content {
+    @apply bg-background dark:bg-gray-800 rounded-lg p-8 max-w-md w-full;
+  }
+
+  .viewer-container {
+    @apply w-full h-[calc(100vh-4rem)] relative;
+  }
+
+  .viewer-controls {
+    @apply absolute top-4 right-4 space-x-2;
+  }
+
+  .upload-history-item {
+    @apply flex items-center justify-between py-2 border-b;
+  }
+
+  .upload-history-item:last-child {
+    @apply border-b-0;
+  }
+
+  .material-library-item {
+    @apply flex items-center justify-between py-2 border-b;
+  }
+
+  .material-library-item:last-child {
+    @apply border-b-0;
+  }
+
+  .report-item {
+    @apply flex items-center justify-between py-2 border-b;
+  }
+
+  .report-item:last-child {
+    @apply border-b-0;
+  }
+
+  .main-container {
+    @apply container mx-auto p-8;
+  }
+
+  .page-header {
+    @apply flex items-center justify-between mb-8;
+  }
+
+  .page-title {
+    @apply text-3xl font-bold tracking-tight;
+  }
+
+  .page-description {
+    @apply text-muted-foreground;
+  }
+
+  .resizer {
+    position: absolute;
+    right: -3px;
+    top: 50%;
+    transform: translateY(-50%);
+    height: 24px;
+    width: 6px;
+    background: transparent;
+    cursor: col-resize;
+    user-select: none;
+    touch-action: none;
+    transition: all 0.2s;
+    z-index: 10;
+  }
+
+  .resizer::after {
+    content: '';
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    height: 20px;
+    width: 2px;
+    border-radius: 1px;
+    background: var(--border);
+    transition: all 0.2s;
+  }
+
+  .resizer:hover {
+    background: var(--primary);
+    opacity: 0.1;
+  }
+
+  .resizer:hover::after {
+    width: 2px;
+    background: var(--primary);
+    opacity: 1;
+  }
+
+  .resizer.isResizing,
+  .resizer.isResizing::after {
+    background: var(--primary);
+    opacity: 1;
+  }
+
+  @media (hover: none) {
+    .resizer {
+      opacity: 1;
+      width: 8px;
+    }
+    
+    .resizer::after {
+      width: 2px;
+    }
+  }
+
+  .select-content {
+    max-width: none !important;
+    width: var(--radix-select-trigger-width);
+    min-width: var(--radix-select-trigger-width);
+  }
+
+  .select-item {
+    padding: 8px;
+  }
+
+  .select-item[data-highlighted] {
+    @apply bg-accent;
+  }
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .sidebar-nav {
+    @apply w-full;
+  }
+
+  .main-content {
+    @apply p-4;
+  }
+
+  .dashboard-card,
+  .project-card {
+    @apply p-4;
+  }
+}
+
+/* Animations */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.fade-in {
+  animation: fadeIn 0.3s ease-in-out;
+}
+
+/* Accessibility */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border-width: 0;
+}
+
+/* Print styles */
+@media print {
+  .no-print {
+    display: none;
+  }
+
+  body {
+    font-size: 12pt;
+  }
+
+  .page-break {
+    page-break-before: always;
+  }
+}
+
+@keyframes float-slow {
+  0%,
+  100% {
+    transform: translate(0, 0);
+  }
+  50% {
+    transform: translate(10px, -20px);
+  }
+}
+
+.animate-float-slow {
+  animation-name: float-slow;
+  animation-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  animation-iteration-count: infinite;
+}
+
+@keyframes pulse-slow {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.8;
+  }
+}
+
+.animate-pulse-slow {
+  animation: pulse-slow 8s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
