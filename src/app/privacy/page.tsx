@@ -75,7 +75,7 @@ export default function PrivacyPage() {
           <p>We share data only in the following circumstances:</p>
           <ul className="list-disc pl-6 space-y-2">
             <li>With your explicit consent</li>
-            <li>With team members you've granted access to your projects</li>
+            <li>With team members you&apos;ve granted access to your projects</li>
             <li>With service providers who help operate our platform</li>
             <li>When required by law or to protect our rights</li>
           </ul>

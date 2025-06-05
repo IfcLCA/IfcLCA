@@ -307,7 +307,7 @@ export function ProjectOverview() {
           {projects.length >= 3 && (
             <div className="mt-6 text-center">
               <p className="text-sm text-muted-foreground">
-                ⚡️ You've reached the project limit during our BETA phase. More
+                ⚡️ You&apos;ve reached the project limit during our BETA phase. More
                 projects coming soon! 🚀
               </p>
             </div>
@@ -377,12 +377,12 @@ export function ProjectOverview() {
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>
-              Are you really sure you don't need it anymore?
+              Are you really sure you don&apos;t need it anymore?
             </AlertDialogTitle>
             <AlertDialogDescription className="space-y-2">
               <p>
                 We can get it back but it involves us digging into our database,
-                which we would rather avoid. So better be sure you don't need it
+                which we would rather avoid. So better be sure you don&apos;t need it
                 anymore...
               </p>
               <p>

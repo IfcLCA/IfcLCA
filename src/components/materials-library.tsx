@@ -1386,7 +1386,7 @@ export function MaterialLibraryComponent() {
             <AlertDialogDescription className="space-y-2">
               <p>
                 You have {Object.keys(temporaryMatches).length} material matches
-                that haven't been applied yet. These changes will be lost if you
+                that haven&apos;t been applied yet. These changes will be lost if you
                 leave without confirming them.
               </p>
               <p>

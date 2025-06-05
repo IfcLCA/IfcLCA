@@ -764,12 +764,12 @@ const DeleteProjectDialog = ({
     <AlertDialogContent>
       <AlertDialogHeader>
         <AlertDialogTitle>
-          Are you really sure you don't need it anymore?
+          Are you really sure you don&apos;t need it anymore?
         </AlertDialogTitle>
         <AlertDialogDescription className="space-y-2">
           <p>
             We can get it back but it involves us digging into our database,
-            which we would rather avoid. So better be sure you don't need it
+            which we would rather avoid. So better be sure you don&apos;t need it
             anymore...
           </p>
           <p>

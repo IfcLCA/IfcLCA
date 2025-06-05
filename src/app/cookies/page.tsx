@@ -13,7 +13,7 @@ export default function CookiesPage() {
           <p>
             Cookies are small text files that are stored on your device when you
             visit our website. They help us provide you with a better experience
-            and are essential for some of our website's functionality.
+            and are essential for some of our website&apos;s functionality.
           </p>
         </CardContent>
       </Card>

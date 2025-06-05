@@ -131,7 +131,7 @@ export default function TermsPage() {
         </CardHeader>
         <CardContent className="space-y-4">
           <p>
-            As per the AGPL-3.0 license, IfcLCA is provided "as is" without
+            As per the AGPL-3.0 license, IfcLCA is provided &quot;as is&quot; without
             warranty of any kind. While we strive for accuracy, IfcLCA:
           </p>
           <ul className="list-disc pl-6 space-y-2">

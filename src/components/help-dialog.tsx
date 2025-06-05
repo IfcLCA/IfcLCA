@@ -191,7 +191,7 @@ export function HelpDialog() {
                           <div>
                             <ul className="list-disc list-inside">
                               <li>Ifc version: preferrably <span className="font-bold">IFC4</span>, 2x3 should work too</li>
-                              <li>Include all "Ifc Base Quantities" in the file, we use <span className="font-bold">NetVolume or GrossVolume</span></li>
+                              <li>Include all &quot;Ifc Base Quantities&quot; in the file, we use <span className="font-bold">NetVolume or GrossVolume</span></li>
                               <li>Include all assembly layers during export, we prefer <span className="font-bold">IfcMaterialLayerset</span> but can work with <span className="font-bold">IfcMaterialConstituentSet</span> as well</li>
                             </ul>
                           </div>
@@ -212,7 +212,7 @@ export function HelpDialog() {
                         <p>Drop your Ifc file in the upload area or click to browse:</p>
                         <ul className="list-disc list-inside">
                           <li>Files are processed locally</li>
-                          <li>Ifc don't get stored on our servers</li>
+                          <li>Ifc don&apos;t get stored on our servers</li>
                         </ul>
                       </div>
                     </div>
