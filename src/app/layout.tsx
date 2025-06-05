@@ -1,7 +1,6 @@
 import { ClerkProvider } from "@clerk/nextjs";
 import { PostHogProvider } from "@/components/PostHogProvider";
 import { ThemeProvider } from "@/components/theme-provider";
-import { TestError } from "@/components/test-error";
 import "@/styles/globals.css";
 import AuthenticatedLayout from "@/components/authenticated-layout";
 import { nunitoSans } from "@/styles/fonts";
@@ -21,7 +20,6 @@ export default function RootLayout({
       <html lang="en" className={nunitoSans.variable} suppressHydrationWarning>
         <body suppressHydrationWarning>
           <PostHogProvider>
-            <TestError />
             <ThemeProvider
               attribute="class"
               defaultTheme="system"
