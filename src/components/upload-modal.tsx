@@ -12,7 +12,7 @@ import { parseIFCFile } from "@/lib/services/ifc-parser-client";
 import { ReloadIcon } from "@radix-ui/react-icons";
 import { UploadCloud } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useCallback, useState } from "react";
+import { useCallback, useState, useEffect } from "react";
 import { useDropzone } from "react-dropzone";
 
 interface UploadModalProps {
@@ -31,8 +31,31 @@ export function UploadModal({
   onProgress,
 }: UploadModalProps) {
   const [isUploading, setIsUploading] = useState(false);
+  const [messageIndex, setMessageIndex] = useState(0);
   const { toast } = useToast();
   const router = useRouter();
+
+  const uploadMessages = [
+    "Crunching your IFC data...",
+    "Counting walls and windows...",
+    "Matching materials with our library...",
+    "Consulting the BIM wizards...",
+    "Summoning digital building blocks...",
+    "Untangling IFC spaghetti...",
+    "Double-checking door swings...",
+    "Juggling geometries...",
+    "Compiling building jokes...",
+    "Almost done with the magic...",
+  ];
+
+  useEffect(() => {
+    if (!isUploading) return;
+    const interval = setInterval(() => {
+      setMessageIndex((i) => (i + 1) % uploadMessages.length);
+    }, 3000);
+    return () => clearInterval(interval);
+  }, [isUploading, uploadMessages.length]);
+
 
   const onDrop = useCallback(
     async (acceptedFiles: File[]) => {
@@ -63,10 +86,39 @@ export function UploadModal({
 
         toast({
           title: "Upload Successful",
-          description:
-            results.unmatchedMaterialCount > 0
-              ? `Successfully processed ${results.elementCount} elements. Found ${results.unmatchedMaterialCount} materials that need matching.`
-              : `Successfully processed ${results.elementCount} elements`,
+          description: (
+            <div className="space-y-1">
+              <p>
+                Processed {results.elementCount} elements across{' '}
+                {Object.keys(results.classCounts || {}).length} classes.
+              </p>
+              <p>Total unique materials: {results.materialCount}.</p>
+              {results.matchedMaterials.length > 0 && (
+                <p>
+                  Auto-matched {results.matchedMaterials.length} materials:{' '}
+                  {results.matchedMaterials.slice(0, 5).join(', ')}
+                  {results.matchedMaterials.length > 5 ? '...' : ''}
+                </p>
+              )}
+              {results.unmatchedMaterialCount > 0 && (
+                <p>{results.unmatchedMaterialCount} materials need matching.</p>
+              )}
+              {Object.keys(results.classCounts || {}).length > 0 && (
+                <div className="pt-2">
+                  <p className="font-semibold">Element counts:</p>
+                  <ul className="list-disc list-inside max-h-40 overflow-y-auto">
+                    {Object.entries(results.classCounts)
+                      .sort((a, b) => b[1] - a[1])
+                      .map(([type, count]) => (
+                        <li key={type}>
+                          {type}: {count}
+                        </li>
+                      ))}
+                  </ul>
+                </div>
+              )}
+            </div>
+          ),
         });
 
         onOpenChange(false);
@@ -78,7 +130,7 @@ export function UploadModal({
         } else {
           logger.debug("No redirection needed, refreshing page");
           router.refresh();
-          onSuccess?.({ id: results.id });
+          onSuccess?.({ id: results.uploadId });
         }
       } catch (error) {
         logger.error("Upload failed:", error);
@@ -88,6 +140,8 @@ export function UploadModal({
             error instanceof Error &&
             error.message === "Upload timed out after 50 seconds"
               ? "The upload timed out. Please try again with a smaller file."
+              : error instanceof Error
+              ? `Error: ${error.message}`
               : "There was an error processing your file. Please try again or contact support if the issue persists.",
           variant: "destructive",
         });
@@ -116,10 +170,10 @@ export function UploadModal({
           <DialogTitle>Load Ifc File</DialogTitle>
         </DialogHeader>
         {isUploading ? (
-          <div className="flex flex-col items-center justify-center py-8">
+          <div className="flex flex-col items-center justify-center py-8 text-center">
             <ReloadIcon className="h-8 w-8 animate-spin text-primary mb-4" />
             <p className="text-sm text-muted-foreground">
-              Processing Ifc file...
+              {uploadMessages[messageIndex]}
             </p>
           </div>
         ) : (
