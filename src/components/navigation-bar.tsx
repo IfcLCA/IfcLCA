@@ -441,11 +441,36 @@ export function NavigationBar({ currentProject, notifications }: NavBarProps) {
               <span className="sr-only">Toggle Menu</span>
             </Button>
           </SheetTrigger>
-          <SheetContent side="left" className="pr-0">
-            <NavigationMenu className="flex flex-col gap-4">
-              <NavigationMenuList className="flex-col items-start gap-4">
-                {/* Mobile menu content (similar to desktop, but adapted for mobile) */}
-                {/* ... */}
+          <SheetContent side="left" className="pr-0 w-64">
+            <NavigationMenu className="flex flex-col gap-4 py-6">
+              <NavigationMenuList className="flex-col items-start gap-2">
+                <NavigationMenuItem>
+                  <NavigationMenuLink asChild>
+                    <Link href="/projects" onClick={() => setIsMobileMenuOpen(false)} className="w-full px-4 py-2 text-sm rounded-md hover:bg-accent">
+                      Projects
+                    </Link>
+                  </NavigationMenuLink>
+                </NavigationMenuItem>
+                <NavigationMenuItem>
+                  <NavigationMenuLink asChild>
+                    <button onClick={() => { handleAnalyseClick(); setIsMobileMenuOpen(false); }} className="w-full px-4 py-2 text-sm rounded-md hover:bg-accent text-left">
+                      New Ifc
+                    </button>
+                  </NavigationMenuLink>
+                </NavigationMenuItem>
+                <NavigationMenuItem>
+                  <NavigationMenuLink asChild>
+                    <Link href="/materials-library" onClick={() => setIsMobileMenuOpen(false)} className="w-full px-4 py-2 text-sm rounded-md hover:bg-accent">
+                      Materials
+                    </Link>
+                  </NavigationMenuLink>
+                </NavigationMenuItem>
+                <NavigationMenuItem>
+                  <div className="flex items-center gap-2 px-4 py-2 text-sm opacity-60">
+                    Reports
+                    <Badge variant="secondary" className="text-[10px]">Coming Soon</Badge>
+                  </div>
+                </NavigationMenuItem>
               </NavigationMenuList>
             </NavigationMenu>
           </SheetContent>
