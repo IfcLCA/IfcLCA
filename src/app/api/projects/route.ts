@@ -144,6 +144,14 @@ export async function POST(req: Request) {
     return NextResponse.json(project);
   } catch (error) {
     console.error("Failed to create project:", error);
+
+    // Track the error with PostHog
+    const { captureServerError } = await import("@/lib/posthog-client");
+    captureServerError(error as Error, userId, {
+      action: "create_project",
+      body: body,
+    });
+
     return NextResponse.json(
       { error: "Failed to create project" },
       { status: 500 }
