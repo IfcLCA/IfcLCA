@@ -1,4 +1,5 @@
 import { ClerkProvider } from "@clerk/nextjs";
+import { PostHogProvider } from "@/components/PostHogProvider";
 import { ThemeProvider } from "@/components/theme-provider";
 import "@/styles/globals.css";
 import AuthenticatedLayout from "@/components/authenticated-layout";
@@ -18,17 +19,19 @@ export default function RootLayout({
     <ClerkProvider appearance={{ baseTheme: undefined }} dynamic>
       <html lang="en" className={nunitoSans.variable} suppressHydrationWarning>
         <body suppressHydrationWarning>
-          <ThemeProvider
-            attribute="class"
-            defaultTheme="system"
-            enableSystem
-            disableTransitionOnChange
-            storageKey="ifclca-theme"
-            enableColorScheme={false}
-            forcedTheme={undefined}
-          >
-            <AuthenticatedLayout>{children}</AuthenticatedLayout>
-          </ThemeProvider>
+          <PostHogProvider>
+            <ThemeProvider
+              attribute="class"
+              defaultTheme="system"
+              enableSystem
+              disableTransitionOnChange
+              storageKey="ifclca-theme"
+              enableColorScheme={false}
+              forcedTheme={undefined}
+            >
+              <AuthenticatedLayout>{children}</AuthenticatedLayout>
+            </ThemeProvider>
+          </PostHogProvider>
         </body>
       </html>
     </ClerkProvider>
