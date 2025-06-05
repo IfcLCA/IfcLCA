@@ -61,7 +61,8 @@
     "tailwindcss-animate": "^1.0.7",
     "three": "^0.159.0",
     "zod": "^3.23.8",
-    "zustand": "^5.0.1"
+    "zustand": "^5.0.1",
+    "@fontsource/nunito-sans": "^5.2.5"
   },
   "devDependencies": {
     "@types/mongoose": "^5.11.97",
