@@ -240,7 +240,7 @@ export default function LandingPage() {
             </div>
             <div className="md:w-1/2">
               <Image
-                src="/placeholder.svg?height=300&width=400"
+                src={isDarkMode ? "/dashboard-dark.jpeg" : "/dashboard.jpeg"}
                 alt="IfcLCA Dashboard Preview"
                 width={400}
                 height={300}
