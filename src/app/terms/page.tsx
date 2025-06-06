@@ -1,5 +1,18 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
+import { Metadata } from "next";
+
+export const metadata: Metadata = {
+  title: "Terms of Service - IfcLCA Usage Agreement",
+  description: "Read IfcLCA's terms of service and usage agreement. Understand your rights and responsibilities when using our open-source LCA platform.",
+  robots: {
+    index: true,
+    follow: true,
+  },
+  alternates: {
+    canonical: "https://ifclca.com/terms",
+  },
+};
 
 export default function TermsPage() {
   return (

@@ -1,4 +1,17 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Metadata } from "next";
+
+export const metadata: Metadata = {
+  title: "Privacy Policy - IfcLCA Data Protection",
+  description: "Learn how IfcLCA protects your data and privacy. Our transparent privacy policy covers data collection, usage, storage, and your rights as a user.",
+  robots: {
+    index: true,
+    follow: true,
+  },
+  alternates: {
+    canonical: "https://ifclca.com/privacy",
+  },
+};
 
 export default function PrivacyPage() {
   return (

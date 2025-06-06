@@ -128,14 +128,14 @@ export default function LandingPage() {
       )}
 
       <main className="flex-grow relative z-10">
-        <section className="py-12 px-4 text-center">
-          <h1 className="text-4xl md:text-5xl font-bold text-gray-800 dark:text-white mb-4">
+        <section className="py-12 px-4 text-center" itemScope itemType="https://schema.org/SoftwareApplication">
+          <h1 className="text-4xl md:text-5xl font-bold text-gray-800 dark:text-white mb-4" itemProp="name">
             Life Cycle Assessment for the Built Environment
           </h1>
-          <p className="text-xl text-gray-600 dark:text-gray-300 mb-8 max-w-2xl mx-auto">
+          <p className="text-xl text-gray-600 dark:text-gray-300 mb-8 max-w-2xl mx-auto" itemProp="description">
             IfcLCA empowers architects, engineers, and sustainability experts to
             make data-driven decisions for environmentally optimized structures
-            across the AEC industry.
+            across the AEC industry using IFC models and Swiss KBOB environmental data.
           </p>
           <Link href="/sign-in?redirect_url=/">
             <Button
