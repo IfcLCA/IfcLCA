@@ -150,7 +150,7 @@ export default function OpenSourcePhilosophyPage() {
                         className="prose prose-lg dark:prose-invert max-w-none mb-16"
                     >
                         <p className="text-lg text-gray-700 dark:text-gray-300 leading-relaxed">
-                            I'm Louis Trümpler, and I've made a conscious choice to release all my software under the
+                            I'm Louis Trümpler, and I've made a conscious choice to release most of the software I create under the
                             AGPL-3.0 license. This isn't just a legal decision-it's a reflection of my deeply held
                             beliefs about how we can advance as an industry and build a more sustainable future together.
                         </p>
