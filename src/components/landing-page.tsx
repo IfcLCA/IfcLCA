@@ -2,17 +2,13 @@
 
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import {
   Card,
   CardContent,
   CardDescription,
-  CardFooter,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import Link from "next/link";
 import Image from "next/image";
 import {
@@ -29,8 +25,6 @@ import {
 } from "lucide-react";
 
 export default function LandingPage() {
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
   const [isDarkMode, setIsDarkMode] = useState(false);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
 
@@ -43,10 +37,6 @@ export default function LandingPage() {
       document.documentElement.classList.add("dark");
     }
   }, []);
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-  };
 
   const toggleDarkMode = () => {
     setIsDarkMode(!isDarkMode);
@@ -128,8 +118,22 @@ export default function LandingPage() {
       )}
 
       <main className="flex-grow relative z-10">
-        <section className="py-12 px-4 text-center" itemScope itemType="https://schema.org/SoftwareApplication">
-          <h1 className="text-4xl md:text-5xl font-bold text-gray-800 dark:text-white mb-4" itemProp="name">
+        <section className="py-12 px-4 text-center relative" itemScope itemType="https://schema.org/SoftwareApplication">
+          <div className="absolute inset-0 pointer-events-none overflow-hidden">
+            <Leaf className="absolute h-16 w-16 text-green-500/40 top-0 left-8 animate-float-slow" />
+            <BarChart3
+              className="absolute h-20 w-20 text-orange-500/40 right-8 top-10 animate-float-slow"
+              style={{ animationDelay: "1s" }}
+            />
+            <Upload
+              className="absolute h-14 w-14 text-purple-500/40 left-1/2 bottom-0 -translate-x-1/2 animate-float-slow"
+              style={{ animationDelay: "2s" }}
+            />
+          </div>
+          <h1
+            className="text-4xl md:text-5xl font-extrabold mb-4 bg-gradient-to-r from-orange-600 via-purple-600 to-blue-600 bg-clip-text text-transparent animate-gradient"
+            itemProp="name"
+          >
             Life Cycle Assessment for the Built Environment
           </h1>
           <p className="text-xl text-gray-600 dark:text-gray-300 mb-8 max-w-2xl mx-auto" itemProp="description">
@@ -195,7 +199,7 @@ export default function LandingPage() {
             ].map((feature, index) => (
               <Card
                 key={index}
-                className="bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm transition-all duration-300 hover:scale-105"
+                className="bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm transition-shadow duration-300 hover:shadow-xl cursor-default"
               >
                 <CardHeader>
                   <feature.icon className="h-10 w-10 text-orange-600 dark:text-orange-400 mb-2" />
@@ -244,7 +248,7 @@ export default function LandingPage() {
                 alt="IfcLCA Dashboard Preview"
                 width={400}
                 height={300}
-                className="rounded-lg shadow-lg transition-all duration-300 hover:scale-105"
+                className="rounded-lg shadow-lg transition-shadow duration-300 hover:shadow-xl"
               />
             </div>
           </div>
