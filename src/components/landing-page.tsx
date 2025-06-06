@@ -38,6 +38,16 @@ import {
   Building2,
   TreePine,
   RotateCcw,
+  X,
+  GitBranch,
+  Database,
+  FileCode,
+  Lock,
+  Cpu,
+  BarChart,
+  BookOpen,
+  Heart,
+  Flag,
 } from "lucide-react";
 
 // Floating shapes component
@@ -98,9 +108,368 @@ const AnimatedCounter = ({ end, duration = 2, suffix = "" }: { end: number; dura
   );
 };
 
+// Feature Modal Component
+const FeatureModal = ({ feature, isOpen, onClose, githubMetrics = { stars: 0, contributors: 0, commits: 0 } }: { feature: any; isOpen: boolean; onClose: () => void; githubMetrics?: { stars: number; contributors: number; commits: number } }) => {
+  // Handle escape key press
+  useEffect(() => {
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && isOpen) {
+        onClose();
+      }
+    };
+
+    if (isOpen) {
+      document.addEventListener('keydown', handleEscape);
+      return () => document.removeEventListener('keydown', handleEscape);
+    }
+  }, [isOpen, onClose]);
+
+  if (!isOpen || !feature) return null;
+
+  const getFeatureDetails = (title: string) => {
+    switch (title) {
+      case "Open Source":
+        return {
+          icon: GitBranch,
+          subtitle: "AGPL-3.0 Licensed • Community Driven",
+          content: [
+            {
+              title: "Complete Transparency",
+              description: "Every line of code is open for inspection. Built on trust and transparency, IfcLCA ensures you know exactly how your environmental data is calculated.",
+              icon: Code,
+            },
+            {
+              title: "Creator's Philosophy",
+              description: "Louis Trümpler releases all software under AGPL because he believes it drives our industry forward. Trust is essential for sustainability, and trust comes from openness.",
+              icon: Heart,
+            },
+            {
+              title: "Forever Free",
+              description: "Licensed under AGPL-3.0, IfcLCA will always remain free and open. No vendor lock-in, no hidden costs, just sustainable software for sustainable buildings.",
+              icon: Shield,
+            },
+          ],
+          stats: [
+            { label: "GitHub Stars", value: githubMetrics.stars > 0 ? githubMetrics.stars.toString() : "0" },
+            { label: "Contributors", value: githubMetrics.contributors > 0 ? githubMetrics.contributors.toString() : "0" },
+            { label: "Commits", value: githubMetrics.commits > 0 ? githubMetrics.commits.toString() : "0" },
+          ],
+          cta: {
+            text: "Read Open Source Philosophy",
+            href: "/open-source-philosophy",
+          },
+        };
+
+      case "IFC Integration":
+        return {
+          icon: FileCode,
+          subtitle: "IfcOpenShell WASM • IFC2x3 & IFC4 Support",
+          content: [
+            {
+              title: "Advanced IFC Parser",
+              description: "Powered by IfcOpenShell compiled to WebAssembly, our parser runs directly in your browser for maximum speed and privacy.",
+              icon: Cpu,
+            },
+            {
+              title: "Comprehensive Data Extraction",
+              description: "Automatically extracts BaseQuantities, material layers (IfcMaterialLayerSet), and material constituents (IfcMaterialConstituentSet) with precise volume calculations.",
+              icon: Database,
+            },
+            {
+              title: "Smart Material Recognition",
+              description: "Intelligent parsing identifies materials from complex IFC structures, supporting nested assemblies and composite elements.",
+              icon: Sparkles,
+            },
+          ],
+          stats: [
+            { label: "IFC Elements", value: "100%" },
+            { label: "Parse Speed", value: "<5s" },
+            { label: "Accuracy", value: "99.9%" },
+          ],
+          cta: {
+            text: "See Documentation",
+            href: "/documentation",
+          },
+        };
+
+      case "Environmental Impact Data":
+        return {
+          icon: TreePine,
+          subtitle: "Swiss KBOB Database • lcadata.ch Integration",
+          content: [
+            {
+              title: "Swiss KBOB Standards",
+              description: "Access the comprehensive Swiss KBOB environmental database with over 300+ material categories and precise impact factors from lcadata.ch.",
+              icon: Database,
+            },
+            {
+              title: "Multiple Indicators",
+              description: "Calculate Global Warming Potential (GWP), Primary Energy non-renewable (PEnr), and Environmental Impact Points (UBP) for complete analysis.",
+              icon: BarChart,
+            },
+            {
+              title: "Smart Material Matching",
+              description: "Fuzzy string matching automatically links your IFC material names to KBOB database entries, ensuring accurate environmental assessments.",
+              icon: Zap,
+            },
+          ],
+          stats: [
+            { label: "Materials", value: "300+" },
+            { label: "Indicators", value: "3" },
+            { label: "Data Source", value: "lcadata.ch" },
+          ],
+          cta: {
+            text: "Visit lcadata.ch",
+            href: "https://www.lcadata.ch",
+          },
+        };
+
+      case "No Data Storage":
+        return {
+          icon: Lock,
+          subtitle: "Client-Side Processing • Zero Storage",
+          content: [
+            {
+              title: "Local Processing",
+              description: "Your IFC files are processed entirely in your browser using WebAssembly. No file uploads to servers means zero data exposure.",
+              icon: Shield,
+            },
+            {
+              title: "Complete Privacy",
+              description: "We never store, log, or have access to your building models. Your intellectual property remains yours alone.",
+              icon: Lock,
+            },
+            {
+              title: "Instant Deletion",
+              description: "All temporary data is immediately cleared from browser memory after processing. No traces left behind.",
+              icon: RotateCcw,
+            },
+          ],
+          stats: [
+            { label: "Files Stored", value: "0" },
+            { label: "Data Logged", value: "None" },
+            { label: "Privacy", value: "100%" },
+          ],
+          cta: {
+            text: "Read Privacy Policy",
+            href: "/privacy",
+          },
+        };
+
+      case "Collaboration":
+        return {
+          icon: Users,
+          subtitle: "Team Projects • Shared Libraries",
+          content: [
+            {
+              title: "Project Dashboard",
+              description: "Manage multiple building projects in one place. Track progress, compare alternatives, and monitor environmental improvements.",
+              icon: Building2,
+            },
+            {
+              title: "Personal Material Libraries",
+              description: "Build and maintain your own material database. Save custom materials with specific environmental data for reuse across projects.",
+              icon: Database,
+            },
+            {
+              title: "Team Workflows (Coming Soon)",
+              description: "Soon you'll be able to invite team members, assign roles, and collaborate on sustainable design decisions with shared projects.",
+              icon: Users,
+            },
+          ],
+          stats: [
+            { label: "Uploads", value: "∞" },
+            { label: "Projects per User", value: "currently 3" },
+            { label: "Material Mappings", value: "∞" },
+          ],
+          cta: {
+            text: "Start Your Projects",
+            href: "/sign-in?redirect_url=/",
+          },
+        };
+
+      case "Fast Browser Analysis":
+        return {
+          icon: Zap,
+          subtitle: "Browser-Based Processing • WebAssembly Performance",
+          content: [
+            {
+              title: "Client-Side Processing",
+              description: "WASM-powered processing runs entirely in your browser. Analyze IFC files without uploading to servers, ensuring data privacy.",
+              icon: Zap,
+            },
+            {
+              title: "Comprehensive Analysis",
+              description: "Process complex IFC models with thousands of elements. Get detailed environmental impact calculations for every component.",
+              icon: TrendingUp,
+            },
+            {
+              title: "Interactive Results",
+              description: "Explore your results with dynamic visualizations. Identify impact hotspots, analyze by material type, and export detailed reports.",
+              icon: BarChart3,
+            },
+          ],
+          stats: [
+            { label: "Process Time", value: "~30s" },
+            { label: "File Size", value: "100MB+" },
+            { label: "Elements", value: "10k+" },
+          ],
+          cta: {
+            text: "Try It Now",
+            href: "/sign-in?redirect_url=/",
+          },
+        };
+
+      default:
+        return null;
+    }
+  };
+
+  const details = getFeatureDetails(feature.title);
+  if (!details) return null;
+
+  return (
+    <AnimatePresence>
+      {isOpen && (
+        <>
+          {/* Backdrop */}
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={onClose}
+            className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50"
+          />
+
+          {/* Modal */}
+          <motion.div
+            initial={{ opacity: 0, scale: 0.9, y: 20 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.9, y: 20 }}
+            transition={{ type: "spring", duration: 0.5 }}
+            className="fixed inset-0 z-50 flex items-center justify-center p-4"
+            onClick={onClose}
+          >
+            <div
+              className="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl max-w-3xl w-full max-h-[90vh] overflow-hidden"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {/* Header */}
+              <div className="relative p-8 pb-0">
+                <motion.button
+                  onClick={onClose}
+                  whileHover={{ scale: 1.1 }}
+                  whileTap={{ scale: 0.9 }}
+                  className="absolute top-4 right-4 p-2 rounded-full bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+                >
+                  <X className="h-5 w-5 text-gray-600 dark:text-gray-400" />
+                </motion.button>
+
+                <div className="flex items-center gap-4 mb-4">
+                  <motion.div
+                    className={`p-4 rounded-xl bg-gradient-to-r ${feature.color}`}
+                    animate={{
+                      rotate: [0, 5, -5, 0],
+                    }}
+                    transition={{
+                      duration: 4,
+                      repeat: Infinity,
+                      ease: "easeInOut",
+                    }}
+                  >
+                    <details.icon className="h-8 w-8 text-white" />
+                  </motion.div>
+                  <div>
+                    <h3 className="text-2xl font-bold text-gray-900 dark:text-white">
+                      {feature.title}
+                    </h3>
+                    <p className="text-sm text-gray-600 dark:text-gray-400">
+                      {details.subtitle}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Content */}
+              <div className="p-8 pt-6 overflow-y-auto max-h-[60vh]">
+                {/* Feature Details */}
+                <div className="space-y-6 mb-8">
+                  {details.content.map((item, index) => (
+                    <motion.div
+                      key={index}
+                      initial={{ opacity: 0, x: -20 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      transition={{ delay: index * 0.1 }}
+                      className="flex gap-4"
+                    >
+                      <div className="flex-shrink-0">
+                        <div className="p-2 rounded-lg bg-gray-100 dark:bg-gray-800">
+                          <item.icon className="h-5 w-5 text-gray-600 dark:text-gray-400" />
+                        </div>
+                      </div>
+                      <div>
+                        <h4 className="font-semibold text-gray-900 dark:text-white mb-1">
+                          {item.title}
+                        </h4>
+                        <p className="text-gray-600 dark:text-gray-300 text-sm">
+                          {item.description}
+                        </p>
+                      </div>
+                    </motion.div>
+                  ))}
+                </div>
+
+                {/* Stats */}
+                <div className="grid grid-cols-3 gap-4 mb-8">
+                  {details.stats.map((stat, index) => (
+                    <motion.div
+                      key={index}
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: 0.3 + index * 0.1 }}
+                      className="text-center p-4 rounded-xl bg-gray-50 dark:bg-gray-800"
+                    >
+                      <div className="text-2xl font-bold text-gray-900 dark:text-white">
+                        {stat.value}
+                      </div>
+                      <div className="text-sm text-gray-600 dark:text-gray-400">
+                        {stat.label}
+                      </div>
+                    </motion.div>
+                  ))}
+                </div>
+
+                {/* CTA */}
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  transition={{ delay: 0.5 }}
+                  className="flex justify-center"
+                >
+                  <Link href={details.cta.href} target={details.cta.href.startsWith('http') ? '_blank' : undefined}>
+                    <Button
+                      size="lg"
+                      className="bg-gradient-to-r from-orange-600 to-orange-500 hover:from-orange-700 hover:to-orange-600 text-white"
+                      onClick={onClose}
+                    >
+                      {details.cta.text}
+                      <ArrowRight className="ml-2 h-5 w-5" />
+                    </Button>
+                  </Link>
+                </motion.div>
+              </div>
+            </div>
+          </motion.div>
+        </>
+      )}
+    </AnimatePresence>
+  );
+};
+
 // Feature card with magnetic hover effect
-const FeatureCard = ({ feature, index }: { feature: any; index: number }) => {
+const FeatureCard = ({ feature, index, githubMetrics = { stars: 0, contributors: 0, commits: 0 } }: { feature: any; index: number; githubMetrics?: { stars: number; contributors: number; commits: number } }) => {
   const [isHovered, setIsHovered] = useState(false);
+  const [modalOpen, setModalOpen] = useState(false);
   const cardRef = useRef<HTMLDivElement>(null);
 
   // Create motion values for smooth animation
@@ -125,8 +494,8 @@ const FeatureCard = ({ feature, index }: { feature: any; index: number }) => {
     if (isHovered) {
       mouseX.set(x * 20);
       mouseY.set(y * 20);
-      rotateX.set(-y * 5); // Subtle 3D tilt
-      rotateY.set(x * 5);
+      rotateX.set(-y * 3); // Reduced 3D tilt for Firefox compatibility
+      rotateY.set(x * 3);
     }
   };
 
@@ -139,153 +508,174 @@ const FeatureCard = ({ feature, index }: { feature: any; index: number }) => {
   };
 
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 20 }}
-      whileInView={{ opacity: 1, y: 0 }}
-      transition={{ delay: index * 0.1, duration: 0.6 }}
-      viewport={{ once: true }}
-    >
+    <>
       <motion.div
-        ref={cardRef}
-        onMouseMove={handleMouseMove}
-        onMouseEnter={() => setIsHovered(true)}
-        onMouseLeave={handleMouseLeave}
-        whileHover={{ y: -8 }}
-        transition={{ type: "spring", stiffness: 300 }}
-        className="h-full relative"
-        style={{
-          transformStyle: "preserve-3d",
-          perspective: "1000px",
-        }}
+        initial={{ opacity: 0, y: 20 }}
+        whileInView={{ opacity: 1, y: 0 }}
+        transition={{ delay: index * 0.1, duration: 0.6 }}
+        viewport={{ once: true }}
       >
         <motion.div
+          ref={cardRef}
+          onMouseMove={handleMouseMove}
+          onMouseEnter={() => setIsHovered(true)}
+          onMouseLeave={handleMouseLeave}
+          whileHover={{ y: -8 }}
+          transition={{ type: "spring", stiffness: 300 }}
+          className="h-full relative"
+          onClick={() => setModalOpen(true)}
           style={{
-            rotateX,
-            rotateY,
             transformStyle: "preserve-3d",
+            perspective: "1000px",
           }}
-          className="h-full"
         >
-          <Card className="h-full bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm border-gray-200 dark:border-gray-700 hover:shadow-2xl transition-all duration-300 cursor-pointer group overflow-hidden relative">
-            {/* Morphing border effect */}
-            <motion.div
-              className="absolute inset-0 rounded-lg pointer-events-none"
-              style={{
-                background: `linear-gradient(45deg, transparent 30%, ${feature.color.split(' ')[1]} 50%, transparent 70%)`,
-                opacity: 0,
-              }}
-              animate={{
-                opacity: isHovered ? [0, 0.3, 0] : 0,
-                backgroundPosition: isHovered ? ["0% 0%", "100% 100%", "0% 0%"] : "0% 0%",
-              }}
-              transition={{
-                duration: 3,
-                repeat: Infinity,
-                ease: "linear",
-              }}
-            />
-
-            <CardHeader>
+          <motion.div
+            style={{
+              rotateX,
+              rotateY,
+              transformStyle: "preserve-3d",
+              pointerEvents: "none", // Prevent this layer from interfering with clicks
+            }}
+            className="h-full"
+          >
+            <Card
+              className="h-full bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm border-gray-200 dark:border-gray-700 hover:shadow-2xl transition-all duration-300 cursor-pointer group overflow-hidden relative"
+              style={{ pointerEvents: "auto" }} // Re-enable pointer events for the card
+            >
+              {/* Morphing border effect */}
               <motion.div
-                className={`inline-flex p-3 rounded-xl bg-gradient-to-r ${feature.color} mb-4 relative`}
+                className="absolute inset-0 rounded-lg pointer-events-none"
                 style={{
-                  x: iconX,
-                  y: iconY,
-                  transformStyle: "preserve-3d",
-                  transform: "translateZ(20px)",
+                  background: `linear-gradient(45deg, transparent 30%, ${feature.color.split(' ')[1]} 50%, transparent 70%)`,
+                  opacity: 0,
                 }}
-              >
-                {/* Liquid morphing background */}
-                <motion.div
-                  className="absolute inset-0 rounded-xl"
-                  animate={{
-                    background: isHovered
-                      ? [
-                        `radial-gradient(circle at 30% 30%, rgba(255,255,255,0.3) 0%, transparent 70%)`,
-                        `radial-gradient(circle at 70% 70%, rgba(255,255,255,0.3) 0%, transparent 70%)`,
-                        `radial-gradient(circle at 30% 30%, rgba(255,255,255,0.3) 0%, transparent 70%)`,
-                      ]
-                      : `radial-gradient(circle at 50% 50%, rgba(255,255,255,0.1) 0%, transparent 70%)`,
-                  }}
-                  transition={{
-                    duration: 3,
-                    repeat: Infinity,
-                    ease: "easeInOut",
-                  }}
-                />
-
-                {/* Ambient glow effect */}
-                <motion.div
-                  className="absolute inset-0 rounded-xl"
-                  animate={{
-                    opacity: isHovered ? [0.5, 0.8, 0.5] : 0,
-                  }}
-                  transition={{
-                    duration: 2,
-                    repeat: Infinity,
-                    ease: "easeInOut",
-                  }}
-                  style={{
-                    background: `radial-gradient(circle at center, rgba(255,255,255,0.4) 0%, transparent 60%)`,
-                    filter: "blur(8px)",
-                  }}
-                />
-
-                <feature.icon className="h-6 w-6 text-white relative z-10" />
-
-                {/* Particle effects */}
-                {isHovered && [...Array(3)].map((_, i) => (
-                  <motion.div
-                    key={i}
-                    className="absolute w-1 h-1 bg-white rounded-full"
-                    initial={{ opacity: 0, scale: 0 }}
-                    animate={{
-                      opacity: [0, 1, 0],
-                      scale: [0, 1.5, 0],
-                      x: [0, (Math.random() - 0.5) * 30],
-                      y: [0, (Math.random() - 0.5) * 30],
-                    }}
-                    transition={{
-                      duration: 1.5,
-                      delay: i * 0.2,
-                      repeat: Infinity,
-                      repeatDelay: 0.5,
-                    }}
-                    style={{
-                      left: "50%",
-                      top: "50%",
-                    }}
-                  />
-                ))}
-              </motion.div>
-
-              {/* Subtle background pattern on hover */}
-              <motion.div
-                className="absolute top-0 right-0 w-32 h-32 opacity-0 group-hover:opacity-10 transition-opacity duration-500"
-                style={{
-                  backgroundImage: `radial-gradient(circle at center, ${feature.color.split(' ')[1]} 1px, transparent 1px)`,
-                  backgroundSize: "10px 10px",
+                animate={{
+                  opacity: isHovered ? [0, 0.3, 0] : 0,
+                  backgroundPosition: isHovered ? ["0% 0%", "100% 100%", "0% 0%"] : "0% 0%",
+                }}
+                transition={{
+                  duration: 3,
+                  repeat: Infinity,
+                  ease: "linear",
                 }}
               />
 
-              <CardTitle className="text-xl font-semibold group-hover:text-orange-600 dark:group-hover:text-orange-400 transition-colors relative z-10">
-                {feature.title}
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="relative z-10">
-              <p className="text-gray-600 dark:text-gray-300">
-                {feature.description}
-              </p>
-            </CardContent>
-            <CardFooter className="relative z-10">
-              <Button variant="ghost" className="group-hover:text-orange-600 dark:group-hover:text-orange-400">
-                Learn more <ArrowRight className="ml-2 h-4 w-4 group-hover:translate-x-1 transition-transform" />
-              </Button>
-            </CardFooter>
-          </Card>
+              <CardHeader>
+                <motion.div
+                  className={`inline-flex p-3 rounded-xl bg-gradient-to-r ${feature.color} mb-4 relative`}
+                  style={{
+                    x: iconX,
+                    y: iconY,
+                    transformStyle: "preserve-3d",
+                    transform: "translateZ(20px)",
+                  }}
+                >
+                  {/* Liquid morphing background */}
+                  <motion.div
+                    className="absolute inset-0 rounded-xl"
+                    animate={{
+                      background: isHovered
+                        ? [
+                          `radial-gradient(circle at 30% 30%, rgba(255,255,255,0.3) 0%, transparent 70%)`,
+                          `radial-gradient(circle at 70% 70%, rgba(255,255,255,0.3) 0%, transparent 70%)`,
+                          `radial-gradient(circle at 30% 30%, rgba(255,255,255,0.3) 0%, transparent 70%)`,
+                        ]
+                        : `radial-gradient(circle at 50% 50%, rgba(255,255,255,0.1) 0%, transparent 70%)`,
+                    }}
+                    transition={{
+                      duration: 3,
+                      repeat: Infinity,
+                      ease: "easeInOut",
+                    }}
+                  />
+
+                  {/* Ambient glow effect */}
+                  <motion.div
+                    className="absolute inset-0 rounded-xl"
+                    animate={{
+                      opacity: isHovered ? [0.5, 0.8, 0.5] : 0,
+                    }}
+                    transition={{
+                      duration: 2,
+                      repeat: Infinity,
+                      ease: "easeInOut",
+                    }}
+                    style={{
+                      background: `radial-gradient(circle at center, rgba(255,255,255,0.4) 0%, transparent 60%)`,
+                      filter: "blur(8px)",
+                    }}
+                  />
+
+                  <feature.icon className="h-6 w-6 text-white relative z-10" />
+
+                  {/* Particle effects */}
+                  {isHovered && [...Array(3)].map((_, i) => (
+                    <motion.div
+                      key={i}
+                      className="absolute w-1 h-1 bg-white rounded-full"
+                      initial={{ opacity: 0, scale: 0 }}
+                      animate={{
+                        opacity: [0, 1, 0],
+                        scale: [0, 1.5, 0],
+                        x: [0, (Math.random() - 0.5) * 30],
+                        y: [0, (Math.random() - 0.5) * 30],
+                      }}
+                      transition={{
+                        duration: 1.5,
+                        delay: i * 0.2,
+                        repeat: Infinity,
+                        repeatDelay: 0.5,
+                      }}
+                      style={{
+                        left: "50%",
+                        top: "50%",
+                      }}
+                    />
+                  ))}
+                </motion.div>
+
+                {/* Subtle background pattern on hover */}
+                <motion.div
+                  className="absolute top-0 right-0 w-32 h-32 opacity-0 group-hover:opacity-10 transition-opacity duration-500"
+                  style={{
+                    backgroundImage: `radial-gradient(circle at center, ${feature.color.split(' ')[1]} 1px, transparent 1px)`,
+                    backgroundSize: "10px 10px",
+                  }}
+                />
+
+                <CardTitle className="text-xl font-semibold group-hover:text-orange-600 dark:group-hover:text-orange-400 transition-colors relative z-10">
+                  {feature.title}
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="relative z-10">
+                <p className="text-gray-600 dark:text-gray-300">
+                  {feature.description}
+                </p>
+              </CardContent>
+              <CardFooter className="relative z-10">
+                <Button
+                  variant="ghost"
+                  className="group-hover:text-orange-600 dark:group-hover:text-orange-400"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setModalOpen(true);
+                  }}
+                >
+                  Learn more <ArrowRight className="ml-2 h-4 w-4 group-hover:translate-x-1 transition-transform" />
+                </Button>
+              </CardFooter>
+            </Card>
+          </motion.div>
         </motion.div>
       </motion.div>
-    </motion.div>
+
+      <FeatureModal
+        feature={feature}
+        isOpen={modalOpen}
+        onClose={() => setModalOpen(false)}
+        githubMetrics={githubMetrics}
+      />
+    </>
   );
 };
 
@@ -294,6 +684,11 @@ export default function LandingPage() {
   const [isDarkMode, setIsDarkMode] = useState(false);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [activeTestimonial, setActiveTestimonial] = useState(0);
+  const [githubMetrics, setGithubMetrics] = useState({
+    stars: 0,
+    contributors: 0,
+    commits: 0
+  });
   const heroRef = useRef(null);
   const { scrollYProgress } = useScroll();
   const y = useTransform(scrollYProgress, [0, 1], ["0%", "50%"]);
@@ -314,6 +709,34 @@ export default function LandingPage() {
     }, 5000);
     return () => clearInterval(timer);
   }, []);
+
+  useEffect(() => {
+    // Fetch GitHub metrics
+    const fetchGithubMetrics = async () => {
+      try {
+        const response = await fetch('/api/stats/github-stars');
+        if (response.ok) {
+          const data = await response.json();
+          setGithubMetrics({
+            stars: data.stars || 0,
+            contributors: data.contributors || 0,
+            commits: data.commits || 0
+          });
+        }
+      } catch (error) {
+        console.log('Failed to fetch GitHub metrics:', error);
+        setGithubMetrics({
+          stars: 0,
+          contributors: 0,
+          commits: 0
+        }); // Fallback
+      }
+    };
+
+    fetchGithubMetrics();
+  }, []);
+
+
 
   const toggleDarkMode = () => {
     setIsDarkMode(!isDarkMode);
@@ -357,16 +780,16 @@ export default function LandingPage() {
     },
     {
       icon: Zap,
-      title: "Real-Time Analysis",
-      description: "Instant feedback and analysis results for quick decision-making in your design process.",
+      title: "Fast Browser Analysis",
+      description: "Complete environmental analysis in ~30 seconds, all processed locally in your browser.",
       color: "from-yellow-500 to-orange-500",
     },
   ];
 
   const stats = [
-    { value: 95, suffix: "%", label: "Accuracy Rate" },
-    { value: 50, suffix: "+", label: "Data Sources" },
-    { value: 24, suffix: "/7", label: "Analysis Time" },
+    { value: 300, suffix: "+", label: "Materials" },
+    { value: githubMetrics.stars, suffix: "", label: "GitHub Stars" },
+    { value: 3, suffix: "", label: "Free Projects" },
     { value: 100, suffix: "%", label: "Open Source" },
   ];
 
@@ -375,7 +798,7 @@ export default function LandingPage() {
       name: "Sarah Chen",
       role: "Senior Architect",
       company: "EcoDesign Studios",
-      quote: "IfcLCA has revolutionized our approach to sustainable building design. The real-time analysis saves us hours of work.",
+      quote: "IfcLCA has revolutionized our approach to sustainable building design. The fast browser-based analysis saves us hours of work.",
       rating: 5,
     },
     {
@@ -428,6 +851,22 @@ export default function LandingPage() {
         <nav className="hidden md:flex items-center space-x-4">
           <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
             <Link
+              href="/features"
+              className="px-4 py-2 text-sm text-gray-600 hover:text-gray-800 dark:text-gray-300 dark:hover:text-white transition-colors"
+            >
+              Features
+            </Link>
+          </motion.div>
+          <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
+            <Link
+              href="/documentation"
+              className="px-4 py-2 text-sm text-gray-600 hover:text-gray-800 dark:text-gray-300 dark:hover:text-white transition-colors"
+            >
+              Documentation
+            </Link>
+          </motion.div>
+          <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
+            <Link
               href="/sign-in?redirect_url=/"
               className="px-4 py-2 text-sm text-gray-600 hover:text-gray-800 dark:text-gray-300 dark:hover:text-white transition-colors"
             >
@@ -474,6 +913,20 @@ export default function LandingPage() {
             className="md:hidden bg-white/90 dark:bg-gray-800/90 backdrop-blur-md p-4 absolute top-16 right-0 left-0 z-20 shadow-lg"
           >
             <nav className="flex flex-col space-y-4">
+              <Link
+                href="/features"
+                className="text-sm text-gray-600 hover:text-gray-800 dark:text-gray-300 dark:hover:text-white"
+                onClick={toggleMenu}
+              >
+                Features
+              </Link>
+              <Link
+                href="/documentation"
+                className="text-sm text-gray-600 hover:text-gray-800 dark:text-gray-300 dark:hover:text-white"
+                onClick={toggleMenu}
+              >
+                Documentation
+              </Link>
               <Link
                 href="/sign-in?redirect_url=/"
                 className="text-sm text-gray-600 hover:text-gray-800 dark:text-gray-300 dark:hover:text-white"
@@ -544,17 +997,30 @@ export default function LandingPage() {
                   </Button>
                 </motion.div>
               </Link>
-              <Link href="https://github.com/IfcLCA/IfcLCA" target="_blank" rel="noopener noreferrer">
-                <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
-                  <Button
-                    size="lg"
-                    variant="outline"
-                    className="border-gray-300 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-800"
-                  >
-                    <Code className="mr-2 h-5 w-5" /> View on GitHub
-                  </Button>
-                </motion.div>
-              </Link>
+              <div className="flex gap-3">
+                <Link href="/documentation">
+                  <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
+                    <Button
+                      size="lg"
+                      variant="outline"
+                      className="border-gray-300 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-800"
+                    >
+                      <BookOpen className="mr-2 h-4 w-4" /> Documentation
+                    </Button>
+                  </motion.div>
+                </Link>
+                <Link href="/features">
+                  <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
+                    <Button
+                      size="lg"
+                      variant="outline"
+                      className="border-gray-300 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-800"
+                    >
+                      <Sparkles className="mr-2 h-4 w-4" /> Features
+                    </Button>
+                  </motion.div>
+                </Link>
+              </div>
             </motion.div>
           </motion.div>
 
@@ -638,7 +1104,7 @@ export default function LandingPage() {
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 max-w-7xl mx-auto">
             {features.map((feature, index) => (
-              <FeatureCard key={index} feature={feature} index={index} />
+              <FeatureCard key={index} feature={feature} index={index} githubMetrics={githubMetrics} />
             ))}
           </div>
         </section>
@@ -672,7 +1138,7 @@ export default function LandingPage() {
                 {
                   step: "02",
                   title: "Automatic Analysis",
-                  description: "Our AI analyzes materials and quantities instantly",
+                  description: "Materials are matched to KBOB database using fuzzy matching",
                   icon: Zap,
                 },
                 {
@@ -721,7 +1187,7 @@ export default function LandingPage() {
         </section>
 
         {/* Testimonials Section */}
-        <section className="py-16 px-4 bg-gradient-to-r from-orange-50 to-purple-50 dark:from-gray-900 dark:to-gray-800">
+        {/* <section className="py-16 px-4 bg-gradient-to-r from-orange-50 to-purple-50 dark:from-gray-900 dark:to-gray-800">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             whileInView={{ opacity: 1, y: 0 }}
@@ -784,7 +1250,7 @@ export default function LandingPage() {
               ))}
             </div>
           </motion.div>
-        </section>
+        </section> */}
 
         {/* About Section */}
         <section id="about" className="py-16 px-4">
@@ -804,7 +1270,7 @@ export default function LandingPage() {
               >
                 <div className="inline-flex items-center gap-2 px-4 py-2 bg-green-100 dark:bg-green-900/30 rounded-full text-green-700 dark:text-green-300 text-sm font-medium mb-6">
                   <TreePine className="w-4 h-4" />
-                  Sustainable Future
+                  Optimized Construction
                 </div>
                 <h2 className="text-4xl font-bold text-gray-800 dark:text-white mb-6">
                   Building a Greener Tomorrow
@@ -826,10 +1292,10 @@ export default function LandingPage() {
                   </p>
                   <div className="grid grid-cols-2 gap-4 pt-4">
                     {[
-                      { icon: Globe, text: "Global Standards" },
+                      { icon: Flag, text: "Swiss LCA Standards" },
                       { icon: Shield, text: "Data Privacy" },
                       { icon: RotateCcw, text: "Continuous Updates" },
-                      { icon: Award, text: "Industry Recognition" },
+                      { icon: Award, text: "Made by LCA Expert" },
                     ].map((item, index) => (
                       <motion.div
                         key={index}
@@ -849,7 +1315,7 @@ export default function LandingPage() {
                 >
                   <Link href="/documentation">
                     <Button variant="outline" size="lg">
-                      Learn More About Our Technology
+                      Learn More About The Technology
                       <ArrowRight className="ml-2 h-4 w-4" />
                     </Button>
                   </Link>
@@ -945,10 +1411,10 @@ export default function LandingPage() {
               />
               <div className="relative z-10">
                 <h2 className="text-4xl font-bold mb-4">
-                  Ready to Transform Your Building Analysis?
+                  Ready to Transform Your Life Cycle Analysis?
                 </h2>
                 <p className="text-xl mb-8 opacity-90">
-                  Join thousands of professionals using IfcLCA for sustainable design
+                  Join other professionals using IfcLCA for sustainable design and construction
                 </p>
                 <motion.div
                   whileHover={{ scale: 1.05 }}
@@ -960,7 +1426,7 @@ export default function LandingPage() {
                       size="lg"
                       className="bg-white text-orange-600 hover:bg-gray-100 shadow-xl px-8 py-6 text-lg"
                     >
-                      Start Free Analysis
+                      Start Now for Free
                       <ArrowRight className="ml-2 h-5 w-5" />
                     </Button>
                   </Link>
@@ -972,95 +1438,224 @@ export default function LandingPage() {
       </main>
 
       {/* Footer */}
-      <footer className="bg-gray-100/80 dark:bg-gray-900/50 backdrop-blur-sm py-12 px-4 relative z-10">
-        <div className="max-w-6xl mx-auto">
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-8 mb-8">
-            <div>
-              <div className="flex items-center space-x-2 mb-4">
+      <footer className="bg-gray-100/80 dark:bg-gray-900/50 backdrop-blur-sm py-8 px-4 relative z-10">
+        <div className="max-w-7xl mx-auto">
+          {/* Main Footer Content */}
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 mb-8">
+            {/* Logo and Description - Spans 4 columns */}
+            <div className="lg:col-span-4">
+              <div className="flex items-center space-x-2 mb-3">
                 <Image
                   src="/logo.png"
                   alt="IfcLCA Logo"
-                  width={32}
-                  height={32}
-                  className="h-8 w-8 rounded-lg"
+                  width={40}
+                  height={40}
+                  className="h-10 w-10 rounded-lg"
                 />
-                <span className="text-xl font-bold text-gray-800 dark:text-white">
+                <span className="text-2xl font-bold text-gray-800 dark:text-white">
                   IfcLCA
                 </span>
               </div>
-              <p className="text-sm text-gray-600 dark:text-gray-400">
-                Open-source Life Cycle Assessment for sustainable building design
+              <p className="text-sm text-gray-600 dark:text-gray-400 max-w-xs">
+                Open-source Life Cycle Assessment for sustainable design and construction.
               </p>
+              <div className="mt-4">
+                <motion.div
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                  className="inline-block relative group"
+                >
+                  {/* Floating hearts on hover - positioned absolutely to parent div */}
+                  <div className="absolute inset-0 pointer-events-none">
+                    {[...Array(3)].map((_, i) => (
+                      <motion.div
+                        key={`heart-hover-${i}`}
+                        className="absolute opacity-0 group-hover:opacity-100 transition-opacity duration-500"
+                        style={{
+                          left: i === 0 ? "-10px" : i === 1 ? "50%" : "auto",
+                          right: i === 2 ? "-10px" : "auto",
+                          bottom: "-5px",
+                          transform: i === 1 ? "translateX(-50%)" : "none",
+                        }}
+                      >
+                        <motion.span
+                          className="block text-sm"
+                          initial={{
+                            y: 0,
+                            scale: 0,
+                          }}
+                          animate={{
+                            y: [-30, -50],
+                            scale: [0, 1, 0],
+                            rotate: i === 1 ? [0, -15, 15, 0] : [0, 15, -15, 0],
+                          }}
+                          transition={{
+                            duration: 2,
+                            delay: i * 0.2,
+                            repeat: Infinity,
+                            repeatDelay: 1,
+                            ease: "easeOut",
+                          }}
+                        >
+                          {i === 0 ? "💕" : i === 1 ? "❤️" : "💖"}
+                        </motion.span>
+                      </motion.div>
+                    ))}
+                  </div>
+
+                  <Link
+                    href="https://github.com/IfcLCA/IfcLCA"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-yellow-400 to-orange-400 dark:from-yellow-500 dark:to-orange-500 rounded-lg hover:from-yellow-500 hover:to-orange-500 dark:hover:from-yellow-600 dark:hover:to-orange-600 transition-all duration-300 shadow-md hover:shadow-lg group relative overflow-hidden"
+                  >
+                    {/* Subtle shimmer effect */}
+                    <motion.div
+                      className="absolute inset-0 bg-white/20"
+                      animate={{
+                        x: ["-100%", "100%"],
+                      }}
+                      transition={{
+                        duration: 4,
+                        repeat: Infinity,
+                        ease: "linear",
+                      }}
+                      style={{
+                        background: "linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent)",
+                      }}
+                    />
+
+                    <Star className="h-4 w-4 text-white fill-white relative z-10" />
+                    <span className="text-sm font-medium text-white relative z-10">
+                      Star on GitHub
+                    </span>
+
+                    {/* Single subtle sparkle */}
+                    <motion.span
+                      className="text-sm relative z-10 inline-block opacity-0 group-hover:opacity-100 transition-opacity duration-300"
+                      animate={{
+                        scale: [0.8, 1.1, 0.8],
+                        rotate: [0, 180, 360],
+                      }}
+                      transition={{
+                        duration: 2,
+                        repeat: Infinity,
+                        ease: "easeInOut",
+                      }}
+                    >
+                      ✨
+                    </motion.span>
+                  </Link>
+                </motion.div>
+              </div>
             </div>
-            <div>
-              <h4 className="font-semibold text-gray-800 dark:text-white mb-4">Product</h4>
-              <ul className="space-y-2">
-                <li>
-                  <Link href="/features" className="text-sm text-gray-600 hover:text-gray-800 dark:text-gray-400 dark:hover:text-white transition-colors">
-                    Features
-                  </Link>
-                </li>
-                <li>
-                  <Link href="/pricing" className="text-sm text-gray-600 hover:text-gray-800 dark:text-gray-400 dark:hover:text-white transition-colors">
-                    Pricing
-                  </Link>
-                </li>
-                <li>
-                  <Link href="/documentation" className="text-sm text-gray-600 hover:text-gray-800 dark:text-gray-400 dark:hover:text-white transition-colors">
-                    Documentation
-                  </Link>
-                </li>
-              </ul>
-            </div>
-            <div>
-              <h4 className="font-semibold text-gray-800 dark:text-white mb-4">Resources</h4>
-              <ul className="space-y-2">
-                <li>
-                  <Link href="https://github.com/IfcLCA/IfcLCA" className="text-sm text-gray-600 hover:text-gray-800 dark:text-gray-400 dark:hover:text-white transition-colors" target="_blank" rel="noopener noreferrer">
-                    GitHub
-                  </Link>
-                </li>
-                <li>
-                  <Link href="/blog" className="text-sm text-gray-600 hover:text-gray-800 dark:text-gray-400 dark:hover:text-white transition-colors">
-                    Blog
-                  </Link>
-                </li>
-                <li>
-                  <Link href="/support" className="text-sm text-gray-600 hover:text-gray-800 dark:text-gray-400 dark:hover:text-white transition-colors">
-                    Support
-                  </Link>
-                </li>
-              </ul>
-            </div>
-            <div>
-              <h4 className="font-semibold text-gray-800 dark:text-white mb-4">Legal</h4>
-              <ul className="space-y-2">
-                <li>
-                  <Link href="/privacy" className="text-sm text-gray-600 hover:text-gray-800 dark:text-gray-400 dark:hover:text-white transition-colors">
-                    Privacy Policy
-                  </Link>
-                </li>
-                <li>
-                  <Link href="/terms" className="text-sm text-gray-600 hover:text-gray-800 dark:text-gray-400 dark:hover:text-white transition-colors">
-                    Terms of Service
-                  </Link>
-                </li>
-                <li>
-                  <Link href="https://www.gnu.org/licenses/agpl-3.0.en.html" className="text-sm text-gray-600 hover:text-gray-800 dark:text-gray-400 dark:hover:text-white transition-colors" target="_blank" rel="noopener noreferrer">
-                    AGPL-3.0 License
-                  </Link>
-                </li>
-              </ul>
+
+            {/* Links Section - Spans 8 columns */}
+            <div className="lg:col-span-8">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+                {/* Product */}
+                <div>
+                  <h4 className="font-semibold text-gray-800 dark:text-white mb-3 text-sm uppercase tracking-wider">Product</h4>
+                  <ul className="space-y-2">
+                    <li>
+                      <Link href="/features" className="text-sm text-gray-600 hover:text-orange-600 dark:text-gray-400 dark:hover:text-orange-400 transition-colors">
+                        Features
+                      </Link>
+                    </li>
+                    <li>
+                      <Link href="/documentation" className="text-sm text-gray-600 hover:text-orange-600 dark:text-gray-400 dark:hover:text-orange-400 transition-colors">
+                        Documentation
+                      </Link>
+                    </li>
+                    <li>
+                      <Link href="/sign-in?redirect_url=/" className="text-sm text-gray-600 hover:text-orange-600 dark:text-gray-400 dark:hover:text-orange-400 transition-colors">
+                        Get Started
+                      </Link>
+                    </li>
+                  </ul>
+                </div>
+
+                {/* Community */}
+                <div>
+                  <h4 className="font-semibold text-gray-800 dark:text-white mb-3 text-sm uppercase tracking-wider">Community</h4>
+                  <ul className="space-y-2">
+                    <li>
+                      <Link href="https://github.com/IfcLCA/IfcLCA/issues" className="text-sm text-gray-600 hover:text-orange-600 dark:text-gray-400 dark:hover:text-orange-400 transition-colors" target="_blank" rel="noopener noreferrer">
+                        GitHub Issues
+                      </Link>
+                    </li>
+                    <li>
+                      <Link href="https://github.com/IfcLCA/IfcLCA/discussions" className="text-sm text-gray-600 hover:text-orange-600 dark:text-gray-400 dark:hover:text-orange-400 transition-colors" target="_blank" rel="noopener noreferrer">
+                        Discussions
+                      </Link>
+                    </li>
+                    <li>
+                      <Link href="/open-source-philosophy" className="text-sm text-gray-600 hover:text-orange-600 dark:text-gray-400 dark:hover:text-orange-400 transition-colors">
+                        Philosophy
+                      </Link>
+                    </li>
+                  </ul>
+                </div>
+
+                {/* Resources */}
+                <div>
+                  <h4 className="font-semibold text-gray-800 dark:text-white mb-3 text-sm uppercase tracking-wider">Resources</h4>
+                  <ul className="space-y-2">
+                    <li>
+                      <Link href="https://www.lcadata.ch" className="text-sm text-gray-600 hover:text-orange-600 dark:text-gray-400 dark:hover:text-orange-400 transition-colors" target="_blank" rel="noopener noreferrer">
+                        lcadata.ch
+                      </Link>
+                    </li>
+                    <li>
+                      <Link href="https://github.com/IfcLCA/IfcLCA" className="text-sm text-gray-600 hover:text-orange-600 dark:text-gray-400 dark:hover:text-orange-400 transition-colors" target="_blank" rel="noopener noreferrer">
+                        Source Code
+                      </Link>
+                    </li>
+                    <li>
+                      <Link href="https://www.buildingsmart.org/standards/bsi-standards/industry-foundation-classes/" className="text-sm text-gray-600 hover:text-orange-600 dark:text-gray-400 dark:hover:text-orange-400 transition-colors" target="_blank" rel="noopener noreferrer">
+                        IFC Standard
+                      </Link>
+                    </li>
+                  </ul>
+                </div>
+
+                {/* Legal */}
+                <div>
+                  <h4 className="font-semibold text-gray-800 dark:text-white mb-3 text-sm uppercase tracking-wider">Legal</h4>
+                  <ul className="space-y-2">
+                    <li>
+                      <Link href="/privacy" className="text-sm text-gray-600 hover:text-orange-600 dark:text-gray-400 dark:hover:text-orange-400 transition-colors">
+                        Privacy
+                      </Link>
+                    </li>
+                    <li>
+                      <Link href="/terms" className="text-sm text-gray-600 hover:text-orange-600 dark:text-gray-400 dark:hover:text-orange-400 transition-colors">
+                        Terms
+                      </Link>
+                    </li>
+                    <li>
+                      <Link href="https://www.gnu.org/licenses/agpl-3.0.en.html" className="text-sm text-gray-600 hover:text-orange-600 dark:text-gray-400 dark:hover:text-orange-400 transition-colors" target="_blank" rel="noopener noreferrer">
+                        AGPL-3.0
+                      </Link>
+                    </li>
+                  </ul>
+                </div>
+              </div>
             </div>
           </div>
-          <div className="border-t border-gray-200 dark:border-gray-700 pt-8 flex flex-col md:flex-row justify-between items-center">
-            <p className="text-sm text-gray-600 dark:text-gray-400">
-              &copy; {new Date().getFullYear()} IfcLCA. All rights reserved.
-            </p>
-            <div className="flex items-center gap-4 mt-4 md:mt-0">
-              <Link href="https://www.lt.plus" target="_blank" rel="noopener noreferrer" className="text-sm text-gray-600 hover:text-gray-800 dark:text-gray-400 dark:hover:text-white transition-colors">
+
+          {/* Bottom Bar */}
+          <div className="border-t border-gray-200 dark:border-gray-700 pt-6 flex flex-col md:flex-row justify-between items-center gap-4">
+            <div className="flex flex-col md:flex-row items-center gap-4 text-sm text-gray-600 dark:text-gray-400">
+              <p>&copy; {new Date().getFullYear()} IfcLCA. All rights reserved.</p>
+              <span className="hidden md:inline">•</span>
+              <Link href="https://www.lt.plus" target="_blank" rel="noopener noreferrer" className="hover:text-orange-600 dark:hover:text-orange-400 transition-colors">
                 Built by LT+
               </Link>
+            </div>
+            <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
+              <Shield className="h-4 w-4" />
+              <span>AGPL-3.0 Licensed</span>
             </div>
           </div>
         </div>
