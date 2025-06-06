@@ -1,4 +1,28 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Metadata } from "next";
+
+export const metadata: Metadata = {
+  title: "Documentation - Getting Started with IfcLCA",
+  description: "Complete guide to using IfcLCA for Life Cycle Assessment. Learn how to upload IFC files, map materials to KBOB database, and generate environmental impact reports.",
+  keywords: [
+    "IfcLCA documentation", "IFC tutorial", "LCA guide", "BIM environmental analysis",
+    "KBOB database", "life cycle assessment tutorial", "sustainability reporting"
+  ],
+  openGraph: {
+    title: "IfcLCA Documentation - Complete Guide",
+    description: "Learn how to use IfcLCA for environmental impact analysis of buildings. Step-by-step guide from IFC upload to report generation.",
+    type: "article",
+    url: "https://ifclca.com/documentation",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "IfcLCA Documentation - Complete Guide",
+    description: "Learn how to use IfcLCA for environmental impact analysis of buildings. Step-by-step guide from IFC upload to report generation.",
+  },
+  alternates: {
+    canonical: "https://ifclca.com/documentation",
+  },
+};
 
 export default function DocumentationPage() {
   return (

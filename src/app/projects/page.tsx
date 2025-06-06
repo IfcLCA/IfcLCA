@@ -1,32 +1,18 @@
-"use client";
+import { ProjectsPageClient } from "@/components/projects-page-client";
+import { Metadata } from "next";
 
-import { ProjectOverview } from "@/components/project-overview";
-import { Button } from "@/components/ui/button";
-import { PlusCircle } from "lucide-react";
-import Link from "next/link";
+// Since this page is behind authentication, prevent indexing
+export const metadata: Metadata = {
+  title: "Projects - IfcLCA Dashboard",
+  description: "Manage and analyze your construction projects with IfcLCA",
+  robots: {
+    index: false, // Don't index authenticated pages
+    follow: false,
+    noarchive: true,
+    nosnippet: true,
+  },
+};
 
 export default function ProjectsPage() {
-  return (
-    <div className="main-container">
-      <section className="space-y-4">
-        <div className="page-header">
-          <div>
-            <h1 className="page-title">Projects</h1>
-            <p className="page-description">
-              Manage and analyze your construction projects
-            </p>
-          </div>
-          <div className="flex items-center gap-4">
-            <Button asChild>
-              <Link href="/projects/new">
-                <PlusCircle className="mr-2 h-4 w-4" />
-                Create Project
-              </Link>
-            </Button>
-          </div>
-        </div>
-        <ProjectOverview />
-      </section>
-    </div>
-  );
+  return <ProjectsPageClient />;
 }

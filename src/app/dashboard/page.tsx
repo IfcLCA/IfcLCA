@@ -2,6 +2,19 @@ import { auth } from "@clerk/nextjs/server";
 import { Dashboard } from "@/components/dashboard";
 import { redirect } from "next/navigation";
 import { unstable_cache } from "next/cache";
+import { Metadata } from "next";
+
+// Since this page is behind authentication, prevent indexing
+export const metadata: Metadata = {
+  title: "Dashboard - IfcLCA",
+  description: "Your personal IfcLCA dashboard with project statistics and recent activity",
+  robots: {
+    index: false, // Don't index authenticated pages
+    follow: false,
+    noarchive: true,
+    nosnippet: true,
+  },
+};
 
 interface ProjectCount {
   _count?: {

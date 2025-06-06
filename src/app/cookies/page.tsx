@@ -1,4 +1,17 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Metadata } from "next";
+
+export const metadata: Metadata = {
+  title: "Cookie Policy - IfcLCA Cookie Usage",
+  description: "Learn about how IfcLCA uses cookies to improve your experience. Understand what cookies we use and how to manage your preferences.",
+  robots: {
+    index: true,
+    follow: true,
+  },
+  alternates: {
+    canonical: "https://ifclca.com/cookies",
+  },
+};
 
 export default function CookiesPage() {
   return (

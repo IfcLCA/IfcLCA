@@ -1,0 +1,24 @@
+User-agent: *
+Allow: /
+
+# Disallow all API endpoints
+Disallow: /api/
+
+# Disallow authentication pages
+Disallow: /sign-in
+Disallow: /sign-up
+
+# Disallow authenticated dashboard and app areas
+Disallow: /dashboard
+Disallow: /projects/
+Disallow: /materials-library
+
+# Allow public pages only
+Allow: /
+Allow: /documentation
+Allow: /privacy
+Allow: /terms
+Allow: /cookies
+
+# Sitemap location
+Sitemap: https://ifclca.com/sitemap.xml 
