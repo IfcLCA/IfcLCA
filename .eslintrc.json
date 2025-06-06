@@ -1,3 +1,10 @@
 {
-  "extends": ["next/core-web-vitals"]
+  "extends": [
+    "next/core-web-vitals"
+  ],
+  "rules": {
+    "prefer-const": "error",
+    "no-console": "warn",
+    "react-hooks/exhaustive-deps": "warn"
+  }
 }

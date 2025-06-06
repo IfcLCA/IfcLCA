@@ -63,7 +63,7 @@ export async function saveElements(
     const totalElementCount = data.elements.length;
 
     let savedCount = 0;
-    let errors = [];
+    const errors = [];
 
     // Process elements in smaller batches
     const batchSize = 20;
