@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@clerk/nextjs": "^6.3.0",
+    "@fontsource/nunito-sans": "^5.2.5",
     "@hookform/resolvers": "^3.9.1",
     "@neondatabase/serverless": "^0.10.2",
     "@radix-ui/react-alert-dialog": "^1.1.2",
@@ -61,8 +62,7 @@
     "tailwindcss-animate": "^1.0.7",
     "three": "^0.159.0",
     "zod": "^3.23.8",
-    "zustand": "^5.0.1",
-    "@fontsource/nunito-sans": "^5.2.5"
+    "zustand": "^5.0.1"
   },
   "devDependencies": {
     "@types/mongoose": "^5.11.97",
