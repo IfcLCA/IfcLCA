@@ -6,7 +6,7 @@
 ![TypeScript](https://img.shields.io/badge/TypeScript-3178C6?logo=typescript&logoColor=white)
 
 ## Overview
-IfcLCA leverages **openBIM** and **Open Data Standards** to analyze environmental impact of construction projects through IFC files using Swiss **KBOB** data from [lcadata.ch](https://lcadata.ch).
+IfcLCA leverages **openBIM** and **Open Data Standards** to analyze the environmental impact of construction projects through IFC files using Swiss **KBOB** environmental impact data from [lcadata.ch](https://lcadata.ch).
 
 ## ✨ Features
 - 🏗️ **Project Dashboard** — manage multiple building projects and track their progress.
