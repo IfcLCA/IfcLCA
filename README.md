@@ -9,10 +9,10 @@
 IfcLCA leverages **openBIM** and **Open Data Standards** to analyze the environmental impact of construction projects through IFC files using Swiss **KBOB** environmental impact data from [lcadata.ch](https://lcadata.ch).
 
 ## ✨ Features
-- 🏗️ **Project Dashboard** — manage multiple building projects and track their progress.
-- ⚙️ **IFC Processing** — upload, parse and inspect IFC files with a built‑in 3D viewer.
-- 📚 **Materials Library** — centralize materials data across projects.
-- 📈 **LCA Charts** — visualize environmental impacts and export nice charts.
+- 🏗️ **Project Dashboard** - manage multiple building projects and track their progress.
+- ⚙️ **IFC Processing** - upload, parse and inspect IFC files with a built‑in 3D viewer.
+- 📚 **Materials Library** - centralize materials data across projects.
+- 📈 **LCA Charts** - visualize environmental impacts and export nice charts.
 
 ## 🚀 Typical Workflow
 1. **Export your Model**
