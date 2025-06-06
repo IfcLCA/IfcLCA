@@ -4,14 +4,7 @@ import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import FeatureCard from "./feature-card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import Link from "next/link";
 import Image from "next/image";
@@ -193,20 +186,12 @@ export default function LandingPage() {
                   "Instant feedback and analysis results for quick decision-making in your design process.",
               },
             ].map((feature, index) => (
-              <Card
+              <FeatureCard
                 key={index}
-                className="bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm transition-all duration-300 hover:scale-105"
-              >
-                <CardHeader>
-                  <feature.icon className="h-10 w-10 text-orange-600 dark:text-orange-400 mb-2" />
-                  <CardTitle>{feature.title}</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <p className="text-gray-600 dark:text-gray-300">
-                    {feature.description}
-                  </p>
-                </CardContent>
-              </Card>
+                icon={feature.icon}
+                title={feature.title}
+                description={feature.description}
+              />
             ))}
           </div>
         </section>
