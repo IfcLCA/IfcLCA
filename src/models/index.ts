@@ -5,3 +5,5 @@ export { Project } from "./project";
 export { Upload } from "./upload";
 export { KBOBMaterial } from "./kbob";
 export { MaterialDeletion } from "./material-deletion";
+
+export { SupportTicket } from "./support-ticket";
