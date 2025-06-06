@@ -27,12 +27,25 @@ import {
   Code,
   Zap,
 } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 export default function LandingPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [isDarkMode, setIsDarkMode] = useState(false);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [selectedFeature, setSelectedFeature] = useState<{
+    icon: any;
+    title: string;
+    description: string;
+    details: string;
+  } | null>(null);
 
   useEffect(() => {
     if (
@@ -154,61 +167,76 @@ export default function LandingPage() {
           <h2 className="text-3xl font-bold text-center text-gray-800 dark:text-white mb-8">
             Key Features
           </h2>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-6xl mx-auto">
-            {[
-              {
-                icon: Code,
-                title: "Open Source",
-                description:
-                  "Fully open-source solution allowing for collaborative and transparent approach to LCA.",
-              },
-              {
-                icon: Upload,
-                title: "Ifc Integration",
-                description:
-                  "Deep Ifc integration with custom parser for accurate material and quantity analysis.",
-              },
-              {
-                icon: BarChart3,
-                title: "Environmental Impact Data",
-                description:
-                  "Utilizes Swiss KBOB data for precise environmental impact assessment.",
-              },
-              {
-                icon: Leaf,
-                title: "No Data Storage",
-                description:
-                  "We don't save your Ifc files, ensuring data privacy and security.",
-              },
-              {
-                icon: Users,
-                title: "Collaboration",
-                description:
-                  "Foster teamwork and knowledge sharing in sustainable design and analysis.",
-              },
-              {
-                icon: Zap,
-                title: "Real-Time Analysis",
-                description:
-                  "Instant feedback and analysis results for quick decision-making in your design process.",
-              },
-            ].map((feature, index) => (
-              <Card
-                key={index}
-                className="bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm transition-all duration-300 hover:scale-105"
-              >
-                <CardHeader>
-                  <feature.icon className="h-10 w-10 text-orange-600 dark:text-orange-400 mb-2" />
-                  <CardTitle>{feature.title}</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <p className="text-gray-600 dark:text-gray-300">
-                    {feature.description}
-                  </p>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-6xl mx-auto">
+              {[
+                {
+                  icon: Code,
+                  title: "Open Source",
+                  description:
+                    "Fully open-source solution allowing for collaborative and transparent approach to LCA.",
+                  details:
+                    "Explore the entire codebase, contribute on GitHub and adapt every part of the workflow to your own needs.",
+                },
+                {
+                  icon: Upload,
+                  title: "Ifc Integration",
+                  description:
+                    "Deep Ifc integration with custom parser for accurate material and quantity analysis.",
+                  details:
+                    "Upload models with BaseQuantities and let the parser automatically analyse materials and quantities without storing your files.",
+                },
+                {
+                  icon: BarChart3,
+                  title: "Environmental Impact Data",
+                  description:
+                    "Utilizes Swiss KBOB data for precise environmental impact assessment.",
+                  details:
+                    "Combine your building information with the Swiss KBOB dataset for accurate and localised calculations.",
+                },
+                {
+                  icon: Leaf,
+                  title: "No Data Storage",
+                  description:
+                    "We don't save your Ifc files, ensuring data privacy and security.",
+                  details:
+                    "Files are processed in-memory only \u2013 nothing is written to disk so your data always stays with you.",
+                },
+                {
+                  icon: Users,
+                  title: "Collaboration",
+                  description:
+                    "Foster teamwork and knowledge sharing in sustainable design and analysis.",
+                  details:
+                    "Share your results with your team and keep everyone aligned through built\u2011in multi-user access.",
+                },
+                {
+                  icon: Zap,
+                  title: "Real-Time Analysis",
+                  description:
+                    "Instant feedback and analysis results for quick decision-making in your design process.",
+                  details:
+                    "Get immediate results while you iterate through different design options to find the most sustainable solution.",
+                },
+              ].map((feature, index) => (
+                <div
+                  key={index}
+                  onClick={() => setSelectedFeature(feature)}
+                  className="cursor-pointer transform transition-all duration-300 hover:scale-105"
+                >
+                  <Card className="bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm">
+                    <CardHeader>
+                      <feature.icon className="h-10 w-10 text-orange-600 dark:text-orange-400 mb-2" />
+                      <CardTitle>{feature.title}</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <p className="text-gray-600 dark:text-gray-300">
+                        {feature.description}
+                      </p>
+                    </CardContent>
+                  </Card>
+                </div>
+              ))}
+            </div>
         </section>
 
         <section id="about" className="py-12 px-4">
@@ -249,6 +277,18 @@ export default function LandingPage() {
             </div>
           </div>
         </section>
+        {selectedFeature && (
+          <Dialog open={Boolean(selectedFeature)} onOpenChange={(o) => !o && setSelectedFeature(null)}>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>{selectedFeature.title}</DialogTitle>
+                <DialogDescription>
+                  {selectedFeature.details}
+                </DialogDescription>
+              </DialogHeader>
+            </DialogContent>
+          </Dialog>
+        )}
       </main>
 
       <footer className="bg-gray-100/80 dark:bg-gray-900/50 backdrop-blur-sm py-8 px-4 relative z-10">
