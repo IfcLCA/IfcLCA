@@ -16,11 +16,16 @@ export interface IKBOBMaterial {
   "max density"?: number;
 }
 
+export interface IEcoMaterialRef {
+  source: string;
+  id: string;
+}
+
 export interface IMaterial {
   _id: string;
   name: string;
   projectId: string;
-  kbobMatchId?: string;
+  ecoMaterial?: IEcoMaterialRef;
   density?: number;
   gwp?: number;
   ubp?: number;
