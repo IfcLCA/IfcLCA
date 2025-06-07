@@ -15,7 +15,8 @@ export async function POST(
     }
 
     await connectToDatabase();
-    const { kbobId } = await request.json();
+    const { ecoMaterial } = await request.json();
+    const kbobId = ecoMaterial?.id || ecoMaterial;
 
     // Get the material first to check project ownership
     const material = await Material.findById(params.id)
@@ -42,7 +43,7 @@ export async function POST(
       );
     }
 
-    // Update the material with KBOB match
+    // Update the material with eco material match
     const updatedMaterial = await Material.findByIdAndUpdate(
       params.id,
       {
@@ -65,16 +66,16 @@ export async function POST(
       name: updatedMaterial.name,
       category: updatedMaterial.category,
       volume: updatedMaterial.volume,
-      kbobMatch: updatedMaterial.kbobMatchId
+      ecoMaterial: updatedMaterial.kbobMatchId
         ? {
-          id: updatedMaterial.kbobMatchId._id.toString(),
-          name: updatedMaterial.kbobMatchId.Name,
-          indicators: {
-            gwp: updatedMaterial.kbobMatchId.GWP,
-            ubp: updatedMaterial.kbobMatchId.UBP,
-            penre: updatedMaterial.kbobMatchId.PENRE,
-          },
-        }
+            id: updatedMaterial.kbobMatchId._id.toString(),
+            name: updatedMaterial.kbobMatchId.Name,
+            indicators: {
+              gwp: updatedMaterial.kbobMatchId.GWP,
+              ubp: updatedMaterial.kbobMatchId.UBP,
+              penre: updatedMaterial.kbobMatchId.PENRE,
+            },
+          }
         : null,
     });
   } catch (error) {
