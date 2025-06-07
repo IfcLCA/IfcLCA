@@ -55,9 +55,10 @@ export function DashboardEmissionsCard({
           <BarChart2 className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors" />
         </CardHeader>
         <CardContent>
-          <div className="text-sm text-muted-foreground">
-            No emissions data available
+          <div className="text-2xl font-bold text-muted-foreground">
+            —
           </div>
+          <p className="text-xs text-muted-foreground">No data</p>
         </CardContent>
       </Card>
     );
@@ -91,8 +92,8 @@ export function DashboardEmissionsCard({
         <BarChart2 className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors" />
       </CardHeader>
       <CardContent>
-        <div className="flex flex-col h-full">
-          <div className="flex flex-col justify-center flex-1 min-h-0">
+        <div className="space-y-2">
+          <div className="flex items-baseline gap-2">
             <p className="text-2xl font-bold group-hover:text-primary transition-colors">
               {formattedValue}
               <span className="text-sm font-normal text-muted-foreground ml-1">
@@ -104,12 +105,12 @@ export function DashboardEmissionsCard({
             value={metric}
             onValueChange={(value) => setMetric(value as MetricKey)}
           >
-            <SelectTrigger className="w-full mt-2">
+            <SelectTrigger className="h-8 text-xs">
               <SelectValue placeholder="Select metric" />
             </SelectTrigger>
             <SelectContent>
               {Object.entries(metrics).map(([key, { description }]) => (
-                <SelectItem key={key} value={key}>
+                <SelectItem key={key} value={key} className="text-xs">
                   {description}
                 </SelectItem>
               ))}
