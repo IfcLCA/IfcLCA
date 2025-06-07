@@ -102,6 +102,7 @@ export function MaterialLibraryComponent() {
   >([]);
   const [isMatchingInProgress, setIsMatchingInProgress] = useState(false);
   const [isKbobOpen, setIsKbobOpen] = useState(false);
+  const [dataSource, setDataSource] = useState<"kbob" | "oekobaudat">("kbob");
   const [previewChanges, setPreviewChanges] = useState<MaterialChange[]>([]);
   const [showPreview, setShowPreview] = useState(false);
   const [favoriteMaterials, setFavoriteMaterials] = useState<string[]>([]);
@@ -249,7 +250,7 @@ export function MaterialLibraryComponent() {
       try {
         const [materialsRes, kbobRes, projectsRes] = await Promise.all([
           fetch("/api/materials"),
-          fetch("/api/kbob"),
+          fetch(`/api/datasources/${dataSource}`),
           fetch("/api/materials/projects"),
         ]);
 
@@ -267,6 +268,7 @@ export function MaterialLibraryComponent() {
         setMaterials(Array.isArray(materialsData) ? materialsData : []);
         setKbobMaterials(kbobData);
         setProjects(projectsData);
+        setKbobSearchTerm("");
 
         // Check URL parameters for projectId
         const urlParams = new URLSearchParams(window.location.search);
@@ -283,7 +285,7 @@ export function MaterialLibraryComponent() {
     }
 
     fetchData();
-  }, []);
+  }, [dataSource]);
 
   const filteredAndSortedMaterials = useMemo(() => {
     // Ensure materials is an array
@@ -1238,23 +1240,43 @@ export function MaterialLibraryComponent() {
               <div className="p-4 border-b bg-secondary/10 flex-shrink-0">
                 <div className="flex items-center justify-between mb-2">
                   <h3 className="font-semibold flex items-center gap-2">
-                    <span>KBOB Materials Database</span>
+                    <span>
+                      {dataSource === "kbob"
+                        ? "KBOB"
+                        : "Ökobaudat"} Materials Database
+                    </span>
                     <Badge variant="outline">
                       {kbobMaterials.length} materials
                     </Badge>
                   </h3>
-                  <div className="flex items-center gap-2">
-                    <Label
-                      htmlFor="auto-scroll"
-                      className="text-sm text-muted-foreground"
+                  <div className="flex items-center gap-4">
+                    <Select
+                      value={dataSource}
+                      onValueChange={(v) =>
+                        setDataSource(v as "kbob" | "oekobaudat")
+                      }
                     >
-                      Auto-scroll
-                    </Label>
-                    <Switch
-                      id="auto-scroll"
-                      checked={autoScrollEnabled}
-                      onCheckedChange={setAutoScrollEnabled}
-                    />
+                      <SelectTrigger className="w-[130px]">
+                        <SelectValue placeholder="Data source" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="kbob">KBOB</SelectItem>
+                        <SelectItem value="oekobaudat">Ökobaudat</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <div className="flex items-center gap-2">
+                      <Label
+                        htmlFor="auto-scroll"
+                        className="text-sm text-muted-foreground"
+                      >
+                        Auto-scroll
+                      </Label>
+                      <Switch
+                        id="auto-scroll"
+                        checked={autoScrollEnabled}
+                        onCheckedChange={setAutoScrollEnabled}
+                      />
+                    </div>
                   </div>
                 </div>
                 <p className="text-sm text-muted-foreground mb-3">

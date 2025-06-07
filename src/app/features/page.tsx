@@ -106,15 +106,15 @@ export default function FeaturesPage() {
             ]
         },
         {
-            title: "Swiss KBOB Database",
-            subtitle: "Professional Environmental Data",
+            title: "Environmental Data Libraries",
+            subtitle: "KBOB and Ökobaudat support",
             icon: TreePine,
             color: "from-green-500 to-emerald-500",
-            description: "Access to 300+ materials with certified environmental impacts",
+            description: "Access certified datasets for LCA calculations",
             details: [
                 {
-                    title: "Certified Data Source",
-                    description: "Official Swiss KBOB environmental database from lcadata.ch",
+                    title: "Certified Data Sources",
+                    description: "Swiss KBOB list and German Ökobaudat CSV import",
                     icon: CheckCircle
                 },
                 {
@@ -285,7 +285,7 @@ export default function FeaturesPage() {
         },
         {
             feature: "Environmental Database",
-            ifclca: "Swiss KBOB (300+ materials)",
+            ifclca: "KBOB built-in, Ökobaudat import",
             others: "Varies or proprietary",
             advantage: "Certified Data"
         },

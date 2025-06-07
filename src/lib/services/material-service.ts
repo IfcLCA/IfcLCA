@@ -111,6 +111,33 @@ export class MaterialService {
     return 0;
   }
 
+  static async getIndicatorsForMaterial(source: string, id: string) {
+    switch (source?.toLowerCase()) {
+      case "kbob":
+      default:
+        return KBOBMaterial.findById(id).lean();
+    }
+  }
+
+  static calculateDensity(materialData: any): number {
+    if (!materialData) return 0;
+    if (typeof materialData["kg/unit"] === "number" && !isNaN(materialData["kg/unit"])) {
+      return materialData["kg/unit"];
+    }
+    if (
+      typeof materialData["min density"] === "number" &&
+      typeof materialData["max density"] === "number" &&
+      !isNaN(materialData["min density"]) &&
+      !isNaN(materialData["max density"])
+    ) {
+      return (materialData["min density"] + materialData["max density"]) / 2;
+    }
+    if (typeof materialData.density === "number" && !isNaN(materialData.density)) {
+      return materialData.density;
+    }
+    return 0;
+  }
+
   // Core KBOB material operations
   static async setKBOBMatch(
     materialId: Types.ObjectId,
@@ -217,7 +244,7 @@ export class MaterialService {
         Material.find({ _id: { $in: objectIds } })
           .populate<{ kbobMatchId: IKBOBMaterial }>("kbobMatchId")
           .lean(),
-        KBOBMaterial.findById<IKBOBMaterial>(kbobObjectId).lean(),
+        this.getIndicatorsForMaterial("kbob", kbobObjectId.toString()),
         Element.find({ "materials.material": { $in: objectIds } })
           .populate<{ projectId: { _id: Types.ObjectId; name: string } }>(
             "projectId",
@@ -317,32 +344,7 @@ export class MaterialService {
     }
   }
 
-  /**
-   * Calculates density from KBOB material with validation
-   */
-  static calculateDensity(kbobMaterial: IKBOBMaterial): number | null {
-    if (!kbobMaterial) return null;
 
-    // Use kg/unit if available
-    if (
-      typeof kbobMaterial["kg/unit"] === "number" &&
-      !isNaN(kbobMaterial["kg/unit"])
-    ) {
-      return kbobMaterial["kg/unit"];
-    }
-
-    // Calculate from min/max density
-    if (
-      typeof kbobMaterial["min density"] === "number" &&
-      typeof kbobMaterial["max density"] === "number" &&
-      !isNaN(kbobMaterial["min density"]) &&
-      !isNaN(kbobMaterial["max density"])
-    ) {
-      return (kbobMaterial["min density"] + kbobMaterial["max density"]) / 2;
-    }
-
-    return null;
-  }
 
   /**
    * Calculates LCA indicators
@@ -350,25 +352,25 @@ export class MaterialService {
   static calculateIndicators(
     volume: number,
     density: number | undefined,
-    kbobMaterial: IKBOBMaterial | null
+    materialData: any
   ): ILCAIndicators | undefined {
-    if (!kbobMaterial || !density || density <= 0 || !volume || isNaN(volume)) {
+    if (!materialData || !density || density <= 0 || !volume || isNaN(volume)) {
       return undefined;
     }
 
     if (
-      typeof kbobMaterial.GWP !== "number" ||
-      typeof kbobMaterial.UBP !== "number" ||
-      typeof kbobMaterial.PENRE !== "number"
+      typeof materialData.GWP !== "number" ||
+      typeof materialData.UBP !== "number" ||
+      typeof materialData.PENRE !== "number"
     ) {
       return undefined;
     }
 
     const mass = volume * density;
     return {
-      gwp: mass * kbobMaterial.GWP,
-      ubp: mass * kbobMaterial.UBP,
-      penre: mass * kbobMaterial.PENRE,
+      gwp: mass * materialData.GWP,
+      ubp: mass * materialData.UBP,
+      penre: mass * materialData.PENRE,
     };
   }
 
@@ -623,10 +625,11 @@ export class MaterialService {
         projectId,
       });
 
-      // Fetch KBOB material data
-      const kbobMaterial = await KBOBMaterial.findById<IKBOBMaterial>(
-        kbobMatchId
-      ).lean();
+      // Fetch material indicator data based on source
+      const kbobMaterial = await this.getIndicatorsForMaterial(
+        "kbob",
+        kbobMatchId.toString()
+      );
       if (!kbobMaterial) {
         throw new Error(`KBOB material not found for id: ${kbobMatchId}`);
       }

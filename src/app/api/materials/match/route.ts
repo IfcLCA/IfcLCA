@@ -7,9 +7,11 @@ export async function POST(request: Request) {
   try {
     const {
       materialIds,
-      kbobMaterialId,
+      ecoMaterial,
       density: userDefinedDensity,
     } = await request.json();
+    // Support both plain ID and object with id field
+    const kbobMaterialId = ecoMaterial?.id || ecoMaterial;
     await connectToDatabase();
 
     // First fetch the KBOB material

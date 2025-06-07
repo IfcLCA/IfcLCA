@@ -1,11 +1,16 @@
 import mongoose from "mongoose";
 
+interface IEcoMaterialRef {
+  source: string;
+  id: mongoose.Types.ObjectId;
+}
+
 interface IMaterial {
   projectId: mongoose.Types.ObjectId;
   name: string;
   category?: string;
   density?: number;
-  kbobMatchId?: mongoose.Types.ObjectId;
+  ecoMaterial?: IEcoMaterialRef;
   lastCalculated?: Date;
 }
 
@@ -32,9 +37,12 @@ const materialSchema = new mongoose.Schema<IMaterial>(
         message: "Density must be 0 or a finite number",
       },
     },
-    kbobMatchId: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "KBOBMaterial",
+    ecoMaterial: {
+      source: { type: String },
+      id: {
+        type: mongoose.Schema.Types.ObjectId,
+        refPath: "ecoMaterial.source",
+      },
     },
     lastCalculated: {
       type: Date,
@@ -49,7 +57,7 @@ const materialSchema = new mongoose.Schema<IMaterial>(
 
 // Indexes
 materialSchema.index({ projectId: 1, name: 1 }, { unique: true });
-materialSchema.index({ kbobMatchId: 1 });
+materialSchema.index({ "ecoMaterial.id": 1 });
 
 // Virtual for elements using this material
 materialSchema.virtual("elements", {
@@ -87,9 +95,9 @@ materialSchema.virtual("totalVolume").get(async function () {
 
 // Virtual for emissions factors from KBOB match
 materialSchema.virtual("emissionFactors").get(function () {
-  if (!this.populated("kbobMatchId")) return null;
+  if (!this.populated("ecoMaterial.id")) return null;
 
-  const kbob = this.kbobMatchId as any;
+  const kbob = this.ecoMaterial?.id as any;
   if (!kbob) return null;
 
   return {

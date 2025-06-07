@@ -111,33 +111,40 @@ export class IFCProcessingService {
       for (let i = 0; i < elements.length; i += BATCH_SIZE) {
         const batch = elements.slice(i, i + BATCH_SIZE);
 
-        const bulkOps = batch.map((element) => {
-          const processedMaterials = [];
+        const bulkOps = await Promise.all(
+          batch.map(async (element) => {
+            const processedMaterials = [];
 
           // Process direct materials
           if (element.materials?.length) {
             processedMaterials.push(
-              ...element.materials
-                .map((material) => {
+              ...(await Promise.all(
+                element.materials.map(async (material) => {
                   const match = materialMatchMap.get(material.name);
                   if (!match) {
                     logger.warn(`Material not found: ${material.name}`);
                     return null;
                   }
+                  const indicatorData = match.ecoMaterial?.id
+                    ? await MaterialService.getIndicatorsForMaterial(
+                        match.ecoMaterial.source,
+                        match.ecoMaterial.id
+                      )
+                    : match.kbobMatchId;
                   return {
                     material: match._id,
                     name: material.name,
                     volume: material.volume,
-                    indicators: match.kbobMatchId
+                    indicators: indicatorData
                       ? MaterialService.calculateIndicators(
                           material.volume,
                           match.density,
-                          match.kbobMatchId
+                          indicatorData
                         )
                       : undefined,
                   };
                 })
-                .filter(Boolean)
+              ).filter(Boolean))
             );
           }
 
@@ -147,27 +154,33 @@ export class IFCProcessingService {
             const layers = element.materialLayers.layers;
 
             processedMaterials.push(
-              ...layers
-                .map((layer) => {
+              ...(await Promise.all(
+                layers.map(async (layer) => {
                   const match = materialMatchMap.get(layer.materialName);
                   if (!match) {
                     logger.warn(`Material not found: ${layer.materialName}`);
                     return null;
                   }
+                  const indicatorData = match.ecoMaterial?.id
+                    ? await MaterialService.getIndicatorsForMaterial(
+                        match.ecoMaterial.source,
+                        match.ecoMaterial.id
+                      )
+                    : match.kbobMatchId;
                   return {
                     material: match._id,
                     name: layer.materialName,
                     volume: layer.volume || totalVolume / layers.length,
-                    indicators: match.kbobMatchId
+                    indicators: indicatorData
                       ? MaterialService.calculateIndicators(
                           layer.volume || totalVolume / layers.length,
                           match.density,
-                          match.kbobMatchId
+                          indicatorData
                         )
                       : undefined,
                   };
                 })
-                .filter(Boolean)
+              ).filter(Boolean))
             );
           }
 
@@ -196,7 +209,8 @@ export class IFCProcessingService {
               upsert: true,
             },
           };
-        });
+          })
+        );
 
         const result = await Element.bulkWrite(bulkOps, { session });
         processedCount += result.upsertedCount + result.modifiedCount;
