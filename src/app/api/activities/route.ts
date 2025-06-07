@@ -2,6 +2,37 @@ import { NextResponse } from "next/server";
 import { connectToDatabase } from "@/lib/mongodb";
 import { Project, Upload, MaterialDeletion } from "@/models";
 import { auth } from "@clerk/nextjs/server";
+import mongoose from "mongoose";
+
+// Define types for lean documents
+interface LeanProject {
+  _id: mongoose.Types.ObjectId;
+  name: string;
+  description?: string;
+  createdAt: Date;
+}
+
+interface LeanUpload {
+  _id: mongoose.Types.ObjectId;
+  filename: string;
+  elementCount: number;
+  createdAt: Date;
+  projectId: {
+    _id: mongoose.Types.ObjectId;
+    name: string;
+  };
+}
+
+interface LeanMaterialDeletion {
+  _id: mongoose.Types.ObjectId;
+  materialName: string;
+  reason?: string;
+  createdAt: Date;
+  projectId: {
+    _id: mongoose.Types.ObjectId;
+    name: string;
+  };
+}
 
 export async function GET(request: Request) {
   try {
@@ -12,38 +43,36 @@ export async function GET(request: Request) {
 
     const { searchParams } = new URL(request.url);
     const page = parseInt(searchParams.get("page") || "1");
-    const limit = 2; // Changed to 2 items per page (and it returns more but cant be bothered to fix it now, future me will be happy)
+    const limit = parseInt(searchParams.get("limit") || "10");
     const skip = (page - 1) * limit;
 
     await connectToDatabase();
 
-    // Get total counts for pagination (even though no pagination UI exists yet)
-    const [projectsCount, uploadsCount, materialDeletionsCount] =
-      await Promise.all([
-        Project.countDocuments({ userId }),
-        Upload.countDocuments({ userId }),
-        MaterialDeletion.countDocuments({ userId }),
-      ]);
-
-    // Fetch paginated projects and uploads
+    // Fetch all activities in one go, sorted by creation date
     const [projects, uploads, materialDeletions] = await Promise.all([
       Project.find({ userId })
         .sort({ createdAt: -1 })
-        .skip(skip)
-        .limit(limit)
-        .lean(),
+        .limit(limit * 2) // Get more than needed to have variety
+        .select("_id name description createdAt")
+        .lean()
+        .exec()
+        .then(docs => docs as unknown as LeanProject[]),
       Upload.find({ userId })
         .sort({ createdAt: -1 })
-        .skip(skip)
-        .limit(limit)
+        .limit(limit * 2)
+        .select("_id filename elementCount createdAt projectId")
         .populate("projectId", "name")
-        .lean(),
+        .lean()
+        .exec()
+        .then(docs => docs as unknown as LeanUpload[]),
       MaterialDeletion.find({ userId })
         .sort({ createdAt: -1 })
-        .skip(skip)
         .limit(limit)
+        .select("_id materialName reason createdAt projectId")
         .populate("projectId", "name")
-        .lean(),
+        .lean()
+        .exec()
+        .then(docs => docs as unknown as LeanMaterialDeletion[]),
     ]);
 
     // Format activities
@@ -53,7 +82,7 @@ export async function GET(request: Request) {
         type: "project_created",
         user: {
           name: "You",
-          avatar: "/placeholder-avatar.jpg",
+          imageUrl: "/placeholder-avatar.jpg",
         },
         action: "created a new project",
         project: project.name,
@@ -68,7 +97,7 @@ export async function GET(request: Request) {
         type: "file_uploaded",
         user: {
           name: "You",
-          avatar: "/placeholder-avatar.jpg",
+          imageUrl: "/placeholder-avatar.jpg",
         },
         action: "uploaded a file to",
         project: upload.projectId?.name || "Unknown Project",
@@ -84,7 +113,7 @@ export async function GET(request: Request) {
         type: "material_deleted",
         user: {
           name: "You",
-          avatar: "/placeholder-avatar.jpg",
+          imageUrl: "/placeholder-avatar.jpg",
         },
         action: "deleted a material from",
         project: deletion.projectId?.name || "Unknown Project",
@@ -103,13 +132,17 @@ export async function GET(request: Request) {
         new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
     );
 
-    const totalCount = projectsCount + uploadsCount + materialDeletionsCount;
-    const hasMore = skip + sortedActivities.length < totalCount;
+    // Apply pagination to the combined sorted activities
+    const paginatedActivities = sortedActivities.slice(skip, skip + limit);
+
+    // Since we're fetching more items than the limit, we can estimate if there are more
+    const totalFetched = projects.length + uploads.length + materialDeletions.length;
+    const hasMore = totalFetched >= limit * 2; // If we got the max we fetched, there are likely more
 
     return NextResponse.json({
-      activities: sortedActivities,
+      activities: paginatedActivities,
       hasMore,
-      total: totalCount,
+      total: totalFetched,
     });
   } catch (error) {
     console.error("Failed to fetch activities:", error);

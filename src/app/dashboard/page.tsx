@@ -96,13 +96,23 @@ export const dynamic = "force-dynamic";
 export const revalidate = 300; // Revalidate page every 5 minutes
 
 export default async function DashboardPage() {
-  const { userId } = auth();
+  const { userId } = await auth();
 
   if (!userId) {
     return redirect("/");
   }
 
-  const initialData = await getInitialData();
+  // For now, let's pass empty initial data and let the client fetch
+  const initialData = {
+    initialRecentProjects: [],
+    statistics: {
+      totalProjects: 0,
+      totalElements: 0,
+      totalMaterials: 0,
+      recentActivities: 0,
+    },
+    initialActivities: [],
+  };
 
   return <Dashboard {...initialData} />;
 }
