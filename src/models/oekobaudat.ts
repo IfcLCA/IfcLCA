@@ -1,22 +1,24 @@
 import mongoose from "mongoose";
 
-export interface IOekobaudatMaterial {
-  uuid: string;
-  name: string;
-  category?: string;
-  subCategory?: string;
-  gwp?: number;
-  penrt?: number;
+interface IOekobaudatMaterial {
+  Name: string;
+  GWP: number;
+  UBP: number;
+  PENRE: number;
 }
 
-const oekobaudatSchema = new mongoose.Schema<IOekobaudatMaterial>(
+interface OekobaudatMaterialModel
+  extends mongoose.Model<IOekobaudatMaterial> {}
+
+const oekobaudatSchema = new mongoose.Schema<
+  IOekobaudatMaterial,
+  OekobaudatMaterialModel
+>(
   {
-    uuid: { type: String, required: true, index: true },
-    name: { type: String, required: true, index: true },
-    category: { type: String },
-    subCategory: { type: String },
-    gwp: { type: Number },
-    penrt: { type: Number },
+    Name: { type: String, required: true, index: true },
+    GWP: { type: Number, required: true },
+    UBP: { type: Number, required: true },
+    PENRE: { type: Number, required: true },
   },
   {
     collection: "indicatorsOekobaudat",
@@ -24,9 +26,20 @@ const oekobaudatSchema = new mongoose.Schema<IOekobaudatMaterial>(
   }
 );
 
-oekobaudatSchema.index({ uuid: 1 });
-oekobaudatSchema.index({ name: 1 });
+oekobaudatSchema.index({ Name: 1 });
+
+oekobaudatSchema.static("findValidMaterials", function () {
+  return this.find({
+    GWP: { $exists: true, $ne: null },
+    UBP: { $exists: true, $ne: null },
+    PENRE: { $exists: true, $ne: null },
+  }).sort({ Name: 1 });
+});
 
 export const OekobaudatMaterial =
-  (mongoose.models.OekobaudatMaterial as mongoose.Model<IOekobaudatMaterial>) ||
-  mongoose.model<IOekobaudatMaterial>("OekobaudatMaterial", oekobaudatSchema, "indicatorsOekobaudat");
+  (mongoose.models.OekobaudatMaterial as OekobaudatMaterialModel) ||
+  mongoose.model<IOekobaudatMaterial, OekobaudatMaterialModel>(
+    "OekobaudatMaterial",
+    oekobaudatSchema,
+    "indicatorsOekobaudat"
+  );
