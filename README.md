@@ -6,7 +6,7 @@
 ![TypeScript](https://img.shields.io/badge/TypeScript-3178C6?logo=typescript&logoColor=white)
 
 ## Overview
-IfcLCA leverages **openBIM** and **Open Data Standards** to analyze the environmental impact of construction projects through IFC files using Swiss **KBOB** environmental impact data from [lcadata.ch](https://lcadata.ch).
+IfcLCA leverages **openBIM** and **Open Data Standards** to analyze the environmental impact of construction projects through IFC files. It supports environmental impact data from the Swiss **KBOB** list via [lcadata.ch](https://lcadata.ch) and the German **Ökobaudat** database.
 
 ## ✨ Features
 - 🏗️ **Project Dashboard** - manage multiple building projects and track their progress.
@@ -23,8 +23,9 @@ IfcLCA leverages **openBIM** and **Open Data Standards** to analyze the environm
    - Drop your IFC file in the upload area or click to browse
    - Files are processed locally and never stored on our servers
 3. **Map Materials**
-   - Search the full KBOB database
-   - Combine your materials with environmental impact data
+   - Search the KBOB or Ökobaudat databases
+   - Import Ökobaudat CSV data under **Materials ➜ Import Dataset**
+   - Combine your materials with the selected environmental dataset
 4. **Analyze Results**
    - View impact metrics: GWP, PEnr, UBP and material breakdown
    - Use interactive charts and material hotspots to identify issues

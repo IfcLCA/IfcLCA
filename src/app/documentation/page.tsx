@@ -50,7 +50,7 @@ export default function DocumentationPage() {
     },
     {
       title: "Material Mapping",
-      description: "Connect your materials to KBOB database",
+      description: "Connect your materials to KBOB or Ökobaudat",
       icon: Database,
       tabValue: "features",
       color: "from-green-500 to-emerald-500"
@@ -107,9 +107,10 @@ export default function DocumentationPage() {
       description: "Connect IFC materials to environmental impact data",
       icon: Database,
       details: [
-        "300+ KBOB materials available",
-        "Fuzzy string matching",
-        "Manual override options",
+        "300+ KBOB materials built-in",
+        "Import Ökobaudat CSV files",
+        "Switch between datasets in the library",
+        "Fuzzy string matching and manual overrides",
         "Save custom mappings"
       ]
     },
@@ -435,11 +436,11 @@ export default function DocumentationPage() {
                     <div>
                       <h3 className="font-semibold mb-3 flex items-center gap-2">
                         <Database className="h-5 w-5 text-blue-500" />
-                        KBOB Database Integration
+                        Environmental Database Integration
                       </h3>
                       <ul className="space-y-2 text-sm">
-                        <li>• 300+ construction materials</li>
-                        <li>• Swiss environmental data standards</li>
+                        <li>• Built-in Swiss KBOB list</li>
+                        <li>• Import Ökobaudat datasets</li>
                         <li>• Regular updates from lcadata.ch</li>
                         <li>• Multiple impact indicators per material</li>
                       </ul>
@@ -554,7 +555,7 @@ export default function DocumentationPage() {
                   </div>
 
                   <div className="p-4 border-l-4 border-green-500 bg-green-50 dark:bg-green-900/20">
-                    <h4 className="font-semibold mb-2">Materials not matching KBOB database</h4>
+                  <h4 className="font-semibold mb-2">Materials not matching selected database</h4>
                     <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">
                       The fuzzy matching algorithm needs recognizable material names.
                     </p>
@@ -604,7 +605,7 @@ export default function DocumentationPage() {
                 <Globe className="h-12 w-12 mx-auto mb-4 text-blue-500" />
                 <h3 className="font-semibold mb-2">lcadata.ch</h3>
                 <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
-                  KBOB API as data source
+                  KBOB API and Ökobaudat CSV support
                 </p>
                 <Link href="https://www.lcadata.ch" target="_blank">
                   <Button variant="outline" size="sm" className="gap-2">
