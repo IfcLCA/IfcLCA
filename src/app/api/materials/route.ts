@@ -33,15 +33,16 @@ export async function GET(request: Request) {
       volume: material.volume,
       density: material.density,
       projectId: material.projectId?.toString(),
-      kbobMatchId: material.kbobMatchId?._id.toString(),
-      kbobMatch: material.kbobMatchId
+      ecoMaterial: material.kbobMatchId
         ? {
-          id: material.kbobMatchId._id.toString(),
-          Name: material.kbobMatchId.Name,
-          GWP: material.kbobMatchId.GWP,
-          UBP: material.kbobMatchId.UBP,
-          PENRE: material.kbobMatchId.PENRE,
-        }
+            id: material.kbobMatchId._id.toString(),
+            name: material.kbobMatchId.Name,
+            indicators: {
+              gwp: material.kbobMatchId.GWP,
+              ubp: material.kbobMatchId.UBP,
+              penre: material.kbobMatchId.PENRE,
+            },
+          }
         : undefined,
     }));
 
