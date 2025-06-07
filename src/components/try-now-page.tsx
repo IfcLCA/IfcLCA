@@ -86,15 +86,17 @@ export default function TryNowPage() {
     const kbobData = kbobDataRef.current;
     if (!kbobData) return undefined;
     const lower = name.trim().toLowerCase();
-    const exact = kbobData.find(
-      (m) => m.Name.trim().toLowerCase() === lower
-    );
+    const exact = kbobData.find((m) => m.Name.trim().toLowerCase() === lower);
     if (exact) return exact;
     if (!fuseRef.current) {
-      fuseRef.current = new Fuse(kbobData, { keys: ["Name"], threshold: 0.3 });
+      fuseRef.current = new Fuse(kbobData, {
+        keys: ["Name"],
+        includeScore: true,
+        threshold: 1,
+      });
     }
-    const result = fuseRef.current.search(name)[0];
-    return result?.item;
+    const results = fuseRef.current.search(name);
+    return results.length > 0 ? results[0].item : undefined;
   };
 
   const calcDensity = (m?: KBOBMaterial) => {
