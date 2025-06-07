@@ -316,7 +316,7 @@ const FeatureModal = ({ feature, isOpen, onClose, githubMetrics = { stars: 0, co
           ],
           cta: {
             text: "Try It Now",
-            href: "/sign-in?redirect_url=/",
+            href: "/try",
           },
         };
 
@@ -1006,6 +1006,17 @@ export default function LandingPage() {
                       className="border-gray-300 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-800"
                     >
                       <BookOpen className="mr-2 h-4 w-4" /> Documentation
+                    </Button>
+                  </motion.div>
+                </Link>
+                <Link href="/try">
+                  <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
+                    <Button
+                      size="lg"
+                      variant="outline"
+                      className="border-gray-300 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-800"
+                    >
+                      Try Now
                     </Button>
                   </motion.div>
                 </Link>
