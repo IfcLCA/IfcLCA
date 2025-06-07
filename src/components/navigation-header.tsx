@@ -5,11 +5,13 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import Image from "next/image";
-import { Menu, Sun, Moon } from "lucide-react";
+import { usePathname } from "next/navigation";
+import { Menu, Sun, Moon, Zap } from "lucide-react";
 
 export default function NavigationHeader() {
     const [isDarkMode, setIsDarkMode] = useState(false);
     const [isMenuOpen, setIsMenuOpen] = useState(false);
+    const pathname = usePathname();
 
     useEffect(() => {
         const root = document.documentElement;
@@ -29,6 +31,28 @@ export default function NavigationHeader() {
 
     const toggleMenu = () => {
         setIsMenuOpen(!isMenuOpen);
+    };
+
+    const isActive = (path: string) => {
+        return pathname === path;
+    };
+
+    const getLinkClasses = (path: string, isHighlighted: boolean = false) => {
+        const isCurrentPage = isActive(path);
+
+        if (isHighlighted) {
+            // Try Now link styling
+            return `px-4 py-2 text-sm font-medium transition-colors flex items-center gap-1 ${isCurrentPage
+                    ? "text-orange-700 dark:text-orange-300"
+                    : "text-orange-600 hover:text-orange-700 dark:text-orange-400 dark:hover:text-orange-300"
+                }`;
+        }
+
+        // Regular link styling
+        return `px-4 py-2 text-sm transition-colors ${isCurrentPage
+                ? "text-gray-900 font-medium dark:text-white"
+                : "text-gray-600 hover:text-gray-800 dark:text-gray-300 dark:hover:text-white"
+            }`;
     };
 
     return (
@@ -67,8 +91,17 @@ export default function NavigationHeader() {
                     <nav className="hidden md:flex items-center space-x-4">
                         <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
                             <Link
+                                href="/try"
+                                className={getLinkClasses("/try", true)}
+                            >
+                                <Zap className="h-3.5 w-3.5" />
+                                Try Now
+                            </Link>
+                        </motion.div>
+                        <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
+                            <Link
                                 href="/features"
-                                className="px-4 py-2 text-sm text-gray-600 hover:text-gray-800 dark:text-gray-300 dark:hover:text-white transition-colors"
+                                className={getLinkClasses("/features")}
                             >
                                 Features
                             </Link>
@@ -76,7 +109,7 @@ export default function NavigationHeader() {
                         <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
                             <Link
                                 href="/documentation"
-                                className="px-4 py-2 text-sm text-gray-600 hover:text-gray-800 dark:text-gray-300 dark:hover:text-white transition-colors"
+                                className={getLinkClasses("/documentation")}
                             >
                                 Documentation
                             </Link>
@@ -84,7 +117,7 @@ export default function NavigationHeader() {
                         <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
                             <Link
                                 href="/sign-in?redirect_url=/"
-                                className="px-4 py-2 text-sm text-gray-600 hover:text-gray-800 dark:text-gray-300 dark:hover:text-white transition-colors"
+                                className={getLinkClasses("/sign-in")}
                             >
                                 Login
                             </Link>
@@ -131,22 +164,33 @@ export default function NavigationHeader() {
                     >
                         <nav className="flex flex-col space-y-4">
                             <Link
+                                href="/try"
+                                className={`${getLinkClasses("/try", true)} ${isActive("/try") ? "bg-orange-50 dark:bg-orange-900/20 rounded-lg px-4 py-2" : ""
+                                    }`}
+                                onClick={toggleMenu}
+                            >
+                                <Zap className="h-3.5 w-3.5" />
+                                Try Now
+                            </Link>
+                            <Link
                                 href="/features"
-                                className="text-sm text-gray-600 hover:text-gray-800 dark:text-gray-300 dark:hover:text-white"
+                                className={`${getLinkClasses("/features")} ${isActive("/features") ? "bg-gray-100 dark:bg-gray-700 rounded-lg px-4 py-2" : ""
+                                    }`}
                                 onClick={toggleMenu}
                             >
                                 Features
                             </Link>
                             <Link
                                 href="/documentation"
-                                className="text-sm text-gray-600 hover:text-gray-800 dark:text-gray-300 dark:hover:text-white"
+                                className={`${getLinkClasses("/documentation")} ${isActive("/documentation") ? "bg-gray-100 dark:bg-gray-700 rounded-lg px-4 py-2" : ""
+                                    }`}
                                 onClick={toggleMenu}
                             >
                                 Documentation
                             </Link>
                             <Link
                                 href="/sign-in?redirect_url=/"
-                                className="text-sm text-gray-600 hover:text-gray-800 dark:text-gray-300 dark:hover:text-white"
+                                className={getLinkClasses("/sign-in")}
                                 onClick={toggleMenu}
                             >
                                 Login
