@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { motion, useScroll, useTransform, AnimatePresence, useMotionValue, useSpring } from "framer-motion";
 import { useInView } from "react-intersection-observer";
 import { Button } from "@/components/ui/button";
@@ -17,6 +17,8 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import Link from "next/link";
 import Image from "next/image";
+import { useRouter } from "next/navigation";
+import { fileTransferService } from "@/lib/file-transfer";
 import {
   ArrowRight,
   BarChart3,
@@ -48,6 +50,8 @@ import {
   BookOpen,
   Heart,
   Flag,
+  ArrowDown,
+  GitFork,
 } from "lucide-react";
 
 // Floating shapes component
@@ -57,17 +61,17 @@ const FloatingShapes = () => {
       {[...Array(6)].map((_, i) => (
         <motion.div
           key={i}
-          className="absolute w-64 h-64 rounded-full bg-gradient-to-r from-orange-400/10 to-blue-400/10 dark:from-orange-500/20 dark:to-blue-500/20 blur-3xl"
+          className="absolute w-64 h-64 rounded-full bg-gradient-to-r from-orange-400/5 to-blue-400/5 dark:from-orange-500/10 dark:to-blue-500/10 blur-3xl"
           animate={{
-            x: [0, 100, -100, 0],
-            y: [0, -100, 100, 0],
-            scale: [1, 1.2, 0.8, 1],
+            x: [0, 50, -50, 0],
+            y: [0, -30, 30, 0],
+            scale: [1, 1.1, 0.9, 1],
           }}
           transition={{
-            duration: 20 + i * 5,
+            duration: 30 + i * 5,
             repeat: Infinity,
             ease: "easeInOut",
-            delay: i * 2,
+            delay: i * 3,
           }}
           style={{
             left: `${Math.random() * 100}%`,
@@ -140,7 +144,7 @@ const FeatureModal = ({ feature, isOpen, onClose, githubMetrics = { stars: 0, co
             },
             {
               title: "Creator's Philosophy",
-              description: "Louis Trümpler releases all software under AGPL because he believes it drives our industry forward. Trust is essential for sustainability, and trust comes from openness.",
+              description: "Louis Trümpler releases IfcLCA under AGPL because he believes it drives our industry forward. Trust is essential for sustainability, and trust comes from openness.",
               icon: Heart,
             },
             {
@@ -182,9 +186,9 @@ const FeatureModal = ({ feature, isOpen, onClose, githubMetrics = { stars: 0, co
             },
           ],
           stats: [
-            { label: "IFC Elements", value: "100%" },
-            { label: "Parse Speed", value: "<5s" },
-            { label: "Accuracy", value: "99.9%" },
+            { label: "large IFC files", value: "100 MB+" },
+            { label: "Parse Speed", value: "<1min" },
+            { label: "IFC Coverage", value: "100%" },
           ],
           cta: {
             text: "See Documentation",
@@ -310,9 +314,9 @@ const FeatureModal = ({ feature, isOpen, onClose, githubMetrics = { stars: 0, co
             },
           ],
           stats: [
-            { label: "Process Time", value: "~30s" },
-            { label: "File Size", value: "100MB+" },
-            { label: "Elements", value: "10k+" },
+            { label: "Analysis Time", value: "~30s" },
+            { label: "Browser Support", value: "99%" },
+            { label: "No Upload", value: "0 MB" },
           ],
           cta: {
             text: "Try It Now",
@@ -689,9 +693,45 @@ export default function LandingPage() {
     contributors: 0,
     commits: 0
   });
-  const heroRef = useRef(null);
+  const [isDragging, setIsDragging] = useState(false);
+  const heroRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const { scrollYProgress } = useScroll();
   const y = useTransform(scrollYProgress, [0, 1], ["0%", "50%"]);
+  const router = useRouter();
+
+  // Headline carousel state
+  const [currentHeadlineIndex, setCurrentHeadlineIndex] = useState(0);
+  const headlines = [
+    {
+      prefix: "Life Cycle Assessment for the",
+      highlight: "Built Environment"
+    },
+    {
+      prefix: "Environmental Analysis for",
+      highlight: "IFC Building Models"
+    },
+    {
+      prefix: "Carbon Footprint Analysis for",
+      highlight: "Infrastructure Projects"
+    },
+    {
+      prefix: "Sustainability Metrics for",
+      highlight: "BIM Models"
+    },
+    {
+      prefix: "Instant LCA Reports for",
+      highlight: "Construction Projects"
+    }
+  ];
+
+  // Rotate headlines
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setCurrentHeadlineIndex((prev) => (prev + 1) % headlines.length);
+    }, 3000);
+    return () => clearInterval(interval);
+  }, []);
 
   useEffect(() => {
     if (
@@ -789,7 +829,7 @@ export default function LandingPage() {
   const stats = [
     { value: 300, suffix: "+", label: "Materials" },
     { value: githubMetrics.stars, suffix: "", label: "GitHub Stars" },
-    { value: 3, suffix: "", label: "Free Projects" },
+    { value: 3, suffix: "", label: "Free Projects per User" },
     { value: 100, suffix: "%", label: "Open Source" },
   ];
 
@@ -816,6 +856,37 @@ export default function LandingPage() {
       rating: 5,
     },
   ];
+
+  const handleDragOver = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(true);
+  }, []);
+
+  const handleDragLeave = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(false);
+  }, []);
+
+  const handleDrop = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(false);
+
+    const file = e.dataTransfer.files[0];
+    if (file && file.name.toLowerCase().endsWith('.ifc')) {
+      // Pass the actual file to the service
+      fileTransferService.setPendingFile(file);
+      router.push('/try');
+    }
+  }, [router]);
+
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file && file.name.toLowerCase().endsWith('.ifc')) {
+      // Pass the actual file to the service
+      fileTransferService.setPendingFile(file);
+      router.push('/try');
+    }
+  };
 
   return (
     <div className={`min-h-screen flex flex-col ${isDarkMode ? "dark" : ""}`}>
@@ -849,6 +920,14 @@ export default function LandingPage() {
           </span>
         </motion.div>
         <nav className="hidden md:flex items-center space-x-4">
+          <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
+            <Link
+              href="/try"
+              className="px-4 py-2 text-sm font-medium text-orange-600 hover:text-orange-700 dark:text-orange-400 dark:hover:text-orange-300 transition-colors"
+            >
+              Try Now
+            </Link>
+          </motion.div>
           <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
             <Link
               href="/features"
@@ -941,7 +1020,7 @@ export default function LandingPage() {
 
       <main className="flex-grow relative z-10">
         {/* Hero Section */}
-        <section ref={heroRef} className="py-16 px-4 text-center relative overflow-hidden">
+        <section ref={heroRef} className="pt-16 pb-12 px-4 text-center relative overflow-hidden">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -964,10 +1043,21 @@ export default function LandingPage() {
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.3, duration: 0.8 }}
             >
-              Life Cycle Assessment for the{" "}
-              <span className="bg-gradient-to-r from-orange-600 to-purple-600 bg-clip-text text-transparent">
-                Built Environment
-              </span>
+              <AnimatePresence mode="wait">
+                <motion.span
+                  key={currentHeadlineIndex}
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -20 }}
+                  transition={{ duration: 0.5 }}
+                  style={{ display: 'block' }}
+                >
+                  {headlines[currentHeadlineIndex].prefix}{" "}
+                  <span className="bg-gradient-to-r from-orange-600 to-purple-600 bg-clip-text text-transparent">
+                    {headlines[currentHeadlineIndex].highlight}
+                  </span>
+                </motion.span>
+              </AnimatePresence>
             </motion.h1>
 
             <motion.p
@@ -976,9 +1066,8 @@ export default function LandingPage() {
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.4, duration: 0.8 }}
             >
-              IfcLCA empowers architects, engineers, and sustainability experts to
-              make data-driven decisions for environmentally optimized structures
-              across the AEC industry using IFC models and Swiss KBOB environmental data.
+              Make data-driven decisions for environmentally optimized structures.
+              Instant analysis using IFC models and Swiss KBOB environmental data.
             </motion.p>
 
             <motion.div
@@ -987,17 +1076,29 @@ export default function LandingPage() {
               transition={{ delay: 0.5, duration: 0.8 }}
               className="flex flex-col sm:flex-row gap-4 justify-center items-center"
             >
-              <Link href="/sign-in?redirect_url=/">
+              <Link href="/try">
                 <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
                   <Button
                     size="lg"
-                    className="bg-gradient-to-r from-orange-600 to-orange-500 hover:from-orange-700 hover:to-orange-600 dark:from-orange-500 dark:to-orange-400 dark:hover:from-orange-600 dark:hover:to-orange-500 text-white shadow-lg shadow-orange-500/25 px-8"
+                    className="bg-gradient-to-r from-orange-600 to-orange-500 hover:from-orange-700 hover:to-orange-600 dark:from-orange-500 dark:to-orange-400 dark:hover:from-orange-600 dark:hover:to-orange-500 text-white shadow-lg shadow-orange-500/25 px-8 py-4 text-lg"
                   >
-                    Start Your Analysis <ArrowRight className="ml-2 h-5 w-5" />
+                    <Zap className="mr-2 h-5 w-5" />
+                    Try Now - No Account Needed
                   </Button>
                 </motion.div>
               </Link>
               <div className="flex gap-3">
+                <Link href="/sign-in?redirect_url=/">
+                  <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
+                    <Button
+                      size="lg"
+                      variant="outline"
+                      className="border-gray-300 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-800"
+                    >
+                      Sign In <ArrowRight className="ml-2 h-5 w-5" />
+                    </Button>
+                  </motion.div>
+                </Link>
                 <Link href="/documentation">
                   <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
                     <Button
@@ -1005,64 +1106,257 @@ export default function LandingPage() {
                       variant="outline"
                       className="border-gray-300 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-800"
                     >
-                      <BookOpen className="mr-2 h-4 w-4" /> Documentation
-                    </Button>
-                  </motion.div>
-                </Link>
-                <Link href="/try">
-                  <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
-                    <Button
-                      size="lg"
-                      variant="outline"
-                      className="border-gray-300 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-800"
-                    >
-                      Try Now
-                    </Button>
-                  </motion.div>
-                </Link>
-                <Link href="/features">
-                  <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
-                    <Button
-                      size="lg"
-                      variant="outline"
-                      className="border-gray-300 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-800"
-                    >
-                      <Sparkles className="mr-2 h-4 w-4" /> Features
+                      <BookOpen className="mr-2 h-4 w-4" /> Docs
                     </Button>
                   </motion.div>
                 </Link>
               </div>
             </motion.div>
+
+            {/* Trust indicators */}
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ delay: 0.6, duration: 0.8 }}
+              className="mt-8 flex flex-wrap items-center justify-center gap-6 text-sm text-gray-600 dark:text-gray-400"
+            >
+              <div className="flex items-center gap-2">
+                <Shield className="h-4 w-4 text-green-600 dark:text-green-400" />
+                <span>100% Browser-Based</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <TreePine className="h-4 w-4 text-green-600 dark:text-green-400" />
+                <span>Swiss KBOB Database</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <Building2 className="h-4 w-4 text-green-600 dark:text-green-400" />
+                <span>IFC 2x3 & 4 Support</span>
+              </div>
+            </motion.div>
+
+            {/* Directional cue */}
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1, y: [0, 10, 0] }}
+              transition={{ delay: 0.8, duration: 2, repeat: Infinity }}
+              className="mt-12"
+            >
+              <ArrowDown className="h-6 w-6 text-gray-400 mx-auto" />
+            </motion.div>
           </motion.div>
 
           {/* Animated background elements */}
           <motion.div
-            className="absolute -top-40 -right-40 w-96 h-96 bg-orange-400/20 rounded-full blur-3xl"
+            className="absolute -top-40 -right-40 w-96 h-96 bg-orange-400/10 rounded-full blur-3xl"
             animate={{
-              scale: [1, 1.2, 1],
-              rotate: [0, 180, 360],
+              scale: [1, 1.1, 1],
+              rotate: [0, 90, 180],
+              x: [0, 30, 0],
+              y: [0, -20, 0],
             }}
             transition={{
-              duration: 20,
+              duration: 30,
               repeat: Infinity,
-              ease: "linear",
+              ease: "easeInOut",
             }}
           />
           <motion.div
-            className="absolute -bottom-40 -left-40 w-96 h-96 bg-blue-400/20 rounded-full blur-3xl"
+            className="absolute -bottom-40 -left-40 w-96 h-96 bg-blue-400/10 rounded-full blur-3xl"
             animate={{
-              scale: [1, 1.3, 1],
-              rotate: [360, 180, 0],
+              scale: [1, 1.15, 1],
+              rotate: [180, 90, 0],
+              x: [0, -40, 0],
+              y: [0, 30, 0],
             }}
             transition={{
-              duration: 25,
+              duration: 35,
               repeat: Infinity,
-              ease: "linear",
+              ease: "easeInOut",
             }}
           />
+
+          {/* Subtle gradient fade at bottom */}
+          <div className="absolute bottom-0 left-0 right-0 h-24 bg-gradient-to-t from-white dark:from-gray-900 to-transparent pointer-events-none" />
         </section>
 
-        {/* Stats Section */}
+        {/* Try It Now Section - MOVED UP FOR BETTER CONVERSION */}
+        <section className="pt-8 pb-16 px-4 relative overflow-hidden bg-gradient-to-b from-gray-50/50 to-white dark:from-gray-800/30 dark:to-gray-900">
+          <motion.div
+            initial={{ opacity: 0 }}
+            whileInView={{ opacity: 1 }}
+            transition={{ duration: 0.8 }}
+            viewport={{ once: true }}
+            className="max-w-6xl mx-auto relative z-10"
+          >
+            <div className="text-center mb-12">
+              <motion.div
+                initial={{ scale: 0 }}
+                whileInView={{ scale: 1 }}
+                transition={{ type: "spring", stiffness: 100 }}
+                viewport={{ once: true }}
+                className="inline-flex items-center gap-2 px-4 py-2 bg-purple-100 dark:bg-purple-900/30 rounded-full text-purple-700 dark:text-purple-300 text-sm font-medium mb-4"
+              >
+                <Zap className="w-4 h-4" />
+                See It In Action
+              </motion.div>
+              <h2 className="text-4xl font-bold text-gray-800 dark:text-white mb-4">
+                Try IfcLCA Right Now
+              </h2>
+              <p className="text-xl text-gray-600 dark:text-gray-300 max-w-2xl mx-auto">
+                No signup. No credit card. Just drag & drop your IFC file below for instant results.
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
+              {/* Left side - Upload preview */}
+              <motion.div
+                initial={{ opacity: 0, x: -20 }}
+                whileInView={{ opacity: 1, x: 0 }}
+                transition={{ delay: 0.2, duration: 0.8 }}
+                viewport={{ once: true }}
+              >
+                <Card className="relative overflow-hidden group hover:shadow-2xl transition-all duration-300">
+                  <div className="absolute inset-0 bg-gradient-to-br from-orange-400/10 to-purple-400/10 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+                  <CardContent className="p-8 relative">
+                    <motion.div
+                      className={`border-2 border-dashed rounded-lg p-12 text-center relative overflow-hidden cursor-pointer transition-all duration-300 ${isDragging
+                        ? "border-orange-500 bg-orange-50 dark:bg-orange-900/20"
+                        : "border-gray-300 dark:border-gray-600 hover:border-orange-400"
+                        }`}
+                      whileHover={{ scale: 1.02 }}
+                      transition={{ type: "spring", stiffness: 300 }}
+                      onDragOver={handleDragOver}
+                      onDragLeave={handleDragLeave}
+                      onDrop={handleDrop}
+                      onClick={() => fileInputRef.current?.click()}
+                    >
+                      {/* Animated particles */}
+                      {[...Array(6)].map((_, i) => (
+                        <motion.div
+                          key={i}
+                          className="absolute w-2 h-2 bg-orange-400/30 rounded-full"
+                          animate={{
+                            x: [0, Math.random() * 100 - 50],
+                            y: [0, Math.random() * 100 - 50],
+                            scale: [0, 1, 0],
+                          }}
+                          transition={{
+                            duration: 3,
+                            repeat: Infinity,
+                            delay: i * 0.5,
+                            ease: "easeOut",
+                          }}
+                          style={{
+                            left: `${Math.random() * 100}%`,
+                            top: `${Math.random() * 100}%`,
+                          }}
+                        />
+                      ))}
+
+                      <motion.div
+                        animate={{
+                          y: [0, -10, 0],
+                          scale: isDragging ? 1.1 : 1,
+                          rotate: isDragging ? 5 : 0,
+                        }}
+                        transition={{
+                          duration: 3,
+                          repeat: Infinity,
+                          ease: "easeInOut",
+                        }}
+                        className="inline-flex p-4 rounded-full bg-gradient-to-r from-orange-100 to-purple-100 dark:from-orange-900/30 dark:to-purple-900/30 mb-4"
+                      >
+                        <Upload className="h-8 w-8 text-orange-600 dark:text-orange-400" />
+                      </motion.div>
+                      <h3 className="text-lg font-semibold text-gray-800 dark:text-white mb-2">
+                        Drop your IFC file here
+                      </h3>
+                      <p className="text-sm text-gray-600 dark:text-gray-400">
+                        100% browser-based • No data stored
+                      </p>
+
+                      <input
+                        ref={fileInputRef}
+                        type="file"
+                        accept=".ifc"
+                        className="hidden"
+                        onChange={handleFileSelect}
+                      />
+                    </motion.div>
+
+                    <Link href="/try">
+                      <Button className="w-full mt-6 bg-gradient-to-r from-orange-600 to-orange-500 hover:from-orange-700 hover:to-orange-600 text-white">
+                        Or Open Try Page <ArrowRight className="ml-2 h-4 w-4" />
+                      </Button>
+                    </Link>
+                  </CardContent>
+                </Card>
+              </motion.div>
+
+              {/* Right side - Features */}
+              <motion.div
+                initial={{ opacity: 0, x: 20 }}
+                whileInView={{ opacity: 1, x: 0 }}
+                transition={{ delay: 0.4, duration: 0.8 }}
+                viewport={{ once: true }}
+                className="space-y-6"
+              >
+                <div className="grid grid-cols-2 gap-4">
+                  {[
+                    { icon: Zap, label: "~30 seconds", title: "Lightning Fast" },
+                    { icon: Shield, label: "100% Private", title: "Browser-Based" },
+                    { icon: BarChart3, label: "3 Indicators", title: "Full Analysis" },
+                    { icon: TreePine, label: "KBOB Data", title: "Swiss Standards" },
+                  ].map((item, index) => (
+                    <motion.div
+                      key={index}
+                      whileHover={{ scale: 1.05 }}
+                      transition={{ type: "spring", stiffness: 300 }}
+                    >
+                      <Card className="h-full hover:shadow-lg transition-shadow">
+                        <CardContent className="p-4 text-center">
+                          <motion.div
+                            whileHover={{ rotate: 360 }}
+                            transition={{ duration: 0.5 }}
+                            className="inline-flex p-2 rounded-lg bg-gradient-to-r from-orange-100 to-purple-100 dark:from-orange-900/30 dark:to-purple-900/30 mb-2"
+                          >
+                            <item.icon className="h-5 w-5 text-orange-600 dark:text-orange-400" />
+                          </motion.div>
+                          <h4 className="font-semibold text-gray-800 dark:text-white text-sm">
+                            {item.title}
+                          </h4>
+                          <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">
+                            {item.label}
+                          </p>
+                        </CardContent>
+                      </Card>
+                    </motion.div>
+                  ))}
+                </div>
+
+                <Card className="bg-gradient-to-r from-purple-50 to-blue-50 dark:from-purple-900/20 dark:to-blue-900/20 border-purple-200 dark:border-purple-800">
+                  <CardContent className="p-6">
+                    <div className="flex items-start gap-3">
+                      <Sparkles className="h-5 w-5 text-purple-600 dark:text-purple-400 mt-0.5" />
+                      <div>
+                        <h4 className="font-semibold text-gray-800 dark:text-white mb-1">
+                          What You'll Get Instantly
+                        </h4>
+                        <p className="text-sm text-gray-600 dark:text-gray-300">
+                          • Interactive charts showing GWP, UBP, and PENRE values<br />
+                          • Material-by-material breakdown with environmental impact<br />
+                          • Model statistics including element counts and volumes<br />
+                        </p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              </motion.div>
+            </div>
+          </motion.div>
+        </section>
+
+        {/* Stats Section - Social Proof */}
         <motion.section
           className="py-16 px-4"
           initial={{ opacity: 0 }}
@@ -1093,35 +1387,8 @@ export default function LandingPage() {
           </div>
         </motion.section>
 
-        {/* Features Section */}
-        <section
-          id="features"
-          className="py-16 px-4 bg-white/80 dark:bg-gray-800/50 backdrop-blur-sm"
-        >
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.8 }}
-            viewport={{ once: true }}
-            className="text-center mb-12"
-          >
-            <h2 className="text-4xl font-bold text-gray-800 dark:text-white mb-4">
-              Powerful Features for Sustainable Design
-            </h2>
-            <p className="text-xl text-gray-600 dark:text-gray-300 max-w-2xl mx-auto">
-              Everything you need to perform comprehensive life cycle assessments
-            </p>
-          </motion.div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 max-w-7xl mx-auto">
-            {features.map((feature, index) => (
-              <FeatureCard key={index} feature={feature} index={index} githubMetrics={githubMetrics} />
-            ))}
-          </div>
-        </section>
-
         {/* How It Works Section */}
-        <section className="py-16 px-4">
+        <section className="py-16 px-4 bg-white/80 dark:bg-gray-800/50 backdrop-blur-sm">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             whileInView={{ opacity: 1, y: 0 }}
@@ -1173,8 +1440,8 @@ export default function LandingPage() {
                   >
                     <motion.div
                       className="text-6xl font-bold text-orange-200 dark:text-orange-900 mb-4"
-                      animate={{ opacity: [0.3, 0.6, 0.3] }}
-                      transition={{ duration: 3, repeat: Infinity }}
+                      animate={{ opacity: [0.4, 0.5, 0.4] }}
+                      transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
                     >
                       {item.step}
                     </motion.div>
@@ -1197,71 +1464,32 @@ export default function LandingPage() {
           </motion.div>
         </section>
 
-        {/* Testimonials Section */}
-        {/* <section className="py-16 px-4 bg-gradient-to-r from-orange-50 to-purple-50 dark:from-gray-900 dark:to-gray-800">
+        {/* Features Section */}
+        <section
+          id="features"
+          className="py-16 px-4"
+        >
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             whileInView={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.8 }}
             viewport={{ once: true }}
-            className="max-w-4xl mx-auto"
+            className="text-center mb-12"
           >
-            <div className="text-center mb-12">
-              <h2 className="text-4xl font-bold text-gray-800 dark:text-white mb-4">
-                Trusted by Industry Leaders
-              </h2>
-              <p className="text-xl text-gray-600 dark:text-gray-300">
-                See what professionals are saying about IfcLCA
-              </p>
-            </div>
-
-            <AnimatePresence mode="wait">
-              <motion.div
-                key={activeTestimonial}
-                initial={{ opacity: 0, x: 20 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: -20 }}
-                transition={{ duration: 0.5 }}
-                className="bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm rounded-2xl p-8 shadow-xl"
-              >
-                <div className="flex items-center mb-4">
-                  {[...Array(testimonials[activeTestimonial].rating)].map((_, i) => (
-                    <Star key={i} className="h-5 w-5 text-yellow-500 fill-current" />
-                  ))}
-                </div>
-                <p className="text-lg text-gray-700 dark:text-gray-300 mb-6 italic">
-                  "{testimonials[activeTestimonial].quote}"
-                </p>
-                <div className="flex items-center">
-                  <div className="w-12 h-12 bg-gradient-to-r from-orange-400 to-purple-400 rounded-full mr-4" />
-                  <div>
-                    <h4 className="font-semibold text-gray-800 dark:text-white">
-                      {testimonials[activeTestimonial].name}
-                    </h4>
-                    <p className="text-sm text-gray-600 dark:text-gray-400">
-                      {testimonials[activeTestimonial].role} at {testimonials[activeTestimonial].company}
-                    </p>
-                  </div>
-                </div>
-              </motion.div>
-            </AnimatePresence>
-
-            <div className="flex justify-center mt-6 gap-2">
-              {testimonials.map((_, index) => (
-                <motion.button
-                  key={index}
-                  onClick={() => setActiveTestimonial(index)}
-                  className={`w-2 h-2 rounded-full transition-all duration-300 ${index === activeTestimonial
-                    ? "w-8 bg-orange-600 dark:bg-orange-400"
-                    : "bg-gray-400 dark:bg-gray-600"
-                    }`}
-                  whileHover={{ scale: 1.2 }}
-                  whileTap={{ scale: 0.9 }}
-                />
-              ))}
-            </div>
+            <h2 className="text-4xl font-bold text-gray-800 dark:text-white mb-4">
+              Powerful Features for Sustainable Design
+            </h2>
+            <p className="text-xl text-gray-600 dark:text-gray-300 max-w-2xl mx-auto">
+              Everything you need to perform comprehensive life cycle assessments
+            </p>
           </motion.div>
-        </section> */}
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 max-w-7xl mx-auto">
+            {features.map((feature, index) => (
+              <FeatureCard key={index} feature={feature} index={index} githubMetrics={githubMetrics} />
+            ))}
+          </div>
+        </section>
 
         {/* About Section */}
         <section id="about" className="py-16 px-4">
@@ -1352,12 +1580,12 @@ export default function LandingPage() {
                     className="rounded-2xl shadow-2xl"
                   />
                   <motion.div
-                    className="absolute -inset-4 bg-gradient-to-r from-orange-400 to-purple-400 rounded-2xl opacity-20 blur-2xl -z-10"
+                    className="absolute -inset-4 bg-gradient-to-r from-orange-400 to-purple-400 rounded-2xl opacity-10 blur-2xl -z-10"
                     animate={{
-                      scale: [1, 1.05, 1],
+                      scale: [1, 1.02, 1],
                     }}
                     transition={{
-                      duration: 4,
+                      duration: 6,
                       repeat: Infinity,
                       ease: "easeInOut",
                     }}
@@ -1366,10 +1594,10 @@ export default function LandingPage() {
                 <motion.div
                   className="absolute -top-6 -right-6 bg-orange-100 dark:bg-orange-900/30 rounded-xl p-4 shadow-lg"
                   animate={{
-                    y: [0, -10, 0],
+                    y: [0, -5, 0],
                   }}
                   transition={{
-                    duration: 3,
+                    duration: 4,
                     repeat: Infinity,
                     ease: "easeInOut",
                   }}
@@ -1379,13 +1607,13 @@ export default function LandingPage() {
                 <motion.div
                   className="absolute -bottom-6 -left-6 bg-blue-100 dark:bg-blue-900/30 rounded-xl p-4 shadow-lg"
                   animate={{
-                    y: [0, 10, 0],
+                    y: [0, 5, 0],
                   }}
                   transition={{
-                    duration: 3,
+                    duration: 4,
                     repeat: Infinity,
                     ease: "easeInOut",
-                    delay: 1.5,
+                    delay: 2,
                   }}
                 >
                   <TrendingUp className="h-8 w-8 text-blue-600 dark:text-blue-400" />
@@ -1396,55 +1624,81 @@ export default function LandingPage() {
         </section>
 
         {/* CTA Section */}
-        <section className="py-16 px-4">
+        <section className="py-20 px-4 relative overflow-hidden">
           <motion.div
-            initial={{ opacity: 0, scale: 0.9 }}
-            whileInView={{ opacity: 1, scale: 1 }}
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.8 }}
             viewport={{ once: true }}
-            className="max-w-4xl mx-auto"
+            className="max-w-4xl mx-auto text-center relative z-10"
           >
-            <div className="bg-gradient-to-r from-orange-600 to-purple-600 rounded-3xl p-12 text-center text-white relative overflow-hidden">
-              <motion.div
-                className="absolute inset-0 bg-white/10"
-                animate={{
-                  backgroundImage: [
-                    "radial-gradient(circle at 20% 50%, transparent 0%, transparent 50%, white 50%, white 60%, transparent 60%)",
-                    "radial-gradient(circle at 80% 50%, transparent 0%, transparent 50%, white 50%, white 60%, transparent 60%)",
-                    "radial-gradient(circle at 20% 50%, transparent 0%, transparent 50%, white 50%, white 60%, transparent 60%)",
-                  ],
-                }}
-                transition={{
-                  duration: 4,
-                  repeat: Infinity,
-                  ease: "easeInOut",
-                }}
-              />
-              <div className="relative z-10">
-                <h2 className="text-4xl font-bold mb-4">
-                  Ready to Transform Your Life Cycle Analysis?
-                </h2>
-                <p className="text-xl mb-8 opacity-90">
-                  Join other professionals using IfcLCA for sustainable design and construction
-                </p>
-                <motion.div
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.95 }}
-                  className="inline-block"
-                >
-                  <Link href="/sign-in?redirect_url=/">
-                    <Button
-                      size="lg"
-                      className="bg-white text-orange-600 hover:bg-gray-100 shadow-xl px-8 py-6 text-lg"
-                    >
-                      Start Now for Free
-                      <ArrowRight className="ml-2 h-5 w-5" />
-                    </Button>
-                  </Link>
+            <h2 className="text-4xl md:text-5xl font-bold text-gray-800 dark:text-white mb-6">
+              Start Your Environmental Analysis Today
+            </h2>
+            <p className="text-xl text-gray-600 dark:text-gray-300 mb-8 max-w-2xl mx-auto">
+              Join leading architects and engineers using IfcLCA to create more sustainable buildings.
+              Free to try, powerful when you need it.
+            </p>
+            <div className="flex flex-col sm:flex-row gap-4 justify-center">
+              <Link href="/try">
+                <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
+                  <Button
+                    size="lg"
+                    className="bg-gradient-to-r from-orange-600 to-orange-500 hover:from-orange-700 hover:to-orange-600 text-white shadow-lg shadow-orange-500/25 px-8 py-4 text-lg"
+                  >
+                    <Zap className="mr-2 h-5 w-5" />
+                    Try Now - No Account Needed
+                  </Button>
                 </motion.div>
-              </div>
+              </Link>
+              <Link href="/sign-up">
+                <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
+                  <Button
+                    size="lg"
+                    variant="outline"
+                    className="border-gray-300 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-800"
+                  >
+                    Create Free Account
+                  </Button>
+                </motion.div>
+              </Link>
             </div>
+            <motion.p
+              className="mt-6 text-sm text-gray-500 dark:text-gray-400"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ delay: 0.5 }}
+            >
+              <Shield className="inline-block h-4 w-4 mr-1" />
+              100% browser-based • Your data never leaves your device
+            </motion.p>
           </motion.div>
+
+          {/* Animated background gradients */}
+          <motion.div
+            className="absolute -top-40 -right-40 w-96 h-96 bg-gradient-to-br from-orange-400/10 to-purple-400/10 rounded-full blur-3xl"
+            animate={{
+              scale: [1, 1.1, 1],
+              rotate: [0, 60, 120],
+            }}
+            transition={{
+              duration: 30,
+              repeat: Infinity,
+              ease: "easeInOut",
+            }}
+          />
+          <motion.div
+            className="absolute -bottom-40 -left-40 w-96 h-96 bg-gradient-to-tr from-blue-400/10 to-green-400/10 rounded-full blur-3xl"
+            animate={{
+              scale: [1, 1.15, 1],
+              rotate: [120, 60, 0],
+            }}
+            transition={{
+              duration: 35,
+              repeat: Infinity,
+              ease: "easeInOut",
+            }}
+          />
         </section>
       </main>
 

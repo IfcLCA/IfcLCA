@@ -187,7 +187,7 @@ export default function FeaturesPage() {
                 }
             ],
             stats: [
-                { label: "Free Projects", value: "3", icon: Building2 },
+                { label: "Free Projects per User", value: "3", icon: Building2 },
                 { label: "Uploads", value: "∞", icon: Upload },
                 { label: "Storage", value: "Unlimited", icon: HardDrive }
             ]
