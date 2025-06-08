@@ -29,6 +29,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
+import MarketingFooter from "@/components/marketing-footer";
 
 export default function DocumentationPage() {
   const [activeSection, setActiveSection] = useState("getting-started");
@@ -646,6 +647,7 @@ export default function DocumentationPage() {
           </div>
         </div>
       </section>
+      <MarketingFooter />
     </div>
   );
 }

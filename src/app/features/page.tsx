@@ -42,6 +42,7 @@ import {
 import Link from "next/link";
 import Image from "next/image";
 import { useState } from "react";
+import MarketingFooter from "@/components/marketing-footer";
 
 export default function FeaturesPage() {
     const [activeFeature, setActiveFeature] = useState(0);
@@ -606,6 +607,7 @@ export default function FeaturesPage() {
                         No credit card required • 3 free projects • Unlimited uploads
                     </p>
                 </motion.div>
+        <MarketingFooter />
             </section>
         </div>
     );

@@ -52,6 +52,7 @@ import {
   Pie,
   Legend,
 } from "recharts";
+import MarketingFooter from "@/components/marketing-footer";
 
 interface KBOBMaterial {
   Name: string;
@@ -1070,6 +1071,7 @@ export default function TryNowPage() {
             </motion.div>
           )}
         </AnimatePresence>
+      <MarketingFooter />
       </div>
     </div>
   );

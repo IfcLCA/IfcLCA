@@ -15,6 +15,7 @@ import {
     Handshake
 } from "lucide-react";
 import Link from "next/link";
+import MarketingFooter from "@/components/marketing-footer";
 import { Button } from "@/components/ui/button";
 
 export default function OpenSourcePhilosophyPage() {
@@ -299,6 +300,7 @@ export default function OpenSourcePhilosophyPage() {
                     </motion.div>
                 </motion.div>
             </section>
+            <MarketingFooter />
         </div>
     );
 } 
