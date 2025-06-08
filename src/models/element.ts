@@ -9,9 +9,12 @@ interface IMaterialLayer {
 
 interface IElement {
   projectId: mongoose.Types.ObjectId;
+  uploadId?: mongoose.Types.ObjectId;
   guid: string;
   name: string;
   type: string;
+  volume?: number;
+  buildingStorey?: string;
   loadBearing: boolean;
   isExternal: boolean;
   materials: IMaterialLayer[];
@@ -52,6 +55,11 @@ const elementSchema = new mongoose.Schema<IElement>(
       required: true,
       index: true,
     },
+    uploadId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Upload",
+      index: true,
+    },
     guid: {
       type: String,
       required: true,
@@ -63,6 +71,13 @@ const elementSchema = new mongoose.Schema<IElement>(
     type: {
       type: String,
       required: true,
+    },
+    volume: {
+      type: Number,
+      default: 0,
+    },
+    buildingStorey: {
+      type: String,
     },
     loadBearing: {
       type: Boolean,
@@ -76,12 +91,13 @@ const elementSchema = new mongoose.Schema<IElement>(
   },
   {
     timestamps: true,
-  }
+  },
 );
 
 // Indexes
 elementSchema.index({ projectId: 1, guid: 1 }, { unique: true });
 elementSchema.index({ "materials.material": 1 });
+elementSchema.index({ projectId: 1, uploadId: 1 });
 
 // Virtual for total volume
 elementSchema.virtual("totalVolume").get(function () {
@@ -105,7 +121,7 @@ elementSchema.virtual("emissions").get(function () {
         penre: acc.penre + mass * (material.kbobMatchId.PENRE || 0),
       };
     },
-    { gwp: 0, ubp: 0, penre: 0 }
+    { gwp: 0, ubp: 0, penre: 0 },
   );
 });
 
@@ -113,7 +129,7 @@ elementSchema.virtual("emissions").get(function () {
 elementSchema.pre("save", function (next) {
   const totalFraction = this.materials.reduce(
     (sum, mat) => sum + mat.fraction,
-    0
+    0,
   );
   if (Math.abs(totalFraction - 1) > 0.0001) {
     next(new Error("Material fractions must sum to 1"));
