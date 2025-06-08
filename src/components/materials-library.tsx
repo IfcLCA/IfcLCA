@@ -38,6 +38,7 @@ import { MaterialChange } from "@/types/material";
 import Fuse from "fuse.js";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
+import { MaterialMappingsModal } from "@/components/material-mappings-modal";
 import confetti from "canvas-confetti";
 import { CheckIcon } from "@radix-ui/react-icons";
 
@@ -104,6 +105,7 @@ export function MaterialLibraryComponent() {
   const [isKbobOpen, setIsKbobOpen] = useState(false);
   const [previewChanges, setPreviewChanges] = useState<MaterialChange[]>([]);
   const [showPreview, setShowPreview] = useState(false);
+  const [showMappings, setShowMappings] = useState(false);
   const [favoriteMaterials, setFavoriteMaterials] = useState<string[]>([]);
   const [selectedKbobId, setSelectedKbobId] = useState<string | null>(null);
   const [activeSearchId, setActiveSearchId] = useState<string | null>(null);
@@ -914,6 +916,9 @@ export function MaterialLibraryComponent() {
             </Select>
             <div className="flex items-center gap-2">
               <Button onClick={handleShowPreview}>Preview Changes</Button>
+              <Button variant="outline" onClick={() => setShowMappings(true)}>
+                Manage Mappings
+              </Button>
               {Object.keys(temporaryMatches).length > 0 && (
                 <Badge
                   variant="secondary"
@@ -1377,6 +1382,9 @@ export function MaterialLibraryComponent() {
           onNavigateToProject={handleNavigateToProject}
           isLoading={isMatchingInProgress}
         />
+      )}
+      {showMappings && (
+        <MaterialMappingsModal open={showMappings} onOpenChange={setShowMappings} />
       )}
       {/* Add the warning dialog */}
       <AlertDialog open={showLeaveWarning} onOpenChange={setShowLeaveWarning}>
