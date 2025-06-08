@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { motion } from "framer-motion";
 import NavigationHeader from "@/components/navigation-header";
+import MarketingFooter from "@/components/marketing-footer";
 import {
   FileText,
   Upload,
@@ -646,6 +647,7 @@ export default function DocumentationPage() {
           </div>
         </div>
       </section>
+      <MarketingFooter />
     </div>
   );
 }

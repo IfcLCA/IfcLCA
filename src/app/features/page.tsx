@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { motion } from "framer-motion";
 import NavigationHeader from "@/components/navigation-header";
+import MarketingFooter from "@/components/marketing-footer";
 import {
     Code,
     Upload,
@@ -607,6 +608,7 @@ export default function FeaturesPage() {
                     </p>
                 </motion.div>
             </section>
+            <MarketingFooter />
         </div>
     );
-} 
+}
