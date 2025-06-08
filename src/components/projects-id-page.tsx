@@ -38,6 +38,8 @@ import {
 } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { UploadModal } from "@/components/upload-modal";
+import { ComparisonModal } from "@/components/comparison-modal";
+import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "@/hooks/use-toast";
 import { ReloadIcon } from "@radix-ui/react-icons";
 import cn from "classnames";
@@ -171,6 +173,8 @@ export default function ProjectDetailsPage() {
   const [project, setProject] = useState<ExtendedProject | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [selectedUploads, setSelectedUploads] = useState<string[]>([]);
+  const [isComparisonOpen, setIsComparisonOpen] = useState(false);
 
   useEffect(() => {
     if (projectId) {
@@ -341,12 +345,21 @@ export default function ProjectDetailsPage() {
         project={project}
         onUpload={() => setIsUploadModalOpen(true)}
         materialsWithCount={materialsWithCount}
+        selectedUploads={selectedUploads}
+        setSelectedUploads={setSelectedUploads}
+        onCompare={() => setIsComparisonOpen(true)}
       />
       <UploadModal
         projectId={projectId}
         open={isUploadModalOpen}
         onOpenChange={setIsUploadModalOpen}
         onSuccess={handleUploadComplete}
+      />
+      <ComparisonModal
+        projectId={projectId}
+        uploadIds={selectedUploads}
+        open={isComparisonOpen}
+        onOpenChange={setIsComparisonOpen}
       />
       <DeleteProjectDialog
         isOpen={isDeleteDialogOpen}
@@ -433,6 +446,9 @@ const ProjectTabs = ({
   project,
   onUpload,
   materialsWithCount,
+  selectedUploads,
+  setSelectedUploads,
+  onCompare,
 }: {
   project: Project;
   onUpload: () => void;
@@ -442,6 +458,9 @@ const ProjectTabs = ({
     category?: string;
     volume?: number;
   }[];
+  selectedUploads: string[];
+  setSelectedUploads: (ids: string[]) => void;
+  onCompare: () => void;
 }) => (
   <Tabs defaultValue="uploads" className="w-full">
     <TabsList className="grid w-full grid-cols-4">
@@ -452,7 +471,13 @@ const ProjectTabs = ({
     </TabsList>
 
     <TabsContent value="uploads" className="space-y-4">
-      <UploadsTab project={project} onUpload={onUpload} />
+      <UploadsTab
+        project={project}
+        onUpload={onUpload}
+        selectedUploads={selectedUploads}
+        setSelectedUploads={setSelectedUploads}
+        onCompare={onCompare}
+      />
     </TabsContent>
 
     <TabsContent value="elements" className="space-y-4">
@@ -472,9 +497,15 @@ const ProjectTabs = ({
 const UploadsTab = ({
   project,
   onUpload,
+  selectedUploads,
+  setSelectedUploads,
+  onCompare,
 }: {
   project: Project;
   onUpload: () => void;
+  selectedUploads: string[];
+  setSelectedUploads: (ids: string[]) => void;
+  onCompare: () => void;
 }) => {
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 5;
@@ -489,6 +520,12 @@ const UploadsTab = ({
   const startIndex = (currentPage - 1) * itemsPerPage;
   const endIndex = startIndex + itemsPerPage;
   const currentUploads = sortedUploads.slice(startIndex, endIndex);
+
+  const toggleUpload = (id: string) => {
+    setSelectedUploads((prev) =>
+      prev.includes(id) ? prev.filter((u) => u !== id) : [...prev, id]
+    );
+  };
 
   return (
     <>
@@ -520,9 +557,19 @@ const UploadsTab = ({
         <div className="space-y-4">
           <div className="grid gap-4">
             {currentUploads.map((upload) => (
-              <UploadCard key={upload._id} upload={upload} />
+              <UploadCard
+                key={upload._id}
+                upload={upload}
+                selected={selectedUploads.includes(upload._id)}
+                toggle={() => toggleUpload(upload._id)}
+              />
             ))}
           </div>
+          {selectedUploads.length >= 2 && (
+            <Button onClick={onCompare} className="mt-2">
+              Compare Selected
+            </Button>
+          )}
 
           {totalPages > 1 && (
             <Pagination className="mt-4">
@@ -571,19 +618,30 @@ const UploadsTab = ({
   );
 };
 
-const UploadCard = ({ upload }: { upload: Upload }) => (
+const UploadCard = ({
+  upload,
+  selected,
+  toggle,
+}: {
+  upload: Upload;
+  selected: boolean;
+  toggle: () => void;
+}) => (
   <Card>
     <CardContent className="flex flex-col sm:flex-row justify-between items-start sm:items-center p-4 gap-3">
-      <div className="space-y-1">
-        <p className="font-medium text-base">{upload.filename}</p>
-        <p className="text-sm text-muted-foreground">
-          Uploaded on {new Date(upload.createdAt).toLocaleString()}
-        </p>
-        {upload.elementCount > 0 && (
+      <div className="flex items-center gap-2">
+        <Checkbox checked={selected} onCheckedChange={toggle} />
+        <div className="space-y-1">
+          <p className="font-medium text-base">{upload.filename}</p>
           <p className="text-sm text-muted-foreground">
-            Elements: {upload.elementCount}
+            Uploaded on {new Date(upload.createdAt).toLocaleString()}
           </p>
-        )}
+          {upload.elementCount > 0 && (
+            <p className="text-sm text-muted-foreground">
+              Elements: {upload.elementCount}
+            </p>
+          )}
+        </div>
       </div>
       <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
         <Badge
