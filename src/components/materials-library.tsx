@@ -820,6 +820,26 @@ export function MaterialLibraryComponent() {
     [selectedMaterials, handleMatch, triggerMatchConfetti]
   );
 
+  // Accept all auto-suggested matches and open the preview
+  const handleAcceptAllSuggestions = useCallback(() => {
+    const suggestions = Object.entries(autoSuggestedMatches).filter(([id]) => {
+      const material = materials.find((m) => m.id === id);
+      return material && !material.kbobMatchId && !temporaryMatches[id];
+    });
+
+    if (suggestions.length === 0) return;
+
+    const newMatches = { ...temporaryMatches };
+    suggestions.forEach(([id, suggestion]) => {
+      newMatches[id] = suggestion.kbobId;
+    });
+
+    setTemporaryMatches(newMatches);
+    setSelectedMaterials([]);
+    triggerMatchConfetti();
+    handleShowPreview();
+  }, [autoSuggestedMatches, materials, temporaryMatches, triggerMatchConfetti]);
+
   // Modify the hasUnappliedMatches function to check for preview modal
   const hasUnappliedMatches = () => {
     // Don't show warning if preview modal is open
@@ -913,6 +933,14 @@ export function MaterialLibraryComponent() {
               </SelectContent>
             </Select>
             <div className="flex items-center gap-2">
+              {Object.keys(autoSuggestedMatches).length > 0 && (
+                <Button
+                  variant="outline"
+                  onClick={handleAcceptAllSuggestions}
+                >
+                  Accept All ({Object.keys(autoSuggestedMatches).length})
+                </Button>
+              )}
               <Button onClick={handleShowPreview}>Preview Changes</Button>
               {Object.keys(temporaryMatches).length > 0 && (
                 <Badge
