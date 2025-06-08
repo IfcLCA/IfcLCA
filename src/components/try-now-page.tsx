@@ -14,6 +14,7 @@ import Link from "next/link";
 import { useProjectEmissions } from "@/hooks/use-project-emissions";
 import { EmissionsSummaryCard } from "@/components/emissions-summary-card";
 import NavigationHeader from "@/components/navigation-header";
+import MarketingFooter from "@/components/marketing-footer";
 import { fileTransferService } from "@/lib/file-transfer";
 import {
   Upload,
@@ -1071,6 +1072,7 @@ export default function TryNowPage() {
           )}
         </AnimatePresence>
       </div>
+      <MarketingFooter />
     </div>
   );
 }

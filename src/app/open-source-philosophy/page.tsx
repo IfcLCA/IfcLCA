@@ -2,6 +2,7 @@
 
 import { motion } from "framer-motion";
 import NavigationHeader from "@/components/navigation-header";
+import MarketingFooter from "@/components/marketing-footer";
 import {
     GitBranch,
     Heart,
@@ -299,6 +300,7 @@ export default function OpenSourcePhilosophyPage() {
                     </motion.div>
                 </motion.div>
             </section>
+            <MarketingFooter />
         </div>
     );
-} 
+}
