@@ -15,11 +15,20 @@ export async function GET() {
     const projectIds = projects.map((p) => p._id);
 
     const mappings = await Material.aggregate([
-      { $match: { projectId: { $in: projectIds }, kbobMatchId: { $exists: true, $ne: null } } },
       {
-        $group: { _id: "$name", kbobMatchId: { $first: "$kbobMatchId" }, density: { $first: "$density" } },
+        $match: {
+          projectId: { $in: projectIds },
+          kbobMatchId: { $exists: true, $ne: null },
+        },
       },
-    ]).lean();
+      {
+        $group: {
+          _id: "$name",
+          kbobMatchId: { $first: "$kbobMatchId" },
+          density: { $first: "$density" },
+        },
+      },
+    ]);
 
     return NextResponse.json(mappings);
   } catch (error) {
