@@ -41,7 +41,7 @@ import { UploadModal } from "@/components/upload-modal";
 import { toast } from "@/hooks/use-toast";
 import { ReloadIcon } from "@radix-ui/react-icons";
 import cn from "classnames";
-import { Edit, Layers, UploadCloud } from "lucide-react";
+import { Edit, Layers, UploadCloud, Trash2 } from "lucide-react";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { useProjectEmissions } from "@/hooks/use-project-emissions";
@@ -311,6 +311,22 @@ export default function ProjectDetailsPage() {
     }
   };
 
+  const handleDeleteUpload = async (uploadId: string) => {
+    if (!confirm("Delete this upload?")) return;
+    try {
+      const res = await fetch(
+        `/api/projects/${projectId}/uploads/${uploadId}`,
+        { method: "DELETE" }
+      );
+      if (!res.ok) throw new Error("Failed to delete upload");
+      toast({ title: "Upload deleted" });
+      await fetchProject();
+    } catch (error) {
+      console.error("Failed to delete upload:", error);
+      toast({ title: "Error deleting upload", variant: "destructive" });
+    }
+  };
+
   if (isLoading) return <LoadingSpinner />;
   if (error) return <ErrorMessage message={error} />;
   if (!project) return <ProjectNotFound />;
@@ -341,6 +357,7 @@ export default function ProjectDetailsPage() {
         project={project}
         onUpload={() => setIsUploadModalOpen(true)}
         materialsWithCount={materialsWithCount}
+        onDeleteUpload={handleDeleteUpload}
       />
       <UploadModal
         projectId={projectId}
@@ -433,6 +450,7 @@ const ProjectTabs = ({
   project,
   onUpload,
   materialsWithCount,
+  onDeleteUpload,
 }: {
   project: Project;
   onUpload: () => void;
@@ -442,6 +460,7 @@ const ProjectTabs = ({
     category?: string;
     volume?: number;
   }[];
+  onDeleteUpload: (id: string) => void;
 }) => (
   <Tabs defaultValue="uploads" className="w-full">
     <TabsList className="grid w-full grid-cols-4">
@@ -452,7 +471,7 @@ const ProjectTabs = ({
     </TabsList>
 
     <TabsContent value="uploads" className="space-y-4">
-      <UploadsTab project={project} onUpload={onUpload} />
+      <UploadsTab project={project} onUpload={onUpload} onDelete={onDeleteUpload} />
     </TabsContent>
 
     <TabsContent value="elements" className="space-y-4">
@@ -472,9 +491,11 @@ const ProjectTabs = ({
 const UploadsTab = ({
   project,
   onUpload,
+  onDelete,
 }: {
   project: Project;
   onUpload: () => void;
+  onDelete: (id: string) => void;
 }) => {
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 5;
@@ -520,7 +541,11 @@ const UploadsTab = ({
         <div className="space-y-4">
           <div className="grid gap-4">
             {currentUploads.map((upload) => (
-              <UploadCard key={upload._id} upload={upload} />
+              <UploadCard
+                key={upload._id}
+                upload={upload}
+                onDelete={onDelete}
+              />
             ))}
           </div>
 
@@ -571,7 +596,13 @@ const UploadsTab = ({
   );
 };
 
-const UploadCard = ({ upload }: { upload: Upload }) => (
+const UploadCard = ({
+  upload,
+  onDelete,
+}: {
+  upload: Upload;
+  onDelete: (id: string) => void;
+}) => (
   <Card>
     <CardContent className="flex flex-col sm:flex-row justify-between items-start sm:items-center p-4 gap-3">
       <div className="space-y-1">
@@ -599,6 +630,14 @@ const UploadCard = ({ upload }: { upload: Upload }) => (
         >
           {upload.status}
         </Badge>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="text-destructive"
+          onClick={() => onDelete(upload._id)}
+        >
+          <Trash2 className="h-4 w-4" />
+        </Button>
       </div>
     </CardContent>
   </Card>
