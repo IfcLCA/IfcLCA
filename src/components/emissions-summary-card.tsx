@@ -34,9 +34,18 @@ const metrics: Record<
   },
 };
 
+const modes = {
+  absolute: "Absolute",
+  yearly: "Per year",
+  perAreaYear: "Per m²·a",
+} as const;
+
 export function EmissionsSummaryCard({ project }: { project?: Project }) {
   const [metric, setMetric] = useState<MetricKey>("gwp");
-  const { totals, formatted, units } = useProjectEmissions(project);
+  const [mode, setMode] = useState<"absolute" | "yearly" | "perAreaYear">(
+    "absolute",
+  );
+  const { totals, formatted, units } = useProjectEmissions(project, { mode });
 
   if (!project?.elements?.length) {
     return (
@@ -84,7 +93,7 @@ export function EmissionsSummaryCard({ project }: { project?: Project }) {
       <div className="flex-1 flex flex-col justify-center min-h-0">
         <p
           className={`${getTextSize(
-            formattedValue
+            formattedValue,
           )} font-bold leading-[0.9] mb-1 group-hover:text-primary transition-colors text-center`}
         >
           {formattedValue}
@@ -106,6 +115,18 @@ export function EmissionsSummaryCard({ project }: { project?: Project }) {
           {Object.entries(metrics).map(([key, { description }]) => (
             <SelectItem key={key} value={key} className="text-sm">
               {description}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+      <Select value={mode} onValueChange={(value) => setMode(value as any)}>
+        <SelectTrigger className="w-full mt-2 text-sm">
+          <SelectValue placeholder="Display mode">{modes[mode]}</SelectValue>
+        </SelectTrigger>
+        <SelectContent>
+          {Object.entries(modes).map(([key, label]) => (
+            <SelectItem key={key} value={key} className="text-sm">
+              {label}
             </SelectItem>
           ))}
         </SelectContent>

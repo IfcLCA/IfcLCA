@@ -37,6 +37,7 @@ export default function EditProjectPage() {
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
+  const [ebf, setEbf] = useState<number | undefined>(undefined);
 
   useEffect(() => {
     async function fetchProject() {
@@ -45,6 +46,7 @@ export default function EditProjectPage() {
         const data = await response.json();
         setName(data.name);
         setDescription(data.description || "");
+        setEbf(typeof data.ebf === "number" ? data.ebf : undefined);
         setIsLoading(false);
       } catch (error) {
         console.error("Failed to fetch project:", error);
@@ -69,7 +71,7 @@ export default function EditProjectPage() {
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ name, description }),
+        body: JSON.stringify({ name, description, ebf }),
       });
 
       if (!response.ok) throw new Error("Failed to update project");
@@ -159,7 +161,9 @@ export default function EditProjectPage() {
                 <Pencil className="h-6 w-6 text-muted-foreground" />
                 Edit Project
               </CardTitle>
-              <CardDescription>Update your project details below</CardDescription>
+              <CardDescription>
+                Update your project details below
+              </CardDescription>
             </div>
             <Button
               type="button"
@@ -203,6 +207,21 @@ export default function EditProjectPage() {
                 placeholder="Enter project description (optional)"
               />
             </div>
+            <div className="space-y-2">
+              <Label htmlFor="ebf" className="text-sm font-medium">
+                EBF (m²)
+              </Label>
+              <Input
+                id="ebf"
+                type="number"
+                step="any"
+                value={ebf ?? ""}
+                onChange={(e) => setEbf(parseFloat(e.target.value))}
+                disabled={isSaving}
+                className="w-full"
+                placeholder="Enter floor area"
+              />
+            </div>
             <div className="flex justify-end gap-4 pt-4">
               <Button
                 type="button"
@@ -227,13 +246,25 @@ export default function EditProjectPage() {
         </CardContent>
       </Card>
 
-      <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+      <AlertDialog
+        open={isDeleteDialogOpen}
+        onOpenChange={setIsDeleteDialogOpen}
+      >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Are you really sure you don't need it anymore?</AlertDialogTitle>
+            <AlertDialogTitle>
+              Are you really sure you don't need it anymore?
+            </AlertDialogTitle>
             <AlertDialogDescription className="space-y-2">
-              <p>We can get it back but it involves us digging into our database, which we would rather avoid. So better be sure you don't need it anymore...</p>
-              <p>This action cannot be undone. This will permanently delete the project and all associated data.</p>
+              <p>
+                We can get it back but it involves us digging into our database,
+                which we would rather avoid. So better be sure you don't need it
+                anymore...
+              </p>
+              <p>
+                This action cannot be undone. This will permanently delete the
+                project and all associated data.
+              </p>
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

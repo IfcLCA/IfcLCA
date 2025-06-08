@@ -13,6 +13,7 @@ interface IFCElement {
   globalId: string;
   type: string;
   name: string;
+  classification?: string;
   volume: number;
   properties: {
     loadBearing?: boolean;
@@ -35,7 +36,7 @@ export class IFCProcessingService {
     projectId: string,
     elements: IFCElement[],
     uploadId: string,
-    session: ClientSession
+    session: ClientSession,
   ) {
     try {
       if (!elements?.length) {
@@ -55,7 +56,7 @@ export class IFCProcessingService {
           const layerMaterials =
             element.materialLayers?.layers.map((l) => l.materialName) || [];
           return [...directMaterials, ...layerMaterials];
-        })
+        }),
       );
 
       logger.debug("Unique materials found", {
@@ -132,12 +133,12 @@ export class IFCProcessingService {
                       ? MaterialService.calculateIndicators(
                           material.volume,
                           match.density,
-                          match.kbobMatchId
+                          match.kbobMatchId,
                         )
                       : undefined,
                   };
                 })
-                .filter(Boolean)
+                .filter(Boolean),
             );
           }
 
@@ -162,12 +163,12 @@ export class IFCProcessingService {
                       ? MaterialService.calculateIndicators(
                           layer.volume || totalVolume / layers.length,
                           match.density,
-                          match.kbobMatchId
+                          match.kbobMatchId,
                         )
                       : undefined,
                   };
                 })
-                .filter(Boolean)
+                .filter(Boolean),
             );
           }
 
@@ -181,6 +182,7 @@ export class IFCProcessingService {
                 $set: {
                   name: element.name,
                   type: element.type,
+                  classification: element.classification,
                   volume: element.volume,
                   loadBearing: element.properties?.loadBearing || false,
                   isExternal: element.properties?.isExternal || false,
@@ -213,9 +215,8 @@ export class IFCProcessingService {
       const matchedMaterials = materials.filter((m) => m.kbobMatchId);
       if (matchedMaterials.length > 0) {
         try {
-          const totals = await MaterialService.calculateProjectTotals(
-            projectId
-          );
+          const totals =
+            await MaterialService.calculateProjectTotals(projectId);
 
           await Project.updateOne(
             { _id: new mongoose.Types.ObjectId(projectId) },
@@ -229,7 +230,7 @@ export class IFCProcessingService {
                 },
               },
             },
-            { session }
+            { session },
           );
 
           logger.debug("Updated project emissions", {
@@ -262,7 +263,7 @@ export class IFCProcessingService {
   static async findAutomaticMatches(
     projectId: string,
     materialNames: string[],
-    session: ClientSession
+    session: ClientSession,
   ) {
     try {
       logger.debug("Starting automatic material matching", {
@@ -292,7 +293,7 @@ export class IFCProcessingService {
             matchScore: bestMatch.score,
             autoMatched: true,
           };
-        })
+        }),
       );
 
       // Filter out failed matches and update materials with matches

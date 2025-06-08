@@ -34,6 +34,7 @@ const formSchema = z.object({
     message: "Project name must be at least 2 characters.",
   }),
   description: z.string().optional(),
+  ebf: z.coerce.number().min(0).optional(),
 });
 
 export default function ProjectsNewPage() {
@@ -59,6 +60,7 @@ export default function ProjectsNewPage() {
     defaultValues: {
       name: "",
       description: "",
+      ebf: 0,
     },
   });
 
@@ -84,7 +86,7 @@ export default function ProjectsNewPage() {
             description: data.message,
             variant: "destructive",
           });
-          router.push('/projects');
+          router.push("/projects");
           return;
         }
         throw new Error(data.error || "Failed to create project");
@@ -144,13 +146,17 @@ export default function ProjectsNewPage() {
           <CardContent className="space-y-4">
             <div className="text-muted-foreground space-y-4">
               <p>
-                Databases cost real money 💸 and while we would like to offer the most to all users in an effort to push sustainable construction, IfcLCA is still fully bootstrapped.
+                Databases cost real money 💸 and while we would like to offer
+                the most to all users in an effort to push sustainable
+                construction, IfcLCA is still fully bootstrapped.
               </p>
               <p>
-                We have plans for many more powerful features once we're out of BETA! 🚀
+                We have plans for many more powerful features once we're out of
+                BETA! 🚀
               </p>
               <p>
-                Stay tuned and get in touch if you really need more projects today (or let's maybe say tomorrow 😉)
+                Stay tuned and get in touch if you really need more projects
+                today (or let's maybe say tomorrow 😉)
               </p>
             </div>
           </CardContent>
@@ -207,6 +213,19 @@ export default function ProjectsNewPage() {
                         placeholder="Enter project description (optional)"
                         {...field}
                       />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="ebf"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>EBF (m²)</FormLabel>
+                    <FormControl>
+                      <Input type="number" step="any" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>

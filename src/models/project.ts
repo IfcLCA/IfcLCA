@@ -17,6 +17,10 @@ const projectSchema = new mongoose.Schema(
     imageUrl: {
       type: String,
     },
+    ebf: {
+      type: Number,
+      default: 0,
+    },
     emissions: {
       gwp: { type: Number, default: 0 },
       ubp: { type: Number, default: 0 },
@@ -27,7 +31,7 @@ const projectSchema = new mongoose.Schema(
   {
     timestamps: true,
     strict: true,
-  }
+  },
 );
 
 // Add index for better query performance

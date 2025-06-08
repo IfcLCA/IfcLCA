@@ -111,6 +111,7 @@ interface Project {
   name: string;
   description?: string;
   imageUrl?: string;
+  ebf?: number;
   createdAt: Date;
   updatedAt: Date;
   uploads: Upload[];
@@ -211,7 +212,7 @@ export default function ProjectDetailsPage() {
     } catch (err) {
       console.error("❌ Error fetching project:", err);
       setError(
-        err instanceof Error ? err.message : "An unknown error occurred"
+        err instanceof Error ? err.message : "An unknown error occurred",
       );
     } finally {
       setIsLoading(false);
@@ -223,9 +224,9 @@ export default function ProjectDetailsPage() {
     const uniqueMaterials = new Set(
       data.elements
         ?.flatMap((element: any) =>
-          element.materials?.map((mat: any) => mat.material?._id)
+          element.materials?.map((mat: any) => mat.material?._id),
         )
-        .filter(Boolean) || []
+        .filter(Boolean) || [],
     );
 
     return {
@@ -234,6 +235,7 @@ export default function ProjectDetailsPage() {
       createdAt: new Date(data.createdAt),
       updatedAt: new Date(data.updatedAt),
       imageUrl: data.imageUrl,
+      ebf: data.ebf,
       uploads: Array.isArray(data.uploads)
         ? data.uploads.map((upload: any) => ({
             _id: upload._id || upload.id,
@@ -296,7 +298,7 @@ export default function ProjectDetailsPage() {
       reader.onloadend = () => {
         const imageUrl = reader.result as string;
         setProject((prevProject) =>
-          prevProject ? { ...prevProject, imageUrl } : null
+          prevProject ? { ...prevProject, imageUrl } : null,
         );
       };
       reader.readAsDataURL(file);
@@ -481,7 +483,7 @@ const UploadsTab = ({
 
   // Sort uploads by createdAt in descending order (newest first)
   const sortedUploads = [...(project?.uploads || [])].sort(
-    (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+    (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
   );
 
   // Calculate pagination
@@ -547,7 +549,7 @@ const UploadsTab = ({
                         {page}
                       </PaginationLink>
                     </PaginationItem>
-                  )
+                  ),
                 )}
                 <PaginationItem>
                   <PaginationNext
@@ -594,7 +596,7 @@ const UploadCard = ({ upload }: { upload: Upload }) => (
             "transition-colors",
             upload.status?.toLowerCase() === "completed"
               ? "bg-green-100 text-green-800 hover:bg-green-200"
-              : "bg-yellow-100 text-yellow-800 hover:bg-yellow-200"
+              : "bg-yellow-100 text-yellow-800 hover:bg-yellow-200",
           )}
         >
           {upload.status}
@@ -634,37 +636,40 @@ const ElementsTab = ({ project }: { project: Project }) => {
 const MaterialsTab = ({ project }: { project: Project }) => {
   const data = useMemo(() => {
     // Group materials by name and sum volumes
-    const materialGroups = project.elements.reduce((acc, element) => {
-      element.materials.forEach((mat: MaterialWithVolume) => {
-        const key = mat.material._id;
-        if (!acc[key]) {
-          acc[key] = {
-            _id: mat.material._id,
-            material: mat.material,
-            volume: 0,
-            emissions: {
-              gwp: 0,
-              ubp: 0,
-              penre: 0,
-            },
-          };
-        }
-        acc[key].volume += mat.volume;
-        acc[key].emissions.gwp +=
-          mat.volume *
-          (mat.material.density || 0) *
-          (mat.material.kbobMatch?.GWP || 0);
-        acc[key].emissions.ubp +=
-          mat.volume *
-          (mat.material.density || 0) *
-          (mat.material.kbobMatch?.UBP || 0);
-        acc[key].emissions.penre +=
-          mat.volume *
-          (mat.material.density || 0) *
-          (mat.material.kbobMatch?.PENRE || 0);
-      });
-      return acc;
-    }, {} as Record<string, Material>);
+    const materialGroups = project.elements.reduce(
+      (acc, element) => {
+        element.materials.forEach((mat: MaterialWithVolume) => {
+          const key = mat.material._id;
+          if (!acc[key]) {
+            acc[key] = {
+              _id: mat.material._id,
+              material: mat.material,
+              volume: 0,
+              emissions: {
+                gwp: 0,
+                ubp: 0,
+                penre: 0,
+              },
+            };
+          }
+          acc[key].volume += mat.volume;
+          acc[key].emissions.gwp +=
+            mat.volume *
+            (mat.material.density || 0) *
+            (mat.material.kbobMatch?.GWP || 0);
+          acc[key].emissions.ubp +=
+            mat.volume *
+            (mat.material.density || 0) *
+            (mat.material.kbobMatch?.UBP || 0);
+          acc[key].emissions.penre +=
+            mat.volume *
+            (mat.material.density || 0) *
+            (mat.material.kbobMatch?.PENRE || 0);
+        });
+        return acc;
+      },
+      {} as Record<string, Material>,
+    );
 
     return Object.values(materialGroups);
   }, [project]);
@@ -712,7 +717,7 @@ const GraphTab = ({ project }: { project: Project }) => {
           (material.material?.density || 0) *
           (material.material?.kbobMatch?.PENRE || 0),
       },
-    }))
+    })),
   );
 
   return (
