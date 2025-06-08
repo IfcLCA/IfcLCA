@@ -6,39 +6,8 @@ import { Button } from "@/components/ui/button";
 import { FileDown, Trash2 } from "lucide-react";
 import { UploadModal } from "@/components/upload-modal";
 
-const columns = [
-  {
-    accessorKey: "filename",
-    header: "Filename",
-  },
-  {
-    accessorKey: "status",
-    header: "Status",
-  },
-  {
-    accessorKey: "createdAt",
-    header: "Upload Date",
-    cell: ({ row }: { row: { original: { createdAt: string } } }) =>
-      new Date(row.original.createdAt).toLocaleDateString(),
-  },
-  {
-    accessorKey: "actions",
-    header: "Actions",
-    cell: ({ row }: { row: any }) => (
-      <div className="flex gap-2">
-        <Button variant="ghost" size="sm">
-          <FileDown className="h-4 w-4" />
-        </Button>
-        <Button variant="ghost" size="sm" className="text-destructive">
-          <Trash2 className="h-4 w-4" />
-        </Button>
-      </div>
-    ),
-  },
-];
-
 export function UploadHistoryClient({ projectId }: { projectId: string }) {
-  const [uploadHistory, setUploadHistory] = useState([]);
+  const [uploadHistory, setUploadHistory] = useState<any[]>([]);
   const [isRefreshing, setIsRefreshing] = useState(false);
 
   const refreshData = async () => {
@@ -53,12 +22,53 @@ export function UploadHistoryClient({ projectId }: { projectId: string }) {
 
   useEffect(() => {
     refreshData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [projectId]);
 
   const handleUploadComplete = () => {
     setIsRefreshing(true);
     refreshData().finally(() => setIsRefreshing(false));
   };
+
+  const handleDelete = async (id: string) => {
+    if (!confirm("Delete this upload?")) return;
+    try {
+      await fetch(`/api/projects/${projectId}/uploads/${id}`, { method: "DELETE" });
+      refreshData();
+    } catch (err) {
+      console.error("Failed to delete upload:", err);
+    }
+  };
+
+  const columns = [
+    { accessorKey: "filename", header: "Filename" },
+    { accessorKey: "status", header: "Status" },
+    {
+      accessorKey: "createdAt",
+      header: "Upload Date",
+      cell: ({ row }: { row: { original: { createdAt: string } } }) =>
+        new Date(row.original.createdAt).toLocaleDateString(),
+    },
+    {
+      accessorKey: "actions",
+      header: "Actions",
+      cell: ({ row }: { row: any }) => (
+        <div className="flex gap-2">
+          <Button variant="ghost" size="sm">
+            <FileDown className="h-4 w-4" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="text-destructive"
+            onClick={() => handleDelete(row.original.id)}
+          >
+            <Trash2 className="h-4 w-4" />
+          </Button>
+        </div>
+      ),
+    },
+  ];
 
   return (
     <div className="space-y-6">
