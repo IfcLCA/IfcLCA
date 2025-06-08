@@ -28,6 +28,14 @@ export async function GET() {
           density: { $first: "$density" },
         },
       },
+      {
+        $project: {
+          _id: 0,
+          materialName: "$_id",
+          kbobMatchId: 1,
+          density: 1,
+        },
+      },
     ]);
 
     return NextResponse.json(mappings);

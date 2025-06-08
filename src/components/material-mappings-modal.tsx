@@ -69,7 +69,10 @@ export function MaterialMappingsModal({ open, onOpenChange }: MaterialMappingsMo
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(json),
       });
-      setMappings(json as MappingEntry[]);
+      // Refresh mappings from the server to include populated KBOB details
+      const res = await fetch("/api/materials/mappings");
+      const updated = await res.json();
+      setMappings(updated as MappingEntry[]);
     } catch {}
   };
 
