@@ -4,8 +4,9 @@ import { ThemeProvider } from "@/components/theme-provider";
 import "@/styles/globals.css";
 import AuthenticatedLayout from "@/components/authenticated-layout";
 import { nunitoSans } from "@/styles/fonts";
+import type { Metadata } from "next";
 
-export const metadata = {
+export const metadata: Metadata = {
   metadataBase: new URL('https://ifclca.com'),
   title: {
     default: "IfcLCA - Life Cycle Assessment for the Built Environment",
@@ -115,6 +116,12 @@ export default function RootLayout({
     <ClerkProvider appearance={{ baseTheme: undefined }} dynamic>
       <html lang="en" className={nunitoSans.variable} suppressHydrationWarning>
         <head>
+          <title>IfcLCA - Life Cycle Assessment for the Built Environment</title>
+          <meta
+            name="description"
+            content="Open-source Life Cycle Assessment (LCA) tool for architects, engineers, and sustainability experts. Analyze environmental impact of buildings using IFC models and Swiss KBOB data."
+          />
+          <link rel="canonical" href="https://ifclca.com" />
           <script
             type="application/ld+json"
             dangerouslySetInnerHTML={{
