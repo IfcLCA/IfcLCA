@@ -10,7 +10,7 @@ export const metadata: Metadata = {
   description:
     "Analyze your building's environmental impact using IFC models and Swiss KBOB metrics with the open-source IfcLCA web application.",
   alternates: {
-    canonical: "https://ifclca.com/",
+    canonical: "https://ifclca.com",
   },
   robots: {
     index: true,
@@ -20,7 +20,7 @@ export const metadata: Metadata = {
     title: "IfcLCA - Open-source Building LCA",
     description:
       "Analyze your building's environmental impact using IFC models and Swiss KBOB metrics with the open-source IfcLCA web application.",
-    url: "https://ifclca.com/",
+    url: "https://ifclca.com",
     siteName: "IfcLCA",
     locale: "en_US",
     type: "website",
