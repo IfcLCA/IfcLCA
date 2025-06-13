@@ -126,23 +126,28 @@ export function MaterialLibraryComponent() {
   const [pendingNavigation, setPendingNavigation] = useState<string | null>(
     null
   );
-  const [hasShownMatchConfetti, setHasShownMatchConfetti] = useState(false);
+  // Track confetti display across sessions without causing re-renders
+  const hasShownConfettiRef = useRef(false);
 
   useEffect(() => {
-    const sessionShown = sessionStorage.getItem("manualMatchConfettiShown") === "true";
-    const lastShown = localStorage.getItem("manualMatchConfettiLastShown");
+    try {
+      const sessionShown = sessionStorage.getItem("manualMatchConfettiShown") === "true";
+      const lastShown = localStorage.getItem("manualMatchConfettiLastShown");
 
-    if (sessionShown) {
-      setHasShownMatchConfetti(true);
-      return;
-    }
-
-    if (lastShown) {
-      const last = parseInt(lastShown, 10);
-      if (!isNaN(last) && Date.now() - last < 24 * 60 * 60 * 1000) {
-        setHasShownMatchConfetti(true);
-        sessionStorage.setItem("manualMatchConfettiShown", "true");
+      if (sessionShown) {
+        hasShownConfettiRef.current = true;
+        return;
       }
+
+      if (lastShown) {
+        const last = parseInt(lastShown, 10);
+        if (!Number.isNaN(last) && Date.now() - last < 24 * 60 * 60 * 1000) {
+          hasShownConfettiRef.current = true;
+          sessionStorage.setItem("manualMatchConfettiShown", "true");
+        }
+      }
+    } catch {
+      // Accessing storage can fail; ignore and treat as not shown
     }
   }, []);
 
@@ -820,17 +825,33 @@ export function MaterialLibraryComponent() {
   }, []);
 
   const maybeTriggerMatchConfetti = useCallback(() => {
-    if (hasShownMatchConfetti) return;
+    if (hasShownConfettiRef.current) return;
 
-    const lastShown = localStorage.getItem("manualMatchConfettiLastShown");
-    const now = Date.now();
-    if (!lastShown || now - parseInt(lastShown, 10) >= 24 * 60 * 60 * 1000) {
-      triggerMatchConfetti();
-      setHasShownMatchConfetti(true);
-      localStorage.setItem("manualMatchConfettiLastShown", now.toString());
-      sessionStorage.setItem("manualMatchConfettiShown", "true");
+    let last = 0;
+    try {
+      const stored = localStorage.getItem("manualMatchConfettiLastShown");
+      if (stored) {
+        const parsed = parseInt(stored, 10);
+        if (!Number.isNaN(parsed)) {
+          last = parsed;
+        }
+      }
+    } catch {
+      // ignore storage errors
     }
-  }, [hasShownMatchConfetti, triggerMatchConfetti]);
+
+    const now = Date.now();
+    if (!last || now - last >= 24 * 60 * 60 * 1000) {
+      triggerMatchConfetti();
+      hasShownConfettiRef.current = true;
+      try {
+        localStorage.setItem("manualMatchConfettiLastShown", now.toString());
+        sessionStorage.setItem("manualMatchConfettiShown", "true");
+      } catch {
+        // ignore storage errors
+      }
+    }
+  }, [triggerMatchConfetti]);
 
   // Modify handleBulkMatch to include animation and confetti
   const handleBulkMatch = useCallback(
