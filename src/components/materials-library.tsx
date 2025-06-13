@@ -126,6 +126,25 @@ export function MaterialLibraryComponent() {
   const [pendingNavigation, setPendingNavigation] = useState<string | null>(
     null
   );
+  const [hasShownMatchConfetti, setHasShownMatchConfetti] = useState(false);
+
+  useEffect(() => {
+    const sessionShown = sessionStorage.getItem("manualMatchConfettiShown") === "true";
+    const lastShown = localStorage.getItem("manualMatchConfettiLastShown");
+
+    if (sessionShown) {
+      setHasShownMatchConfetti(true);
+      return;
+    }
+
+    if (lastShown) {
+      const last = parseInt(lastShown, 10);
+      if (!isNaN(last) && Date.now() - last < 24 * 60 * 60 * 1000) {
+        setHasShownMatchConfetti(true);
+        sessionStorage.setItem("manualMatchConfettiShown", "true");
+      }
+    }
+  }, []);
 
   useEffect(() => {
     if (kbobMaterials.length > 0) {
@@ -432,6 +451,8 @@ export function MaterialLibraryComponent() {
         title: "Success",
         description: "Material matches have been applied successfully.",
       });
+
+      maybeTriggerMatchConfetti();
     } catch (error) {
       console.error("Failed to apply matches:", error);
       toast({
@@ -798,6 +819,19 @@ export function MaterialLibraryComponent() {
     });
   }, []);
 
+  const maybeTriggerMatchConfetti = useCallback(() => {
+    if (hasShownMatchConfetti) return;
+
+    const lastShown = localStorage.getItem("manualMatchConfettiLastShown");
+    const now = Date.now();
+    if (!lastShown || now - parseInt(lastShown, 10) >= 24 * 60 * 60 * 1000) {
+      triggerMatchConfetti();
+      setHasShownMatchConfetti(true);
+      localStorage.setItem("manualMatchConfettiLastShown", now.toString());
+      sessionStorage.setItem("manualMatchConfettiShown", "true");
+    }
+  }, [hasShownMatchConfetti, triggerMatchConfetti]);
+
   // Modify handleBulkMatch to include animation and confetti
   const handleBulkMatch = useCallback(
     (kbobId: string) => {
@@ -808,16 +842,16 @@ export function MaterialLibraryComponent() {
       // Trigger confetti for successful match
       if (selectedMaterials.length >= 3) {
         // More confetti for bulk matches
-        triggerMatchConfetti();
-        setTimeout(triggerMatchConfetti, 150);
+        maybeTriggerMatchConfetti();
+        setTimeout(maybeTriggerMatchConfetti, 150);
       } else {
-        triggerMatchConfetti();
+        maybeTriggerMatchConfetti();
       }
 
       setSelectedMaterials([]);
       setActiveSearchId(null);
     },
-    [selectedMaterials, handleMatch, triggerMatchConfetti]
+    [selectedMaterials, handleMatch, maybeTriggerMatchConfetti]
   );
 
   // Modify the hasUnappliedMatches function to check for preview modal
