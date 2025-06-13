@@ -30,34 +30,30 @@ export async function DELETE(
   request: NextRequest,
   { params }: { params: { id: string } }
 ) {
+  const { userId } = await auth();
+  if (!userId) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  await connectToDatabase();
+  const uploadId = new mongoose.Types.ObjectId(params.id);
+
+  const upload = await Upload.findById(uploadId);
+  if (!upload) {
+    return NextResponse.json({ error: "Upload not found" }, { status: 404 });
+  }
+
+  const project = await Project.findOne({ _id: upload.projectId, userId });
+  if (!project) {
+    return NextResponse.json({ error: "Project not found" }, { status: 404 });
+  }
+
   const session = await mongoose.startSession();
   try {
-    const { userId } = await auth();
-    if (!userId) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    await connectToDatabase();
-
     await session.withTransaction(async () => {
-      const upload = await Upload.findById(params.id).session(session);
-      if (!upload) {
-        throw new Error("Upload not found");
-      }
-
-      const project = await Project.findOne({
-        _id: upload.projectId,
-        userId,
-      }).session(session);
-
-      if (!project) {
-        throw new Error("Project not found");
-      }
-
-      await Element.deleteMany({ uploadId: params.id }).session(session);
-      await Upload.deleteOne({ _id: params.id }).session(session);
+      await Element.deleteMany({ uploadId }).session(session);
+      await Upload.deleteOne({ _id: uploadId }).session(session);
     });
-
     return new Response(null, { status: 204 });
   } catch (error) {
     console.error("Failed to delete upload:", error);

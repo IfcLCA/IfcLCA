@@ -87,7 +87,10 @@ const elementSchema = new mongoose.Schema<IElement>(
 );
 
 // Indexes
-elementSchema.index({ projectId: 1, guid: 1 }, { unique: true });
+// Each element belongs to a specific upload. Allow re-uploads of the
+// same element by making the combination of project, guid and upload
+// unique instead of just project and guid.
+elementSchema.index({ projectId: 1, guid: 1, uploadId: 1 }, { unique: true });
 elementSchema.index({ "materials.material": 1 });
 
 // Virtual for total volume
