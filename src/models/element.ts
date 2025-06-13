@@ -9,6 +9,7 @@ interface IMaterialLayer {
 
 interface IElement {
   projectId: mongoose.Types.ObjectId;
+  uploadId: mongoose.Types.ObjectId;
   guid: string;
   name: string;
   type: string;
@@ -49,6 +50,12 @@ const elementSchema = new mongoose.Schema<IElement>(
     projectId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Project",
+      required: true,
+      index: true,
+    },
+    uploadId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Upload",
       required: true,
       index: true,
     },

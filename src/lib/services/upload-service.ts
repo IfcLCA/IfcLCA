@@ -46,6 +46,7 @@ export class UploadService {
 
           return {
             projectId,
+            uploadId,
             guid: element.globalId,
             name: element.name,
             type: element.type,
