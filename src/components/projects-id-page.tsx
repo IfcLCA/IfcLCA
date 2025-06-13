@@ -41,7 +41,7 @@ import { UploadModal } from "@/components/upload-modal";
 import { toast } from "@/hooks/use-toast";
 import { ReloadIcon } from "@radix-ui/react-icons";
 import cn from "classnames";
-import { Edit, Layers, UploadCloud } from "lucide-react";
+import { Edit, Layers, UploadCloud, Trash2 } from "lucide-react";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { useProjectEmissions } from "@/hooks/use-project-emissions";
@@ -168,6 +168,7 @@ export default function ProjectDetailsPage() {
   const projectId = params.id as string;
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [uploadToDelete, setUploadToDelete] = useState<Upload | null>(null);
   const [project, setProject] = useState<ExtendedProject | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -289,6 +290,29 @@ export default function ProjectDetailsPage() {
 
   const handleEditProject = () => router.push(`/projects/${projectId}/edit`);
 
+  const handleDeleteUpload = async (id: string) => {
+    try {
+      const response = await fetch(`/api/uploads/${id}`, { method: "DELETE" });
+      if (!response.ok) {
+        throw new Error("Failed to delete upload");
+      }
+      toast({
+        title: "Upload deleted",
+        description: "The upload has been removed.",
+      });
+      await fetchProject();
+    } catch (error) {
+      console.error("Failed to delete upload:", error);
+      toast({
+        title: "Error",
+        description: "Failed to delete the upload. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setUploadToDelete(null);
+    }
+  };
+
   const handleImageUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) {
@@ -340,6 +364,7 @@ export default function ProjectDetailsPage() {
       <ProjectTabs
         project={project}
         onUpload={() => setIsUploadModalOpen(true)}
+        onDeleteUpload={(u) => setUploadToDelete(u)}
         materialsWithCount={materialsWithCount}
       />
       <UploadModal
@@ -352,6 +377,11 @@ export default function ProjectDetailsPage() {
         isOpen={isDeleteDialogOpen}
         onClose={() => setIsDeleteDialogOpen(false)}
         onDelete={handleDeleteProject}
+      />
+      <DeleteUploadDialog
+        upload={uploadToDelete}
+        onCancel={() => setUploadToDelete(null)}
+        onDelete={handleDeleteUpload}
       />
     </div>
   );
@@ -432,10 +462,12 @@ const ProjectOverview = ({ project }: { project: ExtendedProject }) => (
 const ProjectTabs = ({
   project,
   onUpload,
+  onDeleteUpload,
   materialsWithCount,
 }: {
   project: Project;
   onUpload: () => void;
+  onDeleteUpload: (upload: Upload) => void;
   materialsWithCount: {
     id: string;
     name: string;
@@ -452,7 +484,11 @@ const ProjectTabs = ({
     </TabsList>
 
     <TabsContent value="uploads" className="space-y-4">
-      <UploadsTab project={project} onUpload={onUpload} />
+      <UploadsTab
+        project={project}
+        onUpload={onUpload}
+        onDeleteUpload={onDeleteUpload}
+      />
     </TabsContent>
 
     <TabsContent value="elements" className="space-y-4">
@@ -472,9 +508,11 @@ const ProjectTabs = ({
 const UploadsTab = ({
   project,
   onUpload,
+  onDeleteUpload,
 }: {
   project: Project;
   onUpload: () => void;
+  onDeleteUpload: (upload: Upload) => void;
 }) => {
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 5;
@@ -520,7 +558,11 @@ const UploadsTab = ({
         <div className="space-y-4">
           <div className="grid gap-4">
             {currentUploads.map((upload) => (
-              <UploadCard key={upload._id} upload={upload} />
+              <UploadCard
+                key={upload._id}
+                upload={upload}
+                onDelete={(u) => onDeleteUpload(u)}
+              />
             ))}
           </div>
 
@@ -571,7 +613,13 @@ const UploadsTab = ({
   );
 };
 
-const UploadCard = ({ upload }: { upload: Upload }) => (
+const UploadCard = ({
+  upload,
+  onDelete,
+}: {
+  upload: Upload;
+  onDelete: (upload: Upload) => void;
+}) => (
   <Card>
     <CardContent className="flex flex-col sm:flex-row justify-between items-start sm:items-center p-4 gap-3">
       <div className="space-y-1">
@@ -599,6 +647,14 @@ const UploadCard = ({ upload }: { upload: Upload }) => (
         >
           {upload.status}
         </Badge>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="text-destructive"
+          onClick={() => onDelete(upload)}
+        >
+          <Trash2 className="h-4 w-4" />
+        </Button>
       </div>
     </CardContent>
   </Card>
@@ -785,6 +841,36 @@ const DeleteProjectDialog = ({
           onClick={onDelete}
         >
           Delete Project
+        </AlertDialogAction>
+      </AlertDialogFooter>
+    </AlertDialogContent>
+  </AlertDialog>
+);
+
+const DeleteUploadDialog = ({
+  upload,
+  onCancel,
+  onDelete,
+}: {
+  upload: Upload | null;
+  onCancel: () => void;
+  onDelete: (id: string) => void;
+}) => (
+  <AlertDialog open={upload !== null} onOpenChange={onCancel}>
+    <AlertDialogContent>
+      <AlertDialogHeader>
+        <AlertDialogTitle>Delete Upload</AlertDialogTitle>
+        <AlertDialogDescription>
+          This will remove the upload and all its elements. This action cannot be undone.
+        </AlertDialogDescription>
+      </AlertDialogHeader>
+      <AlertDialogFooter>
+        <AlertDialogCancel onClick={onCancel}>Cancel</AlertDialogCancel>
+        <AlertDialogAction
+          className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+          onClick={() => upload && onDelete(upload._id)}
+        >
+          Delete Upload
         </AlertDialogAction>
       </AlertDialogFooter>
     </AlertDialogContent>

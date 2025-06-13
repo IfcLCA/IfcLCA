@@ -85,6 +85,7 @@ export async function saveElements(
             filter: {
               guid: element.globalId,
               projectId: projectObjectId,
+              uploadId: uploadObjectId,
             },
             update: {
               $set: {
