@@ -533,7 +533,7 @@ export default function DocumentationPage() {
                   <div className="p-4 border-l-4 border-orange-500 bg-orange-50 dark:bg-orange-900/20">
                     <h4 className="font-semibold mb-2">No materials found in IFC file</h4>
                     <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">
-                      This usually happens when materials aren't properly exported from your BIM software.
+                      This usually happens when materials aren&apos;t properly exported from your BIM software.
                     </p>
                     <ul className="text-sm space-y-1">
                       <li>✓ Check export settings include materials</li>
@@ -548,7 +548,7 @@ export default function DocumentationPage() {
                       BaseQuantities must be exported for accurate calculations.
                     </p>
                     <ul className="text-sm space-y-1">
-                      <li>✓ Enable "Export Base Quantities" in BIM software</li>
+                      <li>✓ Enable &quot;Export Base Quantities&quot; in BIM software</li>
                       <li>✓ Check IfcElementQuantity entities</li>
                       <li>✓ Verify NetVolume or GrossVolume properties</li>
                     </ul>
@@ -560,7 +560,7 @@ export default function DocumentationPage() {
                       The fuzzy matching algorithm needs recognizable material names.
                     </p>
                     <ul className="text-sm space-y-1">
-                      <li>✓ Use standard material names (e.g., "Concrete C30/37")</li>
+                        <li>✓ Use standard material names (e.g., &quot;Concrete C30/37&quot;)</li>
                       <li>✓ Avoid project-specific codes in names</li>
                       <li>✓ Manually map unmatched materials</li>
                     </ul>

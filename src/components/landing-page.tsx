@@ -1339,9 +1339,9 @@ export default function LandingPage() {
                     <div className="flex items-start gap-3">
                       <Sparkles className="h-5 w-5 text-purple-600 dark:text-purple-400 mt-0.5" />
                       <div>
-                        <h4 className="font-semibold text-gray-800 dark:text-white mb-1">
-                          What You'll Get Instantly
-                        </h4>
+                          <h4 className="font-semibold text-gray-800 dark:text-white mb-1">
+                            What You&apos;ll Get Instantly
+                          </h4>
                         <p className="text-sm text-gray-600 dark:text-gray-300">
                           • Interactive charts showing GWP, UBP, and PENRE values<br />
                           • Material-by-material breakdown with environmental impact<br />

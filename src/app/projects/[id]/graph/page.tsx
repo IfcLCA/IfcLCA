@@ -1,4 +1,11 @@
 import { Suspense } from "react";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { GraphPageComponent } from "@/components/graph-page";
 import { GraphSkeleton } from "@/components/skeletons";
 
