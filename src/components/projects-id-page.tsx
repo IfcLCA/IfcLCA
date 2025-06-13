@@ -364,6 +364,7 @@ export default function ProjectDetailsPage() {
       <ProjectTabs
         project={project}
         onUpload={() => setIsUploadModalOpen(true)}
+        onDeleteUpload={(u) => setUploadToDelete(u)}
         materialsWithCount={materialsWithCount}
       />
       <UploadModal
@@ -461,10 +462,12 @@ const ProjectOverview = ({ project }: { project: ExtendedProject }) => (
 const ProjectTabs = ({
   project,
   onUpload,
+  onDeleteUpload,
   materialsWithCount,
 }: {
   project: Project;
   onUpload: () => void;
+  onDeleteUpload: (upload: Upload) => void;
   materialsWithCount: {
     id: string;
     name: string;
@@ -481,7 +484,11 @@ const ProjectTabs = ({
     </TabsList>
 
     <TabsContent value="uploads" className="space-y-4">
-      <UploadsTab project={project} onUpload={onUpload} />
+      <UploadsTab
+        project={project}
+        onUpload={onUpload}
+        onDeleteUpload={onDeleteUpload}
+      />
     </TabsContent>
 
     <TabsContent value="elements" className="space-y-4">
@@ -501,9 +508,11 @@ const ProjectTabs = ({
 const UploadsTab = ({
   project,
   onUpload,
+  onDeleteUpload,
 }: {
   project: Project;
   onUpload: () => void;
+  onDeleteUpload: (upload: Upload) => void;
 }) => {
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 5;
@@ -552,7 +561,7 @@ const UploadsTab = ({
               <UploadCard
                 key={upload._id}
                 upload={upload}
-                onDelete={(u) => setUploadToDelete(u)}
+                onDelete={(u) => onDeleteUpload(u)}
               />
             ))}
           </div>
