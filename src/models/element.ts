@@ -9,6 +9,7 @@ interface IMaterialLayer {
 
 interface IElement {
   projectId: mongoose.Types.ObjectId;
+  uploadId: mongoose.Types.ObjectId;
   guid: string;
   name: string;
   type: string;
@@ -52,6 +53,12 @@ const elementSchema = new mongoose.Schema<IElement>(
       required: true,
       index: true,
     },
+    uploadId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Upload",
+      required: true,
+      index: true,
+    },
     guid: {
       type: String,
       required: true,
@@ -82,6 +89,7 @@ const elementSchema = new mongoose.Schema<IElement>(
 // Indexes
 elementSchema.index({ projectId: 1, guid: 1 }, { unique: true });
 elementSchema.index({ "materials.material": 1 });
+elementSchema.index({ projectId: 1, uploadId: 1 });
 
 // Virtual for total volume
 elementSchema.virtual("totalVolume").get(function () {
