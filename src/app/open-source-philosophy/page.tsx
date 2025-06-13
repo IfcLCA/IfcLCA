@@ -54,12 +54,12 @@ export default function OpenSourcePhilosophyPage() {
         {
             icon: Eye,
             title: "Transparency Builds Trust",
-            description: "From personal experience, I've learned that openness and transparency are the cornerstones of trust-especially crucial in sustainability work."
+            description: "From personal experience, I&apos;ve learned that openness and transparency are the cornerstones of trust-especially crucial in sustainability work."
         },
         {
             icon: Users,
             title: "Community First",
-            description: "Open source isn't just about code; it's about building a community where everyone can contribute, learn, and benefit together."
+            description: "Open source isn&apos;t just about code; it&apos;s about building a community where everyone can contribute, learn, and benefit together."
         }
     ];
 
@@ -151,8 +151,8 @@ export default function OpenSourcePhilosophyPage() {
                         className="prose prose-lg dark:prose-invert max-w-none mb-16"
                     >
                         <p className="text-lg text-gray-700 dark:text-gray-300 leading-relaxed">
-                            I'm Louis Trümpler, and I've made a conscious choice to release most of the software I create under the
-                            AGPL-3.0 license. This isn't just a legal decision-it's a reflection of my deeply held
+                            I&apos;m Louis Trümpler, and I&apos;ve made a conscious choice to release most of the software I create under the
+                            AGPL-3.0 license. This isn&apos;t just a legal decision-it&apos;s a reflection of my deeply held
                             beliefs about how we can advance as an industry and build a more sustainable future together.
                         </p>
                     </motion.div>
@@ -194,19 +194,19 @@ export default function OpenSourcePhilosophyPage() {
                         </h2>
                         <div className="space-y-4 text-gray-700 dark:text-gray-300">
                             <p>
-                                In the field of sustainability, trust is not just important-it's essential. When we're
-                                making decisions that affect our planet's future, stakeholders need to know exactly how
+                                In the field of sustainability, trust is not just important-it&apos;s essential. When we&apos;re
+                                making decisions that affect our planet&apos;s future, stakeholders need to know exactly how
                                 environmental impact calculations are performed, what assumptions are made, and where the
                                 data comes from.
                             </p>
                             <p>
                                 My personal experience has shown me that this trust comes from openness and transparency.
-                                By making IfcLCA's source code completely open, we ensure that every calculation, every
+                                By making IfcLCA&apos;s source code completely open, we ensure that every calculation, every
                                 algorithm, and every data transformation can be inspected, verified, and improved by the
                                 community.
                             </p>
                             <p>
-                                This isn't just about code-it's about building a movement where sustainability professionals
+                                This isn&apos;t just about code-it&apos;s about building a movement where sustainability professionals
                                 can collaborate openly, share knowledge freely, and accelerate our collective progress toward
                                 a more sustainable built environment.
                             </p>
@@ -266,8 +266,8 @@ export default function OpenSourcePhilosophyPage() {
                             Join the Movement
                         </h2>
                         <p className="text-lg text-gray-600 dark:text-gray-300 mb-8 max-w-2xl mx-auto">
-                            Whether you're a developer, sustainability professional, or simply someone who believes
-                            in open collaboration, there's a place for you in the IfcLCA community.
+                            Whether you&apos;re a developer, sustainability professional, or simply someone who believes
+                            in open collaboration, there&apos;s a place for you in the IfcLCA community.
                         </p>
                         <div className="flex flex-col sm:flex-row gap-4 justify-center">
                             <Link href="https://github.com/IfcLCA/IfcLCA" target="_blank">
@@ -291,8 +291,8 @@ export default function OpenSourcePhilosophyPage() {
                         className="mt-16 text-center"
                     >
                         <blockquote className="text-2xl font-medium text-gray-700 dark:text-gray-300 italic">
-                            "I release software under AGPL simply because I can, and because I believe it's the
-                            right thing to do for our industry and our planet."
+                            &quot;I release software under AGPL simply because I can, and because I believe it&apos;s the
+                            right thing to do for our industry and our planet.&quot;
                         </blockquote>
                         <p className="mt-4 text-gray-600 dark:text-gray-400">
                             - Louis Trümpler, Creator of IfcLCA

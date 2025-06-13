@@ -53,7 +53,7 @@ export default async function HomePage() {
     return (
       <>
         <h1 className="sr-only">IfcLCA - Open-source Building LCA</h1>
-        <h2 className="sr-only">Analyze your building's environmental impact using IFC models</h2>
+          <h2 className="sr-only">Analyze your building&apos;s environmental impact using IFC models</h2>
         <LandingPage />
       </>
     );
