@@ -126,6 +126,30 @@ export function MaterialLibraryComponent() {
   const [pendingNavigation, setPendingNavigation] = useState<string | null>(
     null
   );
+  // Track confetti display across sessions without causing re-renders
+  const hasShownConfettiRef = useRef(false);
+
+  useEffect(() => {
+    try {
+      const sessionShown = sessionStorage.getItem("manualMatchConfettiShown") === "true";
+      const lastShown = localStorage.getItem("manualMatchConfettiLastShown");
+
+      if (sessionShown) {
+        hasShownConfettiRef.current = true;
+        return;
+      }
+
+      if (lastShown) {
+        const last = parseInt(lastShown, 10);
+        if (!Number.isNaN(last) && Date.now() - last < 24 * 60 * 60 * 1000) {
+          hasShownConfettiRef.current = true;
+          sessionStorage.setItem("manualMatchConfettiShown", "true");
+        }
+      }
+    } catch {
+      // Accessing storage can fail; ignore and treat as not shown
+    }
+  }, []);
 
   useEffect(() => {
     if (kbobMaterials.length > 0) {
@@ -432,6 +456,8 @@ export function MaterialLibraryComponent() {
         title: "Success",
         description: "Material matches have been applied successfully.",
       });
+
+      maybeTriggerMatchConfetti();
     } catch (error) {
       console.error("Failed to apply matches:", error);
       toast({
@@ -798,6 +824,35 @@ export function MaterialLibraryComponent() {
     });
   }, []);
 
+  const maybeTriggerMatchConfetti = useCallback(() => {
+    if (hasShownConfettiRef.current) return;
+
+    let last = 0;
+    try {
+      const stored = localStorage.getItem("manualMatchConfettiLastShown");
+      if (stored) {
+        const parsed = parseInt(stored, 10);
+        if (!Number.isNaN(parsed)) {
+          last = parsed;
+        }
+      }
+    } catch {
+      // ignore storage errors
+    }
+
+    const now = Date.now();
+    if (!last || now - last >= 24 * 60 * 60 * 1000) {
+      triggerMatchConfetti();
+      hasShownConfettiRef.current = true;
+      try {
+        localStorage.setItem("manualMatchConfettiLastShown", now.toString());
+        sessionStorage.setItem("manualMatchConfettiShown", "true");
+      } catch {
+        // ignore storage errors
+      }
+    }
+  }, [triggerMatchConfetti]);
+
   // Modify handleBulkMatch to include animation and confetti
   const handleBulkMatch = useCallback(
     (kbobId: string) => {
@@ -808,16 +863,16 @@ export function MaterialLibraryComponent() {
       // Trigger confetti for successful match
       if (selectedMaterials.length >= 3) {
         // More confetti for bulk matches
-        triggerMatchConfetti();
-        setTimeout(triggerMatchConfetti, 150);
+        maybeTriggerMatchConfetti();
+        setTimeout(maybeTriggerMatchConfetti, 150);
       } else {
-        triggerMatchConfetti();
+        maybeTriggerMatchConfetti();
       }
 
       setSelectedMaterials([]);
       setActiveSearchId(null);
     },
-    [selectedMaterials, handleMatch, triggerMatchConfetti]
+    [selectedMaterials, handleMatch, maybeTriggerMatchConfetti]
   );
 
   // Modify the hasUnappliedMatches function to check for preview modal
