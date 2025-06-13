@@ -15,7 +15,7 @@ export interface IFCParseResult {
 
 export async function parseIFCFile(
   file: File,
-  projectId: string
+  projectId: string,
 ): Promise<IFCParseResult> {
   let responseData;
   try {
@@ -106,7 +106,7 @@ export async function parseIFCFile(
           (materialName: string) => {
             materials.add(materialName);
             layerMaterialCount++;
-          }
+          },
         );
       }
 
@@ -195,6 +195,7 @@ export async function parseIFCFile(
             globalId: element.id,
             type: element.type,
             name: element.object_type,
+            classification: element.classification,
             volume: element.volume || 0,
             properties: {
               loadBearing: element.properties.loadBearing || false,
@@ -221,14 +222,14 @@ export async function parseIFCFile(
                       materialName: name,
                       volume: data.volume,
                       fraction: data.fraction,
-                    })
+                    }),
                   ),
                 }
               : undefined,
           })),
           isLastChunk: true,
         }),
-      }
+      },
     );
 
     if (!processResponse.ok) {

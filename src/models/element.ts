@@ -64,6 +64,9 @@ const elementSchema = new mongoose.Schema<IElement>(
       type: String,
       required: true,
     },
+    classification: {
+      type: String,
+    },
     loadBearing: {
       type: Boolean,
       default: false,
@@ -76,7 +79,7 @@ const elementSchema = new mongoose.Schema<IElement>(
   },
   {
     timestamps: true,
-  }
+  },
 );
 
 // Indexes
@@ -105,7 +108,7 @@ elementSchema.virtual("emissions").get(function () {
         penre: acc.penre + mass * (material.kbobMatchId.PENRE || 0),
       };
     },
-    { gwp: 0, ubp: 0, penre: 0 }
+    { gwp: 0, ubp: 0, penre: 0 },
   );
 });
 
@@ -113,7 +116,7 @@ elementSchema.virtual("emissions").get(function () {
 elementSchema.pre("save", function (next) {
   const totalFraction = this.materials.reduce(
     (sum, mat) => sum + mat.fraction,
-    0
+    0,
   );
   if (Math.abs(totalFraction - 1) > 0.0001) {
     next(new Error("Material fractions must sum to 1"));

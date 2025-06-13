@@ -2,6 +2,7 @@ export interface APIElement {
   id: string;
   type: string;
   object_type: string;
+  classification?: string;
   properties: {
     name?: string;
     level?: string;
@@ -61,12 +62,12 @@ async function loadPyodideAndIfcOpenShell(): Promise<PyodideInterface> {
             const pyodide: PyodideInterface = await (window as any).loadPyodide(
               {
                 indexURL: "https://cdn.jsdelivr.net/pyodide/v0.26.2/full/",
-              }
+              },
             );
             await pyodide.loadPackage(["micropip", "numpy"]);
             const micropip = pyodide.pyimport("micropip");
             await micropip.install(
-              "https://cdn.jsdelivr.net/gh/IfcOpenShell/wasm-wheels@main/ifcopenshell-0.8.2+d50e806-cp312-cp312-emscripten_3_1_58_wasm32.whl"
+              "https://cdn.jsdelivr.net/gh/IfcOpenShell/wasm-wheels@main/ifcopenshell-0.8.2+d50e806-cp312-cp312-emscripten_3_1_58_wasm32.whl",
             );
             resolve(pyodide);
           } catch (e) {
@@ -82,7 +83,7 @@ async function loadPyodideAndIfcOpenShell(): Promise<PyodideInterface> {
         await pyodide.loadPackage(["micropip", "numpy"]);
         const micropip = pyodide.pyimport("micropip");
         await micropip.install(
-          "https://cdn.jsdelivr.net/gh/IfcOpenShell/wasm-wheels@main/ifcopenshell-0.8.2+d50e806-cp312-cp312-emscripten_3_1_58_wasm32.whl"
+          "https://cdn.jsdelivr.net/gh/IfcOpenShell/wasm-wheels@main/ifcopenshell-0.8.2+d50e806-cp312-cp312-emscripten_3_1_58_wasm32.whl",
         );
         resolve(pyodide);
       }
@@ -260,6 +261,17 @@ def get_material_volumes(element):
     
     return material_volumes
 
+def get_classification(element):
+    if getattr(element, 'HasAssociations', None):
+        for rel in element.HasAssociations:
+            if rel.is_a('IfcRelAssociatesClassification'):
+                cref = rel.RelatingClassification
+                if cref and cref.is_a('IfcClassificationReference'):
+                    ident = getattr(cref, 'Identification', None)
+                    if ident:
+                        return str(ident)
+    return None
+
 ifc_bytes = bytes(ifc_data.to_py())
 path = '/tmp/temp.ifc'
 with open(path, 'wb') as f:
@@ -307,6 +319,7 @@ for e in f.by_type('IfcBuildingElement'):
         'id': e.GlobalId,
         'type': e.is_a(),
         'object_type': get_object_type(e),
+        'classification': get_classification(e),
         'properties': get_properties(e),
         'volume': get_volume(e),
         'materials': element_materials,
