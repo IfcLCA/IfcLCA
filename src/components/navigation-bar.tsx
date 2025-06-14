@@ -19,6 +19,7 @@ import {
   Sun,
   ExternalLink,
   Construction,
+  MessageCircle,
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -532,6 +533,13 @@ export function NavigationBar({ currentProject, notifications }: NavBarProps) {
               <Moon className="absolute h-4 w-4 rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100" />
               <span className="sr-only">Toggle theme</span>
             </Button>
+
+            <Link href="/support">
+              <Button variant="ghost" size="icon" className="h-8 w-8">
+                <MessageCircle className="h-4 w-4" />
+                <span className="sr-only">Support</span>
+              </Button>
+            </Link>
 
             <HelpDialog />
 
