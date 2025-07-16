@@ -1,4 +1,35 @@
 import { NextResponse } from 'next/server';
+import fs from 'fs/promises';
+import os from 'os';
+import path from 'path';
+
+interface GitHubMetrics {
+    stars: number;
+    contributors: number;
+    commits: number;
+}
+
+const cacheFile = path.join(os.tmpdir(), 'githubMetricsCache.json');
+let cachedMetrics: GitHubMetrics = { stars: 22, contributors: 2, commits: 13 };
+
+async function loadCache() {
+    try {
+        const data = await fs.readFile(cacheFile, 'utf-8');
+        cachedMetrics = JSON.parse(data) as GitHubMetrics;
+    } catch {
+        // ignore if file doesn't exist or can't be parsed
+    }
+}
+
+async function saveCache() {
+    try {
+        await fs.writeFile(cacheFile, JSON.stringify(cachedMetrics), 'utf-8');
+    } catch (err) {
+        console.error('Failed to write GitHub metrics cache', err);
+    }
+}
+
+loadCache();
 
 interface GitHubContributor {
     login: string;
@@ -37,21 +68,11 @@ export async function GET() {
                 hasToken: !!process.env.GITHUB_TOKEN
             });
 
-            // Return fallback values instead of throwing
-            if (repoResponse.status === 403) {
-                console.log('Rate limit likely exceeded, returning cached values');
-                return NextResponse.json({
-                    stars: 22,
-                    contributors: 2,
-                    commits: 13
-                });
-            }
-
-            throw new Error(`Failed to fetch repository data: ${repoResponse.status}`);
+            return NextResponse.json(cachedMetrics);
         }
 
         const repoData = await repoResponse.json();
-        const stars = repoData.stargazers_count || 0;
+        const stars = repoData.stargazers_count || cachedMetrics.stars;
 
         // Fetch contributors count
         const contributorsResponse = await fetch(`https://api.github.com/repos/${owner}/${repo}/contributors?per_page=100&anon=true`, {
@@ -60,7 +81,7 @@ export async function GET() {
         });
 
         if (!contributorsResponse.ok) {
-            throw new Error('Failed to fetch contributors');
+            return NextResponse.json(cachedMetrics);
         }
 
         const contributors: GitHubContributor[] = await contributorsResponse.json();
@@ -69,7 +90,7 @@ export async function GET() {
         // For commits count, we'll use the repository's commit count from the main branch
         // Note: Getting exact total commits requires pagination through all commits which is expensive
         // Instead, we'll use an approximation based on the default branch
-        let commitsCount = 0;
+        let commitsCount = cachedMetrics.commits;
 
         try {
             const defaultBranch = repoData.default_branch || 'main';
@@ -95,23 +116,17 @@ export async function GET() {
             }
         } catch (error) {
             console.error('Error fetching commits count:', error);
-            // Use a reasonable fallback
-            commitsCount = 100;
+            commitsCount = cachedMetrics.commits;
         }
-
-        return NextResponse.json({
+        cachedMetrics = {
             stars,
             contributors: contributorsCount,
             commits: commitsCount
-        });
+        };
+        await saveCache();
+        return NextResponse.json(cachedMetrics);
     } catch (error) {
         console.error('Error fetching GitHub metrics:', error);
-
-        // Return fallback values if there's an error
-        return NextResponse.json({
-            stars: 0,
-            contributors: 0,
-            commits: 0
-        });
+        return NextResponse.json(cachedMetrics);
     }
-} 
+}
