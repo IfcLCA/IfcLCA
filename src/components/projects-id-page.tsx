@@ -41,10 +41,15 @@ import { UploadModal } from "@/components/upload-modal";
 import { toast } from "@/hooks/use-toast";
 import { ReloadIcon } from "@radix-ui/react-icons";
 import cn from "classnames";
-import { Edit, Layers, UploadCloud } from "lucide-react";
+import { Download, Edit, Layers, UploadCloud } from "lucide-react";
 import { useParams, useRouter } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useProjectEmissions } from "@/hooks/use-project-emissions";
+import {
+  downloadFile,
+  exportIfcWithLcaResultsService,
+  type ElementLcaResultsMap,
+} from "@/lib/services/ifc-export-service";
 
 interface KBOBMaterial {
   _id: string;
@@ -95,6 +100,12 @@ interface ElementWithMaterials {
   loadBearing?: boolean;
   isExternal?: boolean;
   materials: MaterialEntry[];
+  emissions?: {
+    gwp?: number;
+    ubp?: number;
+    penre?: number;
+    [key: string]: number | undefined;
+  };
 }
 
 interface Upload {
@@ -612,6 +623,123 @@ const ElementsTab = ({ project }: { project: Project }) => {
     }));
   }, [project]);
 
+  const lcaResultsByGuid = useMemo<ElementLcaResultsMap>(() => {
+    const toFiniteNumber = (value: unknown) =>
+      typeof value === "number" && Number.isFinite(value) ? value : undefined;
+
+    return project.elements.reduce<ElementLcaResultsMap>((acc, element: any) => {
+      if (!element?.guid) {
+        return acc;
+      }
+
+      const emissions = element?.emissions || {};
+      const properties: Record<string, number> = {};
+
+      const gwp = toFiniteNumber(emissions.gwp);
+      if (gwp !== undefined) {
+        properties["GWP_fossil"] = gwp;
+      }
+
+      const penre = toFiniteNumber(emissions.penre);
+      if (penre !== undefined) {
+        properties["non-renewableprimaryresourceswithenergycontent-tot"] = penre;
+      }
+
+      const ubp = toFiniteNumber(emissions.ubp);
+      if (ubp !== undefined) {
+        properties["UBP"] = ubp;
+      }
+
+      const uno = toFiniteNumber(emissions.uno);
+      if (uno !== undefined) {
+        properties["non-renewableprimaryresourceswithoutenergycontent-tot"] = uno;
+      }
+
+      if (Object.keys(properties).length > 0) {
+        acc[element.guid] = properties;
+      }
+
+      return acc;
+    }, {} as ElementLcaResultsMap);
+  }, [project.elements]);
+
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [isExporting, setIsExporting] = useState(false);
+  const hasLcaResults = useMemo(
+    () => Object.keys(lcaResultsByGuid).length > 0,
+    [lcaResultsByGuid]
+  );
+
+  const handleExportClick = () => {
+    if (isExporting) return;
+    if (!hasLcaResults) {
+      toast({
+        title: "No LCA results available",
+        description:
+          "Upload an IFC and match materials before exporting the enriched file.",
+      });
+      return;
+    }
+    fileInputRef.current?.click();
+  };
+
+  const handleExportFiles = async (
+    event: React.ChangeEvent<HTMLInputElement>
+  ) => {
+    const files = event.target.files;
+    if (!files || files.length === 0) {
+      return;
+    }
+
+    setIsExporting(true);
+    let totalUpdatedElements = 0;
+
+    try {
+      for (const file of Array.from(files)) {
+        const buffer = await file.arrayBuffer();
+        const exportResult = await exportIfcWithLcaResultsService(
+          buffer,
+          lcaResultsByGuid
+        );
+
+        if (!exportResult) {
+          throw new Error(`Failed to export IFC for ${file.name}`);
+        }
+
+        const baseName = file.name.replace(/\.ifc$/i, "");
+        const downloadName = `${baseName || file.name}_IfcLCA.ifc`;
+
+        downloadFile(
+          exportResult.ifcData,
+          downloadName,
+          "application/octet-stream"
+        );
+        totalUpdatedElements += exportResult.updatedCount ?? 0;
+      }
+
+      toast({
+        title: "IFC export complete",
+        description:
+          totalUpdatedElements > 0
+            ? `Saved LCA results for ${totalUpdatedElements} elements.`
+            : "Export finished, but no matching elements were found in the IFC.",
+      });
+    } catch (error) {
+      console.error("Failed to export IFC with LCA results", error);
+      toast({
+        title: "IFC export failed",
+        description:
+          error instanceof Error
+            ? error.message
+            : "An unexpected error occurred.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsExporting(false);
+      event.target.value = "";
+    }
+  };
+
   return (
     <>
       <div className="flex justify-between items-center mb-4">
@@ -621,6 +749,24 @@ const ElementsTab = ({ project }: { project: Project }) => {
             {data.length}
           </Badge>
         </h2>
+        <div className="flex items-center gap-2">
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".ifc"
+            multiple
+            className="hidden"
+            onChange={handleExportFiles}
+          />
+          <Button onClick={handleExportClick} variant="outline" disabled={isExporting}>
+            {isExporting ? (
+              <ReloadIcon className="mr-2 h-4 w-4 animate-spin" />
+            ) : (
+              <Download className="mr-2 h-4 w-4" />
+            )}
+            {isExporting ? "Exporting IFC..." : "Export IFC with LCA"}
+          </Button>
+        </div>
       </div>
       <Card>
         <CardContent className="p-0">
