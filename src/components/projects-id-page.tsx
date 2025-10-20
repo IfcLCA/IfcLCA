@@ -37,14 +37,16 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { IfcExportModal } from "@/components/ifc-export-modal";
 import { UploadModal } from "@/components/upload-modal";
 import { toast } from "@/hooks/use-toast";
 import { ReloadIcon } from "@radix-ui/react-icons";
 import cn from "classnames";
-import { Edit, Layers, UploadCloud } from "lucide-react";
+import { DownloadCloud, Edit, Layers, UploadCloud } from "lucide-react";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { useProjectEmissions } from "@/hooks/use-project-emissions";
+import type { LcaExportPayload } from "@/lib/services/ifc-export-service";
 
 interface KBOBMaterial {
   _id: string;
@@ -167,6 +169,7 @@ export default function ProjectDetailsPage() {
   const params = useParams();
   const projectId = params.id as string;
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
+  const [isExportModalOpen, setIsExportModalOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [project, setProject] = useState<ExtendedProject | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -311,6 +314,35 @@ export default function ProjectDetailsPage() {
     }
   };
 
+  const lcaExportIndicators = useMemo<LcaExportPayload>(() => {
+    if (!project) {
+      return {};
+    }
+
+    return (project.elements || []).reduce<LcaExportPayload>((acc, element) => {
+      if (!element?.guid) {
+        return acc;
+      }
+
+      acc[element.guid] = {
+        guid: element.guid,
+        name: element.name,
+        type: element.type,
+        gwp: element.emissions?.gwp ?? 0,
+        penre: element.emissions?.penre ?? 0,
+        penreWithoutEnergy: element.emissions?.penre ?? 0,
+        ubp: element.emissions?.ubp ?? 0,
+      };
+
+      return acc;
+    }, {});
+  }, [project]);
+
+  const canExportIfc = useMemo(
+    () => Object.keys(lcaExportIndicators).length > 0,
+    [lcaExportIndicators]
+  );
+
   if (isLoading) return <LoadingSpinner />;
   if (error) return <ErrorMessage message={error} />;
   if (!project) return <ProjectNotFound />;
@@ -334,12 +366,16 @@ export default function ProjectDetailsPage() {
       <ProjectHeader
         project={project}
         onUpload={() => setIsUploadModalOpen(true)}
+        onExport={() => setIsExportModalOpen(true)}
+        canExport={canExportIfc}
         onEdit={handleEditProject}
       />
       <ProjectOverview project={project} />
       <ProjectTabs
         project={project}
         onUpload={() => setIsUploadModalOpen(true)}
+        onExport={() => setIsExportModalOpen(true)}
+        canExport={canExportIfc}
         materialsWithCount={materialsWithCount}
       />
       <UploadModal
@@ -347,6 +383,12 @@ export default function ProjectDetailsPage() {
         open={isUploadModalOpen}
         onOpenChange={setIsUploadModalOpen}
         onSuccess={handleUploadComplete}
+      />
+      <IfcExportModal
+        open={isExportModalOpen}
+        onOpenChange={setIsExportModalOpen}
+        projectName={project.name}
+        lcaIndicators={lcaExportIndicators}
       />
       <DeleteProjectDialog
         isOpen={isDeleteDialogOpen}
@@ -390,10 +432,14 @@ const ProjectNotFound = () => (
 const ProjectHeader = ({
   project,
   onUpload,
+  onExport,
+  canExport,
   onEdit,
 }: {
   project: ExtendedProject;
   onUpload: () => void;
+  onExport: () => void;
+  canExport: boolean;
   onEdit: () => void;
 }) => (
   <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
@@ -409,6 +455,15 @@ const ProjectHeader = ({
       <Button onClick={onUpload} className="bg-primary text-primary-foreground">
         <UploadCloud className="mr-2 h-4 w-4" />
         Add New Ifc
+      </Button>
+      <Button
+        variant="outline"
+        onClick={onExport}
+        disabled={!canExport}
+        className="border-primary/40 text-primary hover:bg-primary/10"
+      >
+        <DownloadCloud className="mr-2 h-4 w-4" />
+        Export IFC Results
       </Button>
       <Button variant="outline" onClick={onEdit}>
         <Edit className="mr-2 h-4 w-4" />
@@ -432,10 +487,14 @@ const ProjectOverview = ({ project }: { project: ExtendedProject }) => (
 const ProjectTabs = ({
   project,
   onUpload,
+  onExport,
+  canExport,
   materialsWithCount,
 }: {
   project: Project;
   onUpload: () => void;
+  onExport: () => void;
+  canExport: boolean;
   materialsWithCount: {
     id: string;
     name: string;
@@ -452,7 +511,12 @@ const ProjectTabs = ({
     </TabsList>
 
     <TabsContent value="uploads" className="space-y-4">
-      <UploadsTab project={project} onUpload={onUpload} />
+      <UploadsTab
+        project={project}
+        onUpload={onUpload}
+        onExport={onExport}
+        canExport={canExport}
+      />
     </TabsContent>
 
     <TabsContent value="elements" className="space-y-4">
@@ -472,9 +536,13 @@ const ProjectTabs = ({
 const UploadsTab = ({
   project,
   onUpload,
+  onExport,
+  canExport,
 }: {
   project: Project;
   onUpload: () => void;
+  onExport: () => void;
+  canExport: boolean;
 }) => {
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 5;
@@ -499,10 +567,21 @@ const UploadsTab = ({
             {project?.uploads?.length || 0}
           </Badge>
         </h2>
-        <Button onClick={onUpload} variant="outline">
-          <UploadCloud className="h-4 w-4 mr-2" />
-          Add New Ifc
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          <Button onClick={onUpload} variant="outline">
+            <UploadCloud className="h-4 w-4 mr-2" />
+            Add New Ifc
+          </Button>
+          <Button
+            variant="outline"
+            onClick={onExport}
+            disabled={!canExport}
+            className="border-primary/40 text-primary hover:bg-primary/10"
+          >
+            <DownloadCloud className="h-4 w-4 mr-2" />
+            Export IFC Results
+          </Button>
+        </div>
       </div>
       {!project?.uploads || project.uploads.length === 0 ? (
         <EmptyState
@@ -510,10 +589,20 @@ const UploadsTab = ({
           title="No uploads yet"
           description="Get elements and materials from an Ifc file."
           action={
-            <Button onClick={onUpload}>
-              <UploadCloud className="mr-2 h-4 w-4" />
-              Add New Ifc
-            </Button>
+            <div className="flex flex-col sm:flex-row gap-2">
+              <Button onClick={onUpload}>
+                <UploadCloud className="mr-2 h-4 w-4" />
+                Add New Ifc
+              </Button>
+              <Button
+                variant="outline"
+                onClick={onExport}
+                disabled={!canExport}
+              >
+                <DownloadCloud className="mr-2 h-4 w-4" />
+                Export IFC Results
+              </Button>
+            </div>
           }
         />
       ) : (
