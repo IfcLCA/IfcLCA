@@ -35,7 +35,7 @@ const kbobSchema = new mongoose.Schema<IKBOBMaterial, KBOBMaterialModel>(
 );
 
 // Add indexes for better query performance
-kbobSchema.index({ KBOB_ID: 1 });
+kbobSchema.index({ KBOB_ID: 1 }, { unique: true, name: "uniq_kbob_id" });
 kbobSchema.index({ Name: 1 });
 kbobSchema.index({ Category: 1 });
 

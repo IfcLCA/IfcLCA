@@ -4,7 +4,7 @@ import { Project, Upload, MaterialDeletion } from "@/models";
 import { auth } from "@clerk/nextjs/server";
 
 export const runtime = "nodejs";
-export const revalidate = 120; // 2 minutes
+export const dynamic = "force-dynamic"; // User-scoped data must not be cached
 
 export async function GET(request: Request) {
   try {
@@ -14,8 +14,11 @@ export async function GET(request: Request) {
     }
 
     const { searchParams } = new URL(request.url);
-    const limit = parseInt(searchParams.get("limit") || "6");
-    const page = parseInt(searchParams.get("page") || "1");
+    // Validate and clamp pagination params to prevent performance issues
+    const rawLimit = parseInt(searchParams.get("limit") || "6", 10);
+    const limit = Number.isFinite(rawLimit) ? Math.min(Math.max(rawLimit, 1), 50) : 6;
+    const rawPage = parseInt(searchParams.get("page") || "1", 10);
+    const page = Number.isFinite(rawPage) && rawPage > 0 ? rawPage : 1;
     const skip = (page - 1) * limit;
 
     await connectToDatabase();
@@ -113,18 +116,20 @@ export async function GET(request: Request) {
     ]);
 
     // Get total count for pagination
+    // First get user's project IDs to filter uploads and deletions correctly
+    const projectIds = await Project.find({ userId }, { _id: 1 }).lean().then(d => d.map(x => x._id));
     const [projectsCount, uploadsCount, materialDeletionsCount] = await Promise.all([
       Project.countDocuments({ userId }),
-      Upload.countDocuments({ userId }),
-      MaterialDeletion.countDocuments({ userId }),
+      Upload.countDocuments({ projectId: { $in: projectIds } }),
+      MaterialDeletion.countDocuments({ projectId: { $in: projectIds } }),
     ]);
 
     const totalCount = projectsCount + uploadsCount + materialDeletionsCount;
     const hasMore = skip + activities.length < totalCount;
 
-    // Format activities with proper IDs
+    // Format activities with proper IDs (ensure stable, unique IDs)
     const formattedActivities = activities.map((activity) => ({
-      id: `${activity.type}_${activity.projectId}_${activity.timestamp}`,
+      id: `${activity.type}_${activity.projectId}_${new Date(activity.timestamp).toISOString()}`,
       type: activity.type,
       user: activity.user,
       action: activity.action,
@@ -138,6 +143,8 @@ export async function GET(request: Request) {
       activities: formattedActivities,
       hasMore,
       total: totalCount,
+    }, {
+      headers: { "Cache-Control": "no-store" }
     });
   } catch (error) {
     console.error("Failed to fetch activities:", error);

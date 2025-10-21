@@ -3,7 +3,7 @@ import { auth } from "@clerk/nextjs/server";
 import { getDashboardData } from "@/lib/services/dashboard-service";
 
 export const runtime = "nodejs";
-export const revalidate = 300; // 5 minutes
+export const dynamic = "force-dynamic"; // User-scoped data must not be cached
 
 export async function GET() {
     try {
@@ -25,6 +25,8 @@ export async function GET() {
             },
             recentProjects: dashboardData.recentProjects,
             activities: dashboardData.recentActivities,
+        }, {
+            headers: { "Cache-Control": "no-store" }
         });
     } catch (error) {
         console.error("Failed to fetch dashboard stats:", error);
