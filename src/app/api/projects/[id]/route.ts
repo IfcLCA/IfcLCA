@@ -337,6 +337,10 @@ export async function PUT(
       return new Response("Project not found", { status: 404 });
     }
 
+    // Invalidate dashboard cache so changes appear immediately
+    const { invalidateDashboardCache } = await import("@/lib/services/dashboard-service");
+    await invalidateDashboardCache();
+
     return NextResponse.json(project);
   } catch (error) {
     console.error("Failed to update project:", error);
@@ -392,6 +396,11 @@ export async function DELETE(
 
       // Commit the transaction
       await session.commitTransaction();
+
+      // Invalidate dashboard cache so deletion is reflected immediately
+      const { invalidateDashboardCache } = await import("@/lib/services/dashboard-service");
+      await invalidateDashboardCache();
+
       return new Response(null, { status: 204 });
     } catch (error) {
       // If any error occurs, abort the transaction
@@ -444,6 +453,10 @@ export async function PATCH(
     if (!project) {
       return NextResponse.json({ error: "Project not found" }, { status: 404 });
     }
+
+    // Invalidate dashboard cache so changes appear immediately
+    const { invalidateDashboardCache } = await import("@/lib/services/dashboard-service");
+    await invalidateDashboardCache();
 
     return NextResponse.json(project);
   } catch (error) {

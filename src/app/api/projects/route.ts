@@ -205,6 +205,10 @@ export async function POST(req: Request) {
       },
     });
 
+    // Invalidate dashboard cache so new project appears immediately
+    const { invalidateDashboardCache } = await import("@/lib/services/dashboard-service");
+    await invalidateDashboardCache();
+
     return NextResponse.json(project);
   } catch (error) {
     console.error("Failed to create project:", error);
