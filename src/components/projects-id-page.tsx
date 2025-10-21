@@ -5,6 +5,7 @@ import { DashboardCards } from "@/components/dashboard-cards";
 import { DataTable } from "@/components/data-table";
 import { elementsColumns } from "@/components/elements-columns";
 import { emissionsColumns } from "@/components/emissions-columns";
+import { ExportIfcModal } from "@/components/export-ifc-modal";
 import { GraphPageComponent } from "@/components/graph-page";
 import { materialsColumns } from "@/components/materials-columns";
 import {
@@ -41,10 +42,11 @@ import { UploadModal } from "@/components/upload-modal";
 import { toast } from "@/hooks/use-toast";
 import { ReloadIcon } from "@radix-ui/react-icons";
 import cn from "classnames";
-import { Edit, Layers, UploadCloud } from "lucide-react";
+import { Download, Edit, UploadCloud } from "lucide-react";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { useProjectEmissions } from "@/hooks/use-project-emissions";
+import type { ElementLcaExportMap } from "@/lib/services/ifc-export-service";
 
 interface KBOBMaterial {
   _id: string;
@@ -138,6 +140,40 @@ export interface ExtendedProject extends Project {
 
 type IndicatorType = "gwp" | "ubp" | "penre";
 
+type KBOBIndicatorValues = {
+  GWP?: number;
+  UBP?: number;
+  PENRE?: number;
+};
+
+type ElementMaterialForExport = {
+  volume?: number;
+  indicators?: { gwp?: number; ubp?: number; penre?: number };
+  material?: {
+    density?: number;
+    kbobMatch?: KBOBIndicatorValues;
+    kbobMatchId?: KBOBIndicatorValues;
+  };
+};
+
+const parseMaybeNumber = (value: unknown): number | null => {
+  if (typeof value === "number") {
+    return Number.isFinite(value) ? value : null;
+  }
+  if (typeof value === "string") {
+    const parsed = parseFloat(value);
+    return Number.isFinite(parsed) ? parsed : null;
+  }
+  return null;
+};
+
+const toFiniteNumber = (value: unknown): number => parseMaybeNumber(value) ?? 0;
+
+const resolveIndicator = (value: unknown, fallback: number): number => {
+  const parsed = parseMaybeNumber(value);
+  return parsed ?? fallback;
+};
+
 const formatNumber = (value: number, decimalPlaces: number = 2) => {
   return (
     value?.toLocaleString("de-CH", {
@@ -167,6 +203,7 @@ export default function ProjectDetailsPage() {
   const params = useParams();
   const projectId = params.id as string;
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
+  const [isExportModalOpen, setIsExportModalOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [project, setProject] = useState<ExtendedProject | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -311,6 +348,68 @@ export default function ProjectDetailsPage() {
     }
   };
 
+  const elementExportData = useMemo(() => {
+    if (!project) {
+      return {
+        results: {} as ElementLcaExportMap,
+        names: {} as Record<string, string>,
+      };
+    }
+
+    const results: ElementLcaExportMap = {};
+    const names: Record<string, string> = {};
+
+    project.elements.forEach((element: ElementWithMaterials) => {
+      if (!element.guid) {
+        return;
+      }
+
+      const materials = (element.materials || []) as ElementMaterialForExport[];
+
+      const totals = materials.reduce(
+        (acc, mat) => {
+          const volume = toFiniteNumber(mat.volume);
+          const density = toFiniteNumber(mat.material?.density);
+          const mass = volume * density;
+
+          const kbobMatch: KBOBIndicatorValues =
+            mat.material?.kbobMatch ?? mat.material?.kbobMatchId ?? {};
+
+          const gwp = resolveIndicator(
+            mat.indicators?.gwp,
+            mass * toFiniteNumber(kbobMatch.GWP)
+          );
+          const ubp = resolveIndicator(
+            mat.indicators?.ubp,
+            mass * toFiniteNumber(kbobMatch.UBP)
+          );
+          const penre = resolveIndicator(
+            mat.indicators?.penre,
+            mass * toFiniteNumber(kbobMatch.PENRE)
+          );
+
+          acc.gwp += gwp;
+          acc.ubp += ubp;
+          acc.penre += penre;
+          return acc;
+        },
+        { gwp: 0, ubp: 0, penre: 0 }
+      );
+
+      results[element.guid] = {
+        guid: element.guid,
+        gwp: toFiniteNumber(totals.gwp),
+        penre: toFiniteNumber(totals.penre),
+        ubp: toFiniteNumber(totals.ubp),
+      };
+      names[element.guid] = element.name;
+    });
+
+    return { results, names };
+  }, [project]);
+
+  const canExport = Object.keys(elementExportData.results).length > 0;
+
   if (isLoading) return <LoadingSpinner />;
   if (error) return <ErrorMessage message={error} />;
   if (!project) return <ProjectNotFound />;
@@ -335,11 +434,15 @@ export default function ProjectDetailsPage() {
         project={project}
         onUpload={() => setIsUploadModalOpen(true)}
         onEdit={handleEditProject}
+        onExport={() => setIsExportModalOpen(true)}
+        canExport={canExport}
       />
       <ProjectOverview project={project} />
       <ProjectTabs
         project={project}
         onUpload={() => setIsUploadModalOpen(true)}
+        onExport={() => setIsExportModalOpen(true)}
+        canExport={canExport}
         materialsWithCount={materialsWithCount}
       />
       <UploadModal
@@ -347,6 +450,13 @@ export default function ProjectDetailsPage() {
         open={isUploadModalOpen}
         onOpenChange={setIsUploadModalOpen}
         onSuccess={handleUploadComplete}
+      />
+      <ExportIfcModal
+        projectName={project.name}
+        open={isExportModalOpen}
+        onOpenChange={(open) => setIsExportModalOpen(open)}
+        elementResults={elementExportData.results}
+        elementNames={elementExportData.names}
       />
       <DeleteProjectDialog
         isOpen={isDeleteDialogOpen}
@@ -391,10 +501,14 @@ const ProjectHeader = ({
   project,
   onUpload,
   onEdit,
+  onExport,
+  canExport,
 }: {
   project: ExtendedProject;
   onUpload: () => void;
   onEdit: () => void;
+  onExport: () => void;
+  canExport: boolean;
 }) => (
   <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
     <div className="space-y-4">
@@ -406,6 +520,14 @@ const ProjectHeader = ({
       </div>
     </div>
     <div className="flex flex-col sm:flex-row gap-4">
+      <Button
+        variant="secondary"
+        onClick={onExport}
+        disabled={!canExport}
+      >
+        <Download className="mr-2 h-4 w-4" />
+        Export IFC
+      </Button>
       <Button onClick={onUpload} className="bg-primary text-primary-foreground">
         <UploadCloud className="mr-2 h-4 w-4" />
         Add New Ifc
@@ -432,10 +554,14 @@ const ProjectOverview = ({ project }: { project: ExtendedProject }) => (
 const ProjectTabs = ({
   project,
   onUpload,
+  onExport,
+  canExport,
   materialsWithCount,
 }: {
   project: Project;
   onUpload: () => void;
+  onExport: () => void;
+  canExport: boolean;
   materialsWithCount: {
     id: string;
     name: string;
@@ -452,7 +578,12 @@ const ProjectTabs = ({
     </TabsList>
 
     <TabsContent value="uploads" className="space-y-4">
-      <UploadsTab project={project} onUpload={onUpload} />
+      <UploadsTab
+        project={project}
+        onUpload={onUpload}
+        onExport={onExport}
+        canExport={canExport}
+      />
     </TabsContent>
 
     <TabsContent value="elements" className="space-y-4">
@@ -472,9 +603,13 @@ const ProjectTabs = ({
 const UploadsTab = ({
   project,
   onUpload,
+  onExport,
+  canExport,
 }: {
   project: Project;
   onUpload: () => void;
+  onExport: () => void;
+  canExport: boolean;
 }) => {
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 5;
@@ -492,17 +627,23 @@ const UploadsTab = ({
 
   return (
     <>
-      <div className="flex justify-between items-center mb-4">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-4">
         <h2 className="text-2xl font-semibold">
           Uploads{" "}
           <Badge variant="secondary" className="ml-2">
             {project?.uploads?.length || 0}
           </Badge>
         </h2>
-        <Button onClick={onUpload} variant="outline">
-          <UploadCloud className="h-4 w-4 mr-2" />
-          Add New Ifc
-        </Button>
+        <div className="flex flex-col sm:flex-row gap-2">
+          <Button onClick={onExport} disabled={!canExport}>
+            <Download className="h-4 w-4 mr-2" />
+            Export IFC
+          </Button>
+          <Button onClick={onUpload} variant="outline">
+            <UploadCloud className="h-4 w-4 mr-2" />
+            Add New Ifc
+          </Button>
+        </div>
       </div>
       {!project?.uploads || project.uploads.length === 0 ? (
         <EmptyState
