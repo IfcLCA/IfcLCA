@@ -36,9 +36,28 @@ const metrics: Record<
 
 export function EmissionsSummaryCard({ project }: { project?: Project }) {
   const [metric, setMetric] = useState<MetricKey>("gwp");
-  const { totals, formatted, units } = useProjectEmissions(project);
 
-  if (!project?.elements?.length) {
+  // For large projects, use pre-calculated emissions directly
+  const emissions = (project as any)?.emissions;
+  const hasPreCalculatedEmissions = emissions && (emissions.gwp > 0 || emissions.ubp > 0 || emissions.penre > 0);
+
+  const { totals, formatted, units } = hasPreCalculatedEmissions
+    ? {
+      totals: emissions,
+      formatted: {
+        gwp: emissions.gwp.toString(),
+        ubp: emissions.ubp.toString(),
+        penre: emissions.penre.toString(),
+      },
+      units: {
+        gwp: "kg CO₂ eq",
+        ubp: "UBP",
+        penre: "kWh oil-eq",
+      },
+    }
+    : useProjectEmissions(project);
+
+  if (!hasPreCalculatedEmissions && !project?.elements?.length) {
     return (
       <div className="flex flex-col justify-center text-center py-4">
         <div className="text-sm text-muted-foreground">

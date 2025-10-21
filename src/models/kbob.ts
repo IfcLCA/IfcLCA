@@ -53,8 +53,7 @@ kbobSchema.static("findValidMaterials", function () {
           {
             "kg/unit": {
               $exists: true,
-              $ne: null,
-              $ne: "-",
+              $nin: [null, "-"],
               $type: "number",
             },
           },

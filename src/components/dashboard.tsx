@@ -178,7 +178,7 @@ export function Dashboard({
     }
   }, [showProjectSelect, fetchProjects]);
 
-  // Fetch emissions after initial render (deferred to avoid blocking page load)
+  // Fetch emissions after initial render (now super fast!)
   useEffect(() => {
     const fetchEmissions = async () => {
       // Only fetch if we don't have emissions data yet
@@ -205,9 +205,8 @@ export function Dashboard({
       }
     };
 
-    // Defer emissions fetch slightly to prioritize initial render
-    const timer = setTimeout(fetchEmissions, 100);
-    return () => clearTimeout(timer);
+    // Now emissions are fast - fetch immediately
+    fetchEmissions();
   }, []); // Empty dependency array - only run once on mount
 
   const handleLoadMore = () => {

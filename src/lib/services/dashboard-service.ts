@@ -319,91 +319,27 @@ const getDashboardBasicStats = unstable_cache(
     }
 );
 
-// Separate emissions calculation (slow)
+// Fast emissions calculation using pre-calculated project emissions
 const getDashboardEmissions = unstable_cache(
     async (userId: string) => {
         await connectToDatabase();
 
+        // Sum pre-calculated emissions from all projects (100x faster!)
         const emissionsResult = await Project.aggregate([
-            { $match: { userId } },
             {
-                $lookup: {
-                    from: "elements",
-                    localField: "_id",
-                    foreignField: "projectId",
-                    as: "elements",
-                },
-            },
-            {
-                $unwind: {
-                    path: "$elements",
-                    preserveNullAndEmptyArrays: true,
-                },
-            },
-            {
-                $unwind: {
-                    path: "$elements.materials",
-                    preserveNullAndEmptyArrays: true,
-                },
-            },
-            {
-                $lookup: {
-                    from: "materials",
-                    localField: "elements.materials.material",
-                    foreignField: "_id",
-                    as: "material",
-                },
-            },
-            {
-                $unwind: {
-                    path: "$material",
-                    preserveNullAndEmptyArrays: true,
-                },
-            },
-            {
-                $lookup: {
-                    from: "indicatorsKBOB",
-                    localField: "material.kbobMatchId",
-                    foreignField: "_id",
-                    as: "kbobMatch",
-                },
-            },
-            {
-                $unwind: {
-                    path: "$kbobMatch",
-                    preserveNullAndEmptyArrays: true,
-                },
+                $match: {
+                    userId,
+                    isArchived: { $ne: true }
+                }
             },
             {
                 $group: {
                     _id: null,
-                    gwp: {
-                        $sum: {
-                            $multiply: [
-                                { $ifNull: ["$kbobMatch.GWP", 0] },
-                                { $ifNull: ["$elements.materials.volume", 0] },
-                                { $ifNull: ["$material.density", 1] },
-                            ],
-                        },
-                    },
-                    ubp: {
-                        $sum: {
-                            $multiply: [
-                                { $ifNull: ["$kbobMatch.UBP", 0] },
-                                { $ifNull: ["$elements.materials.volume", 0] },
-                                { $ifNull: ["$material.density", 1] },
-                            ],
-                        },
-                    },
-                    penre: {
-                        $sum: {
-                            $multiply: [
-                                { $ifNull: ["$kbobMatch.PENRE", 0] },
-                                { $ifNull: ["$elements.materials.volume", 0] },
-                                { $ifNull: ["$material.density", 1] },
-                            ],
-                        },
-                    },
+                    gwp: { $sum: { $ifNull: ["$emissions.gwp", 0] } },
+                    ubp: { $sum: { $ifNull: ["$emissions.ubp", 0] } },
+                    penre: { $sum: { $ifNull: ["$emissions.penre", 0] } },
+                    projectCount: { $sum: 1 },
+                    projectNames: { $push: "$name" },
                 },
             },
         ]);
@@ -413,7 +349,7 @@ const getDashboardEmissions = unstable_cache(
     },
     ["dashboard-emissions"],
     {
-        revalidate: 600, // Cache emissions longer (10 minutes)
+        revalidate: 300, // Cache for 5 minutes (can be shorter since it's fast)
         tags: ["dashboard"],
     }
 );

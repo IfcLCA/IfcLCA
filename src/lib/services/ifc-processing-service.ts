@@ -1,8 +1,9 @@
 import { logger } from "@/lib/logger";
-import { Element, Material } from "@/models";
+import { Element, Material, Project } from "@/models";
 import type { ClientSession } from "mongoose";
 import mongoose from "mongoose";
 import { MaterialService } from "./material-service";
+import type { IKBOBMaterial } from "@/types/material";
 
 interface IFCMaterial {
   name: string;
@@ -97,9 +98,9 @@ export class IFCProcessingService {
         name: { $in: Array.from(uniqueMaterialNames) },
         projectId: new mongoose.Types.ObjectId(projectId),
       })
-        .populate<{ kbobMatchId: IKBOBMaterial }>("kbobMatchId")
+        .populate("kbobMatchId")
         .session(session)
-        .lean();
+        .lean() as unknown as Array<{ _id: mongoose.Types.ObjectId; name: string; kbobMatchId: IKBOBMaterial | null; density?: number }>;
 
       // Create map for quick lookups
       const materialMatchMap = new Map(materials.map((mat) => [mat.name, mat]));
@@ -130,10 +131,10 @@ export class IFCProcessingService {
                     volume: material.volume,
                     indicators: match.kbobMatchId
                       ? MaterialService.calculateIndicators(
-                          material.volume,
-                          match.density,
-                          match.kbobMatchId
-                        )
+                        material.volume,
+                        match.density,
+                        match.kbobMatchId
+                      )
                       : undefined,
                   };
                 })
@@ -160,10 +161,10 @@ export class IFCProcessingService {
                     volume: layer.volume || totalVolume / layers.length,
                     indicators: match.kbobMatchId
                       ? MaterialService.calculateIndicators(
-                          layer.volume || totalVolume / layers.length,
-                          match.density,
-                          match.kbobMatchId
-                        )
+                        layer.volume || totalVolume / layers.length,
+                        match.density,
+                        match.kbobMatchId
+                      )
                       : undefined,
                   };
                 })
@@ -209,42 +210,35 @@ export class IFCProcessingService {
         });
       }
 
+      // Update material volumes from elements
+      const materialVolumes = await Element.aggregate([
+        { $match: { projectId: new mongoose.Types.ObjectId(projectId) } },
+        { $unwind: "$materials" },
+        {
+          $group: {
+            _id: "$materials.material",
+            totalVolume: { $sum: "$materials.volume" },
+          },
+        },
+      ]).session(session);
+
+      if (materialVolumes.length > 0) {
+        await Material.bulkWrite(
+          materialVolumes.map((mv) => ({
+            updateOne: {
+              filter: { _id: mv._id },
+              update: { $set: { volume: mv.totalVolume } },
+            },
+          })),
+          { session }
+        );
+      }
+
       // Update project emissions if there are matched materials
       const matchedMaterials = materials.filter((m) => m.kbobMatchId);
       if (matchedMaterials.length > 0) {
-        try {
-          const totals = await MaterialService.calculateProjectTotals(
-            projectId
-          );
-
-          await Project.updateOne(
-            { _id: new mongoose.Types.ObjectId(projectId) },
-            {
-              $set: {
-                emissions: {
-                  gwp: totals.totalGWP,
-                  ubp: totals.totalUBP,
-                  penre: totals.totalPENRE,
-                  lastCalculated: new Date(),
-                },
-              },
-            },
-            { session }
-          );
-
-          logger.debug("Updated project emissions", {
-            projectId,
-            totals,
-          });
-        } catch (error) {
-          logger.error("Failed to update project emissions", {
-            error,
-            projectId,
-          });
-        }
+        await MaterialService.updateProjectEmissions(projectId, session);
       }
-
-      await MaterialService.updateProjectEmissions(projectId, session);
 
       return {
         elementCount: processedCount,

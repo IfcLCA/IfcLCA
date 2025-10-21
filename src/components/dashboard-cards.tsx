@@ -49,40 +49,43 @@ export function DashboardCards({
   materials = 0,
   project,
 }: DashboardCardsProps) {
-  const totalEmissions = project?.elements?.reduce(
-    (acc: Indicators, element: Element) => {
-      const elementTotals = element.materials.reduce(
-        (materialAcc, material) => {
-          const volume = material.volume || 0;
-          const density = material.material?.density || 0;
-          const kbobIndicators = material.material?.kbobMatchId || {
-            GWP: 0,
-            UBP: 0,
-            PENRE: 0,
-          };
+  // For large projects with pagination, use pre-calculated emissions
+  const totalEmissions = project?.emissions
+    ? project.emissions
+    : project?.elements?.reduce(
+      (acc: Indicators, element: Element) => {
+        const elementTotals = element.materials.reduce(
+          (materialAcc, material) => {
+            const volume = material.volume || 0;
+            const density = material.material?.density || 0;
+            const kbobIndicators = material.material?.kbobMatchId || {
+              GWP: 0,
+              UBP: 0,
+              PENRE: 0,
+            };
 
-          return {
-            gwp:
-              (materialAcc.gwp || 0) +
-              volume * density * (kbobIndicators.GWP || 0),
-            ubp:
-              (materialAcc.ubp || 0) +
-              volume * density * (kbobIndicators.UBP || 0),
-            penre:
-              (materialAcc.penre || 0) +
-              volume * density * (kbobIndicators.PENRE || 0),
-          };
-        },
-        { gwp: 0, ubp: 0, penre: 0 }
-      );
-      return {
-        gwp: (acc.gwp || 0) + elementTotals.gwp,
-        ubp: (acc.ubp || 0) + elementTotals.ubp,
-        penre: (acc.penre || 0) + elementTotals.penre,
-      };
-    },
-    { gwp: 0, ubp: 0, penre: 0 } as Indicators
-  );
+            return {
+              gwp:
+                (materialAcc.gwp || 0) +
+                volume * density * (kbobIndicators.GWP || 0),
+              ubp:
+                (materialAcc.ubp || 0) +
+                volume * density * (kbobIndicators.UBP || 0),
+              penre:
+                (materialAcc.penre || 0) +
+                volume * density * (kbobIndicators.PENRE || 0),
+            };
+          },
+          { gwp: 0, ubp: 0, penre: 0 }
+        );
+        return {
+          gwp: (acc.gwp || 0) + elementTotals.gwp,
+          ubp: (acc.ubp || 0) + elementTotals.ubp,
+          penre: (acc.penre || 0) + elementTotals.penre,
+        };
+      },
+      { gwp: 0, ubp: 0, penre: 0 } as Indicators
+    );
 
   return (
     <div className="grid grid-cols-12 gap-4 h-full">

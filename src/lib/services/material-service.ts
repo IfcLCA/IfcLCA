@@ -2,6 +2,7 @@ import mongoose from "mongoose";
 import { Material, KBOBMaterial, Element, Project } from "@/models";
 import { logger } from "@/lib/logger";
 import { ClientSession, Types } from "mongoose";
+import type { IKBOBMaterial, IMaterial } from "@/types/material";
 
 // Update interfaces with proper types
 interface ILCAIndicators {
@@ -10,18 +11,6 @@ interface ILCAIndicators {
   penre: number;
 }
 
-interface IKBOBMaterial {
-  _id: Types.ObjectId;
-  Name: string;
-  Category?: string;
-  GWP: number;
-  UBP: number;
-  PENRE: number;
-  "kg/unit"?: number;
-  "min density"?: number;
-  "max density"?: number;
-  KBOB_ID: number;
-}
 
 interface IMaterialChange {
   materialId: string;
@@ -79,10 +68,10 @@ export class MaterialService {
     const errorDetails =
       error instanceof Error
         ? {
-            message: error.message,
-            stack: error.stack,
-            name: error.name,
-          }
+          message: error.message,
+          stack: error.stack,
+          name: error.name,
+        }
         : error;
 
     logger.error(`Error in ${methodName}:`, {
@@ -92,11 +81,16 @@ export class MaterialService {
   }
 
   private static calculateDensityFromKBOB(kbobMaterial: IKBOBMaterial): number {
-    if (
-      typeof kbobMaterial["kg/unit"] === "number" &&
-      !isNaN(kbobMaterial["kg/unit"])
-    ) {
-      return kbobMaterial["kg/unit"];
+    // Use kg/unit if available (handle both number and string)
+    const kgPerUnit = kbobMaterial["kg/unit"];
+    if (typeof kgPerUnit === "number" && !isNaN(kgPerUnit)) {
+      return kgPerUnit;
+    }
+    if (typeof kgPerUnit === "string") {
+      const parsed = parseFloat(kgPerUnit);
+      if (!isNaN(parsed)) {
+        return parsed;
+      }
     }
 
     if (
@@ -123,7 +117,7 @@ export class MaterialService {
       const referenceMaterial = await Material.findById(materialId)
         .select("name projectId")
         .session(useSession)
-        .lean();
+        .lean() as { name: string; projectId: Types.ObjectId } | null;
 
       if (!referenceMaterial?.name || !referenceMaterial.projectId) {
         console.error(
@@ -170,18 +164,18 @@ export class MaterialService {
 
     try {
       // Try exact match first
-      const exactMatch = await KBOBMaterial.findOne<IKBOBMaterial>({
+      const exactMatch = await KBOBMaterial.findOne({
         Name: cleanedName,
-      }).lean();
+      }).lean() as IKBOBMaterial | null;
 
       if (exactMatch) {
         return { kbobMaterial: exactMatch, score: 1.0 };
       }
 
       // Try case-insensitive match
-      const caseInsensitiveMatch = await KBOBMaterial.findOne<IKBOBMaterial>({
+      const caseInsensitiveMatch = await KBOBMaterial.findOne({
         Name: { $regex: `^${cleanedName}$`, $options: "i" },
-      }).lean();
+      }).lean() as IKBOBMaterial | null;
 
       if (caseInsensitiveMatch) {
         return { kbobMaterial: caseInsensitiveMatch, score: 0.99 };
@@ -215,16 +209,17 @@ export class MaterialService {
 
       const [materials, newKBOBMaterial, elements] = await Promise.all([
         Material.find({ _id: { $in: objectIds } })
-          .populate<{ kbobMatchId: IKBOBMaterial }>("kbobMatchId")
+          .populate("kbobMatchId")
           .lean(),
-        KBOBMaterial.findById<IKBOBMaterial>(kbobObjectId).lean(),
+        KBOBMaterial.findById(kbobObjectId).lean(),
         Element.find({ "materials.material": { $in: objectIds } })
-          .populate<{ projectId: { _id: Types.ObjectId; name: string } }>(
-            "projectId",
-            "name"
-          )
+          .populate("projectId", "name")
           .lean(),
-      ]);
+      ]) as unknown as [
+          Array<{ _id: Types.ObjectId; name: string; kbobMatchId: IKBOBMaterial | null; density?: number }>,
+          IKBOBMaterial | null,
+          Array<{ _id: Types.ObjectId; materials: Array<{ material: Types.ObjectId }>; projectId: { _id: Types.ObjectId; name: string } }>
+        ];
 
       if (!newKBOBMaterial) {
         throw new Error("KBOB material not found");
@@ -238,7 +233,7 @@ export class MaterialService {
         const projectName = element.projectId?.name;
         if (!projectName) return;
 
-        element.materials.forEach((mat) => {
+        element.materials.forEach((mat: { material: Types.ObjectId }) => {
           const materialId = mat.material.toString();
           elementCounts.set(
             materialId,
@@ -283,39 +278,6 @@ export class MaterialService {
     }
   }
 
-  /**
-   * Finds KBOB material match
-   */
-  static async findBestKBOBMatch(
-    materialName: string
-  ): Promise<{ kbobMaterial: IKBOBMaterial; score: number } | null> {
-    const cleanedName = materialName.trim();
-
-    try {
-      // Try exact match first
-      const exactMatch = await KBOBMaterial.findOne<IKBOBMaterial>({
-        Name: cleanedName,
-      }).lean();
-
-      if (exactMatch) {
-        return { kbobMaterial: exactMatch, score: 1.0 };
-      }
-
-      // Try case-insensitive match
-      const caseInsensitiveMatch = await KBOBMaterial.findOne<IKBOBMaterial>({
-        Name: { $regex: `^${cleanedName}$`, $options: "i" },
-      }).lean();
-
-      if (caseInsensitiveMatch) {
-        return { kbobMaterial: caseInsensitiveMatch, score: 0.99 };
-      }
-
-      return null;
-    } catch (error) {
-      console.error("❌ [Material Service] Error in findBestKBOBMatch:", error);
-      throw error;
-    }
-  }
 
   /**
    * Calculates density from KBOB material with validation
@@ -323,12 +285,16 @@ export class MaterialService {
   static calculateDensity(kbobMaterial: IKBOBMaterial): number | null {
     if (!kbobMaterial) return null;
 
-    // Use kg/unit if available
-    if (
-      typeof kbobMaterial["kg/unit"] === "number" &&
-      !isNaN(kbobMaterial["kg/unit"])
-    ) {
-      return kbobMaterial["kg/unit"];
+    // Use kg/unit if available (handle both number and string)
+    const kgPerUnit = kbobMaterial["kg/unit"];
+    if (typeof kgPerUnit === "number" && !isNaN(kgPerUnit)) {
+      return kgPerUnit;
+    }
+    if (typeof kgPerUnit === "string") {
+      const parsed = parseFloat(kgPerUnit);
+      if (!isNaN(parsed)) {
+        return parsed;
+      }
     }
 
     // Calculate from min/max density
@@ -377,7 +343,7 @@ export class MaterialService {
    */
   static async getProjectsWithMaterials(userId: string) {
     // Get all projects for the user
-    const projects = await Project.find({ userId }).select("_id name").lean();
+    const projects = await Project.find({ userId }).select("_id name").lean() as unknown as Array<{ _id: Types.ObjectId; name: string }>;
 
     // Get all materials for these projects
     const projectIds = projects.map((p) => p._id);
@@ -420,7 +386,7 @@ export class MaterialService {
       // Get projects belonging to the user
       const userProjects = await Project.find({ userId })
         .select("_id")
-        .lean();
+        .lean() as Array<{ _id: Types.ObjectId }>;
       const projectIds = userProjects.map((p) => p._id);
 
       // Try exact match first within user's projects
@@ -430,7 +396,7 @@ export class MaterialService {
         kbobMatchId: { $exists: true },
       })
         .populate("kbobMatchId")
-        .lean();
+        .lean() as (mongoose.Document & IMaterial) | null;
 
       if (exactMatch) {
         return exactMatch;
@@ -443,7 +409,7 @@ export class MaterialService {
         kbobMatchId: { $exists: true },
       })
         .populate("kbobMatchId")
-        .lean();
+        .lean() as (mongoose.Document & IMaterial) | null;
 
       if (caseInsensitiveMatch) {
         return caseInsensitiveMatch;
@@ -624,9 +590,9 @@ export class MaterialService {
       });
 
       // Fetch KBOB material data
-      const kbobMaterial = await KBOBMaterial.findById<IKBOBMaterial>(
+      const kbobMaterial = await KBOBMaterial.findById(
         kbobMatchId
-      ).lean();
+      ).lean() as IKBOBMaterial | null;
       if (!kbobMaterial) {
         throw new Error(`KBOB material not found for id: ${kbobMatchId}`);
       }
@@ -688,10 +654,13 @@ export class MaterialService {
   static async updateProjectEmissions(
     projectId: string | Types.ObjectId,
     session?: ClientSession
-  ) {
+  ): Promise<{ totalGWP: number; totalUBP: number; totalPENRE: number }> {
     try {
+      const projectObjectId = new mongoose.Types.ObjectId(projectId.toString());
+
+      // Calculate emissions from elements
       const elements = await Element.find({
-        projectId: new mongoose.Types.ObjectId(projectId.toString()),
+        projectId: projectObjectId,
       })
         .select("materials.volume materials.material")
         .populate({
@@ -702,28 +671,18 @@ export class MaterialService {
             select: "GWP UBP PENRE",
           },
         })
+        .session(session || null)
         .lean();
-
-      logger.debug("Project elements for emission calculation:", {
-        projectId: projectId.toString(),
-        elementCount: elements.length,
-        sampleElement: elements[0]?.materials.map((m) => ({
-          volume: m.volume,
-          density: m.material?.density,
-          gwp: m.material?.kbobMatchId?.GWP,
-        })),
-      });
 
       const totals = elements.reduce(
         (acc, element) => {
           const elementTotals = element.materials.reduce(
-            (matAcc, material) => {
+            (matAcc: { gwp: number; ubp: number; penre: number }, material: { volume?: number; material?: { density?: number; kbobMatchId?: { GWP?: number; UBP?: number; PENRE?: number } } }) => {
               const volume = material.volume || 0;
               const density = material.material?.density || 0;
               const kbobMatch = material.material?.kbobMatchId;
-
-              // Calculate mass-based emissions
               const mass = volume * density;
+
               return {
                 gwp: matAcc.gwp + mass * (kbobMatch?.GWP || 0),
                 ubp: matAcc.ubp + mass * (kbobMatch?.UBP || 0),
@@ -742,19 +701,30 @@ export class MaterialService {
         { totalGWP: 0, totalUBP: 0, totalPENRE: 0 }
       );
 
-      logger.debug("Project totals calculated:", {
-        projectId,
+      // PERSIST TO PROJECT (THIS WAS MISSING!)
+      await Project.updateOne(
+        { _id: projectObjectId },
+        {
+          $set: {
+            "emissions.gwp": totals.totalGWP,
+            "emissions.ubp": totals.totalUBP,
+            "emissions.penre": totals.totalPENRE,
+            "emissions.lastCalculated": new Date(),
+          },
+        },
+        { session: session || undefined }
+      );
+
+      logger.debug("Updated project emissions", {
+        projectId: projectId.toString(),
         totals,
         elementCount: elements.length,
       });
 
       return totals;
     } catch (error) {
-      logger.error("Error calculating project totals:", {
-        error,
-        projectId,
-      });
-      return { totalGWP: 0, totalUBP: 0, totalPENRE: 0 };
+      logger.error("Error updating project emissions", { error, projectId });
+      throw error; // Don't hide errors
     }
   }
 
@@ -790,102 +760,6 @@ export class MaterialService {
   }
 
   /**
-   * Calculate total project emissions
-   */
-  static async calculateProjectTotals(projectId: string): Promise<{
-    totalGWP: number;
-    totalUBP: number;
-    totalPENRE: number;
-  }> {
-    try {
-      const elements = await Element.find({
-        projectId: new mongoose.Types.ObjectId(projectId),
-      })
-        .populate({
-          path: "materials.material",
-          select: "density kbobMatchId",
-          populate: {
-            path: "kbobMatchId",
-            select: "GWP UBP PENRE",
-          },
-        })
-        .lean();
-
-      const totals = elements.reduce(
-        (acc, element) => {
-          const elementTotals = element.materials.reduce(
-            (matAcc, material) => {
-              const volume = material.volume || 0;
-              const density = material.material?.density || 0;
-              const kbobMatch = material.material?.kbobMatchId;
-
-              // Calculate mass-based emissions
-              const mass = volume * density;
-              return {
-                gwp: matAcc.gwp + mass * (kbobMatch?.GWP || 0),
-                ubp: matAcc.ubp + mass * (kbobMatch?.UBP || 0),
-                penre: matAcc.penre + mass * (kbobMatch?.PENRE || 0),
-              };
-            },
-            { gwp: 0, ubp: 0, penre: 0 }
-          );
-
-          return {
-            totalGWP: acc.totalGWP + elementTotals.gwp,
-            totalUBP: acc.totalUBP + elementTotals.ubp,
-            totalPENRE: acc.totalPENRE + elementTotals.penre,
-          };
-        },
-        { totalGWP: 0, totalUBP: 0, totalPENRE: 0 }
-      );
-
-      logger.debug("Project totals calculated:", {
-        projectId,
-        totals,
-        elementCount: elements.length,
-      });
-
-      return totals;
-    } catch (error) {
-      logger.error("Error calculating project totals:", {
-        error,
-        projectId,
-      });
-      return { totalGWP: 0, totalUBP: 0, totalPENRE: 0 };
-    }
-  }
-
-  /**
-   * Calculates emissions for a project using aggregation
-   */
-  private static async calculateProjectEmissions(
-    projectId: Types.ObjectId | string,
-    session?: ClientSession
-  ) {
-    const [totals] = await Element.aggregate([
-      {
-        $match: {
-          projectId: new mongoose.Types.ObjectId(projectId.toString()),
-        },
-      },
-      {
-        $group: {
-          _id: null,
-          gwp: { $sum: "$totalIndicators.gwp" },
-          ubp: { $sum: "$totalIndicators.ubp" },
-          penre: { $sum: "$totalIndicators.penre" },
-        },
-      },
-    ]).session(session);
-
-    return {
-      gwp: totals?.gwp || 0,
-      ubp: totals?.ubp || 0,
-      penre: totals?.penre || 0,
-    };
-  }
-
-  /**
    * Recalculates elements for given materials with efficient batching
    */
   static async recalculateElementsForMaterials(
@@ -901,7 +775,7 @@ export class MaterialService {
         .lean();
 
       // Create a map for faster lookups
-      const materialMap = new Map(materials.map((m) => [m._id.toString(), m]));
+      const materialMap = new Map(materials.map((m: any) => [m._id.toString(), m]));
 
       // Update elements with new calculations
       const bulkOps = await Element.aggregate([

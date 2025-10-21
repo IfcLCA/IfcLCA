@@ -5,6 +5,7 @@ interface IMaterial {
   name: string;
   category?: string;
   density?: number;
+  volume?: number;
   kbobMatchId?: mongoose.Types.ObjectId;
   lastCalculated?: Date;
 }
@@ -29,6 +30,15 @@ const materialSchema = new mongoose.Schema<IMaterial>(
       validate: {
         validator: (v: number) => v === 0 || Number.isFinite(v),
         message: "Density must be 0 or a finite number",
+      },
+    },
+    volume: {
+      type: Number,
+      default: 0,
+      min: 0,
+      validate: {
+        validator: Number.isFinite,
+        message: "Volume must be a finite number",
       },
     },
     kbobMatchId: {
