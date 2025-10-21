@@ -50,45 +50,52 @@ let pyodideLoading: Promise<PyodideInterface> | null = null;
 
 async function loadPyodideAndIfcOpenShell(): Promise<PyodideInterface> {
     if (pyodideLoading) return pyodideLoading;
-    pyodideLoading = new Promise(async (resolve, reject) => {
-        try {
-            if (!(window as any).loadPyodide) {
-                const script = document.createElement("script");
-                script.src = "https://cdn.jsdelivr.net/pyodide/v0.26.2/full/pyodide.js";
-                script.async = true;
-                script.onload = async () => {
-                    try {
-                        const pyodide: PyodideInterface = await (window as any).loadPyodide(
-                            {
-                                indexURL: "https://cdn.jsdelivr.net/pyodide/v0.26.2/full/",
-                            }
-                        );
-                        await pyodide.loadPackage(["micropip", "numpy"]);
-                        const micropip = pyodide.pyimport("micropip");
-                        await micropip.install(
-                            "https://cdn.jsdelivr.net/gh/IfcOpenShell/wasm-wheels@main/ifcopenshell-0.8.2+d50e806-cp312-cp312-emscripten_3_1_58_wasm32.whl"
-                        );
-                        resolve(pyodide);
-                    } catch (e) {
-                        reject(e);
-                    }
-                };
-                script.onerror = reject;
-                document.head.appendChild(script);
-            } else {
-                const pyodide: PyodideInterface = await (window as any).loadPyodide({
-                    indexURL: "https://cdn.jsdelivr.net/pyodide/v0.26.2/full/",
-                });
-                await pyodide.loadPackage(["micropip", "numpy"]);
-                const micropip = pyodide.pyimport("micropip");
-                await micropip.install(
-                    "https://cdn.jsdelivr.net/gh/IfcOpenShell/wasm-wheels@main/ifcopenshell-0.8.2+d50e806-cp312-cp312-emscripten_3_1_58_wasm32.whl"
-                );
-                resolve(pyodide);
+    pyodideLoading = new Promise((resolve, reject) => {
+        (async () => {
+            try {
+                if (!(window as any).loadPyodide) {
+                    const script = document.createElement("script");
+                    script.src = "https://cdn.jsdelivr.net/pyodide/v0.26.2/full/pyodide.js";
+                    script.async = true;
+                    script.onload = async () => {
+                        try {
+                            const pyodide: PyodideInterface = await (window as any).loadPyodide(
+                                {
+                                    indexURL: "https://cdn.jsdelivr.net/pyodide/v0.26.2/full/",
+                                }
+                            );
+                            await pyodide.loadPackage(["micropip", "numpy"]);
+                            const micropip = pyodide.pyimport("micropip");
+                            await micropip.install(
+                                "https://cdn.jsdelivr.net/gh/IfcOpenShell/wasm-wheels@main/ifcopenshell-0.8.2+d50e806-cp312-cp312-emscripten_3_1_58_wasm32.whl"
+                            );
+                            resolve(pyodide);
+                        } catch (e) {
+                            pyodideLoading = null;
+                            reject(e as Error);
+                        }
+                    };
+                    script.onerror = (e) => {
+                        pyodideLoading = null;
+                        reject(e instanceof Error ? e : new Error("Failed to load Pyodide script"));
+                    };
+                    document.head.appendChild(script);
+                } else {
+                    const pyodide: PyodideInterface = await (window as any).loadPyodide({
+                        indexURL: "https://cdn.jsdelivr.net/pyodide/v0.26.2/full/",
+                    });
+                    await pyodide.loadPackage(["micropip", "numpy"]);
+                    const micropip = pyodide.pyimport("micropip");
+                    await micropip.install(
+                        "https://cdn.jsdelivr.net/gh/IfcOpenShell/wasm-wheels@main/ifcopenshell-0.8.2+d50e806-cp312-cp312-emscripten_3_1_58_wasm32.whl"
+                    );
+                    resolve(pyodide);
+                }
+            } catch (err) {
+                pyodideLoading = null;
+                reject(err as Error);
             }
-        } catch (err) {
-            reject(err);
-        }
+        })();
     });
     return pyodideLoading;
 }
@@ -233,7 +240,7 @@ def get_material_volumes(element):
                             mat_name = safe_string(layer.Material.Name)
                             if mat_name:
                                 thickness = float(layer.LayerThickness)
-                                layer_thicknesses[mat_name] = thickness
+                                layer_thicknesses[mat_name] = layer_thicknesses.get(mat_name, 0.0) + thickness
                                 total_thickness += thickness
                     
                     # Calculate volume fractions based on thickness
@@ -271,7 +278,7 @@ def get_material_volumes(element):
                                 mat_name = safe_string(layer.Material.Name)
                                 if mat_name:
                                     thickness = float(layer.LayerThickness)
-                                    layer_thicknesses[mat_name] = thickness
+                                    layer_thicknesses[mat_name] = layer_thicknesses.get(mat_name, 0.0) + thickness
                                     total_thickness += thickness
                         
                         if total_thickness > 0:
