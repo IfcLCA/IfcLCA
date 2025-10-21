@@ -12,16 +12,7 @@ export interface PyodideInterface {
 
 // Module augmentation for 'pyodide' module (for runtime compatibility)
 declare module 'pyodide' {
-    export interface PyodideInterface {
-        runPython(code: string): any;
-        pyimport(name: string): any;
-        loadPackage(packages: string[]): Promise<void>;
-        version: string;
-        globals: {
-            get(name: string): any;
-            set(name: string, value: any): void;
-        };
-    }
+    export { PyodideInterface };
 
     export function loadPyodide(config?: { indexURL?: string }): Promise<PyodideInterface>;
 }

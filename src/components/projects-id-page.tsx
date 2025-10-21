@@ -133,6 +133,8 @@ interface Project {
     elements: number;
     materials: number;
   };
+  usePagination?: boolean;
+  elementCount?: number;
 }
 
 export interface ExtendedProject extends Project {
@@ -321,7 +323,7 @@ export default function ProjectDetailsPage() {
   };
 
   const handlePrepareExport = async () => {
-    const usePagination = (project as any)?.usePagination;
+    const usePagination = project?.usePagination;
 
     // For small projects or if we already have all elements, open modal directly
     if (!usePagination || fullElementsData) {
@@ -334,7 +336,7 @@ export default function ProjectDetailsPage() {
     try {
       toast({
         title: "Preparing export data",
-        description: `Loading ${(project as any).elementCount} elements for export...`,
+        description: `Loading ${project.elementCount} elements for export...`,
       });
 
       // Fetch all elements (this will be slow but only when user needs export)
@@ -436,7 +438,7 @@ export default function ProjectDetailsPage() {
           const mass = volume * density;
 
           const kbobMatch: KBOBIndicatorValues =
-            (typeof mat.material?.kbobMatch === 'object' && mat.material?.kbobMatch)
+            (mat.material?.kbobMatch && typeof mat.material.kbobMatch === 'object')
               ? mat.material.kbobMatch
               : {};
 
@@ -465,7 +467,7 @@ export default function ProjectDetailsPage() {
       const materialNames = Array.from(new Set(
         materials
           .map(mat => {
-            if (typeof mat.material?.kbobMatch === 'object' && mat.material?.kbobMatch) {
+            if (mat.material?.kbobMatch && typeof mat.material.kbobMatch === 'object') {
               return mat.material.kbobMatch.Name;
             }
             return mat.material?.name;
@@ -476,7 +478,7 @@ export default function ProjectDetailsPage() {
       const materialIds = Array.from(new Set(
         materials
           .map(mat => {
-            if (typeof mat.material?.kbobMatch === 'object' && mat.material?.kbobMatch) {
+            if (mat.material?.kbobMatch && typeof mat.material.kbobMatch === 'object') {
               return mat.material.kbobMatch.KBOB_ID?.toString();
             }
             return mat.material?._id;
@@ -497,7 +499,7 @@ export default function ProjectDetailsPage() {
     return { results, names };
   }, [project, fullElementsData]);
 
-  const canExport = Object.keys(elementExportData.results).length > 0 || (project as any)?.usePagination;
+  const canExport = Object.keys(elementExportData.results).length > 0 || Boolean(project?.usePagination);
 
   if (isLoading) return <LoadingSpinner />;
   if (error) return <ErrorMessage message={error} />;
@@ -866,8 +868,8 @@ const ElementsTab = ({ project }: { project: Project }) => {
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [isLoading, setIsLoading] = useState(false);
-  const usePagination = (project as any).usePagination || false;
-  const totalElements = (project as any).elementCount || project.elements?.length || 0;
+  const usePagination = project.usePagination || false;
+  const totalElements = project.elementCount || project.elements?.length || 0;
 
   // Fetch paginated elements for large projects
   useEffect(() => {
@@ -968,7 +970,7 @@ const ElementsTab = ({ project }: { project: Project }) => {
 };
 
 const MaterialsTab = ({ project }: { project: Project }) => {
-  const usePagination = (project as any).usePagination || false;
+  const usePagination = project.usePagination || false;
 
   const data = useMemo(() => {
     // For large projects with pagination, materials are already aggregated from API
@@ -1041,7 +1043,7 @@ const MaterialsTab = ({ project }: { project: Project }) => {
 };
 
 const GraphTab = ({ project }: { project: Project }) => {
-  const usePagination = (project as any).usePagination || false;
+  const usePagination = project.usePagination || false;
 
   // For large projects with pagination, use material-based chart data
   if (usePagination) {

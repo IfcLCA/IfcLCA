@@ -246,11 +246,9 @@ export class IFCProcessingService {
         );
       }
 
-      // Update project emissions if there are matched materials
-      const matchedMaterials = materials.filter((m) => m.kbobMatchId);
-      if (matchedMaterials.length > 0) {
-        await MaterialService.updateProjectEmissions(projectId, session);
-      }
+      // Always recalculate project emissions after processing elements
+      // This ensures consistency even when new elements reference previously matched materials
+      await MaterialService.updateProjectEmissions(projectId, session);
 
       return {
         elementCount: processedCount,
