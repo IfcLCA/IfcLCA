@@ -75,6 +75,10 @@ export async function POST(
       );
     });
 
+    // Invalidate dashboard cache so new elements/materials appear immediately
+    const { invalidateDashboardCache } = await import("@/lib/services/dashboard-service");
+    await invalidateDashboardCache();
+
     return NextResponse.json({
       success: true,
       shouldRedirectToLibrary: true,
