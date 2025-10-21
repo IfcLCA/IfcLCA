@@ -40,8 +40,7 @@ export async function GET(request: Request) {
               },
             },
             { $sort: { createdAt: -1 } },
-            { $skip: skip },
-            { $limit: limit },
+            { $limit: skip + limit },
           ],
           uploads: [
             {
@@ -68,8 +67,7 @@ export async function GET(request: Request) {
               },
             },
             { $sort: { timestamp: -1 } },
-            { $skip: skip },
-            { $limit: limit },
+            { $limit: skip + limit },
           ],
           deletions: [
             {
@@ -96,8 +94,7 @@ export async function GET(request: Request) {
               },
             },
             { $sort: { timestamp: -1 } },
-            { $skip: skip },
-            { $limit: limit },
+            { $limit: skip + limit },
           ],
         },
       },
@@ -111,6 +108,7 @@ export async function GET(request: Request) {
       { $unwind: "$allActivities" },
       { $replaceRoot: { newRoot: "$allActivities" } },
       { $sort: { timestamp: -1 } },
+      { $skip: skip },
       { $limit: limit },
     ]);
 

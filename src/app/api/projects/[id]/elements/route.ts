@@ -1,10 +1,11 @@
-import { Element } from "@/models";
+import { Element, Project } from "@/models";
 import { NextResponse } from "next/server";
 import mongoose from "mongoose";
 import { connectToDatabase } from "@/lib/mongodb";
+import { auth } from "@clerk/nextjs/server";
 
 export const runtime = "nodejs";
-export const revalidate = 60;
+export const dynamic = "force-dynamic"; // Disable caching for user-specific data
 
 export async function GET(
   request: Request,
@@ -13,13 +14,39 @@ export async function GET(
   try {
     await connectToDatabase();
     const { id } = await params;
-    const { searchParams } = new URL(request.url);
 
-    const page = parseInt(searchParams.get("page") || "1");
-    const limit = parseInt(searchParams.get("limit") || "50");
-    const skip = (page - 1) * limit;
+    // Authenticate user
+    const { userId } = await auth();
+    if (!userId) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return NextResponse.json({ error: "Invalid project ID" }, { status: 400 });
+    }
 
     const projectId = new mongoose.Types.ObjectId(id);
+
+    // Verify project ownership
+    const project = await Project.findOne({ _id: projectId, userId }).lean();
+    if (!project) {
+      return NextResponse.json({ error: "Project not found" }, { status: 404 });
+    }
+
+    const { searchParams } = new URL(request.url);
+
+    // Sanitize pagination params to prevent limit=0, negative pages, NaN, or huge values
+    const rawPage = Number.parseInt(searchParams.get("page") || "1", 10);
+    const rawLimit = Number.parseInt(searchParams.get("limit") || "50", 10);
+
+    const page = Number.isFinite(rawPage) && rawPage > 0 ? rawPage : 1;
+    const DEFAULT_LIMIT = 50;
+    const MAX_LIMIT = 200;
+    const limit = Number.isFinite(rawLimit)
+      ? Math.min(Math.max(rawLimit, 1), MAX_LIMIT)
+      : DEFAULT_LIMIT;
+
+    const skip = (page - 1) * limit;
 
     // Fetch elements with pagination
     const [elements, total] = await Promise.all([
@@ -41,32 +68,35 @@ export async function GET(
     ]);
 
     // Calculate totalVolume and emissions for each element
-    const enrichedElements = elements.map((el: any) => ({
-      ...el,
-      totalVolume: el.materials.reduce((sum: number, mat: any) => sum + (mat.volume || 0), 0),
-      emissions: el.materials.reduce(
-        (acc: any, mat: any) => {
-          const volume = mat.volume || 0;
-          const density = mat.material?.density || 0;
-          const kbob = mat.material?.kbobMatch;
-          const mass = volume * density;
+    const enrichedElements = elements.map((el: any) => {
+      const mats = Array.isArray(el.materials) ? el.materials : [];
+      return {
+        ...el,
+        totalVolume: mats.reduce((sum: number, mat: any) => sum + (mat.volume || 0), 0),
+        emissions: mats.reduce(
+          (acc: any, mat: any) => {
+            const volume = mat.volume || 0;
+            const density = mat.material?.density || 0;
+            const kbob = mat.material?.kbobMatchId;
+            const mass = volume * density;
 
-          return {
-            gwp: acc.gwp + mass * (kbob?.GWP || 0),
-            ubp: acc.ubp + mass * (kbob?.UBP || 0),
-            penre: acc.penre + mass * (kbob?.PENRE || 0),
-          };
-        },
-        { gwp: 0, ubp: 0, penre: 0 }
-      ),
-    }));
+            return {
+              gwp: acc.gwp + mass * (kbob?.GWP || 0),
+              ubp: acc.ubp + mass * (kbob?.UBP || 0),
+              penre: acc.penre + mass * (kbob?.PENRE || 0),
+            };
+          },
+          { gwp: 0, ubp: 0, penre: 0 }
+        ),
+      };
+    });
 
     return NextResponse.json({
       elements: enrichedElements,
       total,
       page,
       limit,
-      totalPages: Math.ceil(total / limit)
+      totalPages: Math.ceil(total / Math.max(limit, 1))
     });
   } catch (error) {
     console.error("Failed to fetch elements:", error);

@@ -19,3 +19,5 @@ declare global {
         pyodide?: import('pyodide').PyodideInterface;
     }
 }
+
+export { };

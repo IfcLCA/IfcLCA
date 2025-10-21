@@ -1,5 +1,5 @@
 import { logger } from "@/lib/logger";
-import { Element, Material, Project } from "@/models";
+import { Element, Material } from "@/models";
 import type { ClientSession } from "mongoose";
 import mongoose from "mongoose";
 import { MaterialService } from "./material-service";

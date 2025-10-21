@@ -3,3 +3,4 @@
 .env*
 .vercel
 /public/fonts
+tsconfig.tsbuildinfo

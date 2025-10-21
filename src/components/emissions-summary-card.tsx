@@ -41,21 +41,14 @@ export function EmissionsSummaryCard({ project }: { project?: Project }) {
   const emissions = (project as any)?.emissions;
   const hasPreCalculatedEmissions = emissions && (emissions.gwp > 0 || emissions.ubp > 0 || emissions.penre > 0);
 
-  const { totals, formatted, units } = hasPreCalculatedEmissions
-    ? {
-      totals: emissions,
-      formatted: {
-        gwp: emissions.gwp.toString(),
-        ubp: emissions.ubp.toString(),
-        penre: emissions.penre.toString(),
-      },
-      units: {
-        gwp: "kg CO₂ eq",
-        ubp: "UBP",
-        penre: "kWh oil-eq",
-      },
-    }
-    : useProjectEmissions(project);
+  // Always call hook unconditionally (Rules of Hooks)
+  const computed = useProjectEmissions(project);
+
+  // Then conditionally select which data to use
+  const totals = hasPreCalculatedEmissions ? emissions : computed.totals;
+  const units = hasPreCalculatedEmissions
+    ? { gwp: "kg CO₂ eq", ubp: "pts", penre: "kWh" }
+    : computed.units;
 
   if (!hasPreCalculatedEmissions && !project?.elements?.length) {
     return (
