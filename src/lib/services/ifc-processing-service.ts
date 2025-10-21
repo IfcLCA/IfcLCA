@@ -112,22 +112,38 @@ export class IFCProcessingService {
       for (let i = 0; i < elements.length; i += BATCH_SIZE) {
         const batch = elements.slice(i, i + BATCH_SIZE);
 
-        const bulkOps = batch.map((element) => {
+        const bulkOps = batch.filter((element) => {
+          // Guard against missing globalId
+          if (!element.globalId) {
+            logger.warn("Skipping element without globalId", { name: element.name });
+            return false;
+          }
+          return true;
+        }).map((element) => {
+
           const processedMaterials = [];
 
           // Prioritize material layers over direct materials to avoid duplication
           // Process material layers
           if (element.materialLayers?.layers?.length) {
-            const totalVolume = Number.isFinite(element.volume) ? Number(element.volume) : 0;
+            // Parse and validate totalVolume
+            const totalVolumeNum = Number(element.volume);
+            const totalVolume = Number.isFinite(totalVolumeNum) ? totalVolumeNum : 0;
             const layers = element.materialLayers.layers;
 
             // Sum specified volumes (0 is valid) and count unspecified
             const specifiedSum = layers.reduce(
-              (acc, l) => acc + (Number.isFinite(l.volume) ? Number(l.volume) : 0),
+              (acc, l) => {
+                const v = Number(l.volume);
+                return acc + (Number.isFinite(v) ? v : 0);
+              },
               0
             );
             const unspecifiedCount = layers.reduce(
-              (acc, l) => acc + (Number.isFinite(l.volume) ? 0 : 1),
+              (acc, l) => {
+                const v = Number(l.volume);
+                return acc + (Number.isFinite(v) ? 0 : 1);
+              },
               0
             );
             const remainder = Math.max(totalVolume - specifiedSum, 0);
@@ -140,8 +156,10 @@ export class IFCProcessingService {
                   logger.warn(`Material not found: ${layer.materialName}`);
                   return null;
                 }
-                const layerVol = Number.isFinite(layer.volume) ? Number(layer.volume) : fallback;
-                const volume = Math.max(layerVol, 0);
+                // Parse and validate layer volume
+                const parsed = Number(layer.volume);
+                const layerVol = Number.isFinite(parsed) ? parsed : fallback;
+                const volume = Math.max(layerVol || 0, 0);
                 return {
                   material: match._id,
                   name: layer.materialName,
@@ -210,6 +228,10 @@ export class IFCProcessingService {
             },
           };
         });
+
+        if (bulkOps.length === 0) {
+          continue;
+        }
 
         const result = await Element.bulkWrite(bulkOps, { session });
         processedCount += result.upsertedCount + result.modifiedCount;

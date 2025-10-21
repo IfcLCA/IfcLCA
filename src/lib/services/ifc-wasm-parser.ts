@@ -1,125 +1,148 @@
 export interface APIElement {
-  id: string;
-  type: string;
-  object_type: string;
-  properties: {
-    name?: string;
-    level?: string;
-    loadBearing?: boolean;
-    isExternal?: boolean;
-  };
-  volume?: number;
-  area?: number;
-  materials?: string[];
-  material_volumes?: {
-    [key: string]: {
-      volume: number;
-      fraction: number;
+    id: string;
+    type: string;
+    object_type: string;
+    properties: {
+        name?: string;
+        level?: string;
+        loadBearing?: boolean;
+        isExternal?: boolean;
     };
-  };
+    volume?: number;
+    area?: number;
+    materials?: string[];
+    material_volumes?: {
+        [key: string]: {
+            volume: number;
+            fraction: number;
+        };
+    };
 }
 
 export interface IFCParseResult {
-  elements: APIElement[];
-  debug: Array<{
-    id: string;
-    type: string;
-    has_associations: boolean;
-    materials_found: number;
-    material_volumes_found: number;
-    materials: string[];
-    material_volumes: { [key: string]: { volume: number; fraction: number } };
-    material_type?: string;
-    constituent_count?: number;
-    layer_count?: number;
-    layer_set_type?: string;
-  }>;
-  total_elements: number;
-  total_materials_found: number;
-  total_material_volumes_found: number;
+    elements: APIElement[];
+    debug: Array<{
+        id: string;
+        type: string;
+        has_associations: boolean;
+        materials_found: number;
+        material_volumes_found: number;
+        materials: string[];
+        material_volumes: { [key: string]: { volume: number; fraction: number } };
+        material_type?: string;
+        constituent_count?: number;
+        layer_count?: number;
+        layer_set_type?: string;
+    }>;
+    total_elements: number;
+    total_materials_found: number;
+    total_material_volumes_found: number;
 }
 
 interface PyodideInterface {
-  loadPackage: (packages: string[]) => Promise<void>;
-  pyimport: (name: string) => any;
-  globals: { set: (name: string, value: unknown) => void };
-  runPythonAsync: (code: string) => Promise<string>;
+    loadPackage: (packages: string[]) => Promise<void>;
+    pyimport: (name: string) => any;
+    globals: { set: (name: string, value: unknown) => void };
+    runPythonAsync: (code: string) => Promise<string>;
 }
 
 let pyodideLoading: Promise<PyodideInterface> | null = null;
 
 async function loadPyodideAndIfcOpenShell(): Promise<PyodideInterface> {
-  if (pyodideLoading) return pyodideLoading;
-  pyodideLoading = new Promise(async (resolve, reject) => {
-    try {
-      if (!(window as any).loadPyodide) {
-        const script = document.createElement("script");
-        script.src = "https://cdn.jsdelivr.net/pyodide/v0.26.2/full/pyodide.js";
-        script.async = true;
-        script.onload = async () => {
-          try {
-            const pyodide: PyodideInterface = await (window as any).loadPyodide(
-              {
-                indexURL: "https://cdn.jsdelivr.net/pyodide/v0.26.2/full/",
-              }
-            );
-            await pyodide.loadPackage(["micropip", "numpy"]);
-            const micropip = pyodide.pyimport("micropip");
-            await micropip.install(
-              "https://cdn.jsdelivr.net/gh/IfcOpenShell/wasm-wheels@main/ifcopenshell-0.8.2+d50e806-cp312-cp312-emscripten_3_1_58_wasm32.whl"
-            );
-            resolve(pyodide);
-          } catch (e) {
-            reject(e);
-          }
-        };
-        script.onerror = reject;
-        document.head.appendChild(script);
-      } else {
-        const pyodide: PyodideInterface = await (window as any).loadPyodide({
-          indexURL: "https://cdn.jsdelivr.net/pyodide/v0.26.2/full/",
-        });
-        await pyodide.loadPackage(["micropip", "numpy"]);
-        const micropip = pyodide.pyimport("micropip");
-        await micropip.install(
-          "https://cdn.jsdelivr.net/gh/IfcOpenShell/wasm-wheels@main/ifcopenshell-0.8.2+d50e806-cp312-cp312-emscripten_3_1_58_wasm32.whl"
-        );
-        resolve(pyodide);
-      }
-    } catch (err) {
-      reject(err);
-    }
-  });
-  return pyodideLoading;
+    if (pyodideLoading) return pyodideLoading;
+    pyodideLoading = new Promise((resolve, reject) => {
+        (async () => {
+            try {
+                if (!(window as any).loadPyodide) {
+                    const script = document.createElement("script");
+                    script.src = "https://cdn.jsdelivr.net/pyodide/v0.26.2/full/pyodide.js";
+                    script.async = true;
+                    script.onload = async () => {
+                        try {
+                            const pyodide: PyodideInterface = await (window as any).loadPyodide(
+                                {
+                                    indexURL: "https://cdn.jsdelivr.net/pyodide/v0.26.2/full/",
+                                }
+                            );
+                            await pyodide.loadPackage(["micropip", "numpy"]);
+                            const micropip = pyodide.pyimport("micropip");
+                            await micropip.install(
+                                "https://cdn.jsdelivr.net/gh/IfcOpenShell/wasm-wheels@main/ifcopenshell-0.8.2+d50e806-cp312-cp312-emscripten_3_1_58_wasm32.whl"
+                            );
+                            resolve(pyodide);
+                        } catch (e) {
+                            pyodideLoading = null;
+                            reject(e as Error);
+                        }
+                    };
+                    script.onerror = (e) => {
+                        pyodideLoading = null;
+                        reject(e instanceof Error ? e : new Error("Failed to load Pyodide script"));
+                    };
+                    document.head.appendChild(script);
+                } else {
+                    const pyodide: PyodideInterface = await (window as any).loadPyodide({
+                        indexURL: "https://cdn.jsdelivr.net/pyodide/v0.26.2/full/",
+                    });
+                    await pyodide.loadPackage(["micropip", "numpy"]);
+                    const micropip = pyodide.pyimport("micropip");
+                    await micropip.install(
+                        "https://cdn.jsdelivr.net/gh/IfcOpenShell/wasm-wheels@main/ifcopenshell-0.8.2+d50e806-cp312-cp312-emscripten_3_1_58_wasm32.whl"
+                    );
+                    resolve(pyodide);
+                }
+            } catch (err) {
+                pyodideLoading = null;
+                reject(err as Error);
+            }
+        })();
+    });
+    return pyodideLoading;
 }
 
 export async function parseIfcWithWasm(file: File): Promise<IFCParseResult> {
-  const pyodide = await loadPyodideAndIfcOpenShell();
-  const buffer = new Uint8Array(await file.arrayBuffer());
-  pyodide.globals.set("ifc_data", buffer);
+    const pyodide = await loadPyodideAndIfcOpenShell();
+    const buffer = new Uint8Array(await file.arrayBuffer());
+    pyodide.globals.set("ifc_data", buffer);
 
-  const pythonCode = `
+    const pythonCode = `
 import ifcopenshell
 import json
 import os
 
 # helper functions
 
+def safe_string(value):
+    """Safely convert IFC attribute to string, handling enums and special values"""
+    if value is None:
+        return None
+    # Convert to string and strip enum wrapper if present
+    str_val = str(value)
+    # Handle IFC enum format like ".NOTDEFINED." or "NOTDEFINED"
+    if str_val.startswith('.') and str_val.endswith('.'):
+        return str_val[1:-1]  # Remove leading and trailing dots
+    return str_val
+
 def get_object_type(element):
-    if getattr(element, 'ObjectType', None):
-        return element.ObjectType
+    obj_type = getattr(element, 'ObjectType', None)
+    if obj_type:
+        return safe_string(obj_type)
     if getattr(element, 'IsTypedBy', None):
         for rel in element.IsTypedBy:
-            if getattr(rel, 'RelatingType', None) and getattr(rel.RelatingType, 'Name', None):
-                return rel.RelatingType.Name
-    if getattr(element, 'Name', None):
-        return element.Name
+            if getattr(rel, 'RelatingType', None):
+                relating_name = getattr(rel.RelatingType, 'Name', None)
+                if relating_name:
+                    return safe_string(relating_name)
+    elem_name = getattr(element, 'Name', None)
+    if elem_name:
+        return safe_string(elem_name)
     return element.is_a()
 
 def get_properties(element):
     props = {}
-    if getattr(element, 'Name', None):
-        props['name'] = element.Name
+    elem_name = getattr(element, 'Name', None)
+    if elem_name:
+        props['name'] = safe_string(elem_name)
     if getattr(element, 'IsDefinedBy', None):
         for rel in element.IsDefinedBy:
             if rel.is_a('IfcRelDefinesByProperties'):
@@ -127,9 +150,10 @@ def get_properties(element):
                 if pdef.is_a('IfcPropertySet'):
                     for prop in pdef.HasProperties:
                         if prop.is_a('IfcPropertySingleValue') and prop.NominalValue:
-                            if prop.Name.lower() == 'loadbearing':
+                            prop_name = safe_string(prop.Name)
+                            if prop_name and prop_name.lower() == 'loadbearing':
                                 props['loadBearing'] = bool(prop.NominalValue.wrappedValue)
-                            if prop.Name.lower() == 'isexternal':
+                            if prop_name and prop_name.lower() == 'isexternal':
                                 props['isExternal'] = bool(prop.NominalValue.wrappedValue)
     return props
 
@@ -151,15 +175,21 @@ def get_materials(element):
             if rel.is_a('IfcRelAssociatesMaterial'):
                 mat = rel.RelatingMaterial
                 if mat.is_a('IfcMaterial') and mat.Name:
-                    mats.append(mat.Name)
+                    mat_name = safe_string(mat.Name)
+                    if mat_name:
+                        mats.append(mat_name)
                 elif mat.is_a('IfcMaterialLayerSet'):
                     for layer in mat.MaterialLayers:
                         if layer.Material and layer.Material.Name:
-                            mats.append(layer.Material.Name)
+                            mat_name = safe_string(layer.Material.Name)
+                            if mat_name:
+                                mats.append(mat_name)
                 elif mat.is_a('IfcMaterialConstituentSet'):
                     for c in mat.MaterialConstituents:
                         if c.Material and c.Material.Name:
-                            mats.append(c.Material.Name)
+                            mat_name = safe_string(c.Material.Name)
+                            if mat_name:
+                                mats.append(mat_name)
     return list(set(mats))
 
 def get_material_volumes(element):
@@ -179,14 +209,16 @@ def get_material_volumes(element):
                     # First pass: collect all fractions
                     for constituent in mat.MaterialConstituents:
                         if constituent.Material and constituent.Material.Name:
-                            fraction = getattr(constituent, 'Fraction', None)
-                            if fraction is not None:
-                                constituent_fractions[constituent.Material.Name] = float(fraction)
-                                total_fraction += float(fraction)
-                            else:
-                                # If no fraction specified, assume equal distribution
-                                constituent_fractions[constituent.Material.Name] = 1.0 / len(mat.MaterialConstituents)
-                                total_fraction += 1.0 / len(mat.MaterialConstituents)
+                            mat_name = safe_string(constituent.Material.Name)
+                            if mat_name:
+                                fraction = getattr(constituent, 'Fraction', None)
+                                if fraction is not None:
+                                    constituent_fractions[mat_name] = float(fraction)
+                                    total_fraction += float(fraction)
+                                else:
+                                    # If no fraction specified, assume equal distribution
+                                    constituent_fractions[mat_name] = 1.0 / len(mat.MaterialConstituents)
+                                    total_fraction += 1.0 / len(mat.MaterialConstituents)
                     
                     # Normalize fractions if they don't sum to 1
                     if total_fraction > 0:
@@ -205,9 +237,11 @@ def get_material_volumes(element):
                     # First pass: collect all thicknesses
                     for layer in mat.MaterialLayers:
                         if layer.Material and layer.Material.Name and hasattr(layer, 'LayerThickness') and layer.LayerThickness:
-                            thickness = float(layer.LayerThickness)
-                            layer_thicknesses[layer.Material.Name] = thickness
-                            total_thickness += thickness
+                            mat_name = safe_string(layer.Material.Name)
+                            if mat_name:
+                                thickness = float(layer.LayerThickness)
+                                layer_thicknesses[mat_name] = layer_thicknesses.get(mat_name, 0.0) + thickness
+                                total_thickness += thickness
                     
                     # Calculate volume fractions based on thickness
                     if total_thickness > 0:
@@ -221,13 +255,18 @@ def get_material_volumes(element):
                         # Equal distribution if no thickness data
                         num_layers = len([l for l in mat.MaterialLayers if l.Material and l.Material.Name])
                         if num_layers > 0:
-                            fraction = 1.0 / num_layers
+                            material_fractions = {}
                             for layer in mat.MaterialLayers:
                                 if layer.Material and layer.Material.Name:
-                                    material_volumes[layer.Material.Name] = {
-                                        'volume': element_volume * fraction,
-                                        'fraction': fraction
-                                    }
+                                    mat_name = safe_string(layer.Material.Name)
+                                    if mat_name:
+                                        material_fractions[mat_name] = material_fractions.get(mat_name, 0) + 1
+                            for mat_name, count in material_fractions.items():
+                                fraction = count / num_layers
+                                material_volumes[mat_name] = {
+                                    'volume': element_volume * fraction,
+                                    'fraction': fraction
+                                }
                 
                 # Handle IfcMaterialLayerSetUsage
                 elif mat.is_a('IfcMaterialLayerSetUsage'):
@@ -239,9 +278,11 @@ def get_material_volumes(element):
                         
                         for layer in layer_set.MaterialLayers:
                             if layer.Material and layer.Material.Name and hasattr(layer, 'LayerThickness') and layer.LayerThickness:
-                                thickness = float(layer.LayerThickness)
-                                layer_thicknesses[layer.Material.Name] = thickness
-                                total_thickness += thickness
+                                mat_name = safe_string(layer.Material.Name)
+                                if mat_name:
+                                    thickness = float(layer.LayerThickness)
+                                    layer_thicknesses[mat_name] = layer_thicknesses.get(mat_name, 0.0) + thickness
+                                    total_thickness += thickness
                         
                         if total_thickness > 0:
                             for material_name, thickness in layer_thicknesses.items():
@@ -253,10 +294,12 @@ def get_material_volumes(element):
                 
                 # Handle single IfcMaterial (simple case)
                 elif mat.is_a('IfcMaterial') and mat.Name:
-                    material_volumes[mat.Name] = {
-                        'volume': element_volume,
-                        'fraction': 1.0
-                    }
+                    mat_name = safe_string(mat.Name)
+                    if mat_name:
+                        material_volumes[mat_name] = {
+                            'volume': element_volume,
+                            'fraction': 1.0
+                        }
     
     return material_volumes
 
@@ -330,6 +373,6 @@ except Exception:
 json.dumps(result)
 `;
 
-  const result = await pyodide.runPythonAsync(pythonCode);
-  return JSON.parse(result);
+    const result = await pyodide.runPythonAsync(pythonCode);
+    return JSON.parse(result);
 }

@@ -33,6 +33,13 @@ export class MaterialService {
   private static cacheTimeout = 5 * 60 * 1000; // 5 minutes
 
   // Utility methods
+  /**
+   * Escapes regex special characters to prevent regex injection
+   */
+  private static escapeRegex(str: string): string {
+    return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  }
+
   private static async withTransaction<T>(
     callback: (session: ClientSession) => Promise<T>,
     existingSession?: ClientSession
@@ -172,9 +179,9 @@ export class MaterialService {
         return { kbobMaterial: exactMatch, score: 1.0 };
       }
 
-      // Try case-insensitive match
+      // Try case-insensitive match with escaped regex to prevent injection
       const caseInsensitiveMatch = await KBOBMaterial.findOne({
-        Name: { $regex: `^${cleanedName}$`, $options: "i" },
+        Name: { $regex: `^${this.escapeRegex(cleanedName)}$`, $options: "i" },
       }).lean() as IKBOBMaterial | null;
 
       if (caseInsensitiveMatch) {
@@ -402,9 +409,9 @@ export class MaterialService {
         return exactMatch;
       }
 
-      // Try case-insensitive match
+      // Try case-insensitive match with escaped regex to prevent injection
       const caseInsensitiveMatch = await Material.findOne({
-        name: { $regex: `^${cleanedName}$`, $options: "i" },
+        name: { $regex: `^${this.escapeRegex(cleanedName)}$`, $options: "i" },
         projectId: { $in: projectIds },
         kbobMatchId: { $exists: true },
       })
