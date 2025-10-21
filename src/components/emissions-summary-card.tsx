@@ -38,8 +38,13 @@ export function EmissionsSummaryCard({ project }: { project?: Project }) {
   const [metric, setMetric] = useState<MetricKey>("gwp");
 
   // For large projects, use pre-calculated emissions directly
-  const emissions = (project as any)?.emissions;
-  const hasPreCalculatedEmissions = emissions && (emissions.gwp > 0 || emissions.ubp > 0 || emissions.penre > 0);
+  const emissions = project?.emissions;
+  const hasPreCalculatedEmissions =
+    emissions != null &&
+    typeof emissions.gwp === 'number' &&
+    typeof emissions.ubp === 'number' &&
+    typeof emissions.penre === 'number' &&
+    (emissions.gwp > 0 || emissions.ubp > 0 || emissions.penre > 0);
 
   // Always call hook unconditionally (Rules of Hooks)
   const computed = useProjectEmissions(project);

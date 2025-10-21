@@ -1,11 +1,4 @@
-import { type PyodideInterface } from "pyodide";
-
-declare global {
-  interface Window {
-    loadPyodide: (config?: { indexURL?: string }) => Promise<PyodideInterface>;
-    pyodide?: PyodideInterface;
-  }
-}
+import { type PyodideInterface } from "@/types/pyodide";
 
 const IFC_OPEN_SHELL_WHEEL_URL =
   "https://raw.githubusercontent.com/IfcOpenShell/wasm-wheels/main/ifcopenshell-0.8.2+d50e806-cp312-cp312-emscripten_3_1_58_wasm32.whl";
@@ -18,91 +11,97 @@ async function getPyodideInstance(): Promise<PyodideInterface> {
   }
 
   if (!pyodidePromise) {
-    pyodidePromise = new Promise(async (resolve, reject) => {
-      try {
-        if (!window.loadPyodide) {
-          // Dynamically load Pyodide script
-          const script = document.createElement("script");
-          script.src = "https://cdn.jsdelivr.net/pyodide/v0.26.2/full/pyodide.js";
-          script.async = true;
-          script.onload = async () => {
-            try {
-              console.log("Loading Pyodide...");
-              const pyodide = await window.loadPyodide({
-                indexURL: "https://cdn.jsdelivr.net/pyodide/v0.26.2/full/",
-              });
-              console.log("Pyodide loaded successfully.");
+    pyodidePromise = new Promise((resolve, reject) => {
+      // Inner async function to handle all async operations
+      const initializePyodide = async () => {
+        try {
+          if (!window.loadPyodide) {
+            // Dynamically load Pyodide script
+            const script = document.createElement("script");
+            script.src = "https://cdn.jsdelivr.net/pyodide/v0.26.2/full/pyodide.js";
+            script.async = true;
+            script.onload = async () => {
+              try {
+                console.log("Loading Pyodide...");
+                const pyodide = await window.loadPyodide({
+                  indexURL: "https://cdn.jsdelivr.net/pyodide/v0.26.2/full/",
+                });
+                console.log("Pyodide loaded successfully.");
 
-              console.log("Loading micropip and numpy packages...");
-              await pyodide.loadPackage(["micropip", "numpy"]);
-              const micropip = pyodide.pyimport("micropip");
-              console.log("Micropip and numpy loaded successfully.");
+                console.log("Loading micropip and numpy packages...");
+                await pyodide.loadPackage(["micropip", "numpy"]);
+                const micropip = pyodide.pyimport("micropip");
+                console.log("Micropip and numpy loaded successfully.");
 
-              console.log(`Installing IfcOpenShell from: ${IFC_OPEN_SHELL_WHEEL_URL}`);
-              await micropip.install(IFC_OPEN_SHELL_WHEEL_URL);
-              console.log("IfcOpenShell installed successfully via micropip.");
+                console.log(`Installing IfcOpenShell from: ${IFC_OPEN_SHELL_WHEEL_URL}`);
+                await micropip.install(IFC_OPEN_SHELL_WHEEL_URL);
+                console.log("IfcOpenShell installed successfully via micropip.");
 
-              // Test import - numpy should already be loaded
-              const version = pyodide.runPython(
-                "import numpy; import ifcopenshell; ifc_version = ifcopenshell.version; ifc_version"
-              );
-              console.log("IfcOpenShell version:", version);
-              if (!version) {
-                throw new Error(
-                  "IfcOpenShell imported but version is undefined. Installation might be incomplete."
+                // Test import - numpy should already be loaded
+                const version = pyodide.runPython(
+                  "import numpy; import ifcopenshell; ifc_version = ifcopenshell.version; ifc_version"
                 );
-              }
+                console.log("IfcOpenShell version:", version);
+                if (!version) {
+                  throw new Error(
+                    "IfcOpenShell imported but version is undefined. Installation might be incomplete."
+                  );
+                }
 
-              window.pyodide = pyodide;
-              resolve(pyodide);
-            } catch (error) {
-              console.error("Error loading Pyodide or IfcOpenShell:", error);
+                window.pyodide = pyodide;
+                resolve(pyodide);
+              } catch (error) {
+                console.error("Error loading Pyodide or IfcOpenShell:", error);
+                pyodidePromise = null;
+                reject(error);
+              }
+            };
+            script.onerror = () => {
+              const error = new Error("Failed to load Pyodide script");
               pyodidePromise = null;
               reject(error);
-            }
-          };
-          script.onerror = () => {
-            const error = new Error("Failed to load Pyodide script");
-            pyodidePromise = null;
-            reject(error);
-          };
-          document.head.appendChild(script);
-        } else {
-          // Pyodide already loaded
-          console.log("Loading Pyodide...");
-          const pyodide = await window.loadPyodide({
-            indexURL: "https://cdn.jsdelivr.net/pyodide/v0.26.2/full/",
-          });
-          console.log("Pyodide loaded successfully.");
+            };
+            document.head.appendChild(script);
+          } else {
+            // Pyodide already loaded
+            console.log("Loading Pyodide...");
+            const pyodide = await window.loadPyodide({
+              indexURL: "https://cdn.jsdelivr.net/pyodide/v0.26.2/full/",
+            });
+            console.log("Pyodide loaded successfully.");
 
-          console.log("Loading micropip and numpy packages...");
-          await pyodide.loadPackage(["micropip", "numpy"]);
-          const micropip = pyodide.pyimport("micropip");
-          console.log("Micropip and numpy loaded successfully.");
+            console.log("Loading micropip and numpy packages...");
+            await pyodide.loadPackage(["micropip", "numpy"]);
+            const micropip = pyodide.pyimport("micropip");
+            console.log("Micropip and numpy loaded successfully.");
 
-          console.log(`Installing IfcOpenShell from: ${IFC_OPEN_SHELL_WHEEL_URL}`);
-          await micropip.install(IFC_OPEN_SHELL_WHEEL_URL);
-          console.log("IfcOpenShell installed successfully via micropip.");
+            console.log(`Installing IfcOpenShell from: ${IFC_OPEN_SHELL_WHEEL_URL}`);
+            await micropip.install(IFC_OPEN_SHELL_WHEEL_URL);
+            console.log("IfcOpenShell installed successfully via micropip.");
 
-          // Test import - numpy should already be loaded
-          const version = pyodide.runPython(
-            "import numpy; import ifcopenshell; ifc_version = ifcopenshell.version; ifc_version"
-          );
-          console.log("IfcOpenShell version:", version);
-          if (!version) {
-            throw new Error(
-              "IfcOpenShell imported but version is undefined. Installation might be incomplete."
+            // Test import - numpy should already be loaded
+            const version = pyodide.runPython(
+              "import numpy; import ifcopenshell; ifc_version = ifcopenshell.version; ifc_version"
             );
-          }
+            console.log("IfcOpenShell version:", version);
+            if (!version) {
+              throw new Error(
+                "IfcOpenShell imported but version is undefined. Installation might be incomplete."
+              );
+            }
 
-          window.pyodide = pyodide;
-          resolve(pyodide);
+            window.pyodide = pyodide;
+            resolve(pyodide);
+          }
+        } catch (error) {
+          console.error("Error during Pyodide initialization:", error);
+          pyodidePromise = null;
+          reject(error);
         }
-      } catch (error) {
-        console.error("Error during Pyodide initialization:", error);
-        pyodidePromise = null;
-        reject(error);
-      }
+      };
+
+      // Invoke the inner async function
+      initializePyodide();
     });
   }
 

@@ -23,7 +23,7 @@ interface IFCElement {
   materialLayers?: {
     layers: Array<{
       materialName: string;
-      volume: number;
+      volume?: number;
     }>;
   };
 }
@@ -118,31 +118,43 @@ export class IFCProcessingService {
           // Prioritize material layers over direct materials to avoid duplication
           // Process material layers
           if (element.materialLayers?.layers?.length) {
-            const totalVolume = element.volume || 0;
+            const totalVolume = Number.isFinite(element.volume) ? Number(element.volume) : 0;
             const layers = element.materialLayers.layers;
 
+            // Sum specified volumes (0 is valid) and count unspecified
+            const specifiedSum = layers.reduce(
+              (acc, l) => acc + (Number.isFinite(l.volume) ? Number(l.volume) : 0),
+              0
+            );
+            const unspecifiedCount = layers.reduce(
+              (acc, l) => acc + (Number.isFinite(l.volume) ? 0 : 1),
+              0
+            );
+            const remainder = Math.max(totalVolume - specifiedSum, 0);
+            const fallback = unspecifiedCount > 0 ? remainder / unspecifiedCount : 0;
+
             processedMaterials.push(
-              ...layers
-                .map((layer) => {
-                  const match = materialMatchMap.get(layer.materialName);
-                  if (!match) {
-                    logger.warn(`Material not found: ${layer.materialName}`);
-                    return null;
-                  }
-                  return {
-                    material: match._id,
-                    name: layer.materialName,
-                    volume: layer.volume || totalVolume / layers.length,
-                    indicators: match.kbobMatchId
-                      ? MaterialService.calculateIndicators(
-                        layer.volume || totalVolume / layers.length,
-                        match.density,
-                        match.kbobMatchId
-                      )
-                      : undefined,
-                  };
-                })
-                .filter(Boolean)
+              ...layers.map((layer) => {
+                const match = materialMatchMap.get(layer.materialName);
+                if (!match) {
+                  logger.warn(`Material not found: ${layer.materialName}`);
+                  return null;
+                }
+                const layerVol = Number.isFinite(layer.volume) ? Number(layer.volume) : fallback;
+                const volume = Math.max(layerVol, 0);
+                return {
+                  material: match._id,
+                  name: layer.materialName,
+                  volume,
+                  indicators: match.kbobMatchId
+                    ? MaterialService.calculateIndicators(
+                      volume,
+                      match.density,
+                      match.kbobMatchId
+                    )
+                    : undefined,
+                };
+              }).filter(Boolean)
             );
           }
           // Only process direct materials if there are no material layers

@@ -4,7 +4,6 @@ import { Breadcrumbs } from "@/components/breadcrumbs";
 import { DashboardCards } from "@/components/dashboard-cards";
 import { DataTable } from "@/components/data-table";
 import { elementsColumns } from "@/components/elements-columns";
-import { emissionsColumns } from "@/components/emissions-columns";
 import { ExportIfcModal } from "@/components/export-ifc-modal";
 import { GraphPageComponent } from "@/components/graph-page";
 import { materialsColumns } from "@/components/materials-columns";
@@ -21,7 +20,6 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { Label } from "@/components/ui/label";
 import {
   Pagination,
   PaginationContent,
@@ -45,7 +43,6 @@ import cn from "classnames";
 import { Download, Edit, UploadCloud } from "lucide-react";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
-import { useProjectEmissions } from "@/hooks/use-project-emissions";
 import type { ElementLcaResultsMap } from "@/lib/services/ifc-export-service";
 
 interface KBOBMaterial {
