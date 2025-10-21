@@ -255,15 +255,18 @@ def get_material_volumes(element):
                         # Equal distribution if no thickness data
                         num_layers = len([l for l in mat.MaterialLayers if l.Material and l.Material.Name])
                         if num_layers > 0:
-                            fraction = 1.0 / num_layers
+                            material_fractions = {}
                             for layer in mat.MaterialLayers:
                                 if layer.Material and layer.Material.Name:
                                     mat_name = safe_string(layer.Material.Name)
                                     if mat_name:
-                                        material_volumes[mat_name] = {
-                                            'volume': element_volume * fraction,
-                                            'fraction': fraction
-                                        }
+                                        material_fractions[mat_name] = material_fractions.get(mat_name, 0) + 1
+                            for mat_name, count in material_fractions.items():
+                                fraction = count / num_layers
+                                material_volumes[mat_name] = {
+                                    'volume': element_volume * fraction,
+                                    'fraction': fraction
+                                }
                 
                 # Handle IfcMaterialLayerSetUsage
                 elif mat.is_a('IfcMaterialLayerSetUsage'):
