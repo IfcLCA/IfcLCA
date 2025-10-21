@@ -7,13 +7,14 @@ export interface ILCAIndicators {
 export interface IKBOBMaterial {
   _id: string;
   Name: string;
-  Category: string;
+  Category?: string;
   GWP: number;
   UBP: number;
   PENRE: number;
-  "kg/unit"?: number;
+  "kg/unit"?: number | string;
   "min density"?: number;
   "max density"?: number;
+  KBOB_ID: number;
 }
 
 export interface IMaterial {

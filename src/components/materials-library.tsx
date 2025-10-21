@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useRouter, usePathname, useBeforeUnload } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation";
 
 import { MaterialChangesPreviewModal } from "@/components/material-changes-preview-modal";
 import {
@@ -193,7 +193,7 @@ export function MaterialLibraryComponent() {
         .replace(/\d+/g, "")
         .trim();
 
-      const results = fuseRef.current.search(searchTerm);
+      const results = fuseRef.current?.search(searchTerm) || [];
       if (results.length > 0) {
         const bestMatch = results[0];
         suggestions[material.id] = {
@@ -474,8 +474,9 @@ export function MaterialLibraryComponent() {
     setShowPreview(false);
   };
 
-  const getPreviewChanges = async () => {
-    const materialIds = Object.keys(temporaryMatches);
+  const getPreviewChanges = async (matchesToPreview?: Record<string, string>) => {
+    const matchesToUse = matchesToPreview || temporaryMatches;
+    const materialIds = Object.keys(matchesToUse);
 
     // Fetch element counts
     const elementCountsResponse = await fetch("/api/materials/element-counts", {
@@ -493,7 +494,7 @@ export function MaterialLibraryComponent() {
 
     const elementCounts = await elementCountsResponse.json();
 
-    return Object.entries(temporaryMatches)
+    return Object.entries(matchesToUse)
       .map(([materialId, kbobId]) => {
         const material = materials.find((m) => m.id === materialId);
         const kbobMaterial = kbobMaterials.find((m) => m._id === kbobId);
@@ -523,18 +524,18 @@ export function MaterialLibraryComponent() {
           typeof kbobMaterial["kg/unit"] === "number"
             ? kbobMaterial["kg/unit"]
             : hasDensityRange
-            ? (kbobMaterial["min density"] + kbobMaterial["max density"]) / 2
-            : currentDensity;
+              ? ((kbobMaterial["min density"] || 0) + (kbobMaterial["max density"] || 0)) / 2
+              : currentDensity;
 
         return {
           materialId,
           materialName: material.name,
           oldMatch: material.kbobMatch
             ? {
-                Name: material.kbobMatch.Name,
-                Density: currentDensity,
-                Elements: elementCount,
-              }
+              Name: material.kbobMatch.Name,
+              Density: currentDensity,
+              Elements: elementCount,
+            }
             : null,
           newMatch: {
             id: kbobMaterial._id,
@@ -543,10 +544,10 @@ export function MaterialLibraryComponent() {
             Elements: elementCount,
             hasDensityRange,
             minDensity: hasDensityRange
-              ? kbobMaterial["min density"]
+              ? (kbobMaterial["min density"] || 0)
               : undefined,
             maxDensity: hasDensityRange
-              ? kbobMaterial["max density"]
+              ? (kbobMaterial["max density"] || 0)
               : undefined,
           },
           projects: affectedProjects.map((p) => p.name),
@@ -557,10 +558,10 @@ export function MaterialLibraryComponent() {
       .filter(Boolean);
   };
 
-  const handleShowPreview = async () => {
+  const handleShowPreview = async (matchesToPreview?: Record<string, string>) => {
     setIsMatchingInProgress(true);
     try {
-      const changes = await getPreviewChanges();
+      const changes = await getPreviewChanges(matchesToPreview);
       setPreviewChanges(changes as MaterialChange[]);
       setShowPreview(true);
     } catch (error) {
@@ -638,9 +639,8 @@ export function MaterialLibraryComponent() {
         const twoWords = `${words[i]} ${words[i + 1]}`.toLowerCase();
         phrases.set(twoWords, (phrases.get(twoWords) || 0) + 1);
         if (i < words.length - 2) {
-          const threeWords = `${words[i]} ${words[i + 1]} ${
-            words[i + 2]
-          }`.toLowerCase();
+          const threeWords = `${words[i]} ${words[i + 1]} ${words[i + 2]
+            }`.toLowerCase();
           phrases.set(threeWords, (phrases.get(threeWords) || 0) + 1);
         }
       }
@@ -875,6 +875,59 @@ export function MaterialLibraryComponent() {
     [selectedMaterials, handleMatch, maybeTriggerMatchConfetti]
   );
 
+  // Get filtered suggestions count based on project selection
+  const getFilteredSuggestionsCount = useCallback(() => {
+    const suggestedMatches = Object.entries(autoSuggestedMatches);
+
+    if (suggestedMatches.length === 0) return 0;
+
+    // Filter suggestions to only include materials from the selected project
+    const filteredSuggestions = suggestedMatches.filter(([materialId, _]) => {
+      // If no project is selected, include all suggestions
+      if (!selectedProject) return true;
+
+      // Check if the material belongs to the selected project
+      const project = projects.find((p) => p.id === selectedProject);
+      return project?.materialIds.includes(materialId) || false;
+    });
+
+    return filteredSuggestions.length;
+  }, [autoSuggestedMatches, selectedProject, projects]);
+
+  // Handle accepting all auto-suggested matches
+  const handleAcceptAllSuggestions = useCallback(async () => {
+    const suggestedMatches = Object.entries(autoSuggestedMatches);
+
+    if (suggestedMatches.length === 0) return;
+
+    // Filter suggestions to only include materials from the selected project
+    const filteredSuggestions = suggestedMatches.filter(([materialId, _]) => {
+      // If no project is selected, include all suggestions
+      if (!selectedProject) return true;
+
+      // Check if the material belongs to the selected project
+      const project = projects.find((p) => p.id === selectedProject);
+      return project?.materialIds.includes(materialId) || false;
+    });
+
+    if (filteredSuggestions.length === 0) return;
+
+    // Create temporary matches for filtered suggestions only
+    const newMatches = { ...temporaryMatches };
+    filteredSuggestions.forEach(([materialId, suggestion]) => {
+      newMatches[materialId] = suggestion.kbobId;
+    });
+
+    setTemporaryMatches(newMatches);
+
+    // Trigger confetti for bulk acceptance
+    maybeTriggerMatchConfetti();
+    setTimeout(maybeTriggerMatchConfetti, 150);
+
+    // Show preview modal automatically with the new matches (before state updates)
+    await handleShowPreview(newMatches);
+  }, [autoSuggestedMatches, temporaryMatches, handleShowPreview, maybeTriggerMatchConfetti, selectedProject, projects]);
+
   // Modify the hasUnappliedMatches function to check for preview modal
   const hasUnappliedMatches = () => {
     // Don't show warning if preview modal is open
@@ -968,7 +1021,7 @@ export function MaterialLibraryComponent() {
               </SelectContent>
             </Select>
             <div className="flex items-center gap-2">
-              <Button onClick={handleShowPreview}>Preview Changes</Button>
+              <Button onClick={() => handleShowPreview()}>Preview Changes</Button>
               {Object.keys(temporaryMatches).length > 0 && (
                 <Badge
                   variant="secondary"
@@ -1025,6 +1078,22 @@ export function MaterialLibraryComponent() {
                         </Badge>
                       </div>
                     </div>
+
+                    {/* Accept All Suggestions Button */}
+                    {getFilteredSuggestionsCount() > 0 && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={handleAcceptAllSuggestions}
+                        disabled={isMatchingInProgress}
+                        className="shrink-0"
+                      >
+                        Accept All Suggestions
+                        <Badge variant="secondary" className="ml-2">
+                          {getFilteredSuggestionsCount()}
+                        </Badge>
+                      </Button>
+                    )}
                   </div>
                 </div>
                 <p className="text-sm text-muted-foreground mb-3">
@@ -1052,15 +1121,13 @@ export function MaterialLibraryComponent() {
                         transition-all duration-300 ease-out
                         hover:bg-secondary/5 hover:scale-[1.02] hover:z-10
                         group
-                        ${
-                          isSelected(material)
-                            ? "ring-2 ring-primary/50 ring-offset-1 shadow-sm bg-primary/5 z-10"
-                            : "hover:ring-1 hover:ring-primary/30"
+                        ${isSelected(material)
+                          ? "ring-2 ring-primary/50 ring-offset-1 shadow-sm bg-primary/5 z-10"
+                          : "hover:ring-1 hover:ring-primary/30"
                         }
-                        ${
-                          temporaryMatches[material.id]
-                            ? "animate-in zoom-in-95 duration-500 ease-spring slide-in-from-left-5"
-                            : ""
+                        ${temporaryMatches[material.id]
+                          ? "animate-in zoom-in-95 duration-500 ease-spring slide-in-from-left-5"
+                          : ""
                         }
                         rounded-md my-2
                       `}
@@ -1172,11 +1239,10 @@ export function MaterialLibraryComponent() {
                       <div
                         className={`
                         flex items-start justify-between gap-4
-                        ${
-                          temporaryMatches[material.id]
+                        ${temporaryMatches[material.id]
                             ? "animate-in slide-in-from-left-1 duration-300"
                             : ""
-                        }
+                          }
                         relative z-10
                       `}
                       >
@@ -1203,7 +1269,7 @@ export function MaterialLibraryComponent() {
                               </p>
                             )}
                           {temporaryMatches[material.id] ||
-                          material.kbobMatchId ? (
+                            material.kbobMatchId ? (
                             <div className="mt-2 flex items-center justify-between gap-2 p-2 bg-secondary/20 rounded-md">
                               <div className="flex-1 min-w-0">
                                 {temporaryMatches[material.id] ? (
@@ -1333,9 +1399,8 @@ export function MaterialLibraryComponent() {
                         <Badge
                           key={`${type}-${text}`}
                           variant="secondary"
-                          className={`cursor-pointer hover:bg-secondary/20 ${
-                            !activeSearchId ? "opacity-50" : ""
-                          }`}
+                          className={`cursor-pointer hover:bg-secondary/20 ${!activeSearchId ? "opacity-50" : ""
+                            }`}
                           onClick={() => {
                             if (id && activeSearchId) {
                               handleBulkMatch(id);
@@ -1371,11 +1436,10 @@ export function MaterialLibraryComponent() {
                       <div
                         key={material._id}
                         data-kbob-id={material._id}
-                        className={`p-4 transition-colors ${
-                          selectedMaterials.length > 0
-                            ? "hover:bg-primary/5 cursor-pointer"
-                            : "opacity-75"
-                        }`}
+                        className={`p-4 transition-colors ${selectedMaterials.length > 0
+                          ? "hover:bg-primary/5 cursor-pointer"
+                          : "opacity-75"
+                          }`}
                         onClick={() => {
                           if (selectedMaterials.length > 0) {
                             handleBulkMatch(material._id);

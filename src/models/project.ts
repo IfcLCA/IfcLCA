@@ -30,7 +30,9 @@ const projectSchema = new mongoose.Schema(
   }
 );
 
-// Add index for better query performance
+// Add indexes for better query performance
+projectSchema.index({ userId: 1, createdAt: -1 });
+projectSchema.index({ userId: 1, updatedAt: -1 });
 projectSchema.index({ "emissions.lastCalculated": -1 });
 
 export const Project =

@@ -1,45 +1,103 @@
+import { Element, Project } from "@/models";
 import { NextResponse } from "next/server";
-import { connectToDatabase } from "@/lib/mongodb";
-import { Element } from "@/models";
 import mongoose from "mongoose";
+import { connectToDatabase } from "@/lib/mongodb";
+import { auth } from "@clerk/nextjs/server";
 
 export const runtime = "nodejs";
-
-interface ElementDoc {
-  _id: mongoose.Types.ObjectId;
-  name: string;
-  type?: string;
-  volume?: number;
-  buildingStorey?: string;
-  materials?: any[];
-}
+export const dynamic = "force-dynamic"; // Disable caching for user-specific data
 
 export async function GET(
   request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    if (!params?.id || !mongoose.Types.ObjectId.isValid(params.id)) {
-      return NextResponse.json(
-        { error: "Invalid project ID" },
-        { status: 400 }
-      );
+    await connectToDatabase();
+    const { id } = await params;
+
+    // Authenticate user
+    const { userId } = await auth();
+    if (!userId) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    await connectToDatabase();
-    const projectId = new mongoose.Types.ObjectId(params.id);
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return NextResponse.json({ error: "Invalid project ID" }, { status: 400 });
+    }
 
-    const elements = await Element.find({ projectId }).lean();
+    const projectId = new mongoose.Types.ObjectId(id);
 
-    const formattedElements = elements.map((element) => ({
-      id: element._id.toString(),
-      name: element.name,
-      type: element.type || "Unknown",
-      volume: element.volume || 0,
-      buildingStorey: element.buildingStorey || "-",
-    }));
+    // Verify project ownership
+    const project = await Project.findOne({ _id: projectId, userId }).lean();
+    if (!project) {
+      return NextResponse.json({ error: "Project not found" }, { status: 404 });
+    }
 
-    return NextResponse.json(formattedElements);
+    const { searchParams } = new URL(request.url);
+
+    // Sanitize pagination params to prevent limit=0, negative pages, NaN, or huge values
+    const rawPage = Number.parseInt(searchParams.get("page") || "1", 10);
+    const rawLimit = Number.parseInt(searchParams.get("limit") || "50", 10);
+
+    const page = Number.isFinite(rawPage) && rawPage > 0 ? rawPage : 1;
+    const DEFAULT_LIMIT = 50;
+    const MAX_LIMIT = 200;
+    const limit = Number.isFinite(rawLimit)
+      ? Math.min(Math.max(rawLimit, 1), MAX_LIMIT)
+      : DEFAULT_LIMIT;
+
+    const skip = (page - 1) * limit;
+
+    // Fetch elements with pagination
+    const [elements, total] = await Promise.all([
+      Element.find({ projectId })
+        .select("name type guid loadBearing isExternal materials")
+        .populate({
+          path: "materials.material",
+          select: "name category density kbobMatchId",
+          populate: {
+            path: "kbobMatchId",
+            select: "Name GWP UBP PENRE"
+          }
+        })
+        .skip(skip)
+        .limit(limit)
+        .sort({ createdAt: -1 })
+        .lean(),
+      Element.countDocuments({ projectId })
+    ]);
+
+    // Calculate totalVolume and emissions for each element
+    const enrichedElements = elements.map((el: any) => {
+      const mats = Array.isArray(el.materials) ? el.materials : [];
+      return {
+        ...el,
+        totalVolume: mats.reduce((sum: number, mat: any) => sum + (mat.volume || 0), 0),
+        emissions: mats.reduce(
+          (acc: any, mat: any) => {
+            const volume = mat.volume || 0;
+            const density = mat.material?.density || 0;
+            const kbob = mat.material?.kbobMatchId;
+            const mass = volume * density;
+
+            return {
+              gwp: acc.gwp + mass * (kbob?.GWP || 0),
+              ubp: acc.ubp + mass * (kbob?.UBP || 0),
+              penre: acc.penre + mass * (kbob?.PENRE || 0),
+            };
+          },
+          { gwp: 0, ubp: 0, penre: 0 }
+        ),
+      };
+    });
+
+    return NextResponse.json({
+      elements: enrichedElements,
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / Math.max(limit, 1))
+    });
   } catch (error) {
     console.error("Failed to fetch elements:", error);
     return NextResponse.json(

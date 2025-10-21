@@ -3,6 +3,7 @@ import { Element, Material } from "@/models";
 import type { ClientSession } from "mongoose";
 import mongoose from "mongoose";
 import { MaterialService } from "./material-service";
+import type { IKBOBMaterial } from "@/types/material";
 
 interface IFCMaterial {
   name: string;
@@ -22,7 +23,7 @@ interface IFCElement {
   materialLayers?: {
     layers: Array<{
       materialName: string;
-      volume: number;
+      volume?: number;
     }>;
   };
 }
@@ -97,9 +98,9 @@ export class IFCProcessingService {
         name: { $in: Array.from(uniqueMaterialNames) },
         projectId: new mongoose.Types.ObjectId(projectId),
       })
-        .populate<{ kbobMatchId: IKBOBMaterial }>("kbobMatchId")
+        .populate("kbobMatchId")
         .session(session)
-        .lean();
+        .lean() as unknown as Array<{ _id: mongoose.Types.ObjectId; name: string; kbobMatchId: IKBOBMaterial | null; density?: number }>;
 
       // Create map for quick lookups
       const materialMatchMap = new Map(materials.map((mat) => [mat.name, mat]));
@@ -114,8 +115,50 @@ export class IFCProcessingService {
         const bulkOps = batch.map((element) => {
           const processedMaterials = [];
 
-          // Process direct materials
-          if (element.materials?.length) {
+          // Prioritize material layers over direct materials to avoid duplication
+          // Process material layers
+          if (element.materialLayers?.layers?.length) {
+            const totalVolume = Number.isFinite(element.volume) ? Number(element.volume) : 0;
+            const layers = element.materialLayers.layers;
+
+            // Sum specified volumes (0 is valid) and count unspecified
+            const specifiedSum = layers.reduce(
+              (acc, l) => acc + (Number.isFinite(l.volume) ? Number(l.volume) : 0),
+              0
+            );
+            const unspecifiedCount = layers.reduce(
+              (acc, l) => acc + (Number.isFinite(l.volume) ? 0 : 1),
+              0
+            );
+            const remainder = Math.max(totalVolume - specifiedSum, 0);
+            const fallback = unspecifiedCount > 0 ? remainder / unspecifiedCount : 0;
+
+            processedMaterials.push(
+              ...layers.map((layer) => {
+                const match = materialMatchMap.get(layer.materialName);
+                if (!match) {
+                  logger.warn(`Material not found: ${layer.materialName}`);
+                  return null;
+                }
+                const layerVol = Number.isFinite(layer.volume) ? Number(layer.volume) : fallback;
+                const volume = Math.max(layerVol, 0);
+                return {
+                  material: match._id,
+                  name: layer.materialName,
+                  volume,
+                  indicators: match.kbobMatchId
+                    ? MaterialService.calculateIndicators(
+                      volume,
+                      match.density,
+                      match.kbobMatchId
+                    )
+                    : undefined,
+                };
+              }).filter(Boolean)
+            );
+          }
+          // Only process direct materials if there are no material layers
+          else if (element.materials?.length) {
             processedMaterials.push(
               ...element.materials
                 .map((material) => {
@@ -130,40 +173,10 @@ export class IFCProcessingService {
                     volume: material.volume,
                     indicators: match.kbobMatchId
                       ? MaterialService.calculateIndicators(
-                          material.volume,
-                          match.density,
-                          match.kbobMatchId
-                        )
-                      : undefined,
-                  };
-                })
-                .filter(Boolean)
-            );
-          }
-
-          // Process material layers
-          if (element.materialLayers?.layers?.length) {
-            const totalVolume = element.volume || 0;
-            const layers = element.materialLayers.layers;
-
-            processedMaterials.push(
-              ...layers
-                .map((layer) => {
-                  const match = materialMatchMap.get(layer.materialName);
-                  if (!match) {
-                    logger.warn(`Material not found: ${layer.materialName}`);
-                    return null;
-                  }
-                  return {
-                    material: match._id,
-                    name: layer.materialName,
-                    volume: layer.volume || totalVolume / layers.length,
-                    indicators: match.kbobMatchId
-                      ? MaterialService.calculateIndicators(
-                          layer.volume || totalVolume / layers.length,
-                          match.density,
-                          match.kbobMatchId
-                        )
+                        material.volume,
+                        match.density,
+                        match.kbobMatchId
+                      )
                       : undefined,
                   };
                 })
@@ -209,41 +222,32 @@ export class IFCProcessingService {
         });
       }
 
-      // Update project emissions if there are matched materials
-      const matchedMaterials = materials.filter((m) => m.kbobMatchId);
-      if (matchedMaterials.length > 0) {
-        try {
-          const totals = await MaterialService.calculateProjectTotals(
-            projectId
-          );
+      // Update material volumes from elements
+      const materialVolumes = await Element.aggregate([
+        { $match: { projectId: new mongoose.Types.ObjectId(projectId) } },
+        { $unwind: "$materials" },
+        {
+          $group: {
+            _id: "$materials.material",
+            totalVolume: { $sum: "$materials.volume" },
+          },
+        },
+      ]).session(session);
 
-          await Project.updateOne(
-            { _id: new mongoose.Types.ObjectId(projectId) },
-            {
-              $set: {
-                emissions: {
-                  gwp: totals.totalGWP,
-                  ubp: totals.totalUBP,
-                  penre: totals.totalPENRE,
-                  lastCalculated: new Date(),
-                },
-              },
+      if (materialVolumes.length > 0) {
+        await Material.bulkWrite(
+          materialVolumes.map((mv) => ({
+            updateOne: {
+              filter: { _id: mv._id },
+              update: { $set: { volume: mv.totalVolume } },
             },
-            { session }
-          );
-
-          logger.debug("Updated project emissions", {
-            projectId,
-            totals,
-          });
-        } catch (error) {
-          logger.error("Failed to update project emissions", {
-            error,
-            projectId,
-          });
-        }
+          })),
+          { session }
+        );
       }
 
+      // Always recalculate project emissions after processing elements
+      // This ensures consistency even when new elements reference previously matched materials
       await MaterialService.updateProjectEmissions(projectId, session);
 
       return {

@@ -86,27 +86,15 @@ export function Dashboard({
   );
   const [projects, setProjects] = useState<Project[]>([]);
   const router = useRouter();
-  const [statistics, setStatistics] = useState<DashboardStatistics>({
-    totalProjects: 0,
-    totalElements: 0,
-    totalMaterials: 0,
-    recentActivities: 0,
-  });
-  const [recentProjects, setRecentProjects] = useState<Project[]>(
-    initialRecentProjects
-  );
-  const [maxElements, setMaxElements] = useState(0);
+
+  // Use initial data as state - no refetching on mount
+  const [statistics, setStatistics] = useState<DashboardStatistics>(initialStatistics);
+  const [recentProjects, setRecentProjects] = useState<Project[]>(initialRecentProjects);
   const [activities, setActivities] = useState(initialActivities);
-  const [page, setPage] = useState(1);
-  const [hasMore, setHasMore] = useState(true);
+
   const [isLoadingActivities, setIsLoadingActivities] = useState(false);
   const [isLoadingStatistics, setIsLoadingStatistics] = useState(false);
-  const ITEMS_PER_PAGE = 5;
-
-  const abortControllerRef = useRef<AbortController>();
-  const lastFetchRef = useRef<number>(0);
-
-  const CACHE_TIMEOUT = 5 * 60 * 1000;
+  const [isLoadingEmissions, setIsLoadingEmissions] = useState(false);
 
   const metrics = useMemo(
     () => [
@@ -148,79 +136,27 @@ export function Dashboard({
     }
   }, []);
 
-  const fetchStatistics = useCallback(
-    async (force = false) => {
-      const now = Date.now();
-      if (!force && now - lastFetchRef.current < CACHE_TIMEOUT) {
-        return; // Use cached data
+  // Only refetch statistics when user performs actions (not on mount)
+  const refreshStatistics = useCallback(async () => {
+    try {
+      setIsLoadingStatistics(true);
+      const response = await fetch("/api/dashboard/stats", {
+        cache: "no-store",
+      });
+      if (response.ok) {
+        const data = await response.json();
+        setStatistics(data.statistics);
+        setRecentProjects(data.recentProjects);
       }
+    } catch (error) {
+      console.error("Failed to refresh statistics:", error);
+    } finally {
+      setIsLoadingStatistics(false);
+    }
+  }, []);
 
-      try {
-        setIsLoadingStatistics(true);
-
-        // Cancel previous request if it exists
-        if (abortControllerRef.current) {
-          abortControllerRef.current.abort();
-        }
-        abortControllerRef.current = new AbortController();
-
-        const [projectsRes, emissionsRes] = await Promise.all([
-          fetch("/api/projects", {
-            signal: abortControllerRef.current.signal,
-            cache: "no-store",
-          }),
-          fetch("/api/emissions", {
-            signal: abortControllerRef.current.signal,
-            cache: "no-store",
-          }),
-        ]);
-
-        if (!projectsRes.ok || !emissionsRes.ok) {
-          console.error("API Response not OK:", {
-            projects: projectsRes.status,
-            emissions: emissionsRes.status,
-          });
-          throw new Error("Failed to fetch data");
-        }
-
-        const [projects, emissions] = await Promise.all([
-          projectsRes.json(),
-          emissionsRes.json(),
-        ]);
-
-        const recentProjects = projects.slice(0, 3);
-        const totalElements = projects.reduce(
-          (acc: number, project: any) => acc + (project._count?.elements || 0),
-          0
-        );
-        const totalMaterials = projects.reduce(
-          (acc: number, project: any) => acc + (project._count?.materials || 0),
-          0
-        );
-
-        const newStatistics = {
-          ...statistics,
-          totalProjects: projects.length,
-          totalElements,
-          totalMaterials,
-          totalEmissions: emissions,
-        };
-
-        setStatistics(newStatistics);
-        setRecentProjects(recentProjects);
-        lastFetchRef.current = now;
-      } catch (error: unknown) {
-        if (error instanceof Error && error.name !== "AbortError") {
-          console.error("Failed to fetch statistics:", error);
-        }
-      } finally {
-        setIsLoadingStatistics(false);
-      }
-    },
-    [statistics]
-  );
-
-  const fetchActivities = useCallback(async () => {
+  // Only refetch activities when user performs actions (not on mount)
+  const refreshActivities = useCallback(async () => {
     try {
       setIsLoadingActivities(true);
       const response = await fetch("/api/activities?limit=6", {
@@ -229,67 +165,53 @@ export function Dashboard({
       const data = await response.json();
       setActivities(data.activities);
     } catch (error) {
-      console.error("Failed to fetch activities:", error);
+      console.error("Failed to refresh activities:", error);
     } finally {
       setIsLoadingActivities(false);
     }
   }, []);
 
-  useEffect(() => {
-    fetchActivities();
-  }, [fetchActivities]);
-
-  const prefetchNextPage = useCallback(() => {
-    if (hasMore && !isLoadingActivities) {
-      const nextPage = page + 1;
-      const prefetchController = new AbortController();
-
-      fetch(`/api/activities?page=${nextPage}`, {
-        signal: prefetchController.signal,
-        cache: "no-store",
-      }).catch(() => {});
-    }
-  }, [hasMore, isLoadingActivities, page]);
-
+  // Only fetch projects when modal opens
   useEffect(() => {
     if (showProjectSelect) {
       fetchProjects();
     }
   }, [showProjectSelect, fetchProjects]);
 
+  // Fetch emissions after initial render (now super fast!)
   useEffect(() => {
-    fetchStatistics();
-    const intervalId = setInterval(() => {
-      fetchStatistics(true);
-    }, CACHE_TIMEOUT);
+    const fetchEmissions = async () => {
+      // Only fetch if we don't have emissions data yet
+      if (statistics.totalEmissions && (statistics.totalEmissions.gwp > 0 || statistics.totalEmissions.ubp > 0 || statistics.totalEmissions.penre > 0)) {
+        return; // Already have emissions
+      }
 
-    return () => {
-      clearInterval(intervalId);
-      if (abortControllerRef.current) {
-        abortControllerRef.current.abort();
+      try {
+        setIsLoadingEmissions(true);
+        const response = await fetch("/api/emissions", {
+          cache: "no-store",
+        });
+        if (response.ok) {
+          const emissions = await response.json();
+          setStatistics(prev => ({
+            ...prev,
+            totalEmissions: emissions,
+          }));
+        }
+      } catch (error) {
+        console.error("Failed to fetch emissions:", error);
+      } finally {
+        setIsLoadingEmissions(false);
       }
     };
-  }, [fetchStatistics]);
 
-  useEffect(() => {
-    const handleScroll = () => {
-      if (
-        window.innerHeight + window.scrollY >=
-        document.documentElement.scrollHeight - 1000
-      ) {
-        prefetchNextPage();
-      }
-    };
-
-    window.addEventListener("scroll", handleScroll);
-    return () => window.removeEventListener("scroll", handleScroll);
-  }, [prefetchNextPage]);
+    // Now emissions are fast - fetch immediately
+    fetchEmissions();
+  }, []); // Empty dependency array - only run once on mount
 
   const handleLoadMore = () => {
-    if (!isLoadingActivities && hasMore) {
-      const nextPage = page + 1;
-      setPage(nextPage);
-      fetchActivities();
+    if (!isLoadingActivities) {
+      refreshActivities();
     }
   };
 
@@ -356,7 +278,7 @@ export function Dashboard({
             </Card>
           );
         })}
-        <DashboardEmissionsCard emissions={statistics.totalEmissions} />
+        <DashboardEmissionsCard emissions={statistics.totalEmissions} isLoading={isLoadingEmissions} />
       </section>
 
       <section>
@@ -475,9 +397,12 @@ export function Dashboard({
           }}
           onSuccess={(upload: { id: string }) => {
             setSelectedProjectId(null);
+            // Refresh dashboard data after successful upload
+            refreshStatistics();
+            refreshActivities();
             router.push(`/projects/${selectedProjectId}`);
           }}
-          onProgress={(progress: number) => {}}
+          onProgress={(progress: number) => { }}
         />
       )}
     </div>

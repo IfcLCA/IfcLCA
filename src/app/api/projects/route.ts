@@ -4,8 +4,9 @@ import { auth } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
 
 export const runtime = "nodejs";
+export const revalidate = 300; // 5 minutes
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
     const { userId } = await auth();
 
@@ -13,9 +14,72 @@ export async function GET() {
       return new Response("Unauthorized", { status: 401 });
     }
 
+    const { searchParams } = new URL(request.url);
+    const summary = searchParams.get("summary") === "true";
+
     await connectToDatabase();
 
-    // Aggregate projects with their latest activity timestamps
+    if (summary) {
+      // Summary mode - only return counts, not full data
+      const projects = await Project.aggregate([
+        { $match: { userId } },
+        {
+          $lookup: {
+            from: "uploads",
+            localField: "_id",
+            foreignField: "projectId",
+            as: "uploads",
+          },
+        },
+        {
+          $lookup: {
+            from: "elements",
+            localField: "_id",
+            foreignField: "projectId",
+            as: "elements",
+          },
+        },
+        {
+          $lookup: {
+            from: "materials",
+            localField: "_id",
+            foreignField: "projectId",
+            as: "materials",
+          },
+        },
+        {
+          $addFields: {
+            lastActivityAt: {
+              $max: [
+                "$updatedAt",
+                { $max: "$uploads.createdAt" },
+                { $max: "$elements.createdAt" },
+                { $max: "$materials.createdAt" },
+              ],
+            },
+            _count: {
+              elements: { $size: "$elements" },
+              uploads: { $size: "$uploads" },
+              materials: { $size: "$materials" },
+            },
+          },
+        },
+        { $sort: { lastActivityAt: -1 } },
+      ]);
+
+      const transformedProjects = projects.map((project) => ({
+        id: project._id.toString(),
+        name: project.name,
+        description: project.description,
+        imageUrl: project.imageUrl,
+        updatedAt: project.lastActivityAt || project.updatedAt,
+        _count: project._count,
+      }));
+
+      return NextResponse.json(transformedProjects);
+    }
+
+    // Full mode - return complete data (for project detail pages)
     const projects = await Project.aggregate([
       { $match: { userId } },
       {

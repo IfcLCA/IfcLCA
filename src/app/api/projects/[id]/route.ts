@@ -5,36 +5,139 @@ import mongoose from "mongoose";
 import { NextResponse } from "next/server";
 
 export const runtime = "nodejs";
+export const revalidate = 60; // Cache for 1 minute
 
 export async function GET(
   request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     await connectToDatabase();
 
-    if (!mongoose.Types.ObjectId.isValid(params.id)) {
+    const { id } = await params;
+
+    if (!mongoose.Types.ObjectId.isValid(id)) {
       return NextResponse.json(
         { error: "Invalid project ID" },
         { status: 400 }
       );
     }
 
-    const projectId = new mongoose.Types.ObjectId(params.id);
+    const projectId = new mongoose.Types.ObjectId(id);
 
-    // Use aggregation pipeline to get all data in one query
+    // Check for summary mode (lightweight, fast response)
+    const { searchParams } = new URL(request.url);
+    const summary = searchParams.get("summary") === "true";
+    const includeAllElements = searchParams.get("includeAllElements") === "true";
+
+    if (summary) {
+      const project = await Project.findById(projectId)
+        .select("name description imageUrl emissions createdAt updatedAt")
+        .lean();
+
+      if (!project) {
+        return NextResponse.json({ error: "Project not found" }, { status: 404 });
+      }
+
+      // Get counts separately (fast queries with indexes)
+      const [elementCount, uploadCount, materialCount] = await Promise.all([
+        Element.countDocuments({ projectId }),
+        Upload.countDocuments({ projectId }),
+        Material.countDocuments({ projectId }),
+      ]);
+
+      return NextResponse.json({
+        ...project,
+        elementCount,
+        uploadCount,
+        materialCount,
+      });
+    }
+
+    // Check element count - if large project, use pagination
+    const elementCount = await Element.countDocuments({ projectId });
+
+    // For large projects (>1000 elements), return summary + pagination flag
+    // UNLESS includeAllElements is requested (for export)
+    if (elementCount > 1000 && !includeAllElements) {
+      const project = await Project.findById(projectId)
+        .select("name description imageUrl emissions createdAt updatedAt")
+        .lean();
+
+      if (!project) {
+        return NextResponse.json({ error: "Project not found" }, { status: 404 });
+      }
+
+      const [uploads, uploadCount, materialCount] = await Promise.all([
+        Upload.find({ projectId })
+          .select("filename status elementCount createdAt")
+          .lean(),
+        Upload.countDocuments({ projectId }),
+        Material.countDocuments({ projectId }),
+      ]);
+
+      // Fetch materials with pre-stored volumes
+      const materials = await Material.aggregate([
+        { $match: { projectId } },
+        {
+          $lookup: {
+            from: "indicatorsKBOB",
+            localField: "kbobMatchId",
+            foreignField: "_id",
+            as: "kbobMatch",
+          },
+        },
+        {
+          $unwind: {
+            path: "$kbobMatch",
+            preserveNullAndEmptyArrays: true,
+          },
+        },
+      ]);
+
+      return NextResponse.json({
+        ...project,
+        uploads,
+        materials,
+        elements: [], // Don't load elements - use pagination endpoint
+        usePagination: true,
+        elementCount,
+        uploadCount,
+        materialCount,
+        totalEmissions: (project as any).emissions || { gwp: 0, ubp: 0, penre: 0 }, // Add totalEmissions for compatibility
+        _count: {
+          elements: elementCount,
+          uploads: uploadCount,
+          materials: materialCount,
+        },
+      });
+    }
+
+    // Optimized aggregation pipeline - use pre-calculated data
     const [project] = await Project.aggregate([
       {
         $match: { _id: projectId },
       },
+      // 1. Lookup uploads (lightweight)
       {
         $lookup: {
           from: "uploads",
           localField: "_id",
           foreignField: "projectId",
           as: "uploads",
+          pipeline: [
+            {
+              $project: {
+                filename: 1,
+                status: 1,
+                elementCount: 1,
+                createdAt: 1,
+              },
+            },
+          ],
         },
       },
+      // 2. Lookup elements with material references (no KBOB - faster!)
       {
         $lookup: {
           from: "elements",
@@ -61,6 +164,15 @@ export async function GET(
                     $unwind: {
                       path: "$kbobMatch",
                       preserveNullAndEmptyArrays: true,
+                    },
+                  },
+                  {
+                    $project: {
+                      name: 1,
+                      category: 1,
+                      density: 1,
+                      kbobMatchId: 1,
+                      kbobMatch: 1,
                     },
                   },
                 ],
@@ -95,57 +207,15 @@ export async function GET(
                   },
                 },
                 totalVolume: { $sum: "$materials.volume" },
-                emissions: {
-                  $reduce: {
-                    input: "$materials",
-                    initialValue: { gwp: 0, ubp: 0, penre: 0 },
-                    in: {
-                      gwp: {
-                        $add: [
-                          "$$value.gwp",
-                          {
-                            $multiply: [
-                              "$$this.volume",
-                              { $ifNull: ["$$this.material.density", 0] },
-                              { $ifNull: ["$$this.material.kbobMatch.GWP", 0] },
-                            ],
-                          },
-                        ],
-                      },
-                      ubp: {
-                        $add: [
-                          "$$value.ubp",
-                          {
-                            $multiply: [
-                              "$$this.volume",
-                              { $ifNull: ["$$this.material.density", 0] },
-                              { $ifNull: ["$$this.material.kbobMatch.UBP", 0] },
-                            ],
-                          },
-                        ],
-                      },
-                      penre: {
-                        $add: [
-                          "$$value.penre",
-                          {
-                            $multiply: [
-                              "$$this.volume",
-                              { $ifNull: ["$$this.material.density", 0] },
-                              {
-                                $ifNull: ["$$this.material.kbobMatch.PENRE", 0],
-                              },
-                            ],
-                          },
-                        ],
-                      },
-                    },
-                  },
-                },
               },
+            },
+            {
+              $unset: "materialRefs", // Remove temp field using $unset instead of $project
             },
           ],
         },
       },
+      // 3. Lookup materials (for materials tab)
       {
         $lookup: {
           from: "materials",
@@ -207,67 +277,21 @@ export async function GET(
                     0,
                   ],
                 },
-                gwp: {
-                  $multiply: [
-                    {
-                      $ifNull: [
-                        { $arrayElemAt: ["$volumeData.totalVolume", 0] },
-                        0,
-                      ],
-                    },
-                    { $ifNull: ["$density", 0] },
-                    { $ifNull: ["$kbobMatch.GWP", 0] },
-                  ],
-                },
-                ubp: {
-                  $multiply: [
-                    {
-                      $ifNull: [
-                        { $arrayElemAt: ["$volumeData.totalVolume", 0] },
-                        0,
-                      ],
-                    },
-                    { $ifNull: ["$density", 0] },
-                    { $ifNull: ["$kbobMatch.UBP", 0] },
-                  ],
-                },
-                penre: {
-                  $multiply: [
-                    {
-                      $ifNull: [
-                        { $arrayElemAt: ["$volumeData.totalVolume", 0] },
-                        0,
-                      ],
-                    },
-                    { $ifNull: ["$density", 0] },
-                    { $ifNull: ["$kbobMatch.PENRE", 0] },
-                  ],
-                },
               },
             },
             {
-              $project: {
-                volumeData: 0,
-              },
+              $unset: "volumeData", // Remove temp field using $unset
             },
           ],
         },
       },
+      // 4. Add counts and use pre-calculated emissions
       {
         $addFields: {
           elementCount: { $size: "$elements" },
           uploadCount: { $size: "$uploads" },
-          totalEmissions: {
-            $reduce: {
-              input: "$elements",
-              initialValue: { gwp: 0, ubp: 0, penre: 0 },
-              in: {
-                gwp: { $add: ["$$value.gwp", "$$this.emissions.gwp"] },
-                ubp: { $add: ["$$value.ubp", "$$this.emissions.ubp"] },
-                penre: { $add: ["$$value.penre", "$$this.emissions.penre"] },
-              },
-            },
-          },
+          // Use pre-calculated emissions from project field (already computed!)
+          totalEmissions: "$emissions",
         },
       },
     ]);
@@ -288,7 +312,7 @@ export async function GET(
 
 export async function PUT(
   request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const { userId } = await auth();
@@ -300,9 +324,11 @@ export async function PUT(
     const body = await request.json();
     await connectToDatabase();
 
+    const { id } = await params;
+
     // Verify project ownership before update
     const project = await Project.findOneAndUpdate(
-      { _id: params.id, userId },
+      { _id: id, userId },
       body,
       { new: true }
     ).lean();
@@ -327,7 +353,7 @@ export async function PUT(
 
 export async function DELETE(
   request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const { userId } = await auth();
@@ -338,6 +364,8 @@ export async function DELETE(
 
     await connectToDatabase();
 
+    const { id } = await params;
+
     // Start a session for atomic operations
     const session = await mongoose.startSession();
     session.startTransaction();
@@ -345,7 +373,7 @@ export async function DELETE(
     try {
       // Verify project exists and belongs to user
       const project = await Project.findOne({
-        _id: params.id,
+        _id: id,
         userId,
       }).session(session);
 
@@ -355,12 +383,12 @@ export async function DELETE(
       }
 
       // Delete all associated data in order
-      await Upload.deleteMany({ projectId: params.id }).session(session);
-      await Element.deleteMany({ projectId: params.id }).session(session);
-      await Material.deleteMany({ projectId: params.id }).session(session);
+      await Upload.deleteMany({ projectId: id }).session(session);
+      await Element.deleteMany({ projectId: id }).session(session);
+      await Material.deleteMany({ projectId: id }).session(session);
 
       // Finally delete the project
-      await Project.deleteOne({ _id: params.id }).session(session);
+      await Project.deleteOne({ _id: id }).session(session);
 
       // Commit the transaction
       await session.commitTransaction();
@@ -395,7 +423,7 @@ export async function DELETE(
 
 export async function PATCH(
   request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const { userId } = await auth();
@@ -405,9 +433,10 @@ export async function PATCH(
 
     await connectToDatabase();
 
+    const { id } = await params;
     const body = await request.json();
     const project = await Project.findOneAndUpdate(
-      { _id: params.id, userId },
+      { _id: id, userId },
       { $set: body },
       { new: true }
     );

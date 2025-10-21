@@ -4,7 +4,7 @@ import { Breadcrumbs } from "@/components/breadcrumbs";
 import { DashboardCards } from "@/components/dashboard-cards";
 import { DataTable } from "@/components/data-table";
 import { elementsColumns } from "@/components/elements-columns";
-import { emissionsColumns } from "@/components/emissions-columns";
+import { ExportIfcModal } from "@/components/export-ifc-modal";
 import { GraphPageComponent } from "@/components/graph-page";
 import { materialsColumns } from "@/components/materials-columns";
 import {
@@ -20,7 +20,6 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { Label } from "@/components/ui/label";
 import {
   Pagination,
   PaginationContent,
@@ -41,10 +40,10 @@ import { UploadModal } from "@/components/upload-modal";
 import { toast } from "@/hooks/use-toast";
 import { ReloadIcon } from "@radix-ui/react-icons";
 import cn from "classnames";
-import { Edit, Layers, UploadCloud } from "lucide-react";
+import { Download, Edit, UploadCloud } from "lucide-react";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
-import { useProjectEmissions } from "@/hooks/use-project-emissions";
+import type { ElementLcaResultsMap } from "@/lib/services/ifc-export-service";
 
 interface KBOBMaterial {
   _id: string;
@@ -63,15 +62,19 @@ interface Material {
 }
 
 interface MaterialEntry {
-  name: string;
   volume: number;
-  density: number;
-  mass: number;
+  fraction: number;
   thickness?: number;
+  // Populated material data from API (replaces the original ObjectId)
   material?: {
+    _id: string;
     name: string;
-    kbobMatchId?: {
+    density?: number;
+    kbobMatchId?: string;
+    kbobMatch?: {
+      _id: string;
       Name: string;
+      KBOB_ID: number;
       GWP?: number;
       UBP?: number;
       PENRE?: number;
@@ -130,6 +133,8 @@ interface Project {
     elements: number;
     materials: number;
   };
+  usePagination?: boolean;
+  elementCount?: number;
 }
 
 export interface ExtendedProject extends Project {
@@ -137,6 +142,51 @@ export interface ExtendedProject extends Project {
 }
 
 type IndicatorType = "gwp" | "ubp" | "penre";
+
+type KBOBIndicatorValues = {
+  GWP?: number;
+  UBP?: number;
+  PENRE?: number;
+};
+
+type ElementMaterialForExport = {
+  volume?: number;
+  fraction?: number;
+  thickness?: number;
+  indicators?: { gwp?: number; ubp?: number; penre?: number };
+  material?: {
+    _id?: string;
+    name?: string;
+    density?: number;
+    kbobMatchId?: string;
+    kbobMatch?: {
+      _id: string;
+      Name: string;
+      KBOB_ID: number;
+      GWP?: number;
+      UBP?: number;
+      PENRE?: number;
+    };
+  };
+};
+
+const parseMaybeNumber = (value: unknown): number | null => {
+  if (typeof value === "number") {
+    return Number.isFinite(value) ? value : null;
+  }
+  if (typeof value === "string") {
+    const parsed = parseFloat(value);
+    return Number.isFinite(parsed) ? parsed : null;
+  }
+  return null;
+};
+
+const toFiniteNumber = (value: unknown): number => parseMaybeNumber(value) ?? 0;
+
+const resolveIndicator = (value: unknown, fallback: number): number => {
+  const parsed = parseMaybeNumber(value);
+  return parsed ?? fallback;
+};
 
 const formatNumber = (value: number, decimalPlaces: number = 2) => {
   return (
@@ -167,10 +217,13 @@ export default function ProjectDetailsPage() {
   const params = useParams();
   const projectId = params.id as string;
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
+  const [isExportModalOpen, setIsExportModalOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [project, setProject] = useState<ExtendedProject | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [isLoadingExportData, setIsLoadingExportData] = useState(false);
+  const [fullElementsData, setFullElementsData] = useState<any>(null);
 
   useEffect(() => {
     if (projectId) {
@@ -236,12 +289,12 @@ export default function ProjectDetailsPage() {
       imageUrl: data.imageUrl,
       uploads: Array.isArray(data.uploads)
         ? data.uploads.map((upload: any) => ({
-            _id: upload._id || upload.id,
-            filename: upload.filename || "Unnamed file",
-            status: upload.status || "unknown",
-            elementCount: upload.elementCount || 0,
-            createdAt: new Date(upload.createdAt),
-          }))
+          _id: upload._id || upload.id,
+          filename: upload.filename || "Unnamed file",
+          status: upload.status || "unknown",
+          elementCount: upload.elementCount || 0,
+          createdAt: new Date(upload.createdAt),
+        }))
         : [],
       elements: (data.elements || []).map((element: any) => ({
         ...element,
@@ -253,18 +306,64 @@ export default function ProjectDetailsPage() {
         id: material.id || material._id,
         name: material.name,
         category: material.category,
+        density: material.density,
         volume: material.volume || 0,
         fraction: material.fraction || 0,
         gwp: material.gwp || 0,
         ubp: material.ubp || 0,
         penre: material.penre || 0,
+        kbobMatch: material.kbobMatch, // Include KBOB match data!
       })),
       _count: {
-        uploads: data.uploads?.length || 0,
-        elements: data.elements?.length || 0,
-        materials: uniqueMaterials.size || 0,
+        uploads: data._count?.uploads || data.uploads?.length || 0,
+        elements: data._count?.elements || data.elementCount || data.elements?.length || 0,
+        materials: data._count?.materials || uniqueMaterials.size || data.materials?.length || 0,
       },
     };
+  };
+
+  const handlePrepareExport = async () => {
+    const usePagination = project?.usePagination;
+
+    // For small projects or if we already have all elements, open modal directly
+    if (!usePagination || fullElementsData) {
+      setIsExportModalOpen(true);
+      return;
+    }
+
+    // For large projects, fetch all elements first with loading feedback
+    setIsLoadingExportData(true);
+    try {
+      toast({
+        title: "Preparing export data",
+        description: `Loading ${project.elementCount} elements for export...`,
+      });
+
+      // Fetch all elements (this will be slow but only when user needs export)
+      const response = await fetch(`/api/projects/${projectId}?includeAllElements=true`);
+      if (!response.ok) {
+        throw new Error("Failed to load export data");
+      }
+
+      const fullData = await response.json();
+      setFullElementsData(fullData.elements);
+
+      toast({
+        title: "Ready to export",
+        description: "All element data loaded successfully",
+      });
+
+      setIsExportModalOpen(true);
+    } catch (error) {
+      console.error("Error loading export data:", error);
+      toast({
+        title: "Error",
+        description: "Failed to load export data. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoadingExportData(false);
+    }
   };
 
   const handleDeleteProject = async () => {
@@ -311,6 +410,97 @@ export default function ProjectDetailsPage() {
     }
   };
 
+  const elementExportData = useMemo(() => {
+    if (!project) {
+      return {
+        results: {} as ElementLcaResultsMap,
+        names: {} as Record<string, string>,
+      };
+    }
+
+    const results: ElementLcaResultsMap = {};
+    const names: Record<string, string> = {};
+
+    // Use fullElementsData if available (for large projects), otherwise use project.elements
+    const elementsToProcess = fullElementsData || project.elements;
+
+    elementsToProcess.forEach((element: ElementWithMaterials) => {
+      if (!element.guid) {
+        return;
+      }
+
+      const materials = element.materials || [];
+
+      const totals = materials.reduce(
+        (acc, mat) => {
+          const volume = toFiniteNumber(mat.volume);
+          const density = toFiniteNumber(mat.material?.density);
+          const mass = volume * density;
+
+          const kbobMatch: KBOBIndicatorValues =
+            (mat.material?.kbobMatch && typeof mat.material.kbobMatch === 'object')
+              ? mat.material.kbobMatch
+              : {};
+
+          const gwp = resolveIndicator(
+            mat.indicators?.gwp,
+            mass * toFiniteNumber(kbobMatch.GWP)
+          );
+          const ubp = resolveIndicator(
+            mat.indicators?.ubp,
+            mass * toFiniteNumber(kbobMatch.UBP)
+          );
+          const penre = resolveIndicator(
+            mat.indicators?.penre,
+            mass * toFiniteNumber(kbobMatch.PENRE)
+          );
+
+          acc.gwp += gwp;
+          acc.ubp += ubp;
+          acc.penre += penre;
+          return acc;
+        },
+        { gwp: 0, ubp: 0, penre: 0 }
+      );
+
+      // Collect KBOB material names and IDs (deduplicated)
+      const materialNames = Array.from(new Set(
+        materials
+          .map(mat => {
+            if (mat.material?.kbobMatch && typeof mat.material.kbobMatch === 'object') {
+              return mat.material.kbobMatch.Name;
+            }
+            return mat.material?.name;
+          })
+          .filter(Boolean)
+      )).join(', ');
+
+      const materialIds = Array.from(new Set(
+        materials
+          .map(mat => {
+            if (mat.material?.kbobMatch && typeof mat.material.kbobMatch === 'object') {
+              return mat.material.kbobMatch.KBOB_ID?.toString();
+            }
+            return mat.material?._id;
+          })
+          .filter(Boolean)
+      )).join(', ');
+
+      results[element.guid] = {
+        gwp: toFiniteNumber(totals.gwp),
+        penre: toFiniteNumber(totals.penre),
+        ubp: toFiniteNumber(totals.ubp),
+        MaterialName: materialNames,
+        MaterialID: materialIds,
+      };
+      names[element.guid] = element.name;
+    });
+
+    return { results, names };
+  }, [project, fullElementsData]);
+
+  const canExport = Object.keys(elementExportData.results).length > 0 || Boolean(project?.usePagination);
+
   if (isLoading) return <LoadingSpinner />;
   if (error) return <ErrorMessage message={error} />;
   if (!project) return <ProjectNotFound />;
@@ -335,11 +525,17 @@ export default function ProjectDetailsPage() {
         project={project}
         onUpload={() => setIsUploadModalOpen(true)}
         onEdit={handleEditProject}
+        onExport={handlePrepareExport}
+        canExport={canExport}
+        isLoadingExport={isLoadingExportData}
       />
       <ProjectOverview project={project} />
       <ProjectTabs
         project={project}
         onUpload={() => setIsUploadModalOpen(true)}
+        onExport={handlePrepareExport}
+        canExport={canExport}
+        isLoadingExport={isLoadingExportData}
         materialsWithCount={materialsWithCount}
       />
       <UploadModal
@@ -347,6 +543,13 @@ export default function ProjectDetailsPage() {
         open={isUploadModalOpen}
         onOpenChange={setIsUploadModalOpen}
         onSuccess={handleUploadComplete}
+      />
+      <ExportIfcModal
+        projectName={project.name}
+        open={isExportModalOpen}
+        onOpenChange={(open) => setIsExportModalOpen(open)}
+        elementResults={elementExportData.results}
+        elementNames={elementExportData.names}
       />
       <DeleteProjectDialog
         isOpen={isDeleteDialogOpen}
@@ -391,10 +594,16 @@ const ProjectHeader = ({
   project,
   onUpload,
   onEdit,
+  onExport,
+  canExport,
+  isLoadingExport = false,
 }: {
   project: ExtendedProject;
   onUpload: () => void;
   onEdit: () => void;
+  onExport: () => void;
+  canExport: boolean;
+  isLoadingExport?: boolean;
 }) => (
   <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
     <div className="space-y-4">
@@ -406,6 +615,23 @@ const ProjectHeader = ({
       </div>
     </div>
     <div className="flex flex-col sm:flex-row gap-4">
+      <Button
+        variant="secondary"
+        onClick={onExport}
+        disabled={!canExport || isLoadingExport}
+      >
+        {isLoadingExport ? (
+          <>
+            <ReloadIcon className="mr-2 h-4 w-4 animate-spin" />
+            Preparing...
+          </>
+        ) : (
+          <>
+            <Download className="mr-2 h-4 w-4" />
+            Export IFC
+          </>
+        )}
+      </Button>
       <Button onClick={onUpload} className="bg-primary text-primary-foreground">
         <UploadCloud className="mr-2 h-4 w-4" />
         Add New Ifc
@@ -432,10 +658,16 @@ const ProjectOverview = ({ project }: { project: ExtendedProject }) => (
 const ProjectTabs = ({
   project,
   onUpload,
+  onExport,
+  canExport,
+  isLoadingExport = false,
   materialsWithCount,
 }: {
   project: Project;
   onUpload: () => void;
+  onExport: () => void;
+  canExport: boolean;
+  isLoadingExport?: boolean;
   materialsWithCount: {
     id: string;
     name: string;
@@ -452,7 +684,13 @@ const ProjectTabs = ({
     </TabsList>
 
     <TabsContent value="uploads" className="space-y-4">
-      <UploadsTab project={project} onUpload={onUpload} />
+      <UploadsTab
+        project={project}
+        onUpload={onUpload}
+        onExport={onExport}
+        canExport={canExport}
+        isLoadingExport={isLoadingExport}
+      />
     </TabsContent>
 
     <TabsContent value="elements" className="space-y-4">
@@ -472,9 +710,15 @@ const ProjectTabs = ({
 const UploadsTab = ({
   project,
   onUpload,
+  onExport,
+  canExport,
+  isLoadingExport = false,
 }: {
   project: Project;
   onUpload: () => void;
+  onExport: () => void;
+  canExport: boolean;
+  isLoadingExport?: boolean;
 }) => {
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 5;
@@ -492,17 +736,32 @@ const UploadsTab = ({
 
   return (
     <>
-      <div className="flex justify-between items-center mb-4">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-4">
         <h2 className="text-2xl font-semibold">
           Uploads{" "}
           <Badge variant="secondary" className="ml-2">
             {project?.uploads?.length || 0}
           </Badge>
         </h2>
-        <Button onClick={onUpload} variant="outline">
-          <UploadCloud className="h-4 w-4 mr-2" />
-          Add New Ifc
-        </Button>
+        <div className="flex flex-col sm:flex-row gap-2">
+          <Button onClick={onExport} disabled={!canExport || isLoadingExport}>
+            {isLoadingExport ? (
+              <>
+                <ReloadIcon className="h-4 w-4 mr-2 animate-spin" />
+                Preparing...
+              </>
+            ) : (
+              <>
+                <Download className="h-4 w-4 mr-2" />
+                Export IFC
+              </>
+            )}
+          </Button>
+          <Button onClick={onUpload} variant="outline">
+            <UploadCloud className="h-4 w-4 mr-2" />
+            Add New Ifc
+          </Button>
+        </div>
       </div>
       {!project?.uploads || project.uploads.length === 0 ? (
         <EmptyState
@@ -605,12 +864,41 @@ const UploadCard = ({ upload }: { upload: Upload }) => (
 );
 
 const ElementsTab = ({ project }: { project: Project }) => {
+  const [elements, setElements] = useState<any[]>(project.elements || []);
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [isLoading, setIsLoading] = useState(false);
+  const usePagination = project.usePagination || false;
+  const totalElements = project.elementCount || project.elements?.length || 0;
+
+  // Fetch paginated elements for large projects
+  useEffect(() => {
+    if (usePagination) {
+      async function fetchElements() {
+        setIsLoading(true);
+        try {
+          const response = await fetch(
+            `/api/projects/${project.id}/elements?page=${page}&limit=50`
+          );
+          const data = await response.json();
+          setElements(data.elements);
+          setTotalPages(data.totalPages);
+        } catch (error) {
+          console.error("Failed to fetch elements:", error);
+        } finally {
+          setIsLoading(false);
+        }
+      }
+      fetchElements();
+    }
+  }, [page, usePagination, project.id]);
+
   const data = useMemo(() => {
-    return project.elements.map((element) => ({
+    return elements.map((element) => ({
       ...element,
       id: element._id,
     }));
-  }, [project]);
+  }, [elements]);
 
   return (
     <>
@@ -618,22 +906,88 @@ const ElementsTab = ({ project }: { project: Project }) => {
         <h2 className="text-2xl font-semibold">
           Elements{" "}
           <Badge variant="secondary" className="ml-2">
-            {data.length}
+            {totalElements}
           </Badge>
         </h2>
       </div>
-      <Card>
-        <CardContent className="p-0">
-          <DataTable columns={elementsColumns} data={data} />
-        </CardContent>
-      </Card>
+      {isLoading ? (
+        <Card>
+          <CardContent className="p-8 text-center">
+            <ReloadIcon className="h-8 w-8 animate-spin text-primary mx-auto mb-2" />
+            <p className="text-muted-foreground">Loading elements...</p>
+          </CardContent>
+        </Card>
+      ) : (
+        <Card>
+          <CardContent className="p-0">
+            <DataTable columns={elementsColumns} data={data} />
+            {usePagination && totalPages > 1 && (
+              <div className="p-4 border-t">
+                <Pagination>
+                  <PaginationContent>
+                    <PaginationItem>
+                      <PaginationPrevious
+                        onClick={() => page > 1 && setPage(page - 1)}
+                        className={
+                          page === 1 ? "pointer-events-none opacity-50" : ""
+                        }
+                      />
+                    </PaginationItem>
+                    {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                      const pageNum = i + Math.max(1, page - 2);
+                      if (pageNum > totalPages) return null;
+                      return (
+                        <PaginationItem key={pageNum}>
+                          <PaginationLink
+                            onClick={() => setPage(pageNum)}
+                            isActive={page === pageNum}
+                          >
+                            {pageNum}
+                          </PaginationLink>
+                        </PaginationItem>
+                      );
+                    })}
+                    <PaginationItem>
+                      <PaginationNext
+                        onClick={() => page < totalPages && setPage(page + 1)}
+                        className={
+                          page === totalPages ? "pointer-events-none opacity-50" : ""
+                        }
+                      />
+                    </PaginationItem>
+                  </PaginationContent>
+                </Pagination>
+                <p className="text-sm text-muted-foreground text-center mt-2">
+                  Page {page} of {totalPages} ({totalElements} total elements)
+                </p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
     </>
   );
 };
 
 const MaterialsTab = ({ project }: { project: Project }) => {
+  const usePagination = project.usePagination || false;
+
   const data = useMemo(() => {
-    // Group materials by name and sum volumes
+    // For large projects with pagination, materials are already aggregated from API
+    if (usePagination && project.materials) {
+      return project.materials.map((mat: any) => ({
+        _id: mat._id,
+        material: mat,
+        volume: mat.volume || 0,
+        emissions: {
+          gwp: (mat.volume || 0) * (mat.density || 0) * (mat.kbobMatch?.GWP || 0),
+          ubp: (mat.volume || 0) * (mat.density || 0) * (mat.kbobMatch?.UBP || 0),
+          penre: (mat.volume || 0) * (mat.density || 0) * (mat.kbobMatch?.PENRE || 0),
+        },
+      }));
+    }
+
+    // For small projects, calculate from elements
     const materialGroups = project.elements.reduce((acc, element) => {
       element.materials.forEach((mat: MaterialWithVolume) => {
         const key = mat.material._id;
@@ -667,7 +1021,7 @@ const MaterialsTab = ({ project }: { project: Project }) => {
     }, {} as Record<string, Material>);
 
     return Object.values(materialGroups);
-  }, [project]);
+  }, [project, usePagination]);
 
   return (
     <>
@@ -689,6 +1043,38 @@ const MaterialsTab = ({ project }: { project: Project }) => {
 };
 
 const GraphTab = ({ project }: { project: Project }) => {
+  const usePagination = project.usePagination || false;
+
+  // For large projects with pagination, use material-based chart data
+  if (usePagination) {
+    const materialsData = (project.materials || []).map((mat: any) => ({
+      name: mat.name,
+      elementName: mat.name, // Add missing elementName property
+      ifcMaterial: mat.name,
+      kbobMaterial: mat.kbobMatch?.Name || "Unknown",
+      category: mat.category || "Uncategorized",
+      volume: mat.volume || 0,
+      indicators: {
+        gwp: (mat.volume || 0) * (mat.density || 0) * (mat.kbobMatch?.GWP || 0),
+        ubp: (mat.volume || 0) * (mat.density || 0) * (mat.kbobMatch?.UBP || 0),
+        penre: (mat.volume || 0) * (mat.density || 0) * (mat.kbobMatch?.PENRE || 0),
+      },
+    }));
+
+    return (
+      <div className="space-y-4">
+        <div className="grid gap-4">
+          <Card>
+            <CardContent className="pt-6">
+              <GraphPageComponent materialsData={materialsData} />
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    );
+  }
+
+  // For small projects, use element-based chart data
   const materialsData = project.elements.flatMap((element) =>
     // Create one entry per element-material combination
     element.materials.map((material: MaterialWithVolume) => ({

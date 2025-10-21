@@ -30,6 +30,11 @@ export type Project = {
       };
     }[];
   }[];
+  emissions?: {
+    gwp: number;
+    ubp: number;
+    penre: number;
+  };
 };
 
 export interface ProjectEmissions {
@@ -98,12 +103,12 @@ export function useProjectEmissions(project?: Project): ProjectEmissions {
         [key]:
           value >= MILLION
             ? `${(value / MILLION).toLocaleString("de-CH", {
-                maximumFractionDigits: 3,
-                minimumFractionDigits: 1,
-              })} Mio.`
+              maximumFractionDigits: 3,
+              minimumFractionDigits: 1,
+            })} Mio.`
             : value.toLocaleString("de-CH", {
-                maximumFractionDigits: 0,
-              }),
+              maximumFractionDigits: 0,
+            }),
       }),
       {} as ProjectEmissions["formatted"]
     );

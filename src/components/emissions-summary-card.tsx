@@ -36,9 +36,26 @@ const metrics: Record<
 
 export function EmissionsSummaryCard({ project }: { project?: Project }) {
   const [metric, setMetric] = useState<MetricKey>("gwp");
-  const { totals, formatted, units } = useProjectEmissions(project);
 
-  if (!project?.elements?.length) {
+  // For large projects, use pre-calculated emissions directly
+  const emissions = project?.emissions;
+  const hasPreCalculatedEmissions =
+    emissions != null &&
+    typeof emissions.gwp === 'number' &&
+    typeof emissions.ubp === 'number' &&
+    typeof emissions.penre === 'number' &&
+    (emissions.gwp > 0 || emissions.ubp > 0 || emissions.penre > 0);
+
+  // Always call hook unconditionally (Rules of Hooks)
+  const computed = useProjectEmissions(project);
+
+  // Then conditionally select which data to use
+  const totals = hasPreCalculatedEmissions ? emissions : computed.totals;
+  const units = hasPreCalculatedEmissions
+    ? { gwp: "kg CO₂ eq", ubp: "pts", penre: "kWh" }
+    : computed.units;
+
+  if (!hasPreCalculatedEmissions && !project?.elements?.length) {
     return (
       <div className="flex flex-col justify-center text-center py-4">
         <div className="text-sm text-muted-foreground">

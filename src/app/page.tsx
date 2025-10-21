@@ -4,6 +4,9 @@ import type { Metadata } from "next";
 import { Dashboard } from "@/components/dashboard";
 import LandingPage from "@/components/landing-page";
 import { TermsAcceptanceWrapper } from "@/components/terms-acceptance-wrapper";
+import { getDashboardData } from "@/lib/services/dashboard-service";
+import { Suspense } from "react";
+import { DashboardStatsLoading, DashboardProjectsLoading, DashboardActivitiesLoading } from "@/components/dashboard-loading";
 
 export const metadata: Metadata = {
   title: "IfcLCA - Open-source Building LCA",
@@ -45,7 +48,7 @@ export const metadata: Metadata = {
 
 export default async function HomePage() {
   const { userId } = await auth();
-  const cookieStore = cookies();
+  const cookieStore = await cookies();
   const hasAcceptedTerms = cookieStore.has("terms_accepted");
 
   // If user is not authenticated, show landing page
@@ -59,15 +62,40 @@ export default async function HomePage() {
     );
   }
 
+  // Fetch dashboard data for authenticated users (excluding slow emissions calculation)
+  const dashboardData = await getDashboardData(userId, false);
+
   // If user is authenticated but hasn't accepted terms, show terms acceptance
   if (!hasAcceptedTerms) {
     return (
       <TermsAcceptanceWrapper>
-        <Dashboard />
+        <Dashboard
+          initialRecentProjects={dashboardData.recentProjects}
+          statistics={{
+            totalProjects: dashboardData.stats.totalProjects,
+            totalElements: dashboardData.stats.totalElements,
+            totalMaterials: dashboardData.stats.totalMaterials,
+            recentActivities: dashboardData.recentActivities.length,
+            totalEmissions: dashboardData.stats.totalEmissions,
+          }}
+          initialActivities={dashboardData.recentActivities}
+        />
       </TermsAcceptanceWrapper>
     );
   }
 
   // If user is authenticated and has accepted terms, show dashboard
-  return <Dashboard />;
+  return (
+    <Dashboard
+      initialRecentProjects={dashboardData.recentProjects}
+      statistics={{
+        totalProjects: dashboardData.stats.totalProjects,
+        totalElements: dashboardData.stats.totalElements,
+        totalMaterials: dashboardData.stats.totalMaterials,
+        recentActivities: dashboardData.recentActivities.length,
+        totalEmissions: dashboardData.stats.totalEmissions,
+      }}
+      initialActivities={dashboardData.recentActivities}
+    />
+  );
 }
