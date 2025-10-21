@@ -115,33 +115,7 @@ export class IFCProcessingService {
         const bulkOps = batch.map((element) => {
           const processedMaterials = [];
 
-          // Process direct materials
-          if (element.materials?.length) {
-            processedMaterials.push(
-              ...element.materials
-                .map((material) => {
-                  const match = materialMatchMap.get(material.name);
-                  if (!match) {
-                    logger.warn(`Material not found: ${material.name}`);
-                    return null;
-                  }
-                  return {
-                    material: match._id,
-                    name: material.name,
-                    volume: material.volume,
-                    indicators: match.kbobMatchId
-                      ? MaterialService.calculateIndicators(
-                        material.volume,
-                        match.density,
-                        match.kbobMatchId
-                      )
-                      : undefined,
-                  };
-                })
-                .filter(Boolean)
-            );
-          }
-
+          // Prioritize material layers over direct materials to avoid duplication
           // Process material layers
           if (element.materialLayers?.layers?.length) {
             const totalVolume = element.volume || 0;
@@ -162,6 +136,32 @@ export class IFCProcessingService {
                     indicators: match.kbobMatchId
                       ? MaterialService.calculateIndicators(
                         layer.volume || totalVolume / layers.length,
+                        match.density,
+                        match.kbobMatchId
+                      )
+                      : undefined,
+                  };
+                })
+                .filter(Boolean)
+            );
+          }
+          // Only process direct materials if there are no material layers
+          else if (element.materials?.length) {
+            processedMaterials.push(
+              ...element.materials
+                .map((material) => {
+                  const match = materialMatchMap.get(material.name);
+                  if (!match) {
+                    logger.warn(`Material not found: ${material.name}`);
+                    return null;
+                  }
+                  return {
+                    material: match._id,
+                    name: material.name,
+                    volume: material.volume,
+                    indicators: match.kbobMatchId
+                      ? MaterialService.calculateIndicators(
+                        material.volume,
                         match.density,
                         match.kbobMatchId
                       )

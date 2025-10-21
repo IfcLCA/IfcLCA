@@ -361,6 +361,31 @@ def find_or_create_lca_pset(model, element, owner_history):
 
 
 def ensure_property(model, pset, prop_name, value, unit=None):
+    # Handle string values (for MaterialName, MaterialID, etc.)
+    if isinstance(value, str):
+        properties = list(getattr(pset, "HasProperties", []) or [])
+        target_property = None
+        for prop in properties:
+            if prop and prop.is_a("IfcPropertySingleValue") and prop.Name == prop_name:
+                target_property = prop
+                break
+        
+        ifc_value = model.create_entity("IfcText", value)
+        
+        if target_property:
+            target_property.NominalValue = ifc_value
+            return
+        
+        new_property = model.create_entity(
+            "IfcPropertySingleValue",
+            Name=prop_name,
+            NominalValue=ifc_value,
+        )
+        properties.append(new_property)
+        pset.HasProperties = properties
+        return
+    
+    # Handle numeric values (existing behavior)
     try:
         numeric_value = float(value)
     except (TypeError, ValueError):
@@ -466,7 +491,7 @@ def export_ifc_with_lca_results(ifc_file_uint8array_js, results_json_str):
 `;
 
 export interface ElementLcaPropertyMap {
-  [propertyName: string]: number | null | undefined;
+  [propertyName: string]: number | string | null | undefined;
 }
 
 export type ElementLcaResultsMap = Record<string, ElementLcaPropertyMap>;

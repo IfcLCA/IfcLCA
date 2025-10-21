@@ -65,15 +65,19 @@ interface Material {
 }
 
 interface MaterialEntry {
-  name: string;
   volume: number;
-  density: number;
-  mass: number;
+  fraction: number;
   thickness?: number;
+  // Populated material data from API (replaces the original ObjectId)
   material?: {
+    _id: string;
     name: string;
-    kbobMatchId?: {
+    density?: number;
+    kbobMatchId?: string;
+    kbobMatch?: {
+      _id: string;
       Name: string;
+      KBOB_ID: number;
       GWP?: number;
       UBP?: number;
       PENRE?: number;
@@ -148,11 +152,22 @@ type KBOBIndicatorValues = {
 
 type ElementMaterialForExport = {
   volume?: number;
+  fraction?: number;
+  thickness?: number;
   indicators?: { gwp?: number; ubp?: number; penre?: number };
   material?: {
+    _id?: string;
+    name?: string;
     density?: number;
-    kbobMatch?: KBOBIndicatorValues;
-    kbobMatchId?: KBOBIndicatorValues;
+    kbobMatchId?: string;
+    kbobMatch?: {
+      _id: string;
+      Name: string;
+      KBOB_ID: number;
+      GWP?: number;
+      UBP?: number;
+      PENRE?: number;
+    };
   };
 };
 
@@ -415,7 +430,7 @@ export default function ProjectDetailsPage() {
         return;
       }
 
-      const materials = (element.materials || []) as ElementMaterialForExport[];
+      const materials = element.materials || [];
 
       const totals = materials.reduce(
         (acc, mat) => {
@@ -424,7 +439,9 @@ export default function ProjectDetailsPage() {
           const mass = volume * density;
 
           const kbobMatch: KBOBIndicatorValues =
-            mat.material?.kbobMatch ?? mat.material?.kbobMatchId ?? {};
+            (typeof mat.material?.kbobMatch === 'object' && mat.material?.kbobMatch)
+              ? mat.material.kbobMatch
+              : {};
 
           const gwp = resolveIndicator(
             mat.indicators?.gwp,
@@ -447,10 +464,35 @@ export default function ProjectDetailsPage() {
         { gwp: 0, ubp: 0, penre: 0 }
       );
 
+      // Collect KBOB material names and IDs (deduplicated)
+      const materialNames = Array.from(new Set(
+        materials
+          .map(mat => {
+            if (typeof mat.material?.kbobMatch === 'object' && mat.material?.kbobMatch) {
+              return mat.material.kbobMatch.Name;
+            }
+            return mat.material?.name;
+          })
+          .filter(Boolean)
+      )).join(', ');
+
+      const materialIds = Array.from(new Set(
+        materials
+          .map(mat => {
+            if (typeof mat.material?.kbobMatch === 'object' && mat.material?.kbobMatch) {
+              return mat.material.kbobMatch.KBOB_ID?.toString();
+            }
+            return mat.material?._id;
+          })
+          .filter(Boolean)
+      )).join(', ');
+
       results[element.guid] = {
         gwp: toFiniteNumber(totals.gwp),
         penre: toFiniteNumber(totals.penre),
         ubp: toFiniteNumber(totals.ubp),
+        MaterialName: materialNames,
+        MaterialID: materialIds,
       };
       names[element.guid] = element.name;
     });
