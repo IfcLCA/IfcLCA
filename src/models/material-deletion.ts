@@ -26,6 +26,10 @@ const materialDeletionSchema = new mongoose.Schema(
   }
 );
 
+// Add indexes for better query performance
+materialDeletionSchema.index({ userId: 1, createdAt: -1 });
+materialDeletionSchema.index({ projectId: 1, createdAt: -1 });
+
 // Add validation middleware
 materialDeletionSchema.pre("save", function (next) {
   if (!this.projectId || !this.userId) {

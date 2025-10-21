@@ -40,6 +40,10 @@ const uploadSchema = new mongoose.Schema(
   }
 );
 
+// Add indexes for better query performance
+uploadSchema.index({ userId: 1, createdAt: -1 });
+uploadSchema.index({ projectId: 1, createdAt: -1 });
+
 // Add validation middleware
 uploadSchema.pre("save", function (next) {
   if (!this.projectId || !this.userId) {

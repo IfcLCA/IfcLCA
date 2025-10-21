@@ -3,6 +3,9 @@ import { connectToDatabase } from "@/lib/mongodb";
 import { Project, Upload, MaterialDeletion } from "@/models";
 import { auth } from "@clerk/nextjs/server";
 
+export const runtime = "nodejs";
+export const revalidate = 120; // 2 minutes
+
 export async function GET(request: Request) {
   try {
     const { userId } = await auth();
@@ -11,103 +14,130 @@ export async function GET(request: Request) {
     }
 
     const { searchParams } = new URL(request.url);
+    const limit = parseInt(searchParams.get("limit") || "6");
     const page = parseInt(searchParams.get("page") || "1");
-    const limit = 2; // Changed to 2 items per page (and it returns more but cant be bothered to fix it now, future me will be happy)
     const skip = (page - 1) * limit;
 
     await connectToDatabase();
 
-    // Get total counts for pagination (even though no pagination UI exists yet)
-    const [projectsCount, uploadsCount, materialDeletionsCount] =
-      await Promise.all([
-        Project.countDocuments({ userId }),
-        Upload.countDocuments({ userId }),
-        MaterialDeletion.countDocuments({ userId }),
-      ]);
-
-    // Fetch paginated projects and uploads
-    const [projects, uploads, materialDeletions] = await Promise.all([
-      Project.find({ userId })
-        .sort({ createdAt: -1 })
-        .skip(skip)
-        .limit(limit)
-        .lean(),
-      Upload.find({ userId })
-        .sort({ createdAt: -1 })
-        .skip(skip)
-        .limit(limit)
-        .populate("projectId", "name")
-        .lean(),
-      MaterialDeletion.find({ userId })
-        .sort({ createdAt: -1 })
-        .skip(skip)
-        .limit(limit)
-        .populate("projectId", "name")
-        .lean(),
+    // Single optimized aggregation query using $unionWith
+    const activities = await Project.aggregate([
+      { $match: { userId } },
+      {
+        $facet: {
+          projects: [
+            {
+              $addFields: {
+                type: "project_created",
+                user: { name: "You" },
+                action: "created a new project",
+                project: "$name",
+                projectId: { $toString: "$_id" },
+                timestamp: "$createdAt",
+                details: {
+                  description: { $ifNull: ["$description", "No description provided"] },
+                },
+              },
+            },
+            { $sort: { createdAt: -1 } },
+            { $skip: skip },
+            { $limit: limit },
+          ],
+          uploads: [
+            {
+              $lookup: {
+                from: "uploads",
+                localField: "_id",
+                foreignField: "projectId",
+                as: "uploads",
+              },
+            },
+            { $unwind: "$uploads" },
+            {
+              $addFields: {
+                type: "file_uploaded",
+                user: { name: "You" },
+                action: "uploaded a file to",
+                project: "$name",
+                projectId: { $toString: "$_id" },
+                timestamp: "$uploads.createdAt",
+                details: {
+                  fileName: "$uploads.filename",
+                  elementCount: "$uploads.elementCount",
+                },
+              },
+            },
+            { $sort: { timestamp: -1 } },
+            { $skip: skip },
+            { $limit: limit },
+          ],
+          deletions: [
+            {
+              $lookup: {
+                from: "material_deletions",
+                localField: "_id",
+                foreignField: "projectId",
+                as: "deletions",
+              },
+            },
+            { $unwind: "$deletions" },
+            {
+              $addFields: {
+                type: "material_deleted",
+                user: { name: "You" },
+                action: "deleted a material from",
+                project: "$name",
+                projectId: { $toString: "$_id" },
+                timestamp: "$deletions.createdAt",
+                details: {
+                  materialName: "$deletions.materialName",
+                  reason: { $ifNull: ["$deletions.reason", "No reason provided"] },
+                },
+              },
+            },
+            { $sort: { timestamp: -1 } },
+            { $skip: skip },
+            { $limit: limit },
+          ],
+        },
+      },
+      {
+        $project: {
+          allActivities: {
+            $concatArrays: ["$projects", "$uploads", "$deletions"],
+          },
+        },
+      },
+      { $unwind: "$allActivities" },
+      { $replaceRoot: { newRoot: "$allActivities" } },
+      { $sort: { timestamp: -1 } },
+      { $limit: limit },
     ]);
 
-    // Format activities
-    const activities = [
-      ...projects.map((project) => ({
-        id: project._id.toString(),
-        type: "project_created",
-        user: {
-          name: "You",
-          avatar: "/placeholder-avatar.jpg",
-        },
-        action: "created a new project",
-        project: project.name,
-        projectId: project._id.toString(),
-        timestamp: project.createdAt,
-        details: {
-          description: project.description || "No description provided",
-        },
-      })),
-      ...uploads.map((upload) => ({
-        id: upload._id.toString(),
-        type: "file_uploaded",
-        user: {
-          name: "You",
-          avatar: "/placeholder-avatar.jpg",
-        },
-        action: "uploaded a file to",
-        project: upload.projectId?.name || "Unknown Project",
-        projectId: upload.projectId?._id?.toString() || "",
-        timestamp: upload.createdAt,
-        details: {
-          fileName: upload.filename,
-          elementCount: upload.elementCount || 0,
-        },
-      })),
-      ...materialDeletions.map((deletion) => ({
-        id: deletion._id.toString(),
-        type: "material_deleted",
-        user: {
-          name: "You",
-          avatar: "/placeholder-avatar.jpg",
-        },
-        action: "deleted a material from",
-        project: deletion.projectId?.name || "Unknown Project",
-        projectId: deletion.projectId?._id?.toString() || "",
-        timestamp: deletion.createdAt,
-        details: {
-          materialName: deletion.materialName,
-          reason: deletion.reason || "No reason provided",
-        },
-      })),
-    ];
-
-    // Sort by timestamp descending
-    const sortedActivities = activities.sort(
-      (a, b) =>
-        new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
-    );
+    // Get total count for pagination
+    const [projectsCount, uploadsCount, materialDeletionsCount] = await Promise.all([
+      Project.countDocuments({ userId }),
+      Upload.countDocuments({ userId }),
+      MaterialDeletion.countDocuments({ userId }),
+    ]);
 
     const totalCount = projectsCount + uploadsCount + materialDeletionsCount;
-    const hasMore = skip + sortedActivities.length < totalCount;
+    const hasMore = skip + activities.length < totalCount;
+
+    // Format activities with proper IDs
+    const formattedActivities = activities.map((activity) => ({
+      id: `${activity.type}_${activity.projectId}_${activity.timestamp}`,
+      type: activity.type,
+      user: activity.user,
+      action: activity.action,
+      project: activity.project,
+      projectId: activity.projectId,
+      timestamp: activity.timestamp,
+      details: activity.details,
+    }));
 
     return NextResponse.json({
-      activities: sortedActivities,
+      activities: formattedActivities,
       hasMore,
       total: totalCount,
     });

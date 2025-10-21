@@ -18,8 +18,8 @@ interface KBOBMaterialModel extends mongoose.Model<IKBOBMaterial> {
 
 const kbobSchema = new mongoose.Schema<IKBOBMaterial, KBOBMaterialModel>(
   {
-    KBOB_ID: { type: Number, required: true, index: true },
-    Name: { type: String, required: true, index: true },
+    KBOB_ID: { type: Number, required: true },
+    Name: { type: String, required: true },
     Category: { type: String },
     GWP: { type: Number, required: true },
     UBP: { type: Number, required: true },
@@ -35,6 +35,7 @@ const kbobSchema = new mongoose.Schema<IKBOBMaterial, KBOBMaterialModel>(
 );
 
 // Add indexes for better query performance
+kbobSchema.index({ KBOB_ID: 1 });
 kbobSchema.index({ Name: 1 });
 kbobSchema.index({ Category: 1 });
 

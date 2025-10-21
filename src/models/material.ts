@@ -15,7 +15,6 @@ const materialSchema = new mongoose.Schema<IMaterial>(
       type: mongoose.Schema.Types.ObjectId,
       ref: "Project",
       required: true,
-      index: true,
     },
     name: {
       type: String,
@@ -49,6 +48,7 @@ const materialSchema = new mongoose.Schema<IMaterial>(
 
 // Indexes
 materialSchema.index({ projectId: 1, name: 1 }, { unique: true });
+materialSchema.index({ projectId: 1, createdAt: -1 });
 materialSchema.index({ kbobMatchId: 1 });
 
 // Virtual for elements using this material

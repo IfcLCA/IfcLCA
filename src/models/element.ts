@@ -50,7 +50,6 @@ const elementSchema = new mongoose.Schema<IElement>(
       type: mongoose.Schema.Types.ObjectId,
       ref: "Project",
       required: true,
-      index: true,
     },
     guid: {
       type: String,
@@ -81,6 +80,7 @@ const elementSchema = new mongoose.Schema<IElement>(
 
 // Indexes
 elementSchema.index({ projectId: 1, guid: 1 }, { unique: true });
+elementSchema.index({ projectId: 1, createdAt: -1 });
 elementSchema.index({ "materials.material": 1 });
 
 // Virtual for total volume
