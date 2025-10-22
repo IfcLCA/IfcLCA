@@ -1,58 +1,6 @@
 import { useMemo } from "react";
 import { getAmortizationYears } from "@/lib/utils/amortization";
-
-interface Material {
-  volume: number;
-  material: {
-    density?: number;
-    kbobMatch?: {
-      GWP?: number;
-      UBP?: number;
-      PENRE?: number;
-    };
-  };
-}
-
-interface Element {
-  materials: Material[];
-  classification?: {
-    system: string;
-    code: string;
-    name?: string;
-  };
-}
-
-export type Project = {
-  elements: Element[];
-  emissions?: {
-    gwp: number;
-    ubp: number;
-    penre: number;
-  };
-  calculationArea?: {
-    type: string;
-    value: number;
-    unit: string;
-  };
-};
-
-export interface ProjectEmissions {
-  totals: {
-    gwp: number;
-    ubp: number;
-    penre: number;
-  };
-  formatted: {
-    gwp: string;
-    ubp: string;
-    penre: string;
-  };
-  units: {
-    gwp: string;
-    ubp: string;
-    penre: string;
-  };
-}
+import type { Project, ProjectEmissions } from "@/types/project";
 
 const MILLION = 1_000_000;
 
@@ -82,12 +30,12 @@ const formatTotals = (
       [key]:
         value >= MILLION
           ? `${(value / MILLION).toLocaleString("de-CH", {
-              maximumFractionDigits: Math.max(1, fractionDigits),
-              minimumFractionDigits: Math.min(3, Math.max(1, fractionDigits)),
-            })} Mio.`
+            maximumFractionDigits: Math.max(1, fractionDigits),
+            minimumFractionDigits: Math.min(3, Math.max(1, fractionDigits)),
+          })} Mio.`
           : value.toLocaleString("de-CH", {
-              maximumFractionDigits: fractionDigits,
-            }),
+            maximumFractionDigits: fractionDigits,
+          }),
     }),
     {} as ProjectEmissions["formatted"]
   );
@@ -130,6 +78,7 @@ export function useProjectEmissions(
         element.materials.forEach((mat) => {
           const volume = mat.volume || 0;
           const density = mat.material?.density || 0;
+          // Use kbobMatch (populated form) for calculations
           const kbob = mat.material?.kbobMatch;
 
           let gwp = volume * density * (kbob?.GWP || 0);

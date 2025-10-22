@@ -18,6 +18,11 @@ export async function GET(
 
         const uploadId = params.id;
 
+        // Validate ObjectId
+        if (!mongoose.isValidObjectId(uploadId)) {
+            return NextResponse.json({ error: "Invalid id" }, { status: 400 });
+        }
+
         // Find upload
         const upload = await Upload.findById(uploadId);
         if (!upload) {
@@ -33,41 +38,43 @@ export async function GET(
         // Convert uploadId to ObjectId for proper querying
         const uploadObjectId = new mongoose.Types.ObjectId(uploadId);
 
-        // Count elements that will be deleted
-        // Note: Elements are upserted by guid, so some may not have uploadId
-        let elementCount = await Element.countDocuments({ uploadId: uploadObjectId });
-        let elementsToDelete = await Element.find({ uploadId: uploadObjectId }).select("materials.material").lean();
+        // Find elements that will be deleted
+        const elementCount = await Element.countDocuments({ uploadId: uploadObjectId });
+        const elementsToDelete = await Element.find({ uploadId: uploadObjectId })
+            .select("_id materials.material")
+            .lean();
 
-        // If no elements found by uploadId, try finding by created time
-        if (elementCount === 0) {
-            const uploadCreatedAt = upload.createdAt;
-            const uploadCreatedPlus5Min = new Date(uploadCreatedAt.getTime() + 5 * 60 * 1000); // 5 min window
-
-            elementCount = await Element.countDocuments({
-                projectId: upload.projectId,
-                createdAt: {
-                    $gte: uploadCreatedAt,
-                    $lte: uploadCreatedPlus5Min
-                }
-            });
-
-            elementsToDelete = await Element.find({
-                projectId: upload.projectId,
-                createdAt: {
-                    $gte: uploadCreatedAt,
-                    $lte: uploadCreatedPlus5Min
-                }
-            }).select("materials.material").lean();
+        // Build set of material IDs referenced by elements to be deleted with null guards
+        const elementsToDeleteIds = elementsToDelete.map((el: any) => el._id);
+        const materialsReferenced = new Set<string>();
+        for (const el of elementsToDelete) {
+            const mats = (el as any).materials ?? [];
+            for (const m of mats) {
+                const id = m?.material?.toString?.();
+                if (id) materialsReferenced.add(id);
+            }
         }
-        const materialsToDeleteIds = new Set(
-            elementsToDelete.flatMap((el) => el.materials.map((m: any) => m.material.toString()))
-        );
+        const materialIds = Array.from(materialsReferenced).map((id) => new mongoose.Types.ObjectId(id));
 
-        // Check which materials will become orphaned (volume becomes 0)
-        const materialsToDelete = await Material.find({
-            _id: { $in: Array.from(materialsToDeleteIds).map((id) => new mongoose.Types.ObjectId(id)) },
-            projectId: upload.projectId,
-        }).select("name _id").lean();
+        // Count remaining references for these materials in other elements of the project
+        const remaining = await Element.aggregate([
+            { $match: { projectId: upload.projectId, _id: { $nin: elementsToDeleteIds } } },
+            { $unwind: "$materials" },
+            { $match: { "materials.material": { $in: materialIds } } },
+            { $group: { _id: "$materials.material", refs: { $sum: 1 } } },
+        ]);
+        const remainingMap = new Map(remaining.map((r: any) => [r._id.toString(), r.refs]));
+        const orphanedIds = materialIds
+            .map((oid) => oid.toString())
+            .filter((id) => (remainingMap.get(id) ?? 0) === 0)
+            .map((id) => new mongoose.Types.ObjectId(id));
+
+        // Check which materials will become truly orphaned (no remaining references)
+        const materialsToDelete = orphanedIds.length
+            ? await Material.find({ _id: { $in: orphanedIds }, projectId: upload.projectId })
+                .select("name _id")
+                .lean()
+            : [];
 
         return NextResponse.json({
             upload: {

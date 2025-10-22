@@ -42,6 +42,11 @@ export async function DELETE(
 
     const uploadId = params.id;
 
+    // Validate ObjectId
+    if (!mongoose.isValidObjectId(uploadId)) {
+      return NextResponse.json({ error: "Invalid id" }, { status: 400 });
+    }
+
     // Find upload and verify ownership
     const upload = await Upload.findById(uploadId);
     if (!upload) {
@@ -65,28 +70,8 @@ export async function DELETE(
       const uploadObjectId = new mongoose.Types.ObjectId(uploadId);
 
       // 1. Delete all elements with this uploadId
-      // Note: Elements are upserted by guid, so some may not have uploadId
-      // Delete by uploadId first, then by created time range as fallback
-      let deleteResult = await Element.deleteMany({ uploadId: uploadObjectId }).session(session);
-
-      // If no elements found by uploadId, try finding by created time
-      if (deleteResult.deletedCount === 0) {
-        logger.debug("No elements found by uploadId, trying by created time", { uploadId });
-        // Get upload creation time to find elements from this upload
-        const uploadCreatedAt = upload.createdAt;
-        const uploadCreatedPlus5Min = new Date(uploadCreatedAt.getTime() + 5 * 60 * 1000); // 5 min window
-
-        deleteResult = await Element.deleteMany({
-          projectId: upload.projectId,
-          createdAt: {
-            $gte: uploadCreatedAt,
-            $lte: uploadCreatedPlus5Min
-          }
-        }).session(session);
-        logger.debug("Deleted elements by time range", { count: deleteResult.deletedCount });
-      } else {
-        logger.debug("Deleted elements by uploadId", { count: deleteResult.deletedCount });
-      }
+      const deleteResult = await Element.deleteMany({ uploadId: uploadObjectId }).session(session);
+      logger.debug("Deleted elements by uploadId", { count: deleteResult.deletedCount });
 
       // 2. Recalculate material volumes from remaining elements
       const materialVolumes = await Element.aggregate([

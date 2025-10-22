@@ -3,8 +3,7 @@ import {
     AMORTIZATION_LOOKUP,
     EBKP_STRUCTURE_WITH_AMORTIZATION
 } from '@/data/ebkp-with-amortization-types';
-
-export const DEFAULT_AMORTIZATION_YEARS = 30;
+import { DEFAULT_AMORTIZATION_YEARS } from '@/lib/constants/amortization';
 
 export const ebkpSystem: ClassificationSystem = {
     id: 'ebkp',

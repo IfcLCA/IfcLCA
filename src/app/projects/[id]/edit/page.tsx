@@ -75,20 +75,37 @@ export default function EditProjectPage() {
     setIsSaving(true);
 
     try {
+      // Build payload with proper validation
+      const payload: any = { name, description };
+
+      if (areaValue === "") {
+        // Explicit clear on server
+        payload.calculationArea = null;
+      } else {
+        // Parse and validate number
+        const v = Number(areaValue);
+        if (!Number.isFinite(v) || v < 0) {
+          toast({
+            title: "Invalid area value",
+            description: "Please enter a valid positive number",
+            variant: "destructive",
+          });
+          setIsSaving(false);
+          return;
+        }
+        payload.calculationArea = {
+          type: areaType || "EBF",
+          value: v,
+          unit: "m²"
+        };
+      }
+
       const response = await fetch(`/api/projects/${projectId}`, {
         method: "PATCH",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({
-          name,
-          description,
-          calculationArea: areaValue ? {
-            type: areaType,
-            value: parseFloat(areaValue),
-            unit: "m²"
-          } : undefined
-        }),
+        body: JSON.stringify(payload),
       });
 
       if (!response.ok) throw new Error("Failed to update project");

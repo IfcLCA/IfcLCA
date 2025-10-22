@@ -3,7 +3,7 @@
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useState } from "react";
 import { useProjectEmissions } from "@/hooks/use-project-emissions";
-import type { Project } from "@/hooks/use-project-emissions";
+import type { Project } from "@/types/project";
 
 type MetricKey = "gwp" | "ubp" | "penre";
 

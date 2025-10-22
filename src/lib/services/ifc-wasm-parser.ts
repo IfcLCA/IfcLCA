@@ -169,15 +169,19 @@ def get_classification(element):
         for rel in element.HasAssociations:
             if rel.is_a('IfcRelAssociatesClassification'):
                 class_ref = rel.RelatingClassification
+                
+                # Handle IfcClassificationReference
                 if class_ref.is_a('IfcClassificationReference'):
                     # Get code from ItemReference (IFC2X3) or Identification (IFC4)
                     code = getattr(class_ref, 'ItemReference', None) or getattr(class_ref, 'Identification', None)
                     
-                    # Get system name from ReferencedSource
+                    # Get system name from ReferencedSource (two-step access)
                     system = None
                     name = None
                     if hasattr(class_ref, 'ReferencedSource') and class_ref.ReferencedSource:
-                        system = safe_string(getattr(class_ref, 'ReferencedSource.Name', None))
+                        src = getattr(class_ref, 'ReferencedSource', None)
+                        if src is not None:
+                            system = safe_string(getattr(src, 'Name', None))
                     
                     # Get classification name
                     if hasattr(class_ref, 'Name') and class_ref.Name:
@@ -189,6 +193,28 @@ def get_classification(element):
                         if code_str:
                             return {
                                 'system': system or 'eBKP-H',
+                                'code': code_str,
+                                'name': name
+                            }
+                
+                # Handle IfcClassification (direct classification object)
+                elif class_ref.is_a('IfcClassification'):
+                    # Get code
+                    code = getattr(class_ref, 'ItemReference', None) or getattr(class_ref, 'Identification', None)
+                    
+                    # Get system/name from classification
+                    system = None
+                    name = None
+                    if hasattr(class_ref, 'Name') and class_ref.Name:
+                        name = safe_string(class_ref.Name)
+                    if hasattr(class_ref, 'Source') and class_ref.Source:
+                        system = safe_string(class_ref.Source)
+                    
+                    if code:
+                        code_str = safe_string(code)
+                        if code_str:
+                            return {
+                                'system': system or name or 'eBKP-H',
                                 'code': code_str,
                                 'name': name
                             }

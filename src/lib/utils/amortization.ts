@@ -1,6 +1,5 @@
 import { classificationRegistry } from '@/lib/classifications';
-
-export const DEFAULT_AMORTIZATION_YEARS = 30;
+import { DEFAULT_AMORTIZATION_YEARS } from '@/lib/constants/amortization';
 
 /**
  * Get amortization years for an element's classification
@@ -36,6 +35,10 @@ export function calculateRelativeEmissions(
     area: number
 ): number {
     if (area <= 0) return 0;
+    // Guard against non-positive amortization years
+    if (amortizationYears <= 0) {
+        amortizationYears = DEFAULT_AMORTIZATION_YEARS;
+    }
     return absoluteEmissions / (amortizationYears * area);
 }
 

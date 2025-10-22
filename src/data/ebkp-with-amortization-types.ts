@@ -1193,20 +1193,8 @@ export const EBKP_STRUCTURE_WITH_AMORTIZATION = {
         "label": "Medizinisches Kälte- / Wärmegerät"
       },
       {
-        "code": "H05.04",
-        "label": "Medizinisches Kälte- / Wärmegerät"
-      },
-      {
         "code": "H05.05",
         "label": "Mess-, Analysetechnik"
-      },
-      {
-        "code": "H05.06",
-        "label": "Reinigung, Desinfektion, Sterilisation"
-      },
-      {
-        "code": "H05.06",
-        "label": "Reinigung, Desinfektion, Sterilisation"
       },
       {
         "code": "H05.06",
@@ -1691,3 +1679,38 @@ export const AMORTIZATION_LOOKUP = new Map<string, number[]>([
   ['G04.01', [30]],
   ['G04.02', [30]]
 ]);
+
+// Build-time validation: Check for duplicate codes
+if (typeof window === 'undefined') {
+  const codes = new Set<string>();
+  const duplicates: string[] = [];
+
+  // Check EBKP_STRUCTURE_WITH_AMORTIZATION
+  for (const hauptgruppe of Object.values(EBKP_STRUCTURE_WITH_AMORTIZATION)) {
+    for (const elementgruppe of Object.values(hauptgruppe)) {
+      for (const item of elementgruppe) {
+        if (codes.has(item.code)) {
+          duplicates.push(item.code);
+        } else {
+          codes.add(item.code);
+        }
+      }
+    }
+  }
+
+  // Check ELEMENTS_WITH_AMORTIZATION
+  for (const item of ELEMENTS_WITH_AMORTIZATION) {
+    if (codes.has(item.code)) {
+      duplicates.push(item.code);
+    } else {
+      codes.add(item.code);
+    }
+  }
+
+  if (duplicates.length > 0) {
+    throw new Error(
+      `Duplicate EBKP codes found: ${duplicates.join(', ')}. ` +
+      `Each code must appear only once in the dataset.`
+    );
+  }
+}
