@@ -10,9 +10,9 @@ IfcLCA leverages **openBIM** and **Open Data Standards** to analyze the environm
 
 ## ✨ Features
 - 🏗️ **Project Dashboard** - manage multiple building projects and track their progress.
-- ⚙️ **IFC Processing** - upload, parse and inspect IFC files with a built‑in 3D viewer.
+- ⚙️ **IFC Processing** - upload and parse IFC files; inspect elements and materials.
 - 📚 **Materials Library** - centralize materials data across projects.
-- 📈 **LCA Charts** - visualize environmental impacts and export nice charts.
+- 📈 **LCA Charts** - visualize environmental impacts; export IFC with LCA results and get nice charts.
 
 ## 🚀 Typical Workflow
 1. **Export your Model**
@@ -27,7 +27,7 @@ IfcLCA leverages **openBIM** and **Open Data Standards** to analyze the environm
    - Combine your materials with environmental impact data
 4. **Analyze Results**
    - View impact metrics: GWP, PEnr, UBP and material breakdown
-   - Use interactive charts and material hotspots to identify issues
+   - Use charts to identify key contributors
    - Comparative analysis and report export *(coming soon)*
 
 ## 🛠 Tech Stack
@@ -41,3 +41,50 @@ IfcLCA leverages **openBIM** and **Open Data Standards** to analyze the environm
 ## 🌍 Open Source
 IfcLCA is and will always be Open Source. Sustainability is a team effort and requires trust and transparency. The project is released under the **AGPL-3.0** license.
 
+
+## 📦 Model Requirements
+- **IFC version**: IFC4 preferred (IFC2x3 is supported)
+- **Base Quantities**: export element volumes via Ifc Base Quantities (NetVolume or GrossVolume)
+- **Materials**: include assembly layers when possible (supports `IfcMaterialLayerSet` and `IfcMaterialConstituentSet`)
+- **Classification**: provide element classification codes for amortization lookup (see below)
+
+## 🧾 Classification Support
+- **Supported systems**: currently **eBKP-H** is supported for amortization years
+- **Unknown/missing classification**: falls back to a sensible default amortization period
+- Classification is read from your IFC model; set or correct it in your authoring tool or use [ifcclassify.com](https://ifcclassify.com)
+
+## 📐 Emissions Calculation
+IfcLCA computes three metrics using Swiss KBOB data:
+- **GWP** (Global Warming Potential)
+- **UBP** (Environmental Impact Points)
+- **PENRE** (Primary Energy Non‑Renewable)
+
+### Absolute emissions
+- Computed per material and summed per project
+- Formula (per material):
+
+$$
+\text{absolute}_{\text{metric}} = \text{volume} \times \text{density} \times \text{factor}_{\text{metric}}
+$$
+
+- Useful for total project impacts
+
+### Relative emissions (annual, per area)
+- Normalizes absolute emissions by amortization years and area
+- Formula:
+
+$$
+\text{relative} = \frac{\text{absolute}}{\text{amortizationYears} \times \text{area}}
+$$
+
+- Requires a valid calculation area and classification to derive amortization years
+
+### Units
+- **Absolute**
+  - GWP: `kg CO₂ eq`
+  - UBP: `UBP`
+  - PENRE: `kWh oil-eq`
+- **Relative** (per area and year; area unit defaults to `m²`)
+  - GWP: `kg CO₂ eq/<area>·a`
+  - UBP: `UBP/<area>·a`
+  - PENRE: `kWh oil-eq/<area>·a`
