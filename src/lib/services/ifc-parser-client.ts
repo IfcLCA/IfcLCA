@@ -60,31 +60,31 @@ export async function parseIFCFile(
       elementCount: elements.length,
       firstElement: elements[0]
         ? {
-            id: elements[0].id,
-            type: elements[0].type,
-            object_type: elements[0].object_type,
-            volume: elements[0].volume,
-            materials: elements[0].materials,
-            material_volumes: elements[0].material_volumes,
-            hasDirectMaterials: !!elements[0].materials,
-            hasMaterialVolumes: !!elements[0].material_volumes,
-            materialVolumesKeys: elements[0].material_volumes
-              ? Object.keys(elements[0].material_volumes)
-              : [],
-          }
+          id: elements[0].id,
+          type: elements[0].type,
+          object_type: elements[0].object_type,
+          volume: elements[0].volume,
+          materials: elements[0].materials,
+          material_volumes: elements[0].material_volumes,
+          hasDirectMaterials: !!elements[0].materials,
+          hasMaterialVolumes: !!elements[0].material_volumes,
+          materialVolumesKeys: elements[0].material_volumes
+            ? Object.keys(elements[0].material_volumes)
+            : [],
+        }
         : null,
       secondElement: elements[1]
         ? {
-            id: elements[1].id,
-            type: elements[1].type,
-            materials: elements[1].materials,
-            material_volumes: elements[1].material_volumes,
-            hasDirectMaterials: !!elements[1].materials,
-            hasMaterialVolumes: !!elements[1].material_volumes,
-            materialVolumesKeys: elements[1].material_volumes
-              ? Object.keys(elements[1].material_volumes)
-              : [],
-          }
+          id: elements[1].id,
+          type: elements[1].type,
+          materials: elements[1].materials,
+          material_volumes: elements[1].material_volumes,
+          hasDirectMaterials: !!elements[1].materials,
+          hasMaterialVolumes: !!elements[1].material_volumes,
+          materialVolumesKeys: elements[1].material_volumes
+            ? Object.keys(elements[1].material_volumes)
+            : [],
+        }
         : null,
     });
 
@@ -200,6 +200,7 @@ export async function parseIFCFile(
               loadBearing: element.properties.loadBearing || false,
               isExternal: element.properties.isExternal || false,
             },
+            classification: element.classification,
             materials:
               element.materials?.map((materialName: string) => {
                 const materialVolumeData =
@@ -215,15 +216,15 @@ export async function parseIFCFile(
               }) || [],
             materialLayers: element.material_volumes
               ? {
-                  layerSetName: `${element.type}_Layers`,
-                  layers: Object.entries(element.material_volumes).map(
-                    ([name, data]) => ({
-                      materialName: name,
-                      volume: data.volume,
-                      fraction: data.fraction,
-                    })
-                  ),
-                }
+                layerSetName: `${element.type}_Layers`,
+                layers: Object.entries(element.material_volumes).map(
+                  ([name, data]) => ({
+                    materialName: name,
+                    volume: data.volume,
+                    fraction: data.fraction,
+                  })
+                ),
+              }
               : undefined,
           })),
           isLastChunk: true,

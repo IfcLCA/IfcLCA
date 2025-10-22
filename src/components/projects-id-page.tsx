@@ -20,6 +20,15 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
   Pagination,
   PaginationContent,
@@ -28,19 +37,12 @@ import {
   PaginationNext,
   PaginationPrevious,
 } from "@/components/ui/pagination";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { UploadModal } from "@/components/upload-modal";
 import { toast } from "@/hooks/use-toast";
 import { ReloadIcon } from "@radix-ui/react-icons";
 import cn from "classnames";
-import { Download, Edit, UploadCloud } from "lucide-react";
+import { Download, Edit, UploadCloud, Trash2 } from "lucide-react";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import type { ElementLcaResultsMap } from "@/lib/services/ifc-export-service";
@@ -114,6 +116,12 @@ interface Project {
   name: string;
   description?: string;
   imageUrl?: string;
+  calculationArea?: {
+    type: string;
+    value: number;
+    unit: string;
+  };
+  classificationSystem?: string;
   createdAt: Date;
   updatedAt: Date;
   uploads: Upload[];
@@ -219,6 +227,9 @@ export default function ProjectDetailsPage() {
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [uploadToDelete, setUploadToDelete] = useState<string | null>(null);
+  const [isDeleteUploadDialogOpen, setIsDeleteUploadDialogOpen] = useState(false);
+  const [uploadDeleteImpact, setUploadDeleteImpact] = useState<any>(null);
   const [project, setProject] = useState<ExtendedProject | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -410,6 +421,55 @@ export default function ProjectDetailsPage() {
     }
   };
 
+  const handleDeleteUploadClick = async (uploadId: string) => {
+    setUploadToDelete(uploadId);
+    try {
+      // Fetch impact preview
+      const response = await fetch(`/api/uploads/${uploadId}/impact`);
+      if (response.ok) {
+        const impact = await response.json();
+        setUploadDeleteImpact(impact);
+      }
+    } catch (error) {
+      console.error("Failed to fetch upload impact:", error);
+    }
+    setIsDeleteUploadDialogOpen(true);
+  };
+
+  const handleDeleteUpload = async () => {
+    if (!uploadToDelete) return;
+
+    try {
+      const response = await fetch(`/api/uploads/${uploadToDelete}`, {
+        method: "DELETE",
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to delete upload");
+      }
+
+      const result = await response.json();
+
+      toast({
+        title: "Upload deleted",
+        description: `Successfully deleted ${result.elementsDeleted} elements.`,
+      });
+
+      setIsDeleteUploadDialogOpen(false);
+      setUploadToDelete(null);
+      setUploadDeleteImpact(null);
+
+      // Refresh project data
+      await fetchProject();
+    } catch (err) {
+      toast({
+        title: "Error",
+        description: "Failed to delete the upload. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
+
   const elementExportData = useMemo(() => {
     if (!project) {
       return {
@@ -537,6 +597,7 @@ export default function ProjectDetailsPage() {
         canExport={canExport}
         isLoadingExport={isLoadingExportData}
         materialsWithCount={materialsWithCount}
+        onDeleteUpload={handleDeleteUploadClick}
       />
       <UploadModal
         projectId={projectId}
@@ -555,6 +616,17 @@ export default function ProjectDetailsPage() {
         isOpen={isDeleteDialogOpen}
         onClose={() => setIsDeleteDialogOpen(false)}
         onDelete={handleDeleteProject}
+      />
+      <DeleteUploadDialog
+        isOpen={isDeleteUploadDialogOpen}
+        onClose={() => {
+          setIsDeleteUploadDialogOpen(false);
+          setUploadToDelete(null);
+          setUploadDeleteImpact(null);
+        }}
+        onDelete={handleDeleteUpload}
+        upload={uploadToDelete ? project?.uploads?.find(u => u._id === uploadToDelete) || null : null}
+        impact={uploadDeleteImpact}
       />
     </div>
   );
@@ -604,45 +676,105 @@ const ProjectHeader = ({
   onExport: () => void;
   canExport: boolean;
   isLoadingExport?: boolean;
-}) => (
-  <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-    <div className="space-y-4">
-      <div>
-        <h1 className="text-3xl font-bold text-primary">{project.name}</h1>
-        {project.description && (
-          <p className="text-muted-foreground mt-1">{project.description}</p>
-        )}
+}) => {
+  const [isEditingArea, setIsEditingArea] = useState(false);
+  const [areaValue, setAreaValue] = useState(project.calculationArea?.value?.toString() || '');
+  const [areaType, setAreaType] = useState(project.calculationArea?.type || 'EBF');
+
+  const handleSaveArea = async () => {
+    const value = parseFloat(areaValue);
+    if (isNaN(value) || value < 0) return;
+
+    try {
+      await fetch(`/api/projects/${project._id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          calculationArea: { type: areaType, value, unit: 'm²' }
+        }),
+      });
+
+      setIsEditingArea(false);
+      window.location.reload(); // Trigger refetch
+    } catch (error) {
+      console.error('Failed to save area:', error);
+    }
+  };
+
+  return (
+    <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+      <div className="space-y-4">
+        <div>
+          <h1 className="text-3xl font-bold text-primary">{project.name}</h1>
+          {project.description && (
+            <p className="text-muted-foreground mt-1">{project.description}</p>
+          )}
+        </div>
+        <div className="flex items-center gap-2">
+          <Label>{areaType} (m²):</Label>
+          {isEditingArea ? (
+            <div className="flex gap-2 items-center">
+              <Select value={areaType} onValueChange={setAreaType}>
+                <SelectTrigger className="w-24">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="EBF">EBF</SelectItem>
+                  <SelectItem value="GFA">GFA</SelectItem>
+                  <SelectItem value="NFA">NFA</SelectItem>
+                </SelectContent>
+              </Select>
+              <Input
+                type="number"
+                min="0"
+                value={areaValue}
+                onChange={(e) => setAreaValue(e.target.value)}
+                onBlur={handleSaveArea}
+                onKeyDown={(e) => e.key === 'Enter' && handleSaveArea()}
+                className="w-32"
+                autoFocus
+              />
+            </div>
+          ) : (
+            <span
+              onClick={() => setIsEditingArea(true)}
+              className="cursor-pointer hover:underline"
+            >
+              {project.calculationArea?.value || 'Not set'}
+            </span>
+          )}
+        </div>
+      </div>
+      <div className="flex flex-col sm:flex-row gap-4">
+        <Button
+          variant="secondary"
+          onClick={onExport}
+          disabled={!canExport || isLoadingExport}
+        >
+          {isLoadingExport ? (
+            <>
+              <ReloadIcon className="mr-2 h-4 w-4 animate-spin" />
+              Preparing...
+            </>
+          ) : (
+            <>
+              <Download className="mr-2 h-4 w-4" />
+              Export IFC
+            </>
+          )}
+        </Button>
+        <Button onClick={onUpload} className="bg-primary text-primary-foreground">
+          <UploadCloud className="mr-2 h-4 w-4" />
+          Add New Ifc
+        </Button>
+        <Button variant="outline" onClick={onEdit}>
+          <Edit className="mr-2 h-4 w-4" />
+          Edit Project
+        </Button>
       </div>
     </div>
-    <div className="flex flex-col sm:flex-row gap-4">
-      <Button
-        variant="secondary"
-        onClick={onExport}
-        disabled={!canExport || isLoadingExport}
-      >
-        {isLoadingExport ? (
-          <>
-            <ReloadIcon className="mr-2 h-4 w-4 animate-spin" />
-            Preparing...
-          </>
-        ) : (
-          <>
-            <Download className="mr-2 h-4 w-4" />
-            Export IFC
-          </>
-        )}
-      </Button>
-      <Button onClick={onUpload} className="bg-primary text-primary-foreground">
-        <UploadCloud className="mr-2 h-4 w-4" />
-        Add New Ifc
-      </Button>
-      <Button variant="outline" onClick={onEdit}>
-        <Edit className="mr-2 h-4 w-4" />
-        Edit Project
-      </Button>
-    </div>
-  </div>
-);
+  );
+};
 
 const ProjectOverview = ({ project }: { project: ExtendedProject }) => (
   <section className="space-y-4">
@@ -662,6 +794,7 @@ const ProjectTabs = ({
   canExport,
   isLoadingExport = false,
   materialsWithCount,
+  onDeleteUpload,
 }: {
   project: Project;
   onUpload: () => void;
@@ -674,6 +807,7 @@ const ProjectTabs = ({
     category?: string;
     volume?: number;
   }[];
+  onDeleteUpload: (uploadId: string) => void;
 }) => (
   <Tabs defaultValue="uploads" className="w-full">
     <TabsList className="grid w-full grid-cols-4">
@@ -690,6 +824,7 @@ const ProjectTabs = ({
         onExport={onExport}
         canExport={canExport}
         isLoadingExport={isLoadingExport}
+        onDeleteUpload={onDeleteUpload}
       />
     </TabsContent>
 
@@ -713,12 +848,14 @@ const UploadsTab = ({
   onExport,
   canExport,
   isLoadingExport = false,
+  onDeleteUpload,
 }: {
   project: Project;
   onUpload: () => void;
   onExport: () => void;
   canExport: boolean;
   isLoadingExport?: boolean;
+  onDeleteUpload: (uploadId: string) => void;
 }) => {
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 5;
@@ -743,25 +880,6 @@ const UploadsTab = ({
             {project?.uploads?.length || 0}
           </Badge>
         </h2>
-        <div className="flex flex-col sm:flex-row gap-2">
-          <Button onClick={onExport} disabled={!canExport || isLoadingExport}>
-            {isLoadingExport ? (
-              <>
-                <ReloadIcon className="h-4 w-4 mr-2 animate-spin" />
-                Preparing...
-              </>
-            ) : (
-              <>
-                <Download className="h-4 w-4 mr-2" />
-                Export IFC
-              </>
-            )}
-          </Button>
-          <Button onClick={onUpload} variant="outline">
-            <UploadCloud className="h-4 w-4 mr-2" />
-            Add New Ifc
-          </Button>
-        </div>
       </div>
       {!project?.uploads || project.uploads.length === 0 ? (
         <EmptyState
@@ -779,7 +897,7 @@ const UploadsTab = ({
         <div className="space-y-4">
           <div className="grid gap-4">
             {currentUploads.map((upload) => (
-              <UploadCard key={upload._id} upload={upload} />
+              <UploadCard key={upload._id} upload={upload} onDelete={onDeleteUpload} />
             ))}
           </div>
 
@@ -830,7 +948,7 @@ const UploadsTab = ({
   );
 };
 
-const UploadCard = ({ upload }: { upload: Upload }) => (
+const UploadCard = ({ upload, onDelete }: { upload: Upload; onDelete: (uploadId: string) => void }) => (
   <Card>
     <CardContent className="flex flex-col sm:flex-row justify-between items-start sm:items-center p-4 gap-3">
       <div className="space-y-1">
@@ -858,6 +976,14 @@ const UploadCard = ({ upload }: { upload: Upload }) => (
         >
           {upload.status}
         </Badge>
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => onDelete(upload._id)}
+          className="text-destructive hover:text-destructive hover:bg-destructive/10"
+        >
+          <Trash2 className="h-4 w-4" />
+        </Button>
       </div>
     </CardContent>
   </Card>
@@ -1171,6 +1297,58 @@ const DeleteProjectDialog = ({
           onClick={onDelete}
         >
           Delete Project
+        </AlertDialogAction>
+      </AlertDialogFooter>
+    </AlertDialogContent>
+  </AlertDialog>
+);
+
+const DeleteUploadDialog = ({
+  isOpen,
+  onClose,
+  onDelete,
+  upload,
+  impact,
+}: {
+  isOpen: boolean;
+  onClose: () => void;
+  onDelete: () => void;
+  upload: Upload | null;
+  impact: any;
+}) => (
+  <AlertDialog open={isOpen} onOpenChange={onClose}>
+    <AlertDialogContent>
+      <AlertDialogHeader>
+        <AlertDialogTitle>Delete Upload?</AlertDialogTitle>
+        <AlertDialogDescription>
+          <div className="space-y-2">
+            <p>
+              This will permanently delete the upload <strong>{upload?.filename}</strong> and all associated elements.
+            </p>
+            {impact && (
+              <div className="mt-3 space-y-1">
+                <p className="text-sm font-medium">Impact:</p>
+                <ul className="text-sm space-y-1 list-disc list-inside">
+                  <li>{impact.impact?.elementsToDelete || 0} elements will be deleted</li>
+                  {impact.impact?.materialsToDelete > 0 && (
+                    <li>{impact.impact.materialsToDelete} unused materials will be removed</li>
+                  )}
+                </ul>
+              </div>
+            )}
+            <p className="text-sm text-muted-foreground mt-2">
+              This action cannot be undone.
+            </p>
+          </div>
+        </AlertDialogDescription>
+      </AlertDialogHeader>
+      <AlertDialogFooter>
+        <AlertDialogCancel>Cancel</AlertDialogCancel>
+        <AlertDialogAction
+          className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+          onClick={onDelete}
+        >
+          Delete Upload
         </AlertDialogAction>
       </AlertDialogFooter>
     </AlertDialogContent>

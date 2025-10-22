@@ -444,9 +444,24 @@ export async function PATCH(
 
     const { id } = await params;
     const body = await request.json();
+
+    // Handle calculationArea null by unsetting it instead of setting to null
+    const updateOp: any = { $set: {} };
+    if (body.calculationArea === null) {
+      updateOp.$unset = { calculationArea: "" };
+      delete body.calculationArea;
+    }
+
+    // Copy other fields to $set
+    Object.keys(body).forEach(key => {
+      if (body[key] !== undefined) {
+        updateOp.$set[key] = body[key];
+      }
+    });
+
     const project = await Project.findOneAndUpdate(
       { _id: id, userId },
-      { $set: body },
+      updateOp,
       { new: true }
     );
 

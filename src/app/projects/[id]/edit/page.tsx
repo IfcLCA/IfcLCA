@@ -6,6 +6,13 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
   Card,
   CardContent,
   CardHeader,
@@ -37,6 +44,8 @@ export default function EditProjectPage() {
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
+  const [areaType, setAreaType] = useState("");
+  const [areaValue, setAreaValue] = useState("");
 
   useEffect(() => {
     async function fetchProject() {
@@ -45,6 +54,8 @@ export default function EditProjectPage() {
         const data = await response.json();
         setName(data.name);
         setDescription(data.description || "");
+        setAreaType(data.calculationArea?.type || "EBF");
+        setAreaValue(data.calculationArea?.value?.toString() || "");
         setIsLoading(false);
       } catch (error) {
         console.error("Failed to fetch project:", error);
@@ -64,12 +75,37 @@ export default function EditProjectPage() {
     setIsSaving(true);
 
     try {
+      // Build payload with proper validation
+      const payload: any = { name, description };
+
+      if (areaValue === "") {
+        // Explicit clear on server
+        payload.calculationArea = null;
+      } else {
+        // Parse and validate number
+        const v = Number(areaValue);
+        if (!Number.isFinite(v) || v < 0) {
+          toast({
+            title: "Invalid area value",
+            description: "Please enter a valid positive number",
+            variant: "destructive",
+          });
+          setIsSaving(false);
+          return;
+        }
+        payload.calculationArea = {
+          type: areaType || "EBF",
+          value: v,
+          unit: "m²"
+        };
+      }
+
       const response = await fetch(`/api/projects/${projectId}`, {
         method: "PATCH",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ name, description }),
+        body: JSON.stringify(payload),
       });
 
       if (!response.ok) throw new Error("Failed to update project");
@@ -202,6 +238,38 @@ export default function EditProjectPage() {
                 className="w-full resize-none"
                 placeholder="Enter project description (optional)"
               />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="area" className="text-sm font-medium">
+                Calculation Area (for relative LCA)
+              </Label>
+              <div className="flex gap-2">
+                <Select value={areaType} onValueChange={setAreaType} disabled={isSaving}>
+                  <SelectTrigger className="w-32">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="EBF">EBF</SelectItem>
+                    <SelectItem value="GFA">GFA</SelectItem>
+                    <SelectItem value="NFA">NFA</SelectItem>
+                    <SelectItem value="GIA">GIA</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Input
+                  id="area"
+                  type="number"
+                  value={areaValue}
+                  onChange={(e) => setAreaValue(e.target.value)}
+                  disabled={isSaving}
+                  className="flex-1"
+                  placeholder="Enter area in m²"
+                  min="0"
+                  step="0.01"
+                />
+              </div>
+              <p className="text-xs text-muted-foreground">
+                This area is used for calculating relative emissions (emissions per m² per year)
+              </p>
             </div>
             <div className="flex justify-end gap-4 pt-4">
               <Button

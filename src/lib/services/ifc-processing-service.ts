@@ -19,6 +19,11 @@ interface IFCElement {
     loadBearing?: boolean;
     isExternal?: boolean;
   };
+  classification?: {
+    system: string;
+    code: string;
+    name?: string;
+  };
   materials?: IFCMaterial[];
   materialLayers?: {
     layers: Array<{
@@ -215,12 +220,13 @@ export class IFCProcessingService {
                   volume: element.volume,
                   loadBearing: element.properties?.loadBearing || false,
                   isExternal: element.properties?.isExternal || false,
+                  classification: element.classification,
                   materials: processedMaterials,
+                  uploadId: new mongoose.Types.ObjectId(uploadId), // Always set uploadId, even on updates
                   updatedAt: new Date(),
                 },
                 $setOnInsert: {
                   projectId: new mongoose.Types.ObjectId(projectId),
-                  uploadId: new mongoose.Types.ObjectId(uploadId),
                   createdAt: new Date(),
                 },
               },

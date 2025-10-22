@@ -17,6 +17,23 @@ const projectSchema = new mongoose.Schema(
     imageUrl: {
       type: String,
     },
+    calculationArea: {
+      type: {
+        type: String,
+      },
+      value: {
+        type: Number,
+        min: 0,
+      },
+      unit: {
+        type: String,
+        default: "m²",
+      },
+    },
+    classificationSystem: {
+      type: String,
+      default: "eBKP-H",
+    },
     emissions: {
       gwp: { type: Number, default: 0 },
       ubp: { type: Number, default: 0 },
