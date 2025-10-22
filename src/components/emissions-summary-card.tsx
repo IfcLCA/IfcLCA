@@ -38,7 +38,10 @@ export function EmissionsSummaryCard({ project }: { project?: Project }) {
   const totals = computed.totals;
   const units = computed.units;
 
-  if (!project?.elements?.length) {
+  const hasElements = project?.elements?.length;
+  const hasAggregatedEmissions = Boolean(project?.emissions);
+
+  if (!hasElements && !hasAggregatedEmissions) {
     return (
       <div className="flex flex-col justify-center text-center py-4">
         <div className="text-sm text-muted-foreground">

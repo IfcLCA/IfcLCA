@@ -54,6 +54,14 @@ export interface ProjectEmissions {
   };
 }
 
+const MILLION = 1_000_000;
+
+const ABSOLUTE_UNITS: ProjectEmissions["units"] = {
+  gwp: "kg CO₂ eq",
+  ubp: "UBP",
+  penre: "kWh oil-eq",
+};
+
 const defaultEmissions: ProjectEmissions = {
   totals: { gwp: 0, ubp: 0, penre: 0 },
   formatted: {
@@ -61,14 +69,34 @@ const defaultEmissions: ProjectEmissions = {
     ubp: "0",
     penre: "0",
   },
-  units: {
-    gwp: "kg CO₂ eq",
-    ubp: "UBP",
-    penre: "kWh oil-eq",
-  },
+  units: ABSOLUTE_UNITS,
 };
 
-const MILLION = 1_000_000;
+const formatTotals = (
+  totals: ProjectEmissions["totals"],
+  fractionDigits = 0
+): ProjectEmissions["formatted"] =>
+  Object.entries(totals).reduce(
+    (acc, [key, value]) => ({
+      ...acc,
+      [key]:
+        value >= MILLION
+          ? `${(value / MILLION).toLocaleString("de-CH", {
+              maximumFractionDigits: Math.max(1, fractionDigits),
+              minimumFractionDigits: Math.min(3, Math.max(1, fractionDigits)),
+            })} Mio.`
+          : value.toLocaleString("de-CH", {
+              maximumFractionDigits: fractionDigits,
+            }),
+    }),
+    {} as ProjectEmissions["formatted"]
+  );
+
+const getRelativeUnits = (unit?: string): ProjectEmissions["units"] => ({
+  gwp: `kg CO₂ eq/${unit || "m²"}·a`,
+  ubp: `UBP/${unit || "m²"}·a`,
+  penre: `kWh/${unit || "m²"}·a`,
+});
 
 export function useProjectEmissions(
   project?: Project,
@@ -76,7 +104,20 @@ export function useProjectEmissions(
 ): ProjectEmissions {
   return useMemo(() => {
     if (!project?.elements?.length) {
-      return defaultEmissions;
+      if (displayMode === "absolute" && project?.emissions) {
+        return {
+          totals: project.emissions,
+          formatted: formatTotals(project.emissions),
+          units: ABSOLUTE_UNITS,
+        };
+      }
+
+      return {
+        ...defaultEmissions,
+        units: displayMode === "relative"
+          ? getRelativeUnits(project?.calculationArea?.unit)
+          : ABSOLUTE_UNITS,
+      };
     }
 
     // Calculate totals from elements
@@ -113,29 +154,13 @@ export function useProjectEmissions(
     );
 
     // Format numbers consistently
-    const formatted = Object.entries(totals).reduce(
-      (acc, [key, value]) => ({
-        ...acc,
-        [key]:
-          value >= MILLION
-            ? `${(value / MILLION).toLocaleString("de-CH", {
-              maximumFractionDigits: 3,
-              minimumFractionDigits: 1,
-            })} Mio.`
-            : value.toLocaleString("de-CH", {
-              maximumFractionDigits: 0,
-            }),
-      }),
-      {} as ProjectEmissions["formatted"]
-    );
+    const fractionDigits = displayMode === "relative" ? 3 : 0;
+    const formatted = formatTotals(totals, fractionDigits);
 
-    const units = displayMode === 'relative'
-      ? {
-        gwp: `kg CO₂ eq/${project?.calculationArea?.unit || 'm²'}·a`,
-        ubp: `UBP/${project?.calculationArea?.unit || 'm²'}·a`,
-        penre: `kWh/${project?.calculationArea?.unit || 'm²'}·a`
-      }
-      : { gwp: "kg CO₂ eq", ubp: "UBP", penre: "kWh oil-eq" };
+    const units =
+      displayMode === "relative"
+        ? getRelativeUnits(project?.calculationArea?.unit)
+        : ABSOLUTE_UNITS;
 
     return {
       totals,
