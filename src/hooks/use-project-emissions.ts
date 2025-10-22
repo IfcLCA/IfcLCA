@@ -85,12 +85,14 @@ export function useProjectEmissions(
           let ubp = volume * density * (kbob?.UBP || 0);
           let penre = volume * density * (kbob?.PENRE || 0);
 
-          // Apply relative calculation if mode is relative and area exists
-          if (displayMode === 'relative' && project.calculationArea?.value) {
+          // Apply relative calculation if mode is relative and area is valid
+          if (displayMode === 'relative' && project.calculationArea?.value && project.calculationArea.value > 0) {
             const divisor = amortYears * project.calculationArea.value;
-            gwp /= divisor;
-            ubp /= divisor;
-            penre /= divisor;
+            if (divisor > 0) {
+              gwp /= divisor;
+              ubp /= divisor;
+              penre /= divisor;
+            }
           }
 
           acc.gwp += gwp;
