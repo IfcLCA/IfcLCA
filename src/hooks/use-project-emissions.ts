@@ -1,4 +1,5 @@
 import { useMemo } from "react";
+import { getAmortizationYears } from "@/lib/utils/amortization";
 
 interface Material {
   volume: number;
@@ -14,26 +15,24 @@ interface Material {
 
 interface Element {
   materials: Material[];
+  classification?: {
+    system: string;
+    code: string;
+    name?: string;
+  };
 }
 
 export type Project = {
-  elements: {
-    materials: {
-      volume: number;
-      material: {
-        density?: number;
-        kbobMatch?: {
-          GWP?: number;
-          UBP?: number;
-          PENRE?: number;
-        };
-      };
-    }[];
-  }[];
+  elements: Element[];
   emissions?: {
     gwp: number;
     ubp: number;
     penre: number;
+  };
+  calculationArea?: {
+    type: string;
+    value: number;
+    unit: string;
   };
 };
 
@@ -71,7 +70,10 @@ const defaultEmissions: ProjectEmissions = {
 
 const MILLION = 1_000_000;
 
-export function useProjectEmissions(project?: Project): ProjectEmissions {
+export function useProjectEmissions(
+  project?: Project,
+  displayMode: 'absolute' | 'relative' = 'absolute'
+): ProjectEmissions {
   return useMemo(() => {
     if (!project?.elements?.length) {
       return defaultEmissions;
@@ -82,14 +84,28 @@ export function useProjectEmissions(project?: Project): ProjectEmissions {
       (acc, element) => {
         if (!element?.materials?.length) return acc;
 
+        const amortYears = getAmortizationYears(element.classification);
+
         element.materials.forEach((mat) => {
           const volume = mat.volume || 0;
           const density = mat.material?.density || 0;
           const kbob = mat.material?.kbobMatch;
 
-          acc.gwp += volume * density * (kbob?.GWP || 0);
-          acc.ubp += volume * density * (kbob?.UBP || 0);
-          acc.penre += volume * density * (kbob?.PENRE || 0);
+          let gwp = volume * density * (kbob?.GWP || 0);
+          let ubp = volume * density * (kbob?.UBP || 0);
+          let penre = volume * density * (kbob?.PENRE || 0);
+
+          // Apply relative calculation if mode is relative and area exists
+          if (displayMode === 'relative' && project.calculationArea?.value) {
+            const divisor = amortYears * project.calculationArea.value;
+            gwp /= divisor;
+            ubp /= divisor;
+            penre /= divisor;
+          }
+
+          acc.gwp += gwp;
+          acc.ubp += ubp;
+          acc.penre += penre;
         });
         return acc;
       },
@@ -113,10 +129,18 @@ export function useProjectEmissions(project?: Project): ProjectEmissions {
       {} as ProjectEmissions["formatted"]
     );
 
+    const units = displayMode === 'relative'
+      ? {
+        gwp: `kg CO₂ eq/${project?.calculationArea?.unit || 'm²'}·a`,
+        ubp: `UBP/${project?.calculationArea?.unit || 'm²'}·a`,
+        penre: `kWh/${project?.calculationArea?.unit || 'm²'}·a`
+      }
+      : { gwp: "kg CO₂ eq", ubp: "UBP", penre: "kWh oil-eq" };
+
     return {
       totals,
       formatted,
-      units: defaultEmissions.units,
+      units,
     };
-  }, [project]);
+  }, [project, displayMode]);
 }

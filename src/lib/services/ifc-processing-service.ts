@@ -19,6 +19,11 @@ interface IFCElement {
     loadBearing?: boolean;
     isExternal?: boolean;
   };
+  classification?: {
+    system: string;
+    code: string;
+    name?: string;
+  };
   materials?: IFCMaterial[];
   materialLayers?: {
     layers: Array<{
@@ -215,6 +220,7 @@ export class IFCProcessingService {
                   volume: element.volume,
                   loadBearing: element.properties?.loadBearing || false,
                   isExternal: element.properties?.isExternal || false,
+                  classification: element.classification,
                   materials: processedMaterials,
                   updatedAt: new Date(),
                 },

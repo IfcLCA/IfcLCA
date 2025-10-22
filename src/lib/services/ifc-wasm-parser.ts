@@ -8,6 +8,11 @@ export interface APIElement {
         loadBearing?: boolean;
         isExternal?: boolean;
     };
+    classification?: {
+        system: string;
+        code: string;
+        name?: string;
+    };
     volume?: number;
     area?: number;
     materials?: string[];
@@ -156,6 +161,57 @@ def get_properties(element):
                             if prop_name and prop_name.lower() == 'isexternal':
                                 props['isExternal'] = bool(prop.NominalValue.wrappedValue)
     return props
+
+def get_classification(element):
+    """Extract classification with system and code"""
+    # Priority 1: IfcClassificationReference association
+    if getattr(element, 'HasAssociations', None):
+        for rel in element.HasAssociations:
+            if rel.is_a('IfcRelAssociatesClassification'):
+                class_ref = rel.RelatingClassification
+                if class_ref.is_a('IfcClassificationReference'):
+                    # Get code from ItemReference (IFC2X3) or Identification (IFC4)
+                    code = getattr(class_ref, 'ItemReference', None) or getattr(class_ref, 'Identification', None)
+                    
+                    # Get system name from ReferencedSource
+                    system = None
+                    name = None
+                    if hasattr(class_ref, 'ReferencedSource') and class_ref.ReferencedSource:
+                        system = safe_string(getattr(class_ref, 'ReferencedSource.Name', None))
+                    
+                    # Get classification name
+                    if hasattr(class_ref, 'Name') and class_ref.Name:
+                        name = safe_string(class_ref.Name)
+                    
+                    if code:
+                        code_str = safe_string(code)
+                        # Only return if we have a valid code
+                        if code_str:
+                            return {
+                                'system': system or 'eBKP-H',
+                                'code': code_str,
+                                'name': name
+                            }
+    
+    # Priority 2: Property fallback
+    if getattr(element, 'IsDefinedBy', None):
+        for rel in element.IsDefinedBy:
+            if rel.is_a('IfcRelDefinesByProperties'):
+                pdef = rel.RelatingPropertyDefinition
+                if pdef.is_a('IfcPropertySet'):
+                    for prop in pdef.HasProperties:
+                        if prop.is_a('IfcPropertySingleValue'):
+                            prop_name = safe_string(prop.Name)
+                            if prop_name and ('classification' in prop_name.lower() or 'ebkp' in prop_name.lower()):
+                                if prop.NominalValue:
+                                    code_value = safe_string(prop.NominalValue.wrappedValue)
+                                    if code_value:
+                                        return {
+                                            'system': 'eBKP-H',
+                                            'code': code_value,
+                                            'name': None
+                                        }
+    return None
 
 def get_volume(element):
     if getattr(element, 'IsDefinedBy', None):
@@ -351,6 +407,7 @@ for e in f.by_type('IfcBuildingElement'):
         'type': e.is_a(),
         'object_type': get_object_type(e),
         'properties': get_properties(e),
+        'classification': get_classification(e),
         'volume': get_volume(e),
         'materials': element_materials,
         'material_volumes': element_material_volumes
