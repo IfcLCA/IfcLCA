@@ -1,6 +1,7 @@
 "use client";
 
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { useProjectEmissions } from "@/hooks/use-project-emissions";
 import type { Project } from "@/types/project";
 import { useState } from "react";
@@ -59,22 +60,29 @@ export function EmissionsSummaryCard({ project }: { project?: Project }) {
   let formattedValue: string;
   let displayUnit = unit;
 
+  const fractionDigits = displayMode === 'relative' ? 3 : 0;
+
   if (currentValue >= MILLION) {
     formattedValue = (currentValue / MILLION).toLocaleString("de-CH", {
-      maximumFractionDigits: 3,
-      minimumFractionDigits: 1,
+      maximumFractionDigits: Math.max(1, fractionDigits),
+      minimumFractionDigits: Math.max(1, fractionDigits),
       useGrouping: true,
     });
     displayUnit = `Mio. ${unit}`;
   } else {
-    // Show more precision for relative values
-    const fractionDigits = displayMode === 'relative' ? 3 : 0;
     formattedValue = currentValue.toLocaleString("de-CH", {
       maximumFractionDigits: fractionDigits,
       minimumFractionDigits: displayMode === 'relative' ? 3 : 0,
       useGrouping: true,
     });
   }
+
+  // Full number for tooltip
+  const fullNumber = currentValue.toLocaleString("de-CH", {
+    maximumFractionDigits: fractionDigits,
+    minimumFractionDigits: displayMode === 'relative' ? 3 : 0,
+    useGrouping: true,
+  });
 
   // Calculate dynamic text size based on number length
   const getTextSize = (value: string) => {
@@ -128,9 +136,18 @@ export function EmissionsSummaryCard({ project }: { project?: Project }) {
 
       {/* Main value display */}
       <div className="flex flex-col justify-center items-center flex-1 px-2">
-        <p className={`${getTextSize(formattedValue)} font-bold leading-tight group-hover:text-primary transition-colors text-center`}>
-          {formattedValue}
-        </p>
+        <TooltipProvider>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <p className={`${getTextSize(formattedValue)} font-bold leading-tight group-hover:text-primary transition-colors text-center cursor-help`}>
+                {formattedValue}
+              </p>
+            </TooltipTrigger>
+            <TooltipContent>
+              <p className="font-mono">{fullNumber}</p>
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
         <p className="text-sm text-muted-foreground/80 group-hover:text-primary/70 transition-colors mt-2 text-center">
           {displayUnit}
         </p>

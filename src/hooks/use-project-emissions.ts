@@ -31,7 +31,7 @@ const formatTotals = (
         value >= MILLION
           ? `${(value / MILLION).toLocaleString("de-CH", {
             maximumFractionDigits: Math.max(1, fractionDigits),
-            minimumFractionDigits: Math.min(3, Math.max(1, fractionDigits)),
+            minimumFractionDigits: Math.max(1, fractionDigits),
           })} Mio.`
           : value.toLocaleString("de-CH", {
             maximumFractionDigits: fractionDigits,

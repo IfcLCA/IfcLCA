@@ -11,6 +11,7 @@ import {
 } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 type MetricKey = "gwp" | "ubp" | "penre";
 
@@ -89,22 +90,29 @@ export function DashboardEmissionsCard({
   const unit = metrics[metric].unit;
 
   const MILLION = 1_000_000;
+  const fractionDigits = 0; // Dashboard always uses absolute mode
 
   let formattedValue: string;
 
   if (currentValue >= MILLION) {
     formattedValue = (currentValue / MILLION).toLocaleString("de-CH", {
-      maximumFractionDigits: 3,
-      minimumFractionDigits: 1,
+      maximumFractionDigits: Math.max(1, fractionDigits),
+      minimumFractionDigits: Math.max(1, fractionDigits),
       useGrouping: true,
     });
     formattedValue = `${formattedValue} Mio.`;
   } else {
     formattedValue = currentValue.toLocaleString("de-CH", {
-      maximumFractionDigits: 0,
+      maximumFractionDigits: fractionDigits,
       useGrouping: true,
     });
   }
+
+  // Full number for tooltip
+  const fullNumber = currentValue.toLocaleString("de-CH", {
+    maximumFractionDigits: 0,
+    useGrouping: true,
+  });
 
   return (
     <Card className="group h-full">
@@ -115,12 +123,21 @@ export function DashboardEmissionsCard({
       <CardContent>
         <div className="flex flex-col h-full">
           <div className="flex flex-col justify-center flex-1 min-h-0">
-            <p className="text-2xl font-bold group-hover:text-primary transition-colors">
-              {formattedValue}
-              <span className="text-sm font-normal text-muted-foreground ml-1">
-                {unit}
-              </span>
-            </p>
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <p className="text-2xl font-bold group-hover:text-primary transition-colors cursor-help">
+                    {formattedValue}
+                    <span className="text-sm font-normal text-muted-foreground ml-1">
+                      {unit}
+                    </span>
+                  </p>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p className="font-mono">{fullNumber}</p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
           </div>
           <Select
             value={metric}
