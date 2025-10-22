@@ -1680,37 +1680,49 @@ export const AMORTIZATION_LOOKUP = new Map<string, number[]>([
   ['G04.02', [30]]
 ]);
 
-// Build-time validation: Check for duplicate codes
+// Build-time validation: Check for duplicate codes within each dataset
 if (typeof window === 'undefined') {
-  const codes = new Set<string>();
-  const duplicates: string[] = [];
+  // Check EBKP_STRUCTURE_WITH_AMORTIZATION for internal duplicates
+  const structureCodes = new Set<string>();
+  const structureDuplicates: string[] = [];
 
-  // Check EBKP_STRUCTURE_WITH_AMORTIZATION
   for (const hauptgruppe of Object.values(EBKP_STRUCTURE_WITH_AMORTIZATION)) {
     for (const elementgruppe of Object.values(hauptgruppe)) {
       for (const item of elementgruppe) {
-        if (codes.has(item.code)) {
-          duplicates.push(item.code);
+        if (structureCodes.has(item.code)) {
+          structureDuplicates.push(item.code);
         } else {
-          codes.add(item.code);
+          structureCodes.add(item.code);
         }
       }
     }
   }
 
-  // Check ELEMENTS_WITH_AMORTIZATION
+  // Check ELEMENTS_WITH_AMORTIZATION for internal duplicates
+  const elementsCodes = new Set<string>();
+  const elementsDuplicates: string[] = [];
+
   for (const item of ELEMENTS_WITH_AMORTIZATION) {
-    if (codes.has(item.code)) {
-      duplicates.push(item.code);
+    if (elementsCodes.has(item.code)) {
+      elementsDuplicates.push(item.code);
     } else {
-      codes.add(item.code);
+      elementsCodes.add(item.code);
     }
   }
 
-  if (duplicates.length > 0) {
+  // Report errors if any duplicates found
+  const errors: string[] = [];
+  if (structureDuplicates.length > 0) {
+    errors.push(`Duplicates in EBKP_STRUCTURE_WITH_AMORTIZATION: ${structureDuplicates.join(', ')}`);
+  }
+  if (elementsDuplicates.length > 0) {
+    errors.push(`Duplicates in ELEMENTS_WITH_AMORTIZATION: ${elementsDuplicates.join(', ')}`);
+  }
+
+  if (errors.length > 0) {
     throw new Error(
-      `Duplicate EBKP codes found: ${duplicates.join(', ')}. ` +
-      `Each code must appear only once in the dataset.`
+      `Duplicate EBKP codes found:\n${errors.join('\n')}\n` +
+      `Each code must appear only once within its respective dataset.`
     );
   }
 }

@@ -43,7 +43,7 @@ const formatTotals = (
 const getRelativeUnits = (unit?: string): ProjectEmissions["units"] => ({
   gwp: `kg CO₂ eq/${unit || "m²"}·a`,
   ubp: `UBP/${unit || "m²"}·a`,
-  penre: `kWh/${unit || "m²"}·a`,
+  penre: `kWh oil‑eq/${unit || "m²"}·a`,
 });
 
 export function useProjectEmissions(

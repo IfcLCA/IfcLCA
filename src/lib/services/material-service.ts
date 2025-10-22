@@ -684,10 +684,11 @@ export class MaterialService {
       const totals = elements.reduce(
         (acc, element) => {
           const elementTotals = element.materials.reduce(
-            (matAcc: { gwp: number; ubp: number; penre: number }, material: { volume?: number; material?: { density?: number; kbobMatchId?: { GWP?: number; UBP?: number; PENRE?: number } } }) => {
+            (matAcc: { gwp: number; ubp: number; penre: number }, material: { volume?: number; material?: { density?: number; kbobMatchId?: Types.ObjectId | { GWP?: number; UBP?: number; PENRE?: number } } }) => {
               const volume = material.volume || 0;
               const density = material.material?.density || 0;
-              const kbobMatch = material.material?.kbobMatchId;
+              // When populated, kbobMatchId contains the KBOB material object
+              const kbobMatch = material.material?.kbobMatchId as { GWP?: number; UBP?: number; PENRE?: number } | undefined;
               const mass = volume * density;
 
               return {
@@ -775,6 +776,7 @@ export class MaterialService {
   ): Promise<number> {
     try {
       // Get all materials with their KBOB matches
+      // Note: After populate(), kbobMatchId contains the populated KBOB material object
       const materials = await Material.find({ _id: { $in: materialIds } })
         .select("_id density kbobMatchId name")
         .populate("kbobMatchId", "GWP UBP PENRE")

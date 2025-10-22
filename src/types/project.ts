@@ -3,7 +3,8 @@ export interface MaterialWithMatchId {
   volume: number;
   material: {
     density?: number;
-    kbobMatchId?: {
+    kbobMatchId?: string; // ObjectId reference
+    kbobMatch?: {
       GWP?: number;
       UBP?: number;
       PENRE?: number;

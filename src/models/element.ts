@@ -99,16 +99,18 @@ elementSchema.virtual("emissions").get(function () {
   return this.materials.reduce(
     (acc, mat) => {
       const material = mat.material as any; // Will be populated
-      if (!material?.kbobMatchId) return acc;
+      // When populated, kbobMatchId contains the KBOB material object
+      const kbobMatch = material?.kbobMatchId;
+      if (!kbobMatch || typeof kbobMatch === 'string') return acc;
 
       const volume = mat.volume || 0;
       const density = material.density || 0;
       const mass = volume * density;
 
       return {
-        gwp: acc.gwp + mass * (material.kbobMatchId.GWP || 0),
-        ubp: acc.ubp + mass * (material.kbobMatchId.UBP || 0),
-        penre: acc.penre + mass * (material.kbobMatchId.PENRE || 0),
+        gwp: acc.gwp + mass * (kbobMatch.GWP || 0),
+        ubp: acc.ubp + mass * (kbobMatch.UBP || 0),
+        penre: acc.penre + mass * (kbobMatch.PENRE || 0),
       };
     },
     { gwp: 0, ubp: 0, penre: 0 }

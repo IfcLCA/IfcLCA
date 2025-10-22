@@ -26,24 +26,29 @@ export async function GET(request: Request) {
       .populate("kbobMatchId")
       .lean();
 
-    const transformedMaterials = materials.map((material) => ({
-      id: material._id.toString(),
-      name: material.name,
-      category: material.category,
-      volume: material.volume,
-      density: material.density,
-      projectId: material.projectId?.toString(),
-      kbobMatchId: material.kbobMatchId?._id.toString(),
-      kbobMatch: material.kbobMatchId
-        ? {
-          id: material.kbobMatchId._id.toString(),
-          Name: material.kbobMatchId.Name,
-          GWP: material.kbobMatchId.GWP,
-          UBP: material.kbobMatchId.UBP,
-          PENRE: material.kbobMatchId.PENRE,
-        }
-        : undefined,
-    }));
+    const transformedMaterials = materials.map((material: any) => {
+      // When populated, kbobMatchId contains the KBOB material object
+      const kbobMatch = material.kbobMatchId;
+
+      return {
+        id: material._id.toString(),
+        name: material.name,
+        category: material.category,
+        volume: material.volume,
+        density: material.density,
+        projectId: material.projectId?.toString(),
+        kbobMatchId: kbobMatch?._id.toString(),
+        kbobMatch: kbobMatch
+          ? {
+            id: kbobMatch._id.toString(),
+            Name: kbobMatch.Name,
+            GWP: kbobMatch.GWP,
+            UBP: kbobMatch.UBP,
+            PENRE: kbobMatch.PENRE,
+          }
+          : undefined,
+      };
+    });
 
     return NextResponse.json(transformedMaterials);
   } catch (error) {

@@ -60,19 +60,22 @@ export async function POST(
       );
     }
 
+    // When populated, kbobMatchId contains the KBOB material object
+    const kbobMatch = updatedMaterial.kbobMatchId as any;
+
     return NextResponse.json({
       id: updatedMaterial._id.toString(),
       name: updatedMaterial.name,
       category: updatedMaterial.category,
       volume: updatedMaterial.volume,
-      kbobMatch: updatedMaterial.kbobMatchId
+      kbobMatch: kbobMatch
         ? {
-          id: updatedMaterial.kbobMatchId._id.toString(),
-          name: updatedMaterial.kbobMatchId.Name,
+          id: kbobMatch._id.toString(),
+          name: kbobMatch.Name,
           indicators: {
-            gwp: updatedMaterial.kbobMatchId.GWP,
-            ubp: updatedMaterial.kbobMatchId.UBP,
-            penre: updatedMaterial.kbobMatchId.PENRE,
+            gwp: kbobMatch.GWP,
+            ubp: kbobMatch.UBP,
+            penre: kbobMatch.PENRE,
           },
         }
         : null,
