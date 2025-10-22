@@ -23,12 +23,16 @@ IfcLCA leverages **openBIM** and **Open Data Standards** to analyze the environm
    - Drop your IFC file in the upload area or click to browse
    - Files are processed locally and never stored on our servers
 3. **Map Materials**
-   - Search the full KBOB database
+   - Search the full swiss KBOB database
    - Combine your materials with environmental impact data
 4. **Analyze Results**
    - View impact metrics: GWP, PEnr, UBP and material breakdown
    - Use charts to identify key contributors
-   - Comparative analysis and report export *(coming soon)*
+   - Enter project EBF (in m²) to toggle between absolute and relative emissions views (explanation below)
+5. **Export IFC with LCA Results**
+   - Upload your original IFC file to embed the LCA results
+   - LCA data (GWP, UBP, PENRE) is added as IFC property sets for each element
+   - The exported IFC can be used for further analysis, optimization, and interoperability with other BIM tools
 
 ## 🛠 Tech Stack
 - **IfcOpenShell WASM** for Ifc parsing
@@ -41,6 +45,12 @@ IfcLCA leverages **openBIM** and **Open Data Standards** to analyze the environm
 ## 🌍 Open Source
 IfcLCA is and will always be Open Source. Sustainability is a team effort and requires trust and transparency. The project is released under the **AGPL-3.0** license.
 
+## 🔐 Data & Privacy
+- **Client-side parsing**: IFC files are parsed entirely in your browser using IfcOpenShell WASM
+- **No file storage**: Your original IFC files are never uploaded or stored on our servers
+- **Stored data**: Only derived metadata (elements, volumes, materials, classifications, and calculated indicators) is stored in the database
+- **Upload records**: Filename and processing metadata are stored to track upload history
+- **Deletion**: You can delete uploads and their derived data; orphaned materials are automatically cleaned up
 
 ## 📦 Model Requirements
 - **IFC version**: IFC4 preferred (IFC2x3 is supported)
@@ -88,3 +98,9 @@ $$
   - GWP: `kg CO₂ eq/<area>·a`
   - UBP: `UBP/<area>·a`
   - PENRE: `kWh oil-eq/<area>·a`
+
+## ⚠️ Known Limitations & Roadmap
+- **No built-in 3D viewer**: Currently no IFC geometry visualization
+- **Classification systems**: Only eBKP-H is supported
+- **Comparative analysis**: Project comparison and benchmarking features are in development
+- **Aditional environmental impact data sources**: Ökobaudat coming soon...
