@@ -153,6 +153,7 @@ export default function TryNowPage() {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const projectForEmissions = {
+    id: "try-now",
     elements: elements.map((el) => ({
       materials: el.materials.map((m) => ({
         volume: m.volume,
@@ -173,9 +174,10 @@ export default function TryNowPage() {
       // Automatically process the file
       handleFile(pendingFile);
     }
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Only run once on mount - handleFile is stable via useCallback
 
-  const findBestMatch = (name: string): KBOBMaterial | undefined => {
+  const findBestMatch = useCallback((name: string): KBOBMaterial | undefined => {
     const kbobData = kbobDataRef.current;
     if (!kbobData) return undefined;
     const lower = name.trim().toLowerCase();
@@ -190,9 +192,9 @@ export default function TryNowPage() {
     }
     const results = fuseRef.current.search(name);
     return results.length > 0 ? results[0].item : undefined;
-  };
+  }, []);
 
-  const calcDensity = (m?: KBOBMaterial) => {
+  const calcDensity = useCallback((m?: KBOBMaterial) => {
     if (!m) return undefined;
     if (typeof m["kg/unit"] === "number") return m["kg/unit"];
     if (
@@ -202,15 +204,15 @@ export default function TryNowPage() {
       return (m["min density"] + m["max density"]) / 2;
     }
     return undefined;
-  };
+  }, []);
 
-  const formatFileSize = (bytes: number): string => {
+  const formatFileSize = useCallback((bytes: number): string => {
     if (bytes === 0) return "0 Bytes";
     const k = 1024;
     const sizes = ["Bytes", "KB", "MB", "GB"];
     const i = Math.floor(Math.log(bytes) / Math.log(k));
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i];
-  };
+  }, []);
 
   const formatValue = (value: number): string => {
     const absValue = Math.abs(value);
@@ -240,35 +242,8 @@ export default function TryNowPage() {
     return value.toFixed(0);
   };
 
-  const handleFile = async (file: File) => {
-    setLoading(true);
-    setError("");
-    setFileName(file.name);
-    setFileSize(formatFileSize(file.size));
-    setCurrentStage(0);
-    setCompletedStages([]);
-
-    // Start insight rotation
-    const insightInterval = setInterval(() => {
-      setProcessingInsight(PROCESSING_INSIGHTS[Math.floor(Math.random() * PROCESSING_INSIGHTS.length)]);
-    }, 800);
-
-    try {
-      // Process file with real-time stage updates
-      await processFileWithProgress(file);
-
-    } catch (err) {
-      console.error(err);
-      setError("Failed to process the IFC file. Please ensure it contains valid data.");
-    } finally {
-      clearInterval(insightInterval);
-      setProcessingInsight("");
-      setLoading(false);
-    }
-  };
-
   // Update stage with minimum display time for visibility
-  const updateStage = async (stage: number) => {
+  const updateStage = useCallback(async (stage: number) => {
     setCurrentStage(stage);
 
     // Ensure each stage is visible for at least 200ms
@@ -276,10 +251,10 @@ export default function TryNowPage() {
 
     // Mark stage as completed
     setCompletedStages(prev => [...prev, stage]);
-  };
+  }, []);
 
   // Process file with real-time progress updates
-  const processFileWithProgress = async (file: File) => {
+  const processFileWithProgress = useCallback(async (file: File) => {
     // Stage 0: Upload (instant, but show it)
     await updateStage(0);
 
@@ -362,15 +337,15 @@ export default function TryNowPage() {
             acc.gwp +=
               m.volume *
               m.material.density *
-              (m.material.kbobMatch.gwpTotal ?? m.material.kbobMatch.GWP ?? 0);
+              (m.material.kbobMatch.GWP ?? 0);
             acc.ubp +=
               m.volume *
               m.material.density *
-              (m.material.kbobMatch.ubp21Total ?? m.material.kbobMatch.UBP ?? 0);
+              (m.material.kbobMatch.UBP ?? 0);
             acc.penre +=
               m.volume *
               m.material.density *
-              (m.material.kbobMatch.primaryEnergyNonRenewableTotal ?? m.material.kbobMatch.PENRE ?? 0);
+              (m.material.kbobMatch.PENRE ?? 0);
           }
           return acc;
         },
@@ -408,11 +383,11 @@ export default function TryNowPage() {
         existing.volume += m.volume;
         if (m.material.kbobMatch && m.material.density) {
           existing.emissions.gwp +=
-            m.volume * m.material.density * (m.material.kbobMatch.gwpTotal ?? m.material.kbobMatch.GWP ?? 0);
+            m.volume * m.material.density * (m.material.kbobMatch.GWP ?? 0);
           existing.emissions.ubp +=
-            m.volume * m.material.density * (m.material.kbobMatch.ubp21Total ?? m.material.kbobMatch.UBP ?? 0);
+            m.volume * m.material.density * (m.material.kbobMatch.UBP ?? 0);
           existing.emissions.penre +=
-            m.volume * m.material.density * (m.material.kbobMatch.primaryEnergyNonRenewableTotal ?? m.material.kbobMatch.PENRE ?? 0);
+            m.volume * m.material.density * (m.material.kbobMatch.PENRE ?? 0);
         }
         matMap.set(key, existing);
       });
@@ -429,7 +404,34 @@ export default function TryNowPage() {
 
     // Stage 4: Complete
     await updateStage(4);
-  };
+  }, [updateStage, findBestMatch, calcDensity]);
+
+  const handleFile = useCallback(async (file: File) => {
+    setLoading(true);
+    setError("");
+    setFileName(file.name);
+    setFileSize(formatFileSize(file.size));
+    setCurrentStage(0);
+    setCompletedStages([]);
+
+    // Start insight rotation
+    const insightInterval = setInterval(() => {
+      setProcessingInsight(PROCESSING_INSIGHTS[Math.floor(Math.random() * PROCESSING_INSIGHTS.length)]);
+    }, 800);
+
+    try {
+      // Process file with real-time stage updates
+      await processFileWithProgress(file);
+
+    } catch (err) {
+      console.error(err);
+      setError("Failed to process the IFC file. Please ensure it contains valid data.");
+    } finally {
+      clearInterval(insightInterval);
+      setProcessingInsight("");
+      setLoading(false);
+    }
+  }, [processFileWithProgress, formatFileSize]);
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -451,7 +453,7 @@ export default function TryNowPage() {
     } else {
       setError("Please upload a valid IFC file");
     }
-  }, []);
+  }, [handleFile]);
 
   const resetAnalysis = () => {
     setMaterials([]);

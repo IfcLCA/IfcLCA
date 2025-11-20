@@ -6,7 +6,7 @@ import mongoose from "mongoose";
 
 export async function GET(
     request: NextRequest,
-    { params }: { params: { id: string } }
+    { params }: { params: Promise<{ id: string }> }
 ) {
     try {
         const { userId } = await auth();
@@ -16,7 +16,8 @@ export async function GET(
 
         await connectToDatabase();
 
-        const uploadId = params.id;
+        const { id } = await params;
+        const uploadId = id;
 
         // Validate ObjectId
         if (!mongoose.isValidObjectId(uploadId)) {

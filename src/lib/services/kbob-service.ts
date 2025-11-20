@@ -195,7 +195,7 @@ export class KbobService {
       }
       
       // Return cached materials (even if stale, better than nothing)
-      const materials = await KBOBMaterial.findValidMaterials().lean();
+      const materials = await (KBOBMaterial.findValidMaterials() as any).lean();
       
       if (materials.length === 0 && shouldRefresh) {
         // If no cache and we're refreshing, wait a bit for sync to complete
@@ -206,7 +206,7 @@ export class KbobService {
             new Promise((resolve) => setTimeout(resolve, 5000)), // Max 5 second wait
           ]);
           // Try again after sync
-          return await KBOBMaterial.findValidMaterials().lean();
+          return await (KBOBMaterial.findValidMaterials() as any).lean();
         } catch (error) {
           logger.error("[KBOB Service] Initial sync failed:", error);
           return [];

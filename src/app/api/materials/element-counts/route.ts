@@ -33,8 +33,8 @@ export async function POST(request: Request) {
 
     // Count elements per material
     const countMap: Record<string, number> = {};
-    elements.forEach(element => {
-      element.materials.forEach(mat => {
+    elements.forEach((element: any) => {
+      element.materials.forEach((mat: any) => {
         const materialId = mat.material.toString();
         if (materialIds.includes(materialId)) {
           countMap[materialId] = (countMap[materialId] || 0) + 1;
@@ -43,7 +43,7 @@ export async function POST(request: Request) {
     });
 
     // Ensure all requested materials have a count (even if 0)
-    const result = materialIds.reduce((acc, id) => {
+    const result = materialIds.reduce((acc: Record<string, number>, id: string) => {
       acc[id] = countMap[id] || 0;
       return acc;
     }, {} as Record<string, number>);

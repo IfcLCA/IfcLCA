@@ -12,7 +12,7 @@ import { useToast } from "@/hooks/use-toast";
 import {
   downloadFile,
   exportIfcWithLcaResultsService,
-  type ElementLcaExportMap,
+  type ElementLcaResultsMap,
 } from "@/lib/services/ifc-export-service";
 import { ReloadIcon } from "@radix-ui/react-icons";
 import { UploadCloud } from "lucide-react";
@@ -23,7 +23,7 @@ interface ExportIfcModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   projectName: string;
-  elementResults: ElementLcaExportMap;
+  elementResults: ElementLcaResultsMap;
   elementNames: Record<string, string>;
 }
 
@@ -73,8 +73,9 @@ export function ExportIfcModal({
           const outputName = `${fileName || "IfcLCA"}_with-results.ifc`;
           downloadFile(result.ifcData, outputName, "application/ifc");
 
-          const missingCount = result.missingGuids.length;
-          const missingExamples = result.missingGuids
+          const missingGuids = result.missingGuids || [];
+          const missingCount = missingGuids.length;
+          const missingExamples = missingGuids
             .slice(0, 3)
             .map((guid) => elementNames[guid] || guid)
             .join(", ");
@@ -84,7 +85,7 @@ export function ExportIfcModal({
             description:
               missingCount > 0
                 ? `Added results to ${result.updatedCount} elements. Missing ${missingCount} GUIDs: ${missingExamples}${
-                    result.missingGuids.length > 3 ? ", ..." : ""
+                    missingGuids.length > 3 ? ", ..." : ""
                   }`
                 : `Successfully embedded results for ${result.updatedCount} elements.`,
           });

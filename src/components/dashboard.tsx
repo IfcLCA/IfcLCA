@@ -207,7 +207,8 @@ export function Dashboard({
 
     // Now emissions are fast - fetch immediately
     fetchEmissions();
-  }, []); // Empty dependency array - only run once on mount
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Only run once on mount - statistics.totalEmissions is set inside
 
   const handleLoadMore = () => {
     if (!isLoadingActivities) {
@@ -354,9 +355,6 @@ export function Dashboard({
         </div>
         <ActivityFeed
           activities={activities}
-          isLoading={isLoadingActivities}
-          hasMore={false}
-          onLoadMore={handleLoadMore}
         />
       </section>
 

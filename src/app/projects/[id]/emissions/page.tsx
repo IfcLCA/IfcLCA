@@ -7,11 +7,12 @@ export default async function EmissionsPage({
   params,
   searchParams,
 }: {
-  params: { id: string };
-  searchParams?: { query?: string; page?: string };
+  params: Promise<{ id: string }>;
+  searchParams?: Promise<{ query?: string; page?: string }>;
 }) {
+  const { id } = await params;
   // Fetch project data
-  const res = await fetch(`/api/projects/${params.id}`, { cache: "no-store" });
+  const res = await fetch(`/api/projects/${id}`, { cache: "no-store" });
   const project = await res.json();
 
   return (
@@ -27,7 +28,7 @@ export default async function EmissionsPage({
       <Card>
         <CardContent className="p-0">
           <DataTable
-            columns={emissionsColumns}
+            columns={emissionsColumns as any}
             data={project.elements.flatMap(
               (element: {
                 materials: Array<{

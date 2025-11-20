@@ -8,6 +8,9 @@ export async function initializeIndexes() {
 
     // Verify indexes
     const db = mongoose.connection.db;
+    if (!db) {
+      throw new Error("Database connection not available");
+    }
 
     // Drop and recreate Element indexes
     await db.collection("elements").dropIndexes();

@@ -24,7 +24,7 @@ interface IFCElement {
 
 export async function POST(
   request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   const session = await mongoose.startSession();
 
@@ -35,6 +35,8 @@ export async function POST(
     };
 
     await connectToDatabase();
+
+    const { id } = await params;
 
     await session.withTransaction(async () => {
       // Process elements and find automatic matches
@@ -50,13 +52,13 @@ export async function POST(
       // Run both operations in parallel
       const [elementResult, matchResult] = await Promise.all([
         IFCProcessingService.processElements(
-          params.id,
+          id,
           elements,
           uploadId,
           session
         ),
         IFCProcessingService.findAutomaticMatches(
-          params.id,
+          id,
           uniqueMaterialNames,
           session
         ),

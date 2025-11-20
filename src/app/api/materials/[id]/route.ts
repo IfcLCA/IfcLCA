@@ -2,10 +2,11 @@ import { NextResponse } from "next/server";
 import { connectToDatabase } from "@/lib/mongodb";
 import { Material, MaterialDeletion } from "@/models";
 import { auth } from "@clerk/nextjs/server";
+import mongoose from "mongoose";
 
 export async function DELETE(
   request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const { userId } = await auth();
@@ -15,10 +16,14 @@ export async function DELETE(
 
     await connectToDatabase();
 
-    const materialId = params.id;
+    const { id } = await params;
+    const materialId = id;
 
     // Find the material to get its name and project ID before deletion
-    const material = await Material.findById(materialId).lean();
+    const material = await Material.findById(materialId).lean() as {
+      projectId?: mongoose.Types.ObjectId;
+      name?: string;
+    } | null;
     if (!material) {
       return NextResponse.json(
         { error: "Material not found" },

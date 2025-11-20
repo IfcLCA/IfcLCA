@@ -133,10 +133,10 @@ export async function POST(request: Request) {
       _id: { $in: sampleIndices.map((i) => allElements[i]._id) },
     }).lean();
 
-    sampledElements.map((e) => ({
+    sampledElements.map((e: any) => ({
       _id: e._id,
       materialsCount: e.materials.length,
-      hasIndicators: e.materials.every((m) => m.indicators),
+      hasIndicators: e.materials.every((m: any) => m.indicators),
       sampleIndicators: e.materials[0]?.indicators,
     }));
 

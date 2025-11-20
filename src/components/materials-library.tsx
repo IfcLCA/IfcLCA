@@ -167,33 +167,7 @@ export function MaterialLibraryComponent() {
     }
   }, []);
 
-  useEffect(() => {
-    if (kbobMaterials.length > 0) {
-      fuseRef.current = new Fuse(kbobMaterials, {
-        keys: ["Name"],
-        threshold: 0.8,
-        ignoreLocation: true,
-        findAllMatches: true,
-        getFn: (obj, path) => {
-          const value = Fuse.config.getFn(obj, path);
-          if (!value) return "";
-          return value
-            .toString()
-            .toLowerCase()
-            .normalize("NFKD")
-            .replace(/[\u0300-\u036f]/g, "")
-            .replace(/[^a-z0-9\s]/g, " ")
-            .replace(/\s+/g, " ")
-            .trim();
-        },
-      });
-
-      // Generate suggestions for unmatched materials
-      generateSuggestions();
-    }
-  }, [kbobMaterials, materials]);
-
-  // Add function to generate suggestions
+  // Add function to generate suggestions (moved before useEffect that uses it)
   const generateSuggestions = useCallback(() => {
     if (!fuseRef.current) return;
 
@@ -222,6 +196,32 @@ export function MaterialLibraryComponent() {
 
     setAutoSuggestedMatches(suggestions);
   }, [materials, temporaryMatches]);
+
+  useEffect(() => {
+    if (kbobMaterials.length > 0) {
+      fuseRef.current = new Fuse(kbobMaterials, {
+        keys: ["Name"],
+        threshold: 0.8,
+        ignoreLocation: true,
+        findAllMatches: true,
+        getFn: (obj, path) => {
+          const value = Fuse.config.getFn(obj, path);
+          if (!value) return "";
+          return value
+            .toString()
+            .toLowerCase()
+            .normalize("NFKD")
+            .replace(/[\u0300-\u036f]/g, "")
+            .replace(/[^a-z0-9\s]/g, " ")
+            .replace(/\s+/g, " ")
+            .trim();
+        },
+      });
+
+      // Generate suggestions for unmatched materials
+      generateSuggestions();
+    }
+  }, [kbobMaterials, materials, generateSuggestions]);
 
   const scrollToMatchingKbob = useCallback(
     (ifcMaterialName: string) => {
@@ -415,17 +415,19 @@ export function MaterialLibraryComponent() {
     }
   };
 
-  const handleMatch = (materialIds: string[], kbobId: string | null) => {
-    const newMatches = { ...temporaryMatches };
-    materialIds.forEach((id) => {
-      if (kbobId) {
-        newMatches[id] = kbobId;
-      } else {
-        delete newMatches[id];
-      }
+  const handleMatch = useCallback((materialIds: string[], kbobId: string | null) => {
+    setTemporaryMatches((prevMatches) => {
+      const newMatches = { ...prevMatches };
+      materialIds.forEach((id) => {
+        if (kbobId) {
+          newMatches[id] = kbobId;
+        } else {
+          delete newMatches[id];
+        }
+      });
+      return newMatches;
     });
-    setTemporaryMatches(newMatches);
-  };
+  }, []);
 
   const handleConfirmMatch = async (changesWithDensity: MaterialChange[]) => {
     try {
@@ -490,7 +492,7 @@ export function MaterialLibraryComponent() {
     setShowPreview(false);
   };
 
-  const getPreviewChanges = async (matchesToPreview?: Record<string, string>) => {
+  const getPreviewChanges = useCallback(async (matchesToPreview?: Record<string, string>) => {
     const matchesToUse = matchesToPreview || temporaryMatches;
     const materialIds = Object.keys(matchesToUse);
 
@@ -572,9 +574,9 @@ export function MaterialLibraryComponent() {
         };
       })
       .filter(Boolean);
-  };
+  }, [temporaryMatches, materials, kbobMaterials, projects]);
 
-  const handleShowPreview = async (matchesToPreview?: Record<string, string>) => {
+  const handleShowPreview = useCallback(async (matchesToPreview?: Record<string, string>) => {
     setIsMatchingInProgress(true);
     try {
       const changes = await getPreviewChanges(matchesToPreview);
@@ -590,7 +592,7 @@ export function MaterialLibraryComponent() {
     } finally {
       setIsMatchingInProgress(false);
     }
-  };
+  }, [getPreviewChanges]);
 
   const handleNavigateToProject = (projectId: string) => {
     if (hasUnappliedMatches()) {
@@ -945,11 +947,11 @@ export function MaterialLibraryComponent() {
   }, [autoSuggestedMatches, temporaryMatches, handleShowPreview, maybeTriggerMatchConfetti, selectedProject, projects]);
 
   // Modify the hasUnappliedMatches function to check for preview modal
-  const hasUnappliedMatches = () => {
+  const hasUnappliedMatches = useCallback(() => {
     // Don't show warning if preview modal is open
     if (showPreview) return false;
     return Object.keys(temporaryMatches).length > 0;
-  };
+  }, [showPreview, temporaryMatches]);
 
   // Add this effect to handle Next.js navigation
   useEffect(() => {

@@ -8,12 +8,13 @@ import { logger } from "@/lib/logger";
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     await connectToDatabase();
 
-    const upload = await Upload.findById(params.id).populate("elements");
+    const { id } = await params;
+    const upload = await Upload.findById(id).populate("elements");
 
     if (!upload) {
       return NextResponse.json({ error: "Upload not found" }, { status: 404 });
@@ -30,7 +31,7 @@ export async function GET(
 
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const { userId } = await auth();
@@ -40,7 +41,8 @@ export async function DELETE(
 
     await connectToDatabase();
 
-    const uploadId = params.id;
+    const { id } = await params;
+    const uploadId = id;
 
     // Validate ObjectId
     if (!mongoose.isValidObjectId(uploadId)) {
@@ -100,7 +102,7 @@ export async function DELETE(
 
       // Update all materials: set volume to 0 if no elements reference them, otherwise update to actual volume
       if (allMaterials.length > 0) {
-        const materialUpdates = allMaterials.map((mat) => ({
+        const materialUpdates = allMaterials.map((mat: any) => ({
           updateOne: {
             filter: { _id: mat._id },
             update: {

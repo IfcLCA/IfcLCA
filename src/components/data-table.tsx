@@ -84,11 +84,10 @@ export function DataTable<TData, TValue>({
     onSortingChange: setSorting,
   });
 
+  const allColumns = table.getAllColumns();
   const totalColumnsWidth = React.useMemo(() => {
-    return table
-      .getAllColumns()
-      .reduce((acc, column) => acc + column.getSize(), 0);
-  }, [table.getAllColumns()]);
+    return allColumns.reduce((acc, column) => acc + column.getSize(), 0);
+  }, [allColumns]);
 
   const containerRef = React.useRef<HTMLDivElement>(null);
   const firstColumnRef = React.useRef<HTMLDivElement>(null);
@@ -146,7 +145,7 @@ export function DataTable<TData, TValue>({
 
       setColumnSizing(newColumnSizing);
     }
-  }, [containerWidth, totalColumnsWidth, firstColumnWidth]);
+  }, [containerWidth, totalColumnsWidth, firstColumnWidth, table]);
 
   if (isLoading) {
     return (

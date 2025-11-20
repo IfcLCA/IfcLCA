@@ -2,7 +2,7 @@ import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 
 export async function POST() {
-  const cookieStore = cookies();
+  const cookieStore = await cookies();
 
   // Set a cookie that expires in 10 years
   cookieStore.set("terms_accepted", "true", {

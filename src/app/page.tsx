@@ -70,7 +70,7 @@ export default async function HomePage() {
     return (
       <TermsAcceptanceWrapper>
         <Dashboard
-          initialRecentProjects={dashboardData.recentProjects}
+          initialRecentProjects={dashboardData.recentProjects as any}
           statistics={{
             totalProjects: dashboardData.stats.totalProjects,
             totalElements: dashboardData.stats.totalElements,
@@ -78,7 +78,7 @@ export default async function HomePage() {
             recentActivities: dashboardData.recentActivities.length,
             totalEmissions: dashboardData.stats.totalEmissions,
           }}
-          initialActivities={dashboardData.recentActivities}
+          initialActivities={dashboardData.recentActivities as any}
         />
       </TermsAcceptanceWrapper>
     );
@@ -87,7 +87,7 @@ export default async function HomePage() {
   // If user is authenticated and has accepted terms, show dashboard
   return (
     <Dashboard
-      initialRecentProjects={dashboardData.recentProjects}
+      initialRecentProjects={dashboardData.recentProjects as any}
       statistics={{
         totalProjects: dashboardData.stats.totalProjects,
         totalElements: dashboardData.stats.totalElements,
@@ -95,7 +95,7 @@ export default async function HomePage() {
         recentActivities: dashboardData.recentActivities.length,
         totalEmissions: dashboardData.stats.totalEmissions,
       }}
-      initialActivities={dashboardData.recentActivities}
+      initialActivities={dashboardData.recentActivities as any}
     />
   );
 }

@@ -21,8 +21,8 @@ const protectedRoutes = [
   "/api/projects",
 ];
 
-export default clerkMiddleware((auth, request) => {
-  const { userId } = auth;
+export default clerkMiddleware(async (auth, request) => {
+  const { userId } = await auth();
   const { pathname } = request.nextUrl;
 
   // Allow public routes

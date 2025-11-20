@@ -50,14 +50,15 @@ async function MaterialsGraph({ projectId }: { projectId: string }) {
   );
 }
 
-export default function GraphPage({ params }: { params: { id: string } }) {
+export default async function GraphPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
   return (
     <div className="main-container">
       <div className="page-header">
         <h2 className="page-title">Material Emissions Graph</h2>
       </div>
       <Suspense fallback={<GraphSkeleton />}>
-        <MaterialsGraph projectId={params.id} />
+        <MaterialsGraph projectId={id} />
       </Suspense>
     </div>
   );

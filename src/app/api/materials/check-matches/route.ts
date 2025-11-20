@@ -3,6 +3,7 @@ import { MaterialService } from "@/lib/services/material-service";
 import { connectToDatabase } from "@/lib/mongodb";
 import { Project } from "@/models";
 import { auth } from "@clerk/nextjs/server";
+import mongoose from "mongoose";
 
 export async function POST(request: Request) {
   try {
@@ -43,14 +44,14 @@ export async function POST(request: Request) {
         materialName,
         userId
       );
-      if (!existingMatch) {
+      if (!existingMatch || !existingMatch.kbobMatchId) {
         unmatchedMaterials.push(materialName);
       } else {
         // Create a new material in the current project with the same match
         const newMaterial = await MaterialService.createMaterialWithMatch(
           projectId,
           materialName,
-          existingMatch.kbobMatchId,
+          new mongoose.Types.ObjectId(existingMatch.kbobMatchId),
           existingMatch.density
         );
         matchedMaterials.push(newMaterial);

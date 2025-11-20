@@ -44,7 +44,7 @@ import { ReloadIcon } from "@radix-ui/react-icons";
 import cn from "classnames";
 import { Download, Edit, UploadCloud, Trash2 } from "lucide-react";
 import { useParams, useRouter } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useCallback } from "react";
 import { getGWP, getUBP, getPENRE } from "@/lib/utils/kbob-indicators";
 import type { ElementLcaResultsMap } from "@/lib/services/ifc-export-service";
 
@@ -237,53 +237,7 @@ export default function ProjectDetailsPage() {
   const [isLoadingExportData, setIsLoadingExportData] = useState(false);
   const [fullElementsData, setFullElementsData] = useState<any>(null);
 
-  useEffect(() => {
-    if (projectId) {
-      fetchProject();
-    }
-  }, [projectId]);
-
-  const fetchProject = async () => {
-    try {
-      setIsLoading(true);
-      console.debug("🔄 Fetching project data...");
-
-      const response = await fetch(`/api/projects/${projectId}`);
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-      const data = await response.json();
-
-      console.debug("📥 Raw project data:", {
-        id: data._id,
-        name: data.name,
-        uploadsCount: data.uploads?.length,
-        uploads: data.uploads,
-        elementCount: data.elements?.length,
-      });
-
-      const transformed = transformProjectData(data);
-
-      console.debug("✨ Transformed project data:", {
-        id: transformed.id,
-        name: transformed.name,
-        uploadsCount: transformed.uploads?.length,
-        uploads: transformed.uploads,
-        elementCount: transformed.elements?.length,
-      });
-
-      setProject(transformed);
-    } catch (err) {
-      console.error("❌ Error fetching project:", err);
-      setError(
-        err instanceof Error ? err.message : "An unknown error occurred"
-      );
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const transformProjectData = (data: any): ExtendedProject => {
+  const transformProjectData = useCallback((data: any): ExtendedProject => {
     // Get unique materials from elements
     const uniqueMaterials = new Set(
       data.elements
@@ -332,7 +286,53 @@ export default function ProjectDetailsPage() {
         materials: data._count?.materials || uniqueMaterials.size || data.materials?.length || 0,
       },
     };
-  };
+  }, []);
+
+  const fetchProject = useCallback(async () => {
+    try {
+      setIsLoading(true);
+      console.debug("🔄 Fetching project data...");
+
+      const response = await fetch(`/api/projects/${projectId}`);
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      const data = await response.json();
+
+      console.debug("📥 Raw project data:", {
+        id: data._id,
+        name: data.name,
+        uploadsCount: data.uploads?.length,
+        uploads: data.uploads,
+        elementCount: data.elements?.length,
+      });
+
+      const transformed = transformProjectData(data);
+
+      console.debug("✨ Transformed project data:", {
+        id: transformed.id,
+        name: transformed.name,
+        uploadsCount: transformed.uploads?.length,
+        uploads: transformed.uploads,
+        elementCount: transformed.elements?.length,
+      });
+
+      setProject(transformed);
+    } catch (err) {
+      console.error("❌ Error fetching project:", err);
+      setError(
+        err instanceof Error ? err.message : "An unknown error occurred"
+      );
+    } finally {
+      setIsLoading(false);
+    }
+  }, [projectId, transformProjectData]);
+
+  useEffect(() => {
+    if (projectId) {
+      fetchProject();
+    }
+  }, [projectId, fetchProject]);
 
   const handlePrepareExport = async () => {
     const usePagination = project?.usePagination;
