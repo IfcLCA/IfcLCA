@@ -54,8 +54,9 @@ export async function GET(request: Request) {
     return NextResponse.json(transformedMaterials);
   } catch (error) {
     console.error("Error fetching materials:", error);
+    const errorMessage = error instanceof Error ? error.message : "Unknown error";
     return NextResponse.json(
-      { error: "Failed to fetch materials" },
+      { error: "Failed to fetch materials", details: errorMessage },
       { status: 500 }
     );
   }

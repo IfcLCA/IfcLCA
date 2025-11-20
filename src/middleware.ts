@@ -9,6 +9,8 @@ const publicRoutes = [
   "/terms",
   "/privacy",
   "/cookies",
+  "/site.webmanifest",
+  "/robots.txt",
 ];
 
 // Define protected routes that require authentication
@@ -22,13 +24,15 @@ const protectedRoutes = [
 ];
 
 export default clerkMiddleware(async (auth, request) => {
-  const { userId } = await auth();
   const { pathname } = request.nextUrl;
 
-  // Allow public routes
-  if (publicRoutes.some((route) => pathname.startsWith(route))) {
+  // Allow public routes - check these FIRST before calling auth()
+  if (publicRoutes.some((route) => pathname === route || pathname.startsWith(route + "/"))) {
     return NextResponse.next();
   }
+
+  // Now we can safely call auth() for protected routes
+  const { userId } = await auth();
 
   // Check if it's a protected route
   const isProtectedRoute = protectedRoutes.some((route) =>
@@ -62,18 +66,16 @@ export default clerkMiddleware(async (auth, request) => {
   return NextResponse.next();
 });
 
-// Fixed matcher pattern
+// Matcher pattern - exclude static files and Next.js internals
 export const config = {
   matcher: [
-    "/",
-    "/sign-in",
-    "/sign-up",
-    "/dashboard/:path*",
-    "/projects/:path*",
-    "/materials/:path*",
-    "/settings/:path*",
-    "/reports/:path*",
-    "/api/:path*",
-    "/((?!_next/static|_next/image|favicon.ico).*)",
+    /*
+     * Match all request paths except for the ones starting with:
+     * - _next/static (static files)
+     * - _next/image (image optimization files)
+     * - favicon.ico (favicon file)
+     * - public files (images, manifests, etc.)
+     */
+    "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico|webmanifest|xml|txt)$).*)",
   ],
 };
