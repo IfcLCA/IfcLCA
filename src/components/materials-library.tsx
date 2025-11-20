@@ -520,12 +520,28 @@ export function MaterialLibraryComponent() {
           typeof kbobMaterial["max density"] === "number";
 
         // Get the new density from the KBOB material
-        const newDensity =
-          typeof kbobMaterial["kg/unit"] === "number"
-            ? kbobMaterial["kg/unit"]
-            : hasDensityRange
-              ? ((kbobMaterial["min density"] || 0) + (kbobMaterial["max density"] || 0)) / 2
-              : currentDensity;
+        // First try the new API density field
+        let newDensity = currentDensity;
+        if (kbobMaterial.density !== null && kbobMaterial.density !== undefined) {
+          if (typeof kbobMaterial.density === "number" && !isNaN(kbobMaterial.density)) {
+            newDensity = kbobMaterial.density;
+          } else if (typeof kbobMaterial.density === "string" && kbobMaterial.density !== "" && kbobMaterial.density !== "-") {
+            const parsed = parseFloat(kbobMaterial.density);
+            if (!isNaN(parsed)) {
+              newDensity = parsed;
+            }
+          }
+        }
+        
+        // Fallback to old field names if new density field not available
+        if (newDensity === currentDensity || newDensity === 0) {
+          newDensity =
+            typeof kbobMaterial["kg/unit"] === "number"
+              ? kbobMaterial["kg/unit"]
+              : hasDensityRange
+                ? ((kbobMaterial["min density"] || 0) + (kbobMaterial["max density"] || 0)) / 2
+                : currentDensity;
+        }
 
         return {
           materialId,
