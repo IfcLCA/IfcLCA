@@ -1,4 +1,5 @@
 import mongoose from "mongoose";
+import { getGWP, getUBP, getPENRE } from "@/lib/utils/kbob-indicators";
 
 interface IMaterial {
   projectId: mongoose.Types.ObjectId;
@@ -102,15 +103,11 @@ materialSchema.virtual("emissionFactors").get(function () {
   const kbob = this.kbobMatchId as any;
   if (!kbob) return null;
 
-  // Use fallback logic directly (avoid require in virtual)
-  const gwp = kbob.gwpTotal ?? kbob.GWP ?? 0;
-  const ubp = kbob.ubp21Total ?? kbob.UBP ?? 0;
-  const penre = kbob.primaryEnergyNonRenewableTotal ?? kbob.PENRE ?? 0;
-  
+  // Use centralized helper functions for consistent indicator resolution
   return {
-    gwp,
-    ubp,
-    penre,
+    gwp: getGWP(kbob),
+    ubp: getUBP(kbob),
+    penre: getPENRE(kbob),
   };
 });
 

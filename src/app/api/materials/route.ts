@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { connectToDatabase } from "@/lib/mongodb";
 import { Material, Project } from "@/models";
 import { auth } from "@clerk/nextjs/server";
+import { getGWP, getUBP, getPENRE } from "@/lib/utils/kbob-indicators";
 
 export async function GET(request: Request) {
   try {
@@ -42,9 +43,9 @@ export async function GET(request: Request) {
           ? {
             id: kbobMatch._id.toString(),
             Name: kbobMatch.Name,
-            GWP: kbobMatch.gwpTotal ?? kbobMatch.GWP ?? 0,
-            UBP: kbobMatch.ubp21Total ?? kbobMatch.UBP ?? 0,
-            PENRE: kbobMatch.primaryEnergyNonRenewableTotal ?? kbobMatch.PENRE ?? 0,
+            GWP: getGWP(kbobMatch),
+            UBP: getUBP(kbobMatch),
+            PENRE: getPENRE(kbobMatch),
           }
           : undefined,
       };

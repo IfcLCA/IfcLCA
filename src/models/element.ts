@@ -1,4 +1,5 @@
 import mongoose from "mongoose";
+import { getGWP, getUBP, getPENRE } from "@/lib/utils/kbob-indicators";
 
 interface IMaterialLayer {
   material: mongoose.Types.ObjectId;
@@ -107,10 +108,10 @@ elementSchema.virtual("emissions").get(function () {
       const density = material.density || 0;
       const mass = volume * density;
 
-      // Use helper functions with fallback logic
-      const gwp = kbobMatch.gwpTotal ?? kbobMatch.GWP ?? 0;
-      const ubp = kbobMatch.ubp21Total ?? kbobMatch.UBP ?? 0;
-      const penre = kbobMatch.primaryEnergyNonRenewableTotal ?? kbobMatch.PENRE ?? 0;
+      // Use helper functions for consistent indicator resolution
+      const gwp = getGWP(kbobMatch);
+      const ubp = getUBP(kbobMatch);
+      const penre = getPENRE(kbobMatch);
 
       return {
         gwp: acc.gwp + mass * gwp,

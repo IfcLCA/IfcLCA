@@ -230,7 +230,7 @@ export class MaterialService {
 
       const [materials, newKBOBMaterial, elements] = await Promise.all([
         Material.find({ _id: { $in: objectIds } })
-          .populate("kbobMatchId")
+          .populate("kbobMatchId", "Name GWP UBP PENRE gwpTotal ubp21Total primaryEnergyNonRenewableTotal density")
           .lean(),
         KBOBMaterial.findById(kbobObjectId).lean(),
         Element.find({ "materials.material": { $in: objectIds } })
@@ -343,13 +343,26 @@ export class MaterialService {
       return undefined;
     }
 
+    // Check if material has ANY valid environmental indicators (legacy or new format)
+    const hasLegacyIndicators =
+      typeof kbobMaterial.GWP === "number" ||
+      typeof kbobMaterial.UBP === "number" ||
+      typeof kbobMaterial.PENRE === "number";
+    
+    const hasNewIndicators =
+      typeof kbobMaterial.gwpTotal === "number" ||
+      typeof kbobMaterial.ubp21Total === "number" ||
+      typeof kbobMaterial.primaryEnergyNonRenewableTotal === "number";
+    
+    // If material has no indicators at all, return undefined
+    if (!hasLegacyIndicators && !hasNewIndicators) {
+      return undefined;
+    }
+
+    // Use helper functions to get values (with fallback logic)
     const gwp = getGWP(kbobMaterial);
     const ubp = getUBP(kbobMaterial);
     const penre = getPENRE(kbobMaterial);
-    
-    if (gwp === 0 && ubp === 0 && penre === 0) {
-      return undefined;
-    }
 
     const mass = volume * density;
     return {
@@ -416,7 +429,7 @@ export class MaterialService {
         projectId: { $in: projectIds },
         kbobMatchId: { $exists: true },
       })
-        .populate("kbobMatchId")
+        .populate("kbobMatchId", "Name GWP UBP PENRE gwpTotal ubp21Total primaryEnergyNonRenewableTotal density")
         .lean() as (mongoose.Document & IMaterial) | null;
 
       if (exactMatch) {
@@ -429,7 +442,7 @@ export class MaterialService {
         projectId: { $in: projectIds },
         kbobMatchId: { $exists: true },
       })
-        .populate("kbobMatchId")
+        .populate("kbobMatchId", "Name GWP UBP PENRE gwpTotal ubp21Total primaryEnergyNonRenewableTotal density")
         .lean() as (mongoose.Document & IMaterial) | null;
 
       if (caseInsensitiveMatch) {

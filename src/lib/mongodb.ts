@@ -54,23 +54,6 @@ export async function connectToDatabase() {
   }
 }
 
-/**
- * Force disconnect and clear connection cache
- * Useful when IP whitelist changes or connection needs refresh
- */
-export async function disconnectDatabase() {
-  try {
-    if (cached.conn) {
-      await mongoose.disconnect();
-    }
-  } catch (error) {
-    console.error("Error disconnecting:", error);
-  } finally {
-    cached.conn = null;
-    cached.promise = null;
-  }
-}
-
 // Helper function to ensure database connection
 export async function withDatabase<T>(operation: () => Promise<T>): Promise<T> {
   try {

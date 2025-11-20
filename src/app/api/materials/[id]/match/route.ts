@@ -3,6 +3,7 @@ import { connectToDatabase } from "@/lib/mongodb";
 import { Material, Project } from "@/models";
 import mongoose from "mongoose";
 import { auth } from "@clerk/nextjs/server";
+import { getGWP, getUBP, getPENRE } from "@/lib/utils/kbob-indicators";
 
 export async function POST(
   request: Request,
@@ -73,9 +74,9 @@ export async function POST(
           id: kbobMatch._id.toString(),
           name: kbobMatch.Name,
           indicators: {
-            gwp: kbobMatch.gwpTotal ?? kbobMatch.GWP ?? 0,
-            ubp: kbobMatch.ubp21Total ?? kbobMatch.UBP ?? 0,
-            penre: kbobMatch.primaryEnergyNonRenewableTotal ?? kbobMatch.PENRE ?? 0,
+            gwp: getGWP(kbobMatch),
+            ubp: getUBP(kbobMatch),
+            penre: getPENRE(kbobMatch),
           },
         }
         : null,
