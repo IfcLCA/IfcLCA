@@ -107,10 +107,15 @@ elementSchema.virtual("emissions").get(function () {
       const density = material.density || 0;
       const mass = volume * density;
 
+      // Use helper functions with fallback logic
+      const gwp = kbobMatch.gwpTotal ?? kbobMatch.GWP ?? 0;
+      const ubp = kbobMatch.ubp21Total ?? kbobMatch.UBP ?? 0;
+      const penre = kbobMatch.primaryEnergyNonRenewableTotal ?? kbobMatch.PENRE ?? 0;
+
       return {
-        gwp: acc.gwp + mass * (kbobMatch.GWP || 0),
-        ubp: acc.ubp + mass * (kbobMatch.UBP || 0),
-        penre: acc.penre + mass * (kbobMatch.PENRE || 0),
+        gwp: acc.gwp + mass * gwp,
+        ubp: acc.ubp + mass * ubp,
+        penre: acc.penre + mass * penre,
       };
     },
     { gwp: 0, ubp: 0, penre: 0 }

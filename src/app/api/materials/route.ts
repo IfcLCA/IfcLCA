@@ -42,9 +42,9 @@ export async function GET(request: Request) {
           ? {
             id: kbobMatch._id.toString(),
             Name: kbobMatch.Name,
-            GWP: kbobMatch.GWP,
-            UBP: kbobMatch.UBP,
-            PENRE: kbobMatch.PENRE,
+            GWP: kbobMatch.gwpTotal ?? kbobMatch.GWP ?? 0,
+            UBP: kbobMatch.ubp21Total ?? kbobMatch.UBP ?? 0,
+            PENRE: kbobMatch.primaryEnergyNonRenewableTotal ?? kbobMatch.PENRE ?? 0,
           }
           : undefined,
       };

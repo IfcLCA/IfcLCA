@@ -27,6 +27,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { toast } from "@/hooks/use-toast";
+import { getGWP, getUBP, getPENRE } from "@/lib/utils/kbob-indicators";
 import {
   MagnifyingGlassIcon,
   ReloadIcon,
@@ -51,9 +52,14 @@ interface Material {
   kbobMatch?: {
     id: string;
     Name: string;
-    GWP: number;
-    UBP: number;
-    PENRE: number;
+    // Legacy fields
+    GWP?: number;
+    UBP?: number;
+    PENRE?: number;
+    // New API fields
+    gwpTotal?: number | null;
+    ubp21Total?: number | null;
+    primaryEnergyNonRenewableTotal?: number | null;
   };
   projects?: string[];
   originalIds?: string[];
@@ -61,11 +67,21 @@ interface Material {
 
 interface KbobMaterial {
   _id: string;
-  KBOB_ID: number;
+  KBOB_ID?: number;
   Name: string;
-  GWP: number;
-  UBP: number;
-  PENRE: number;
+  // Legacy fields
+  GWP?: number;
+  UBP?: number;
+  PENRE?: number;
+  // New API fields
+  gwpTotal?: number | null;
+  ubp21Total?: number | null;
+  primaryEnergyNonRenewableTotal?: number | null;
+  uuid?: string;
+  nameDE?: string;
+  nameFR?: string;
+  group?: string;
+  density?: number | string | null;
   "min density"?: number;
   "max density"?: number;
   "kg/unit"?: number;
@@ -1278,7 +1294,7 @@ export function MaterialLibraryComponent() {
                                       {getTemporaryMatch(material.id)?.Name}
                                     </p>
                                     <p className="text-sm text-muted-foreground">
-                                      GWP: {getTemporaryMatch(material.id)?.GWP}{" "}
+                                      GWP: {getGWP(getTemporaryMatch(material.id))}{" "}
                                       kg CO₂-eq
                                     </p>
                                   </>
@@ -1288,7 +1304,7 @@ export function MaterialLibraryComponent() {
                                       {material.kbobMatch.Name}
                                     </p>
                                     <p className="text-sm text-muted-foreground">
-                                      GWP: {material.kbobMatch.GWP} kg CO₂-eq
+                                      GWP: {getGWP(material.kbobMatch)} kg CO₂-eq
                                     </p>
                                   </>
                                 ) : null}
@@ -1468,13 +1484,13 @@ export function MaterialLibraryComponent() {
                             </div>
                             <div className="mt-1 space-y-1">
                               <p className="text-sm text-muted-foreground">
-                                GWP: {material.GWP} kg CO₂-eq
+                                GWP: {getGWP(material)} kg CO₂-eq
                               </p>
                               <p className="text-sm text-muted-foreground">
-                                UBP: {material.UBP}
+                                UBP: {getUBP(material)}
                               </p>
                               <p className="text-sm text-muted-foreground">
-                                PENRE: {material.PENRE}
+                                PENRE: {getPENRE(material)}
                               </p>
                             </div>
                           </div>

@@ -2,6 +2,7 @@ import mongoose from "mongoose";
 import { Material, KBOBMaterial, Element, Project } from "@/models";
 import { logger } from "@/lib/logger";
 import { ClientSession, Types } from "mongoose";
+import { getGWP, getUBP, getPENRE } from "@/lib/utils/kbob-indicators";
 import type { IKBOBMaterial, IMaterial } from "@/types/material";
 
 // Update interfaces with proper types
@@ -88,6 +89,19 @@ export class MaterialService {
   }
 
   private static calculateDensityFromKBOB(kbobMaterial: IKBOBMaterial): number {
+    // First try the new API density field
+    if (kbobMaterial.density !== null && kbobMaterial.density !== undefined) {
+      if (typeof kbobMaterial.density === "number" && !isNaN(kbobMaterial.density)) {
+        return kbobMaterial.density;
+      }
+      if (typeof kbobMaterial.density === "string" && kbobMaterial.density !== "" && kbobMaterial.density !== "-") {
+        const parsed = parseFloat(kbobMaterial.density);
+        if (!isNaN(parsed)) {
+          return parsed;
+        }
+      }
+    }
+    
     // Use kg/unit if available (handle both number and string)
     const kgPerUnit = kbobMaterial["kg/unit"];
     if (typeof kgPerUnit === "number" && !isNaN(kgPerUnit)) {
@@ -329,19 +343,19 @@ export class MaterialService {
       return undefined;
     }
 
-    if (
-      typeof kbobMaterial.GWP !== "number" ||
-      typeof kbobMaterial.UBP !== "number" ||
-      typeof kbobMaterial.PENRE !== "number"
-    ) {
+    const gwp = getGWP(kbobMaterial);
+    const ubp = getUBP(kbobMaterial);
+    const penre = getPENRE(kbobMaterial);
+    
+    if (gwp === 0 && ubp === 0 && penre === 0) {
       return undefined;
     }
 
     const mass = volume * density;
     return {
-      gwp: mass * kbobMaterial.GWP,
-      ubp: mass * kbobMaterial.UBP,
-      penre: mass * kbobMaterial.PENRE,
+      gwp: mass * gwp,
+      ubp: mass * ubp,
+      penre: mass * penre,
     };
   }
 
@@ -684,17 +698,17 @@ export class MaterialService {
       const totals = elements.reduce(
         (acc, element) => {
           const elementTotals = element.materials.reduce(
-            (matAcc: { gwp: number; ubp: number; penre: number }, material: { volume?: number; material?: { density?: number; kbobMatchId?: Types.ObjectId | { GWP?: number; UBP?: number; PENRE?: number } } }) => {
+            (matAcc: { gwp: number; ubp: number; penre: number }, material: { volume?: number; material?: { density?: number; kbobMatchId?: Types.ObjectId | any } }) => {
               const volume = material.volume || 0;
               const density = material.material?.density || 0;
               // When populated, kbobMatchId contains the KBOB material object
-              const kbobMatch = material.material?.kbobMatchId as { GWP?: number; UBP?: number; PENRE?: number } | undefined;
+              const kbobMatch = material.material?.kbobMatchId as any;
               const mass = volume * density;
 
               return {
-                gwp: matAcc.gwp + mass * (kbobMatch?.GWP || 0),
-                ubp: matAcc.ubp + mass * (kbobMatch?.UBP || 0),
-                penre: matAcc.penre + mass * (kbobMatch?.PENRE || 0),
+                gwp: matAcc.gwp + mass * getGWP(kbobMatch),
+                ubp: matAcc.ubp + mass * getUBP(kbobMatch),
+                penre: matAcc.penre + mass * getPENRE(kbobMatch),
               };
             },
             { gwp: 0, ubp: 0, penre: 0 }
@@ -779,7 +793,7 @@ export class MaterialService {
       // Note: After populate(), kbobMatchId contains the populated KBOB material object
       const materials = await Material.find({ _id: { $in: materialIds } })
         .select("_id density kbobMatchId name")
-        .populate("kbobMatchId", "GWP UBP PENRE")
+        .populate("kbobMatchId", "GWP UBP PENRE gwpTotal ubp21Total primaryEnergyNonRenewableTotal")
         .session(session)
         .lean();
 
@@ -832,7 +846,14 @@ export class MaterialService {
                                     "$$material.density",
                                   ],
                                 },
-                                { $ifNull: ["$$material.kbobMatchId.GWP", 0] },
+                                {
+                                  $ifNull: [
+                                    {
+                                      $ifNull: ["$$material.kbobMatchId.gwpTotal", "$$material.kbobMatchId.GWP"],
+                                    },
+                                    0,
+                                  ],
+                                },
                               ],
                             },
                             ubp: {
@@ -843,7 +864,14 @@ export class MaterialService {
                                     "$$material.density",
                                   ],
                                 },
-                                { $ifNull: ["$$material.kbobMatchId.UBP", 0] },
+                                {
+                                  $ifNull: [
+                                    {
+                                      $ifNull: ["$$material.kbobMatchId.ubp21Total", "$$material.kbobMatchId.UBP"],
+                                    },
+                                    0,
+                                  ],
+                                },
                               ],
                             },
                             penre: {
@@ -855,7 +883,15 @@ export class MaterialService {
                                   ],
                                 },
                                 {
-                                  $ifNull: ["$$material.kbobMatchId.PENRE", 0],
+                                  $ifNull: [
+                                    {
+                                      $ifNull: [
+                                        "$$material.kbobMatchId.primaryEnergyNonRenewableTotal",
+                                        "$$material.kbobMatchId.PENRE",
+                                      ],
+                                    },
+                                    0,
+                                  ],
                                 },
                               ],
                             },

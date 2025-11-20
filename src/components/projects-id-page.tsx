@@ -45,6 +45,7 @@ import cn from "classnames";
 import { Download, Edit, UploadCloud, Trash2 } from "lucide-react";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
+import { getGWP, getUBP, getPENRE } from "@/lib/utils/kbob-indicators";
 import type { ElementLcaResultsMap } from "@/lib/services/ifc-export-service";
 
 interface KBOBMaterial {
@@ -504,15 +505,15 @@ export default function ProjectDetailsPage() {
 
           const gwp = resolveIndicator(
             mat.indicators?.gwp,
-            mass * toFiniteNumber(kbobMatch.GWP)
+            mass * getGWP(kbobMatch)
           );
           const ubp = resolveIndicator(
             mat.indicators?.ubp,
-            mass * toFiniteNumber(kbobMatch.UBP)
+            mass * getUBP(kbobMatch)
           );
           const penre = resolveIndicator(
             mat.indicators?.penre,
-            mass * toFiniteNumber(kbobMatch.PENRE)
+            mass * getPENRE(kbobMatch)
           );
 
           acc.gwp += gwp;
@@ -1106,9 +1107,9 @@ const MaterialsTab = ({ project }: { project: Project }) => {
         material: mat,
         volume: mat.volume || 0,
         emissions: {
-          gwp: (mat.volume || 0) * (mat.density || 0) * (mat.kbobMatch?.GWP || 0),
-          ubp: (mat.volume || 0) * (mat.density || 0) * (mat.kbobMatch?.UBP || 0),
-          penre: (mat.volume || 0) * (mat.density || 0) * (mat.kbobMatch?.PENRE || 0),
+          gwp: (mat.volume || 0) * (mat.density || 0) * getGWP(mat.kbobMatch),
+          ubp: (mat.volume || 0) * (mat.density || 0) * getUBP(mat.kbobMatch),
+          penre: (mat.volume || 0) * (mat.density || 0) * getPENRE(mat.kbobMatch),
         },
       }));
     }
@@ -1133,15 +1134,15 @@ const MaterialsTab = ({ project }: { project: Project }) => {
         acc[key].emissions.gwp +=
           mat.volume *
           (mat.material.density || 0) *
-          (mat.material.kbobMatch?.GWP || 0);
+          getGWP(mat.material.kbobMatch);
         acc[key].emissions.ubp +=
           mat.volume *
           (mat.material.density || 0) *
-          (mat.material.kbobMatch?.UBP || 0);
+          getUBP(mat.material.kbobMatch);
         acc[key].emissions.penre +=
           mat.volume *
           (mat.material.density || 0) *
-          (mat.material.kbobMatch?.PENRE || 0);
+          getPENRE(mat.material.kbobMatch);
       });
       return acc;
     }, {} as Record<string, Material>);
@@ -1181,9 +1182,9 @@ const GraphTab = ({ project }: { project: Project }) => {
       category: mat.category || "Uncategorized",
       volume: mat.volume || 0,
       indicators: {
-        gwp: (mat.volume || 0) * (mat.density || 0) * (mat.kbobMatch?.GWP || 0),
-        ubp: (mat.volume || 0) * (mat.density || 0) * (mat.kbobMatch?.UBP || 0),
-        penre: (mat.volume || 0) * (mat.density || 0) * (mat.kbobMatch?.PENRE || 0),
+        gwp: (mat.volume || 0) * (mat.density || 0) * getGWP(mat.kbobMatch),
+        ubp: (mat.volume || 0) * (mat.density || 0) * getUBP(mat.kbobMatch),
+        penre: (mat.volume || 0) * (mat.density || 0) * getPENRE(mat.kbobMatch),
       },
     }));
 
@@ -1214,15 +1215,15 @@ const GraphTab = ({ project }: { project: Project }) => {
         gwp:
           material.volume *
           (material.material?.density || 0) *
-          (material.material?.kbobMatch?.GWP || 0),
+          getGWP(material.material?.kbobMatch),
         ubp:
           material.volume *
           (material.material?.density || 0) *
-          (material.material?.kbobMatch?.UBP || 0),
+          getUBP(material.material?.kbobMatch),
         penre:
           material.volume *
           (material.material?.density || 0) *
-          (material.material?.kbobMatch?.PENRE || 0),
+          getPENRE(material.material?.kbobMatch),
       },
     }))
   );

@@ -102,10 +102,15 @@ materialSchema.virtual("emissionFactors").get(function () {
   const kbob = this.kbobMatchId as any;
   if (!kbob) return null;
 
+  // Use fallback logic directly (avoid require in virtual)
+  const gwp = kbob.gwpTotal ?? kbob.GWP ?? 0;
+  const ubp = kbob.ubp21Total ?? kbob.UBP ?? 0;
+  const penre = kbob.primaryEnergyNonRenewableTotal ?? kbob.PENRE ?? 0;
+  
   return {
-    gwp: kbob.GWP || 0,
-    ubp: kbob.UBP || 0,
-    penre: kbob.PENRE || 0,
+    gwp,
+    ubp,
+    penre,
   };
 });
 

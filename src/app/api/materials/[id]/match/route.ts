@@ -73,9 +73,9 @@ export async function POST(
           id: kbobMatch._id.toString(),
           name: kbobMatch.Name,
           indicators: {
-            gwp: kbobMatch.GWP,
-            ubp: kbobMatch.UBP,
-            penre: kbobMatch.PENRE,
+            gwp: kbobMatch.gwpTotal ?? kbobMatch.GWP ?? 0,
+            ubp: kbobMatch.ubp21Total ?? kbobMatch.UBP ?? 0,
+            penre: kbobMatch.primaryEnergyNonRenewableTotal ?? kbobMatch.PENRE ?? 0,
           },
         }
         : null,

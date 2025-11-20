@@ -47,8 +47,27 @@ export async function connectToDatabase() {
     return cached.conn;
   } catch (e) {
     console.error("MongoDB connection error:", e);
+    // Clear both connection and promise on error to force retry
     cached.promise = null;
+    cached.conn = null;
     throw e;
+  }
+}
+
+/**
+ * Force disconnect and clear connection cache
+ * Useful when IP whitelist changes or connection needs refresh
+ */
+export async function disconnectDatabase() {
+  try {
+    if (cached.conn) {
+      await mongoose.disconnect();
+    }
+  } catch (error) {
+    console.error("Error disconnecting:", error);
+  } finally {
+    cached.conn = null;
+    cached.promise = null;
   }
 }
 

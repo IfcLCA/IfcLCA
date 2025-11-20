@@ -2,6 +2,7 @@ import { Element, Project } from "@/models";
 import { NextResponse } from "next/server";
 import mongoose from "mongoose";
 import { connectToDatabase } from "@/lib/mongodb";
+import { getGWP, getUBP, getPENRE } from "@/lib/utils/kbob-indicators";
 import { auth } from "@clerk/nextjs/server";
 
 export const runtime = "nodejs";
@@ -81,9 +82,9 @@ export async function GET(
             const mass = volume * density;
 
             return {
-              gwp: acc.gwp + mass * (kbob?.GWP || 0),
-              ubp: acc.ubp + mass * (kbob?.UBP || 0),
-              penre: acc.penre + mass * (kbob?.PENRE || 0),
+              gwp: acc.gwp + mass * getGWP(kbob),
+              ubp: acc.ubp + mass * getUBP(kbob),
+              penre: acc.penre + mass * getPENRE(kbob),
             };
           },
           { gwp: 0, ubp: 0, penre: 0 }

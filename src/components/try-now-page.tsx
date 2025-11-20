@@ -362,15 +362,15 @@ export default function TryNowPage() {
             acc.gwp +=
               m.volume *
               m.material.density *
-              m.material.kbobMatch.GWP;
+              (m.material.kbobMatch.gwpTotal ?? m.material.kbobMatch.GWP ?? 0);
             acc.ubp +=
               m.volume *
               m.material.density *
-              m.material.kbobMatch.UBP;
+              (m.material.kbobMatch.ubp21Total ?? m.material.kbobMatch.UBP ?? 0);
             acc.penre +=
               m.volume *
               m.material.density *
-              m.material.kbobMatch.PENRE;
+              (m.material.kbobMatch.primaryEnergyNonRenewableTotal ?? m.material.kbobMatch.PENRE ?? 0);
           }
           return acc;
         },
@@ -408,11 +408,11 @@ export default function TryNowPage() {
         existing.volume += m.volume;
         if (m.material.kbobMatch && m.material.density) {
           existing.emissions.gwp +=
-            m.volume * m.material.density * m.material.kbobMatch.GWP;
+            m.volume * m.material.density * (m.material.kbobMatch.gwpTotal ?? m.material.kbobMatch.GWP ?? 0);
           existing.emissions.ubp +=
-            m.volume * m.material.density * m.material.kbobMatch.UBP;
+            m.volume * m.material.density * (m.material.kbobMatch.ubp21Total ?? m.material.kbobMatch.UBP ?? 0);
           existing.emissions.penre +=
-            m.volume * m.material.density * m.material.kbobMatch.PENRE;
+            m.volume * m.material.density * (m.material.kbobMatch.primaryEnergyNonRenewableTotal ?? m.material.kbobMatch.PENRE ?? 0);
         }
         matMap.set(key, existing);
       });

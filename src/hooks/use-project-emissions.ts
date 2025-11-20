@@ -1,5 +1,6 @@
 import { useMemo } from "react";
 import { getAmortizationYears } from "@/lib/utils/amortization";
+import { getGWP, getUBP, getPENRE } from "@/lib/utils/kbob-indicators";
 import type { Project, ProjectEmissions } from "@/types/project";
 
 const MILLION = 1_000_000;
@@ -81,9 +82,9 @@ export function useProjectEmissions(
           // Use kbobMatch (populated form) for calculations
           const kbob = mat.material?.kbobMatch;
 
-          let gwp = volume * density * (kbob?.GWP || 0);
-          let ubp = volume * density * (kbob?.UBP || 0);
-          let penre = volume * density * (kbob?.PENRE || 0);
+          let gwp = volume * density * getGWP(kbob);
+          let ubp = volume * density * getUBP(kbob);
+          let penre = volume * density * getPENRE(kbob);
 
           // Apply relative calculation if mode is relative and area is valid
           if (displayMode === 'relative' && project.calculationArea?.value && project.calculationArea.value > 0) {
