@@ -1,4 +1,5 @@
 import mongoose from "mongoose";
+import { getGWP, getUBP, getPENRE } from "@/lib/utils/kbob-indicators";
 
 interface IMaterialLayer {
   material: mongoose.Types.ObjectId;
@@ -107,10 +108,15 @@ elementSchema.virtual("emissions").get(function () {
       const density = material.density || 0;
       const mass = volume * density;
 
+      // Use helper functions for consistent indicator resolution
+      const gwp = getGWP(kbobMatch);
+      const ubp = getUBP(kbobMatch);
+      const penre = getPENRE(kbobMatch);
+
       return {
-        gwp: acc.gwp + mass * (kbobMatch.GWP || 0),
-        ubp: acc.ubp + mass * (kbobMatch.UBP || 0),
-        penre: acc.penre + mass * (kbobMatch.PENRE || 0),
+        gwp: acc.gwp + mass * gwp,
+        ubp: acc.ubp + mass * ubp,
+        penre: acc.penre + mass * penre,
       };
     },
     { gwp: 0, ubp: 0, penre: 0 }

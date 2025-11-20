@@ -8,7 +8,7 @@ export const runtime = "nodejs";
 
 export async function POST(
   request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const { userId } = await auth();
@@ -21,11 +21,12 @@ export async function POST(
 
     await connectToDatabase();
 
+    const { id } = await params;
     const body = await request.json();
     const filename = body.filename || "Unnamed File";
 
     // Validate and convert project ID
-    if (!mongoose.Types.ObjectId.isValid(params.id)) {
+    if (!mongoose.Types.ObjectId.isValid(id)) {
       return NextResponse.json(
         { error: "Invalid project ID" },
         { status: 400 }
@@ -34,7 +35,7 @@ export async function POST(
 
     // Create upload document with all required fields
     const upload = new Upload({
-      projectId: new mongoose.Types.ObjectId(params.id),
+      projectId: new mongoose.Types.ObjectId(id),
       userId,
       filename,
       status: "Processing",

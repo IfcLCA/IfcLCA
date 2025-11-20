@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { connectToDatabase } from "@/lib/mongodb";
 import { Material, Project } from "@/models";
 import { auth } from "@clerk/nextjs/server";
+import { getGWP, getUBP, getPENRE } from "@/lib/utils/kbob-indicators";
 
 export async function GET(request: Request) {
   try {
@@ -42,9 +43,9 @@ export async function GET(request: Request) {
           ? {
             id: kbobMatch._id.toString(),
             Name: kbobMatch.Name,
-            GWP: kbobMatch.GWP,
-            UBP: kbobMatch.UBP,
-            PENRE: kbobMatch.PENRE,
+            GWP: getGWP(kbobMatch),
+            UBP: getUBP(kbobMatch),
+            PENRE: getPENRE(kbobMatch),
           }
           : undefined,
       };
@@ -53,8 +54,9 @@ export async function GET(request: Request) {
     return NextResponse.json(transformedMaterials);
   } catch (error) {
     console.error("Error fetching materials:", error);
+    const errorMessage = error instanceof Error ? error.message : "Unknown error";
     return NextResponse.json(
-      { error: "Failed to fetch materials" },
+      { error: "Failed to fetch materials", details: errorMessage },
       { status: 500 }
     );
   }

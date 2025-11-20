@@ -37,9 +37,7 @@ export async function connectToDatabase() {
       connectTimeoutMS: 10000,
     };
 
-    cached.promise = mongoose.connect(MONGODB_URI, opts).then((mongoose) => {
-      return mongoose;
-    });
+    cached.promise = mongoose.connect(MONGODB_URI, opts) as any;
   }
 
   try {
@@ -47,7 +45,9 @@ export async function connectToDatabase() {
     return cached.conn;
   } catch (e) {
     console.error("MongoDB connection error:", e);
+    // Clear both connection and promise on error to force retry
     cached.promise = null;
+    cached.conn = null;
     throw e;
   }
 }

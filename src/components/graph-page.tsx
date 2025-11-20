@@ -87,6 +87,7 @@ export function GraphPageComponent({ materialsData }: Props) {
       if (!existingMaterial) {
         materials.set(key, {
           name: key,
+          elementName: material.elementName || material.name || "Unnamed Element",
           volume: material.volume || 0,
           indicators: {
             gwp: material.indicators?.gwp || 0,
@@ -142,10 +143,14 @@ export function GraphPageComponent({ materialsData }: Props) {
         kbobMaterial: material.kbobMaterial,
         ifcMaterial: material.ifcMaterial,
       }))
-      .sort((a, b) => b[selectedIndicator] - a[selectedIndicator]);
+      .sort((a, b) => {
+        const aValue = selectedIndicator === "gwp" ? a.gwp : selectedIndicator === "ubp" ? a.ubp : a.penre;
+        const bValue = selectedIndicator === "gwp" ? b.gwp : selectedIndicator === "ubp" ? b.ubp : b.penre;
+        return bValue - aValue;
+      });
 
     setChartData(filteredData);
-  }, [uniqueMaterials, selectedMaterials, selectedIndicator]);
+  }, [uniqueMaterials, selectedMaterials, selectedIndicator, materialsData?.length]);
 
   const formatValue = (
     value: number | null | undefined,
@@ -442,7 +447,9 @@ export function GraphPageComponent({ materialsData }: Props) {
               interval={0}
               tick={(props) => {
                 const { x, y, payload } = props;
-                if (chartData.length > 50) return null;
+                if (chartData.length > 50) {
+                  return <g />;
+                }
 
                 return (
                   <g transform={`translate(${x},${y})`}>
@@ -507,7 +514,9 @@ export function GraphPageComponent({ materialsData }: Props) {
               interval={0}
               tick={(props) => {
                 const { x, y, payload } = props;
-                if (chartData.length > 50) return null;
+                if (chartData.length > 50) {
+                  return <g />;
+                }
 
                 return (
                   <g transform={`translate(${x},${y})`}>
@@ -574,16 +583,7 @@ export function GraphPageComponent({ materialsData }: Props) {
               cx="50%"
               cy="50%"
               outerRadius={150}
-              labelLine={({ percent }) => {
-                // Hide label lines for the same conditions as labels
-                const minPercent =
-                  chartData.length > 50
-                    ? 0.01
-                    : chartData.length > 20
-                    ? 0.02
-                    : 0;
-                return percent > minPercent;
-              }}
+              labelLine={false}
               label={({ name, percent }) => {
                 // Only show label if the slice is more than 2% of the total for datasets > 20 items
                 // or more than 1% for datasets > 50 items

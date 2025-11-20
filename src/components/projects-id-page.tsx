@@ -44,16 +44,14 @@ import { ReloadIcon } from "@radix-ui/react-icons";
 import cn from "classnames";
 import { Download, Edit, UploadCloud, Trash2 } from "lucide-react";
 import { useParams, useRouter } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useCallback } from "react";
+import { getGWP, getUBP, getPENRE } from "@/lib/utils/kbob-indicators";
 import type { ElementLcaResultsMap } from "@/lib/services/ifc-export-service";
 
 interface KBOBMaterial {
   _id: string;
   Name: string;
   Category?: string;
-  GWP: number;
-  UBP: number;
-  PENRE: number;
 }
 
 interface Material {
@@ -76,10 +74,7 @@ interface MaterialEntry {
     kbobMatch?: {
       _id: string;
       Name: string;
-      KBOB_ID: number;
-      GWP?: number;
-      UBP?: number;
-      PENRE?: number;
+      uuid?: string;
     };
   };
   indicators?: {
@@ -152,9 +147,12 @@ export interface ExtendedProject extends Project {
 type IndicatorType = "gwp" | "ubp" | "penre";
 
 type KBOBIndicatorValues = {
-  GWP?: number;
-  UBP?: number;
-  PENRE?: number;
+  gwpTotal?: number | null;
+  ubp21Total?: number | null;
+  primaryEnergyNonRenewableTotal?: number | null;
+  _id?: string;
+  Name?: string;
+  uuid?: string;
 };
 
 type ElementMaterialForExport = {
@@ -170,10 +168,7 @@ type ElementMaterialForExport = {
     kbobMatch?: {
       _id: string;
       Name: string;
-      KBOB_ID: number;
-      GWP?: number;
-      UBP?: number;
-      PENRE?: number;
+      uuid?: string;
     };
   };
 };
@@ -212,9 +207,9 @@ interface MaterialWithVolume {
     density?: number;
     kbobMatch?: {
       Name?: string;
-      GWP?: number;
-      UBP?: number;
-      PENRE?: number;
+      gwpTotal?: number | null;
+      ubp21Total?: number | null;
+      primaryEnergyNonRenewableTotal?: number | null;
     };
   };
   volume: number;
@@ -236,53 +231,7 @@ export default function ProjectDetailsPage() {
   const [isLoadingExportData, setIsLoadingExportData] = useState(false);
   const [fullElementsData, setFullElementsData] = useState<any>(null);
 
-  useEffect(() => {
-    if (projectId) {
-      fetchProject();
-    }
-  }, [projectId]);
-
-  const fetchProject = async () => {
-    try {
-      setIsLoading(true);
-      console.debug("🔄 Fetching project data...");
-
-      const response = await fetch(`/api/projects/${projectId}`);
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-      const data = await response.json();
-
-      console.debug("📥 Raw project data:", {
-        id: data._id,
-        name: data.name,
-        uploadsCount: data.uploads?.length,
-        uploads: data.uploads,
-        elementCount: data.elements?.length,
-      });
-
-      const transformed = transformProjectData(data);
-
-      console.debug("✨ Transformed project data:", {
-        id: transformed.id,
-        name: transformed.name,
-        uploadsCount: transformed.uploads?.length,
-        uploads: transformed.uploads,
-        elementCount: transformed.elements?.length,
-      });
-
-      setProject(transformed);
-    } catch (err) {
-      console.error("❌ Error fetching project:", err);
-      setError(
-        err instanceof Error ? err.message : "An unknown error occurred"
-      );
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const transformProjectData = (data: any): ExtendedProject => {
+  const transformProjectData = useCallback((data: any): ExtendedProject => {
     // Get unique materials from elements
     const uniqueMaterials = new Set(
       data.elements
@@ -331,7 +280,53 @@ export default function ProjectDetailsPage() {
         materials: data._count?.materials || uniqueMaterials.size || data.materials?.length || 0,
       },
     };
-  };
+  }, []);
+
+  const fetchProject = useCallback(async () => {
+    try {
+      setIsLoading(true);
+      console.debug("🔄 Fetching project data...");
+
+      const response = await fetch(`/api/projects/${projectId}`);
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      const data = await response.json();
+
+      console.debug("📥 Raw project data:", {
+        id: data._id,
+        name: data.name,
+        uploadsCount: data.uploads?.length,
+        uploads: data.uploads,
+        elementCount: data.elements?.length,
+      });
+
+      const transformed = transformProjectData(data);
+
+      console.debug("✨ Transformed project data:", {
+        id: transformed.id,
+        name: transformed.name,
+        uploadsCount: transformed.uploads?.length,
+        uploads: transformed.uploads,
+        elementCount: transformed.elements?.length,
+      });
+
+      setProject(transformed);
+    } catch (err) {
+      console.error("❌ Error fetching project:", err);
+      setError(
+        err instanceof Error ? err.message : "An unknown error occurred"
+      );
+    } finally {
+      setIsLoading(false);
+    }
+  }, [projectId, transformProjectData]);
+
+  useEffect(() => {
+    if (projectId) {
+      fetchProject();
+    }
+  }, [projectId, fetchProject]);
 
   const handlePrepareExport = async () => {
     const usePagination = project?.usePagination;
@@ -504,15 +499,15 @@ export default function ProjectDetailsPage() {
 
           const gwp = resolveIndicator(
             mat.indicators?.gwp,
-            mass * toFiniteNumber(kbobMatch.GWP)
+            mass * getGWP(kbobMatch)
           );
           const ubp = resolveIndicator(
             mat.indicators?.ubp,
-            mass * toFiniteNumber(kbobMatch.UBP)
+            mass * getUBP(kbobMatch)
           );
           const penre = resolveIndicator(
             mat.indicators?.penre,
-            mass * toFiniteNumber(kbobMatch.PENRE)
+            mass * getPENRE(kbobMatch)
           );
 
           acc.gwp += gwp;
@@ -539,8 +534,9 @@ export default function ProjectDetailsPage() {
         materials
           .map(mat => {
             if (mat.material?.kbobMatch && typeof mat.material.kbobMatch === 'object') {
-              return mat.material.kbobMatch.KBOB_ID?.toString();
+              return mat.material.kbobMatch.uuid;
             }
+            // Only use material _id if there's no KBOB match
             return mat.material?._id;
           })
           .filter(Boolean)
@@ -1106,9 +1102,9 @@ const MaterialsTab = ({ project }: { project: Project }) => {
         material: mat,
         volume: mat.volume || 0,
         emissions: {
-          gwp: (mat.volume || 0) * (mat.density || 0) * (mat.kbobMatch?.GWP || 0),
-          ubp: (mat.volume || 0) * (mat.density || 0) * (mat.kbobMatch?.UBP || 0),
-          penre: (mat.volume || 0) * (mat.density || 0) * (mat.kbobMatch?.PENRE || 0),
+          gwp: (mat.volume || 0) * (mat.density || 0) * getGWP(mat.kbobMatch),
+          ubp: (mat.volume || 0) * (mat.density || 0) * getUBP(mat.kbobMatch),
+          penre: (mat.volume || 0) * (mat.density || 0) * getPENRE(mat.kbobMatch),
         },
       }));
     }
@@ -1133,15 +1129,15 @@ const MaterialsTab = ({ project }: { project: Project }) => {
         acc[key].emissions.gwp +=
           mat.volume *
           (mat.material.density || 0) *
-          (mat.material.kbobMatch?.GWP || 0);
+          getGWP(mat.material.kbobMatch);
         acc[key].emissions.ubp +=
           mat.volume *
           (mat.material.density || 0) *
-          (mat.material.kbobMatch?.UBP || 0);
+          getUBP(mat.material.kbobMatch);
         acc[key].emissions.penre +=
           mat.volume *
           (mat.material.density || 0) *
-          (mat.material.kbobMatch?.PENRE || 0);
+          getPENRE(mat.material.kbobMatch);
       });
       return acc;
     }, {} as Record<string, Material>);
@@ -1181,9 +1177,9 @@ const GraphTab = ({ project }: { project: Project }) => {
       category: mat.category || "Uncategorized",
       volume: mat.volume || 0,
       indicators: {
-        gwp: (mat.volume || 0) * (mat.density || 0) * (mat.kbobMatch?.GWP || 0),
-        ubp: (mat.volume || 0) * (mat.density || 0) * (mat.kbobMatch?.UBP || 0),
-        penre: (mat.volume || 0) * (mat.density || 0) * (mat.kbobMatch?.PENRE || 0),
+        gwp: (mat.volume || 0) * (mat.density || 0) * getGWP(mat.kbobMatch),
+        ubp: (mat.volume || 0) * (mat.density || 0) * getUBP(mat.kbobMatch),
+        penre: (mat.volume || 0) * (mat.density || 0) * getPENRE(mat.kbobMatch),
       },
     }));
 
@@ -1214,15 +1210,15 @@ const GraphTab = ({ project }: { project: Project }) => {
         gwp:
           material.volume *
           (material.material?.density || 0) *
-          (material.material?.kbobMatch?.GWP || 0),
+          getGWP(material.material?.kbobMatch),
         ubp:
           material.volume *
           (material.material?.density || 0) *
-          (material.material?.kbobMatch?.UBP || 0),
+          getUBP(material.material?.kbobMatch),
         penre:
           material.volume *
           (material.material?.density || 0) *
-          (material.material?.kbobMatch?.PENRE || 0),
+          getPENRE(material.material?.kbobMatch),
       },
     }))
   );
@@ -1276,12 +1272,12 @@ const DeleteProjectDialog = ({
     <AlertDialogContent>
       <AlertDialogHeader>
         <AlertDialogTitle>
-          Are you really sure you don't need it anymore?
+          Are you really sure you don&apos;t need it anymore?
         </AlertDialogTitle>
         <AlertDialogDescription className="space-y-2">
           <p>
             We can get it back but it involves us digging into our database,
-            which we would rather avoid. So better be sure you don't need it
+            which we would rather avoid. So better be sure you don&apos;t need it
             anymore...
           </p>
           <p>

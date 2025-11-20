@@ -8,13 +8,21 @@ export interface IKBOBMaterial {
   _id: string;
   Name: string;
   Category?: string;
-  GWP: number;
-  UBP: number;
-  PENRE: number;
+  uuid?: string;
+  nameDE?: string;
+  nameFR?: string;
+  group?: string;
+  version?: string;
+  lastUpdated?: Date;
+  gwpTotal?: number | null;
+  ubp21Total?: number | null;
+  primaryEnergyNonRenewableTotal?: number | null;
+  density?: number | string | null;
+  unit?: string;
+  // Legacy density fields (kept for DB compatibility, but prefer density field)
   "kg/unit"?: number | string;
   "min density"?: number;
   "max density"?: number;
-  KBOB_ID: number;
 }
 
 export interface IMaterial {

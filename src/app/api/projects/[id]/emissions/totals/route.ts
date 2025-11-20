@@ -6,7 +6,7 @@ import mongoose from "mongoose";
 
 export async function POST(
   request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const { userId } = await auth();
@@ -15,7 +15,8 @@ export async function POST(
     }
 
     await connectToDatabase();
-    const projectId = new mongoose.Types.ObjectId(params.id);
+    const { id } = await params;
+    const projectId = new mongoose.Types.ObjectId(id);
 
     // Calculate totals using MongoDB aggregation
     const [totals] = await Element.aggregate([

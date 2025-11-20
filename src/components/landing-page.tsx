@@ -725,13 +725,37 @@ export default function LandingPage() {
     }
   ];
 
+  const testimonials = [
+    {
+      name: "Sarah Chen",
+      role: "Senior Architect",
+      company: "EcoDesign Studios",
+      quote: "IfcLCA has revolutionized our approach to sustainable building design. The fast browser-based analysis saves us hours of work.",
+      rating: 5,
+    },
+    {
+      name: "Michael Torres",
+      role: "Sustainability Engineer",
+      company: "GreenBuild Corp",
+      quote: "The accuracy of environmental impact data using Swiss KBOB standards is unmatched. Essential tool for any serious LCA professional.",
+      rating: 5,
+    },
+    {
+      name: "Dr. Emma Wilson",
+      role: "Research Director",
+      company: "Institute for Sustainable Construction",
+      quote: "Finally, an open-source LCA tool that delivers professional-grade results without compromising on features or accuracy.",
+      rating: 5,
+    },
+  ];
+
   // Rotate headlines
   useEffect(() => {
     const interval = setInterval(() => {
       setCurrentHeadlineIndex((prev) => (prev + 1) % headlines.length);
     }, 3000);
     return () => clearInterval(interval);
-  }, []);
+  }, [headlines.length]);
 
   useEffect(() => {
     if (
@@ -748,7 +772,7 @@ export default function LandingPage() {
       setActiveTestimonial((prev) => (prev + 1) % testimonials.length);
     }, 5000);
     return () => clearInterval(timer);
-  }, []);
+  }, [testimonials.length]);
 
   useEffect(() => {
     // Fetch GitHub metrics
@@ -831,30 +855,6 @@ export default function LandingPage() {
     { value: githubMetrics.stars, suffix: "", label: "GitHub Stars" },
     { value: 3, suffix: "", label: "Free Projects per User" },
     { value: 100, suffix: "%", label: "Open Source" },
-  ];
-
-  const testimonials = [
-    {
-      name: "Sarah Chen",
-      role: "Senior Architect",
-      company: "EcoDesign Studios",
-      quote: "IfcLCA has revolutionized our approach to sustainable building design. The fast browser-based analysis saves us hours of work.",
-      rating: 5,
-    },
-    {
-      name: "Michael Torres",
-      role: "Sustainability Engineer",
-      company: "GreenBuild Corp",
-      quote: "The accuracy of environmental impact data using Swiss KBOB standards is unmatched. Essential tool for any serious LCA professional.",
-      rating: 5,
-    },
-    {
-      name: "Dr. Emma Wilson",
-      role: "Research Director",
-      company: "Institute for Sustainable Construction",
-      quote: "Finally, an open-source LCA tool that delivers professional-grade results without compromising on features or accuracy.",
-      rating: 5,
-    },
   ];
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
@@ -1340,7 +1340,7 @@ export default function LandingPage() {
                       <Sparkles className="h-5 w-5 text-purple-600 dark:text-purple-400 mt-0.5" />
                       <div>
                         <h4 className="font-semibold text-gray-800 dark:text-white mb-1">
-                          What You'll Get Instantly
+                          What You&apos;ll Get Instantly
                         </h4>
                         <p className="text-sm text-gray-600 dark:text-gray-300">
                           • Interactive charts showing GWP, UBP, and PENRE values<br />

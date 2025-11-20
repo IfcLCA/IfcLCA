@@ -1,6 +1,7 @@
 import { Suspense } from "react";
 import { GraphPageComponent } from "@/components/graph-page";
 import { GraphSkeleton } from "@/components/skeletons";
+import { Card, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 
 async function MaterialsGraph({ projectId }: { projectId: string }) {
   const res = await fetch(`/api/projects/${projectId}`, {
@@ -49,14 +50,15 @@ async function MaterialsGraph({ projectId }: { projectId: string }) {
   );
 }
 
-export default function GraphPage({ params }: { params: { id: string } }) {
+export default async function GraphPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
   return (
     <div className="main-container">
       <div className="page-header">
         <h2 className="page-title">Material Emissions Graph</h2>
       </div>
       <Suspense fallback={<GraphSkeleton />}>
-        <MaterialsGraph projectId={params.id} />
+        <MaterialsGraph projectId={id} />
       </Suspense>
     </div>
   );

@@ -170,7 +170,7 @@ export async function GET(request: Request) {
       imageUrl: project.imageUrl,
       updatedAt: project.lastActivityAt || project.updatedAt,
       _count: project._count,
-      elements: project.elements.map((element) => ({
+      elements: project.elements.map((element: any) => ({
         ...element,
         _id: element._id.toString(),
         materials: element.materials || [],
@@ -185,13 +185,16 @@ export async function GET(request: Request) {
 }
 
 export async function POST(req: Request) {
+  let userId: string | null = null;
+  let body: any = null;
   try {
-    const { userId } = await auth();
+    const authResult = await auth();
+    userId = authResult.userId || null;
     if (!userId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const body = await req.json();
+    body = await req.json();
     await connectToDatabase();
 
     const project = await Project.create({
@@ -215,7 +218,7 @@ export async function POST(req: Request) {
 
     // Track the error with PostHog
     const { captureServerError } = await import("@/lib/posthog-client");
-    captureServerError(error as Error, userId, {
+    captureServerError(error as Error, userId || undefined, {
       action: "create_project",
       body: body,
     });

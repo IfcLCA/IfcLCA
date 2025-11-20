@@ -3,10 +3,11 @@ import { connectToDatabase } from "@/lib/mongodb";
 import { Material, Project } from "@/models";
 import mongoose from "mongoose";
 import { auth } from "@clerk/nextjs/server";
+import { getGWP, getUBP, getPENRE } from "@/lib/utils/kbob-indicators";
 
 export async function POST(
   request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const { userId } = await auth();
@@ -15,14 +16,15 @@ export async function POST(
     }
 
     await connectToDatabase();
+    const { id } = await params;
     const { kbobId } = await request.json();
 
     // Get the material first to check project ownership
-    const material = await Material.findById(params.id)
+    const material = await Material.findById(id)
       .select("projectId")
-      .lean();
+      .lean() as { projectId?: mongoose.Types.ObjectId } | null;
 
-    if (!material) {
+    if (!material || !material.projectId) {
       return NextResponse.json(
         { error: "Material not found" },
         { status: 404 }
@@ -44,7 +46,7 @@ export async function POST(
 
     // Update the material with KBOB match
     const updatedMaterial = await Material.findByIdAndUpdate(
-      params.id,
+      id,
       {
         $set: {
           kbobMatchId: new mongoose.Types.ObjectId(kbobId),
@@ -73,9 +75,9 @@ export async function POST(
           id: kbobMatch._id.toString(),
           name: kbobMatch.Name,
           indicators: {
-            gwp: kbobMatch.GWP,
-            ubp: kbobMatch.UBP,
-            penre: kbobMatch.PENRE,
+            gwp: getGWP(kbobMatch),
+            ubp: getUBP(kbobMatch),
+            penre: getPENRE(kbobMatch),
           },
         }
         : null,

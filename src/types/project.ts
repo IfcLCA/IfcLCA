@@ -5,9 +5,9 @@ export interface MaterialWithMatchId {
     density?: number;
     kbobMatchId?: string; // ObjectId reference
     kbobMatch?: {
-      GWP?: number;
-      UBP?: number;
-      PENRE?: number;
+      gwpTotal?: number | null;
+      ubp21Total?: number | null;
+      primaryEnergyNonRenewableTotal?: number | null;
     };
   };
 }
@@ -18,9 +18,11 @@ export interface MaterialWithMatch {
   material: {
     density?: number;
     kbobMatch?: {
-      GWP?: number;
-      UBP?: number;
-      PENRE?: number;
+      gwpTotal?: number | null;
+      ubp21Total?: number | null;
+      primaryEnergyNonRenewableTotal?: number | null;
+      // Allow other fields from MongoDB document (legacy fields may exist but are not used)
+      [key: string]: any;
     };
   };
 }

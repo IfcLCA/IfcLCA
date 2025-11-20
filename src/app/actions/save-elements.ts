@@ -113,7 +113,7 @@ export async function saveElements(
       } catch (batchError) {
         errors.push({
           batch: i / batchSize,
-          error: batchError.message,
+          error: batchError instanceof Error ? batchError.message : String(batchError),
         });
       }
     }
@@ -136,7 +136,7 @@ export async function saveElements(
       try {
         await Upload.findByIdAndUpdate(data.uploadId, {
           status: "Failed",
-          error: error.message,
+          error: error instanceof Error ? error.message : String(error),
         });
       } catch (updateError) {
         console.error("Failed to update upload status:", updateError);

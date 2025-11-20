@@ -1,5 +1,6 @@
 import { connectToDatabase } from "@/lib/mongodb";
 import { Element, KBOBMaterial, Material } from "@/models";
+import { getGWP, getUBP, getPENRE } from "@/lib/utils/kbob-indicators";
 import mongoose from "mongoose";
 import { NextResponse } from "next/server";
 
@@ -94,9 +95,9 @@ export async function POST(request: Request) {
                     volume: mat.volume,
                     fraction: mat.fraction,
                     indicators: {
-                      gwp: mat.volume * density * kbobMaterial.GWP,
-                      ubp: mat.volume * density * kbobMaterial.UBP,
-                      penre: mat.volume * density * kbobMaterial.PENRE,
+                      gwp: mat.volume * density * getGWP(kbobMaterial),
+                      ubp: mat.volume * density * getUBP(kbobMaterial),
+                      penre: mat.volume * density * getPENRE(kbobMaterial),
                     },
                   };
                 }
@@ -132,10 +133,10 @@ export async function POST(request: Request) {
       _id: { $in: sampleIndices.map((i) => allElements[i]._id) },
     }).lean();
 
-    sampledElements.map((e) => ({
+    sampledElements.map((e: any) => ({
       _id: e._id,
       materialsCount: e.materials.length,
-      hasIndicators: e.materials.every((m) => m.indicators),
+      hasIndicators: e.materials.every((m: any) => m.indicators),
       sampleIndicators: e.materials[0]?.indicators,
     }));
 

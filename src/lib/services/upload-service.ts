@@ -107,14 +107,15 @@ export class UploadService {
 
         // Process elements in batches to avoid memory issues
         const batchSize = 50;
-        const batches = elements.reduce((acc, element, index) => {
+        type ElementType = typeof elements[0];
+        const batches = elements.reduce((acc: ElementType[][], element, index) => {
           const chunkIndex = Math.floor(index / batchSize);
           if (!acc[chunkIndex]) {
             acc[chunkIndex] = [];
           }
           acc[chunkIndex].push(element);
           return acc;
-        }, []);
+        }, [] as ElementType[][]);
 
         let processedElements = 0;
         let elementsWithMissingMaterials = 0;

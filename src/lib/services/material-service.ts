@@ -2,6 +2,7 @@ import mongoose from "mongoose";
 import { Material, KBOBMaterial, Element, Project } from "@/models";
 import { logger } from "@/lib/logger";
 import { ClientSession, Types } from "mongoose";
+import { getGWP, getUBP, getPENRE, isValidKbobMaterial } from "@/lib/utils/kbob-indicators";
 import type { IKBOBMaterial, IMaterial } from "@/types/material";
 
 // Update interfaces with proper types
@@ -88,6 +89,19 @@ export class MaterialService {
   }
 
   private static calculateDensityFromKBOB(kbobMaterial: IKBOBMaterial): number {
+    // First try the new API density field
+    if (kbobMaterial.density !== null && kbobMaterial.density !== undefined) {
+      if (typeof kbobMaterial.density === "number" && !isNaN(kbobMaterial.density)) {
+        return kbobMaterial.density;
+      }
+      if (typeof kbobMaterial.density === "string" && kbobMaterial.density !== "" && kbobMaterial.density !== "-") {
+        const parsed = parseFloat(kbobMaterial.density);
+        if (!isNaN(parsed)) {
+          return parsed;
+        }
+      }
+    }
+
     // Use kg/unit if available (handle both number and string)
     const kgPerUnit = kbobMaterial["kg/unit"];
     if (typeof kgPerUnit === "number" && !isNaN(kgPerUnit)) {
@@ -176,7 +190,11 @@ export class MaterialService {
       }).lean() as IKBOBMaterial | null;
 
       if (exactMatch) {
-        return { kbobMaterial: exactMatch, score: 1.0 };
+        if (isValidKbobMaterial(exactMatch)) {
+          return { kbobMaterial: exactMatch, score: 1.0 };
+        } else {
+          logger.debug(`Exact match found for "${cleanedName}" but has invalid emissions or density, skipping`);
+        }
       }
 
       // Try case-insensitive match with escaped regex to prevent injection
@@ -185,7 +203,11 @@ export class MaterialService {
       }).lean() as IKBOBMaterial | null;
 
       if (caseInsensitiveMatch) {
-        return { kbobMaterial: caseInsensitiveMatch, score: 0.99 };
+        if (isValidKbobMaterial(caseInsensitiveMatch)) {
+          return { kbobMaterial: caseInsensitiveMatch, score: 0.99 };
+        } else {
+          logger.debug(`Case-insensitive match found for "${cleanedName}" but has invalid emissions or density, skipping`);
+        }
       }
 
       return null;
@@ -216,7 +238,7 @@ export class MaterialService {
 
       const [materials, newKBOBMaterial, elements] = await Promise.all([
         Material.find({ _id: { $in: objectIds } })
-          .populate("kbobMatchId")
+          .populate("kbobMatchId", "Name uuid gwpTotal ubp21Total primaryEnergyNonRenewableTotal density")
           .lean(),
         KBOBMaterial.findById(kbobObjectId).lean(),
         Element.find({ "materials.material": { $in: objectIds } })
@@ -329,19 +351,27 @@ export class MaterialService {
       return undefined;
     }
 
-    if (
-      typeof kbobMaterial.GWP !== "number" ||
-      typeof kbobMaterial.UBP !== "number" ||
-      typeof kbobMaterial.PENRE !== "number"
-    ) {
+    // Check if material has valid environmental indicators
+    const hasIndicators =
+      typeof kbobMaterial.gwpTotal === "number" ||
+      typeof kbobMaterial.ubp21Total === "number" ||
+      typeof kbobMaterial.primaryEnergyNonRenewableTotal === "number";
+
+    // If material has no indicators, return undefined
+    if (!hasIndicators) {
       return undefined;
     }
 
+    // Use helper functions to get values (with fallback logic)
+    const gwp = getGWP(kbobMaterial);
+    const ubp = getUBP(kbobMaterial);
+    const penre = getPENRE(kbobMaterial);
+
     const mass = volume * density;
     return {
-      gwp: mass * kbobMaterial.GWP,
-      ubp: mass * kbobMaterial.UBP,
-      penre: mass * kbobMaterial.PENRE,
+      gwp: mass * gwp,
+      ubp: mass * ubp,
+      penre: mass * penre,
     };
   }
 
@@ -402,7 +432,7 @@ export class MaterialService {
         projectId: { $in: projectIds },
         kbobMatchId: { $exists: true },
       })
-        .populate("kbobMatchId")
+        .populate("kbobMatchId", "Name uuid gwpTotal ubp21Total primaryEnergyNonRenewableTotal density")
         .lean() as (mongoose.Document & IMaterial) | null;
 
       if (exactMatch) {
@@ -415,7 +445,7 @@ export class MaterialService {
         projectId: { $in: projectIds },
         kbobMatchId: { $exists: true },
       })
-        .populate("kbobMatchId")
+        .populate("kbobMatchId", "Name uuid gwpTotal ubp21Total primaryEnergyNonRenewableTotal density")
         .lean() as (mongoose.Document & IMaterial) | null;
 
       if (caseInsensitiveMatch) {
@@ -675,7 +705,7 @@ export class MaterialService {
           select: "density kbobMatchId",
           populate: {
             path: "kbobMatchId",
-            select: "GWP UBP PENRE",
+            select: "gwpTotal ubp21Total primaryEnergyNonRenewableTotal",
           },
         })
         .session(session || null)
@@ -684,17 +714,17 @@ export class MaterialService {
       const totals = elements.reduce(
         (acc, element) => {
           const elementTotals = element.materials.reduce(
-            (matAcc: { gwp: number; ubp: number; penre: number }, material: { volume?: number; material?: { density?: number; kbobMatchId?: Types.ObjectId | { GWP?: number; UBP?: number; PENRE?: number } } }) => {
+            (matAcc: { gwp: number; ubp: number; penre: number }, material: { volume?: number; material?: { density?: number; kbobMatchId?: Types.ObjectId | any } }) => {
               const volume = material.volume || 0;
               const density = material.material?.density || 0;
               // When populated, kbobMatchId contains the KBOB material object
-              const kbobMatch = material.material?.kbobMatchId as { GWP?: number; UBP?: number; PENRE?: number } | undefined;
+              const kbobMatch = material.material?.kbobMatchId as any;
               const mass = volume * density;
 
               return {
-                gwp: matAcc.gwp + mass * (kbobMatch?.GWP || 0),
-                ubp: matAcc.ubp + mass * (kbobMatch?.UBP || 0),
-                penre: matAcc.penre + mass * (kbobMatch?.PENRE || 0),
+                gwp: matAcc.gwp + mass * getGWP(kbobMatch),
+                ubp: matAcc.ubp + mass * getUBP(kbobMatch),
+                penre: matAcc.penre + mass * getPENRE(kbobMatch),
               };
             },
             { gwp: 0, ubp: 0, penre: 0 }
@@ -779,7 +809,7 @@ export class MaterialService {
       // Note: After populate(), kbobMatchId contains the populated KBOB material object
       const materials = await Material.find({ _id: { $in: materialIds } })
         .select("_id density kbobMatchId name")
-        .populate("kbobMatchId", "GWP UBP PENRE")
+        .populate("kbobMatchId", "gwpTotal ubp21Total primaryEnergyNonRenewableTotal")
         .session(session)
         .lean();
 
@@ -832,7 +862,12 @@ export class MaterialService {
                                     "$$material.density",
                                   ],
                                 },
-                                { $ifNull: ["$$material.kbobMatchId.GWP", 0] },
+                                {
+                                  $ifNull: [
+                                    "$$material.kbobMatchId.gwpTotal",
+                                    0,
+                                  ],
+                                },
                               ],
                             },
                             ubp: {
@@ -843,7 +878,12 @@ export class MaterialService {
                                     "$$material.density",
                                   ],
                                 },
-                                { $ifNull: ["$$material.kbobMatchId.UBP", 0] },
+                                {
+                                  $ifNull: [
+                                    "$$material.kbobMatchId.ubp21Total",
+                                    0,
+                                  ],
+                                },
                               ],
                             },
                             penre: {
@@ -855,7 +895,10 @@ export class MaterialService {
                                   ],
                                 },
                                 {
-                                  $ifNull: ["$$material.kbobMatchId.PENRE", 0],
+                                  $ifNull: [
+                                    "$$material.kbobMatchId.primaryEnergyNonRenewableTotal",
+                                    0,
+                                  ],
                                 },
                               ],
                             },

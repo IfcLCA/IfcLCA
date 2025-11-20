@@ -1,9 +1,10 @@
 import { UploadHistoryClient } from "@/components/upload-history-client";
 
-export default function UploadHistoryPage({
+export default async function UploadHistoryPage({
   params,
 }: {
-  params: { id: string };
+  params: Promise<{ id: string }>;
 }) {
-  return <UploadHistoryClient projectId={params.id} />;
+  const { id } = await params;
+  return <UploadHistoryClient projectId={id} />;
 }

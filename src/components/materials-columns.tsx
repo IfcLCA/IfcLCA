@@ -11,9 +11,6 @@ interface Material {
     density: number;
     kbobMatch?: {
       Name: string;
-      GWP: number;
-      UBP: number;
-      PENRE: number;
     };
   };
   volume: number;

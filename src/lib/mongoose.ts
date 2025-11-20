@@ -27,7 +27,7 @@ export async function connectToDatabase() {
         socketTimeoutMS: 45000,
       };
 
-      cached.promise = mongoose.connect(MONGODB_URI, opts);
+      cached.promise = mongoose.connect(MONGODB_URI, opts) as any;
     }
 
     cached.conn = await cached.promise;

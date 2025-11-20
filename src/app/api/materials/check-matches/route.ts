@@ -3,6 +3,7 @@ import { MaterialService } from "@/lib/services/material-service";
 import { connectToDatabase } from "@/lib/mongodb";
 import { Project } from "@/models";
 import { auth } from "@clerk/nextjs/server";
+import mongoose from "mongoose";
 
 export async function POST(request: Request) {
   try {
@@ -27,7 +28,7 @@ export async function POST(request: Request) {
         { status: 404 }
       );
     }
-    
+
     if (!Array.isArray(materialNames)) {
       return NextResponse.json(
         { error: "materialNames must be an array" },
@@ -43,24 +44,39 @@ export async function POST(request: Request) {
         materialName,
         userId
       );
-      if (!existingMatch) {
+      if (!existingMatch || !existingMatch.kbobMatchId) {
         unmatchedMaterials.push(materialName);
       } else {
+        // Extract the ID from the populated object (kbobMatchId is populated, so it's an object with _id)
+        // If it's already an ObjectId or string, use it directly
+        const kbobMatchIdSource =
+          (existingMatch.kbobMatchId as any)?._id ?? existingMatch.kbobMatchId;
+
+        if (!kbobMatchIdSource) {
+          unmatchedMaterials.push(materialName);
+          continue;
+        }
+
+        // Ensure we have a valid ObjectId
+        const kbobMatchId = kbobMatchIdSource instanceof mongoose.Types.ObjectId
+          ? kbobMatchIdSource
+          : new mongoose.Types.ObjectId(kbobMatchIdSource);
+
         // Create a new material in the current project with the same match
         const newMaterial = await MaterialService.createMaterialWithMatch(
           projectId,
           materialName,
-          existingMatch.kbobMatchId,
+          kbobMatchId,
           existingMatch.density
         );
         matchedMaterials.push(newMaterial);
       }
     }
 
-    return NextResponse.json({ 
+    return NextResponse.json({
       unmatchedMaterials,
       matchedMaterials,
-      unmatchedCount: unmatchedMaterials.length 
+      unmatchedCount: unmatchedMaterials.length
     });
   } catch (error) {
     console.error("[Material Check API] Error:", error);

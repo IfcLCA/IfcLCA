@@ -27,6 +27,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { toast } from "@/hooks/use-toast";
+import { getGWP, getUBP, getPENRE, isValidKbobMaterial } from "@/lib/utils/kbob-indicators";
 import {
   MagnifyingGlassIcon,
   ReloadIcon,
@@ -51,9 +52,14 @@ interface Material {
   kbobMatch?: {
     id: string;
     Name: string;
-    GWP: number;
-    UBP: number;
-    PENRE: number;
+    // Legacy fields
+    GWP?: number;
+    UBP?: number;
+    PENRE?: number;
+    // New API fields
+    gwpTotal?: number | null;
+    ubp21Total?: number | null;
+    primaryEnergyNonRenewableTotal?: number | null;
   };
   projects?: string[];
   originalIds?: string[];
@@ -61,14 +67,19 @@ interface Material {
 
 interface KbobMaterial {
   _id: string;
-  KBOB_ID: number;
   Name: string;
-  GWP: number;
-  UBP: number;
-  PENRE: number;
+  uuid?: string;
+  nameDE?: string;
+  nameFR?: string;
+  group?: string;
+  gwpTotal?: number | null;
+  ubp21Total?: number | null;
+  primaryEnergyNonRenewableTotal?: number | null;
+  density?: number | string | null;
+  // Legacy density fields (kept for DB compatibility, but prefer density field)
+  "kg/unit"?: number | string;
   "min density"?: number;
   "max density"?: number;
-  "kg/unit"?: number;
 }
 
 interface Project {
@@ -151,9 +162,62 @@ export function MaterialLibraryComponent() {
     }
   }, []);
 
+  const sortedKbobMaterials = useMemo(() => {
+    // Filter out materials with invalid emissions (0 or null) and invalid density
+    const validMaterials = kbobMaterials.filter((material) => isValidKbobMaterial(material));
+
+    // Log filtering results for debugging
+    const filteredCount = kbobMaterials.length - validMaterials.length;
+    if (filteredCount > 0) {
+      console.log(`🔍 Filtered out ${filteredCount} KBOB materials with invalid emissions or density`);
+      console.log(`✅ ${validMaterials.length} valid KBOB materials available`);
+    }
+
+    return validMaterials.sort((a, b) => {
+      const aFav = favoriteMaterials.includes(a._id);
+      const bFav = favoriteMaterials.includes(b._id);
+      if (aFav && !bFav) return -1;
+      if (!aFav && bFav) return 1;
+      return a.Name?.localeCompare(b.Name || "") || 0;
+    });
+  }, [kbobMaterials, favoriteMaterials]);
+
+  // Add function to generate suggestions (moved before useEffect that uses it)
+  const generateSuggestions = useCallback(() => {
+    if (!fuseRef.current) return;
+
+    const suggestions: Record<string, AutoSuggestedMatch> = {};
+
+    materials.forEach((material) => {
+      // Skip if material already has a match
+      if (material.kbobMatchId || temporaryMatches[material.id]) return;
+
+      const searchTerm = material.name
+        .toLowerCase()
+        .replace(/[_-]/g, " ")
+        .replace(/\d+/g, "")
+        .trim();
+
+      const results = fuseRef.current?.search(searchTerm) || [];
+
+      // Results are already filtered (using sortedKbobMaterials in Fuse initialization)
+      if (results.length > 0) {
+        const bestMatch = results[0];
+        suggestions[material.id] = {
+          kbobId: bestMatch.item._id,
+          score: bestMatch.score || 1,
+          name: bestMatch.item.Name,
+        };
+      }
+    });
+
+    setAutoSuggestedMatches(suggestions);
+  }, [materials, temporaryMatches]);
+
   useEffect(() => {
-    if (kbobMaterials.length > 0) {
-      fuseRef.current = new Fuse(kbobMaterials, {
+    if (sortedKbobMaterials.length > 0) {
+      // Initialize Fuse with already filtered valid materials
+      fuseRef.current = new Fuse(sortedKbobMaterials, {
         keys: ["Name"],
         threshold: 0.8,
         ignoreLocation: true,
@@ -175,37 +239,7 @@ export function MaterialLibraryComponent() {
       // Generate suggestions for unmatched materials
       generateSuggestions();
     }
-  }, [kbobMaterials, materials]);
-
-  // Add function to generate suggestions
-  const generateSuggestions = useCallback(() => {
-    if (!fuseRef.current) return;
-
-    const suggestions: Record<string, AutoSuggestedMatch> = {};
-
-    materials.forEach((material) => {
-      // Skip if material already has a match
-      if (material.kbobMatchId || temporaryMatches[material.id]) return;
-
-      const searchTerm = material.name
-        .toLowerCase()
-        .replace(/[_-]/g, " ")
-        .replace(/\d+/g, "")
-        .trim();
-
-      const results = fuseRef.current?.search(searchTerm) || [];
-      if (results.length > 0) {
-        const bestMatch = results[0];
-        suggestions[material.id] = {
-          kbobId: bestMatch.item._id,
-          score: bestMatch.score || 1,
-          name: bestMatch.item.Name,
-        };
-      }
-    });
-
-    setAutoSuggestedMatches(suggestions);
-  }, [materials, temporaryMatches]);
+  }, [sortedKbobMaterials, materials, generateSuggestions]);
 
   const scrollToMatchingKbob = useCallback(
     (ifcMaterialName: string) => {
@@ -399,17 +433,19 @@ export function MaterialLibraryComponent() {
     }
   };
 
-  const handleMatch = (materialIds: string[], kbobId: string | null) => {
-    const newMatches = { ...temporaryMatches };
-    materialIds.forEach((id) => {
-      if (kbobId) {
-        newMatches[id] = kbobId;
-      } else {
-        delete newMatches[id];
-      }
+  const handleMatch = useCallback((materialIds: string[], kbobId: string | null) => {
+    setTemporaryMatches((prevMatches) => {
+      const newMatches = { ...prevMatches };
+      materialIds.forEach((id) => {
+        if (kbobId) {
+          newMatches[id] = kbobId;
+        } else {
+          delete newMatches[id];
+        }
+      });
+      return newMatches;
     });
-    setTemporaryMatches(newMatches);
-  };
+  }, []);
 
   const handleConfirmMatch = async (changesWithDensity: MaterialChange[]) => {
     try {
@@ -474,7 +510,7 @@ export function MaterialLibraryComponent() {
     setShowPreview(false);
   };
 
-  const getPreviewChanges = async (matchesToPreview?: Record<string, string>) => {
+  const getPreviewChanges = useCallback(async (matchesToPreview?: Record<string, string>) => {
     const matchesToUse = matchesToPreview || temporaryMatches;
     const materialIds = Object.keys(matchesToUse);
 
@@ -556,9 +592,9 @@ export function MaterialLibraryComponent() {
         };
       })
       .filter(Boolean);
-  };
+  }, [temporaryMatches, materials, kbobMaterials, projects]);
 
-  const handleShowPreview = async (matchesToPreview?: Record<string, string>) => {
+  const handleShowPreview = useCallback(async (matchesToPreview?: Record<string, string>) => {
     setIsMatchingInProgress(true);
     try {
       const changes = await getPreviewChanges(matchesToPreview);
@@ -574,7 +610,7 @@ export function MaterialLibraryComponent() {
     } finally {
       setIsMatchingInProgress(false);
     }
-  };
+  }, [getPreviewChanges]);
 
   const handleNavigateToProject = (projectId: string) => {
     if (hasUnappliedMatches()) {
@@ -602,19 +638,10 @@ export function MaterialLibraryComponent() {
     return Array.from(projectSet).sort();
   }, [materials]);
 
-  const sortedKbobMaterials = useMemo(() => {
-    return [...kbobMaterials].sort((a, b) => {
-      const aFav = favoriteMaterials.includes(a._id);
-      const bFav = favoriteMaterials.includes(b._id);
-      if (aFav && !bFav) return -1;
-      if (!aFav && bFav) return 1;
-      return a.Name?.localeCompare(b.Name || "") || 0;
-    });
-  }, [kbobMaterials, favoriteMaterials]);
-
   const commonWords = useMemo(() => {
     const words = new Map<string, number>();
-    kbobMaterials.forEach((material) => {
+    // Only process valid KBOB materials (with valid emissions and density)
+    sortedKbobMaterials.forEach((material) => {
       if (!material.Name) return;
       const wordList = material.Name.split(/[\s,.-]+/).filter(
         (w) => w.length > 2
@@ -627,11 +654,12 @@ export function MaterialLibraryComponent() {
       .filter(([_, count]) => count > 1) // Only keep words that appear more than once
       .sort((a, b) => b[1] - a[1])
       .map(([word]) => word);
-  }, [kbobMaterials]);
+  }, [sortedKbobMaterials]);
 
   const commonPhrases = useMemo(() => {
     const phrases = new Map<string, number>();
-    kbobMaterials.forEach((material) => {
+    // Only process valid KBOB materials (with valid emissions and density)
+    sortedKbobMaterials.forEach((material) => {
       if (!material.Name) return;
       // Get 2-3 word phrases
       const words = material.Name.split(/[\s,.-]+/).filter((w) => w.length > 2);
@@ -650,7 +678,7 @@ export function MaterialLibraryComponent() {
       .filter(([_, count]) => count > 1) // Only keep phrases that appear more than once
       .sort((a, b) => b[1] - a[1])
       .map(([phrase]) => phrase);
-  }, [kbobMaterials]);
+  }, [sortedKbobMaterials]);
 
   // Normalize text for comparison (handle special characters, case, etc.)
   const normalizeText = (text: string) => {
@@ -929,11 +957,11 @@ export function MaterialLibraryComponent() {
   }, [autoSuggestedMatches, temporaryMatches, handleShowPreview, maybeTriggerMatchConfetti, selectedProject, projects]);
 
   // Modify the hasUnappliedMatches function to check for preview modal
-  const hasUnappliedMatches = () => {
+  const hasUnappliedMatches = useCallback(() => {
     // Don't show warning if preview modal is open
     if (showPreview) return false;
     return Object.keys(temporaryMatches).length > 0;
-  };
+  }, [showPreview, temporaryMatches]);
 
   // Add this effect to handle Next.js navigation
   useEffect(() => {
@@ -1278,7 +1306,7 @@ export function MaterialLibraryComponent() {
                                       {getTemporaryMatch(material.id)?.Name}
                                     </p>
                                     <p className="text-sm text-muted-foreground">
-                                      GWP: {getTemporaryMatch(material.id)?.GWP}{" "}
+                                      GWP: {getGWP(getTemporaryMatch(material.id))}{" "}
                                       kg CO₂-eq
                                     </p>
                                   </>
@@ -1288,7 +1316,7 @@ export function MaterialLibraryComponent() {
                                       {material.kbobMatch.Name}
                                     </p>
                                     <p className="text-sm text-muted-foreground">
-                                      GWP: {material.kbobMatch.GWP} kg CO₂-eq
+                                      GWP: {getGWP(material.kbobMatch)} kg CO₂-eq
                                     </p>
                                   </>
                                 ) : null}
@@ -1468,13 +1496,13 @@ export function MaterialLibraryComponent() {
                             </div>
                             <div className="mt-1 space-y-1">
                               <p className="text-sm text-muted-foreground">
-                                GWP: {material.GWP} kg CO₂-eq
+                                GWP: {getGWP(material)} kg CO₂-eq
                               </p>
                               <p className="text-sm text-muted-foreground">
-                                UBP: {material.UBP}
+                                UBP: {getUBP(material)}
                               </p>
                               <p className="text-sm text-muted-foreground">
-                                PENRE: {material.PENRE}
+                                PENRE: {getPENRE(material)}
                               </p>
                             </div>
                           </div>
@@ -1505,7 +1533,7 @@ export function MaterialLibraryComponent() {
             <AlertDialogDescription className="space-y-2">
               <p>
                 You have {Object.keys(temporaryMatches).length} material matches
-                that haven't been applied yet. These changes will be lost if you
+                that haven&apos;t been applied yet. These changes will be lost if you
                 leave without confirming them.
               </p>
               <p>

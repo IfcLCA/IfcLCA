@@ -37,7 +37,6 @@ export function TermsAcceptanceWrapper({
       <TermsAcceptanceModal
         open={showModal}
         onAccept={handleAcceptTerms}
-        redirectUrl={redirectUrl}
       />
       {children}
     </>

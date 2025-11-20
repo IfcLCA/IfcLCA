@@ -138,8 +138,16 @@ export function UploadHistory({
               initialFocus
               mode="range"
               defaultMonth={dateRange?.[0]}
-              selected={dateRange}
-              onSelect={setDateRange}
+              selected={dateRange?.[0] && dateRange[1] ? { from: dateRange[0], to: dateRange[1] } : dateRange?.[0] ? { from: dateRange[0] } : undefined}
+              onSelect={(range) => {
+                if (range?.from && range?.to) {
+                  setDateRange([range.from, range.to]);
+                } else if (range?.from) {
+                  setDateRange([range.from, undefined]);
+                } else {
+                  setDateRange([undefined, undefined]);
+                }
+              }}
               numberOfMonths={2}
             />
           </PopoverContent>

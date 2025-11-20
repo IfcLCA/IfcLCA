@@ -19,7 +19,7 @@ export const metadata: Metadata = {
 export const revalidate = 300; // Revalidate page every 5 minutes
 
 export default async function DashboardPage() {
-  const { userId } = auth();
+  const { userId } = await auth();
 
   if (!userId) {
     return redirect("/");
@@ -29,7 +29,7 @@ export default async function DashboardPage() {
 
   return (
     <Dashboard
-      initialRecentProjects={dashboardData.recentProjects}
+      initialRecentProjects={dashboardData.recentProjects as any}
       statistics={{
         totalProjects: dashboardData.stats.totalProjects,
         totalElements: dashboardData.stats.totalElements,
@@ -37,7 +37,7 @@ export default async function DashboardPage() {
         recentActivities: dashboardData.recentActivities.length,
         totalEmissions: dashboardData.stats.totalEmissions,
       }}
-      initialActivities={dashboardData.recentActivities}
+      initialActivities={dashboardData.recentActivities as any}
     />
   );
 }
