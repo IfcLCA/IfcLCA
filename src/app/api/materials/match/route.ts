@@ -26,18 +26,33 @@ export async function POST(request: Request) {
     // Use user-defined density if provided, otherwise calculate from KBOB material data
     let density = userDefinedDensity;
     if (!density) {
-      if (
-        kbobMaterial["kg/unit"] &&
-        typeof kbobMaterial["kg/unit"] === "number"
-      ) {
-        density = kbobMaterial["kg/unit"];
-      } else if (kbobMaterial["min density"] && kbobMaterial["max density"]) {
-        density =
-          (kbobMaterial["min density"] + kbobMaterial["max density"]) / 2;
+      // First try the new API density field
+      if (kbobMaterial.density !== null && kbobMaterial.density !== undefined) {
+        if (typeof kbobMaterial.density === "number" && !isNaN(kbobMaterial.density)) {
+          density = kbobMaterial.density;
+        } else if (typeof kbobMaterial.density === "string" && kbobMaterial.density !== "" && kbobMaterial.density !== "-") {
+          const parsed = parseFloat(kbobMaterial.density);
+          if (!isNaN(parsed)) {
+            density = parsed;
+          }
+        }
+      }
+      
+      // Fallback to old field names if new density field not available
+      if (!density) {
+        if (
+          kbobMaterial["kg/unit"] &&
+          typeof kbobMaterial["kg/unit"] === "number"
+        ) {
+          density = kbobMaterial["kg/unit"];
+        } else if (kbobMaterial["min density"] && kbobMaterial["max density"]) {
+          density =
+            (kbobMaterial["min density"] + kbobMaterial["max density"]) / 2;
+        }
       }
     }
 
-    if (!density) {
+    if (!density || density === 0) {
       return NextResponse.json(
         { error: "Invalid density in KBOB material" },
         { status: 400 }
