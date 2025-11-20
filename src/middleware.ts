@@ -27,11 +27,13 @@ export default clerkMiddleware(async (auth, request) => {
   const { pathname } = request.nextUrl;
 
   // Allow public routes - check these FIRST before calling auth()
-  if (publicRoutes.some((route) => pathname === route || pathname.startsWith(route + "/"))) {
+  if (
+    publicRoutes.some((route) => pathname === route || pathname.startsWith(route + "/"))
+  ) {
     return NextResponse.next();
   }
 
-  // Now we can safely call auth() for protected routes
+  // Get auth only for routes that need it
   const { userId } = await auth();
 
   // Check if it's a protected route
