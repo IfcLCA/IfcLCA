@@ -203,8 +203,8 @@ export function DataTable<TData, TValue>({
                               onMouseDown={header.getResizeHandler()}
                               onTouchStart={header.getResizeHandler()}
                               className={`resizer ${header.column.getIsResizing()
-                                  ? "isResizing"
-                                  : ""
+                                ? "isResizing"
+                                : ""
                                 }`}
                               role="separator"
                             />
