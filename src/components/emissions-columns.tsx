@@ -3,7 +3,7 @@
 import { ColumnDef } from "@tanstack/react-table";
 import { Badge } from "@/components/ui/badge";
 
-interface EmissionRow {
+export interface EmissionRow {
   _id: string;
   name: string;
   type: string;

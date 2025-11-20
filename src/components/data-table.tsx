@@ -84,10 +84,9 @@ export function DataTable<TData, TValue>({
     onSortingChange: setSorting,
   });
 
-  const allColumns = table.getAllColumns();
   const totalColumnsWidth = React.useMemo(() => {
-    return allColumns.reduce((acc, column) => acc + column.getSize(), 0);
-  }, [allColumns]);
+    return table.getAllColumns().reduce((acc, column) => acc + column.getSize(), 0);
+  }, [table]);
 
   const containerRef = React.useRef<HTMLDivElement>(null);
   const firstColumnRef = React.useRef<HTMLDivElement>(null);
@@ -176,11 +175,9 @@ export function DataTable<TData, TValue>({
                       {header.isPlaceholder ? null : (
                         <>
                           <div
-                            className={`select-none flex items-center ${
-                              header.index === 0 ? "whitespace-normal" : ""
-                            } ${
-                              header.column.getCanSort() ? "cursor-pointer" : ""
-                            }`}
+                            className={`select-none flex items-center ${header.index === 0 ? "whitespace-normal" : ""
+                              } ${header.column.getCanSort() ? "cursor-pointer" : ""
+                              }`}
                             ref={
                               header.index === 0 ? firstColumnRef : undefined
                             }
@@ -205,11 +202,10 @@ export function DataTable<TData, TValue>({
                             <div
                               onMouseDown={header.getResizeHandler()}
                               onTouchStart={header.getResizeHandler()}
-                              className={`resizer ${
-                                header.column.getIsResizing()
+                              className={`resizer ${header.column.getIsResizing()
                                   ? "isResizing"
                                   : ""
-                              }`}
+                                }`}
                               role="separator"
                             />
                           )}
