@@ -8,6 +8,39 @@ interface KbobMaterialLike {
   gwpTotal?: number | null;
   ubp21Total?: number | null;
   primaryEnergyNonRenewableTotal?: number | null;
+  density?: number | string | null;
+}
+
+/**
+ * Check if a KBOB material has valid emissions and density
+ * A material is considered valid if:
+ * - All three environmental indicators exist and are not null
+ * - At least one environmental indicator is non-zero
+ * - Density exists and is non-zero
+ */
+export function isValidKbobMaterial(material: KbobMaterialLike | null | undefined): boolean {
+  if (!material) return false;
+
+  // Check if material has valid environmental indicators
+  const hasValidGWP = material.gwpTotal !== null && material.gwpTotal !== undefined;
+  const hasValidUBP = material.ubp21Total !== null && material.ubp21Total !== undefined;
+  const hasValidPENRE = material.primaryEnergyNonRenewableTotal !== null && material.primaryEnergyNonRenewableTotal !== undefined;
+
+  // At least one indicator must be non-zero
+  const hasNonZeroIndicator =
+    (hasValidGWP && material.gwpTotal !== 0) ||
+    (hasValidUBP && material.ubp21Total !== 0) ||
+    (hasValidPENRE && material.primaryEnergyNonRenewableTotal !== 0);
+
+  // Check if material has valid density
+  const hasValidDensity =
+    material.density !== null &&
+    material.density !== undefined &&
+    material.density !== "" &&
+    material.density !== "-" &&
+    material.density !== 0;
+
+  return hasValidGWP && hasValidUBP && hasValidPENRE && hasNonZeroIndicator && hasValidDensity;
 }
 
 /**

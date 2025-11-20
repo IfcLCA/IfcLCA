@@ -2,7 +2,7 @@ import mongoose from "mongoose";
 import { Material, KBOBMaterial, Element, Project } from "@/models";
 import { logger } from "@/lib/logger";
 import { ClientSession, Types } from "mongoose";
-import { getGWP, getUBP, getPENRE } from "@/lib/utils/kbob-indicators";
+import { getGWP, getUBP, getPENRE, isValidKbobMaterial } from "@/lib/utils/kbob-indicators";
 import type { IKBOBMaterial, IMaterial } from "@/types/material";
 
 // Update interfaces with proper types
@@ -190,7 +190,11 @@ export class MaterialService {
       }).lean() as IKBOBMaterial | null;
 
       if (exactMatch) {
-        return { kbobMaterial: exactMatch, score: 1.0 };
+        if (isValidKbobMaterial(exactMatch)) {
+          return { kbobMaterial: exactMatch, score: 1.0 };
+        } else {
+          logger.debug(`Exact match found for "${cleanedName}" but has invalid emissions or density, skipping`);
+        }
       }
 
       // Try case-insensitive match with escaped regex to prevent injection
@@ -199,7 +203,11 @@ export class MaterialService {
       }).lean() as IKBOBMaterial | null;
 
       if (caseInsensitiveMatch) {
-        return { kbobMaterial: caseInsensitiveMatch, score: 0.99 };
+        if (isValidKbobMaterial(caseInsensitiveMatch)) {
+          return { kbobMaterial: caseInsensitiveMatch, score: 0.99 };
+        } else {
+          logger.debug(`Case-insensitive match found for "${cleanedName}" but has invalid emissions or density, skipping`);
+        }
       }
 
       return null;

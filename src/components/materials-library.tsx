@@ -27,7 +27,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { toast } from "@/hooks/use-toast";
-import { getGWP, getUBP, getPENRE } from "@/lib/utils/kbob-indicators";
+import { getGWP, getUBP, getPENRE, isValidKbobMaterial } from "@/lib/utils/kbob-indicators";
 import {
   MagnifyingGlassIcon,
   ReloadIcon,
@@ -162,6 +162,26 @@ export function MaterialLibraryComponent() {
     }
   }, []);
 
+  const sortedKbobMaterials = useMemo(() => {
+    // Filter out materials with invalid emissions (0 or null) and invalid density
+    const validMaterials = kbobMaterials.filter((material) => isValidKbobMaterial(material));
+
+    // Log filtering results for debugging
+    const filteredCount = kbobMaterials.length - validMaterials.length;
+    if (filteredCount > 0) {
+      console.log(`🔍 Filtered out ${filteredCount} KBOB materials with invalid emissions or density`);
+      console.log(`✅ ${validMaterials.length} valid KBOB materials available`);
+    }
+
+    return validMaterials.sort((a, b) => {
+      const aFav = favoriteMaterials.includes(a._id);
+      const bFav = favoriteMaterials.includes(b._id);
+      if (aFav && !bFav) return -1;
+      if (!aFav && bFav) return 1;
+      return a.Name?.localeCompare(b.Name || "") || 0;
+    });
+  }, [kbobMaterials, favoriteMaterials]);
+
   // Add function to generate suggestions (moved before useEffect that uses it)
   const generateSuggestions = useCallback(() => {
     if (!fuseRef.current) return;
@@ -179,6 +199,8 @@ export function MaterialLibraryComponent() {
         .trim();
 
       const results = fuseRef.current?.search(searchTerm) || [];
+
+      // Results are already filtered (using sortedKbobMaterials in Fuse initialization)
       if (results.length > 0) {
         const bestMatch = results[0];
         suggestions[material.id] = {
@@ -193,8 +215,9 @@ export function MaterialLibraryComponent() {
   }, [materials, temporaryMatches]);
 
   useEffect(() => {
-    if (kbobMaterials.length > 0) {
-      fuseRef.current = new Fuse(kbobMaterials, {
+    if (sortedKbobMaterials.length > 0) {
+      // Initialize Fuse with already filtered valid materials
+      fuseRef.current = new Fuse(sortedKbobMaterials, {
         keys: ["Name"],
         threshold: 0.8,
         ignoreLocation: true,
@@ -216,7 +239,7 @@ export function MaterialLibraryComponent() {
       // Generate suggestions for unmatched materials
       generateSuggestions();
     }
-  }, [kbobMaterials, materials, generateSuggestions]);
+  }, [sortedKbobMaterials, materials, generateSuggestions]);
 
   const scrollToMatchingKbob = useCallback(
     (ifcMaterialName: string) => {
@@ -615,19 +638,10 @@ export function MaterialLibraryComponent() {
     return Array.from(projectSet).sort();
   }, [materials]);
 
-  const sortedKbobMaterials = useMemo(() => {
-    return [...kbobMaterials].sort((a, b) => {
-      const aFav = favoriteMaterials.includes(a._id);
-      const bFav = favoriteMaterials.includes(b._id);
-      if (aFav && !bFav) return -1;
-      if (!aFav && bFav) return 1;
-      return a.Name?.localeCompare(b.Name || "") || 0;
-    });
-  }, [kbobMaterials, favoriteMaterials]);
-
   const commonWords = useMemo(() => {
     const words = new Map<string, number>();
-    kbobMaterials.forEach((material) => {
+    // Only process valid KBOB materials (with valid emissions and density)
+    sortedKbobMaterials.forEach((material) => {
       if (!material.Name) return;
       const wordList = material.Name.split(/[\s,.-]+/).filter(
         (w) => w.length > 2
@@ -640,11 +654,12 @@ export function MaterialLibraryComponent() {
       .filter(([_, count]) => count > 1) // Only keep words that appear more than once
       .sort((a, b) => b[1] - a[1])
       .map(([word]) => word);
-  }, [kbobMaterials]);
+  }, [sortedKbobMaterials]);
 
   const commonPhrases = useMemo(() => {
     const phrases = new Map<string, number>();
-    kbobMaterials.forEach((material) => {
+    // Only process valid KBOB materials (with valid emissions and density)
+    sortedKbobMaterials.forEach((material) => {
       if (!material.Name) return;
       // Get 2-3 word phrases
       const words = material.Name.split(/[\s,.-]+/).filter((w) => w.length > 2);
@@ -663,7 +678,7 @@ export function MaterialLibraryComponent() {
       .filter(([_, count]) => count > 1) // Only keep phrases that appear more than once
       .sort((a, b) => b[1] - a[1])
       .map(([phrase]) => phrase);
-  }, [kbobMaterials]);
+  }, [sortedKbobMaterials]);
 
   // Normalize text for comparison (handle special characters, case, etc.)
   const normalizeText = (text: string) => {

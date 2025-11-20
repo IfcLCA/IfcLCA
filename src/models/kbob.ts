@@ -82,7 +82,8 @@ kbobSchema.index({ lastUpdated: 1 });
 kbobSchema.static("findValidMaterials", function () {
   return this.find({
     $and: [
-      // Must have environmental indicators in new API format
+      // Must have environmental indicators in new API format with non-zero values
+      // At least one indicator must be non-zero to be considered valid
       {
         $and: [
           { gwpTotal: { $exists: true, $ne: null } },
@@ -90,12 +91,20 @@ kbobSchema.static("findValidMaterials", function () {
           { primaryEnergyNonRenewableTotal: { $exists: true, $ne: null } },
         ],
       },
+      // At least one environmental indicator must be non-zero
+      {
+        $or: [
+          { gwpTotal: { $ne: 0 } },
+          { ubp21Total: { $ne: 0 } },
+          { primaryEnergyNonRenewableTotal: { $ne: 0 } },
+        ],
+      },
       // Must have valid density
       {
         density: {
           $exists: true,
           $ne: null,
-          $nin: [null, "-", ""],
+          $nin: [null, "-", "", 0],
         },
       },
     ],
