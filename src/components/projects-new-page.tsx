@@ -147,10 +147,10 @@ export default function ProjectsNewPage() {
                 Databases cost real money 💸 and while we would like to offer the most to all users in an effort to push sustainable construction, IfcLCA is still fully bootstrapped.
               </p>
               <p>
-                We have plans for many more powerful features once we're out of BETA! 🚀
+                We have plans for many more powerful features once we&apos;re out of BETA! 🚀
               </p>
               <p>
-                Stay tuned and get in touch if you really need more projects today (or let's maybe say tomorrow 😉)
+                Stay tuned and get in touch if you really need more projects today (or let&apos;s maybe say tomorrow 😉)
               </p>
             </div>
           </CardContent>

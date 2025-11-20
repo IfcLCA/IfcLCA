@@ -1,6 +1,7 @@
 import { Suspense } from "react";
 import { GraphPageComponent } from "@/components/graph-page";
 import { GraphSkeleton } from "@/components/skeletons";
+import { Card, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 
 async function MaterialsGraph({ projectId }: { projectId: string }) {
   const res = await fetch(`/api/projects/${projectId}`, {
