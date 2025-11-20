@@ -77,7 +77,8 @@ interface MaterialEntry {
     kbobMatch?: {
       _id: string;
       Name: string;
-      KBOB_ID: number;
+      KBOB_ID?: number;
+      uuid?: string;
       GWP?: number;
       UBP?: number;
       PENRE?: number;
@@ -540,8 +541,10 @@ export default function ProjectDetailsPage() {
         materials
           .map(mat => {
             if (mat.material?.kbobMatch && typeof mat.material.kbobMatch === 'object') {
-              return mat.material.kbobMatch.KBOB_ID?.toString();
+              // Prefer UUID from new API format, fallback to KBOB_ID for legacy materials
+              return mat.material.kbobMatch.uuid || mat.material.kbobMatch.KBOB_ID?.toString();
             }
+            // Only use material _id if there's no KBOB match
             return mat.material?._id;
           })
           .filter(Boolean)
