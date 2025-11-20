@@ -8,6 +8,9 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, usePathname, useBeforeUnload } from "next/navigation";
 
 import { MaterialChangesPreviewModal } from "@/components/material-changes-preview-modal";
+import { DataSourceToggle } from "@/components/data-source-toggle";
+import { OkobaudatSearch } from "@/components/okobaudat-search";
+import { DensityInputModal } from "@/components/density-input-modal";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -71,6 +74,18 @@ interface KbobMaterial {
   "kg/unit"?: number;
 }
 
+interface OkobaudatMaterial {
+  uuid: string;
+  name: string;
+  category: string;
+  density?: number;
+  gwp: number;
+  penre: number;
+  ubp?: number;
+  declaredUnit: string;
+  compliance: string[];
+}
+
 interface Project {
   id: string;
   name: string;
@@ -100,6 +115,17 @@ export function MaterialLibraryComponent() {
   const [projects, setProjects] = useState<
     Array<{ id: string; name: string; materialIds: string[] }>
   >([]);
+  
+  // Data source state
+  const [dataSource, setDataSource] = useState<'kbob' | 'okobaudat'>('kbob');
+  const [showOkobaudatSearch, setShowOkobaudatSearch] = useState(false);
+  const [densityModalData, setDensityModalData] = useState<{
+    open: boolean;
+    materialName: string;
+    category?: string;
+    okobaudatId?: string;
+    suggestedDensity?: any;
+  }>({ open: false, materialName: '' });
   const [isMatchingInProgress, setIsMatchingInProgress] = useState(false);
   const [isKbobOpen, setIsKbobOpen] = useState(false);
   const [previewChanges, setPreviewChanges] = useState<MaterialChange[]>([]);
@@ -409,6 +435,87 @@ export function MaterialLibraryComponent() {
       }
     });
     setTemporaryMatches(newMatches);
+  };
+
+  // Handler for Ökobaudat material selection
+  const handleOkobaudatSelect = async (material: OkobaudatMaterial) => {
+    if (selectedMaterials.length === 0) {
+      toast({
+        title: "No materials selected",
+        description: "Please select IFC materials to match first",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Check if material has density
+    if (!material.density) {
+      // Open density modal
+      setDensityModalData({
+        open: true,
+        materialName: material.name,
+        category: material.category,
+        okobaudatId: material.uuid,
+        suggestedDensity: undefined, // Could fetch from density service
+      });
+    } else {
+      // Direct match with density
+      await matchWithOkobaudat(selectedMaterials, material.uuid, material.density);
+    }
+  };
+
+  // Handler for density confirmation
+  const handleDensityConfirm = async (density: number) => {
+    if (densityModalData.okobaudatId) {
+      await matchWithOkobaudat(selectedMaterials, densityModalData.okobaudatId, density);
+    }
+    setDensityModalData({ open: false, materialName: '' });
+  };
+
+  // Match materials with Ökobaudat
+  const matchWithOkobaudat = async (materialIds: string[], okobaudatId: string, density: number) => {
+    try {
+      setIsMatchingInProgress(true);
+      
+      const response = await fetch("/api/materials/match", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          materialIds,
+          matchId: okobaudatId,
+          dataSource: 'okobaudat',
+          density,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to match with Ökobaudat");
+      }
+
+      // Refresh materials
+      const materialsResponse = await fetch("/api/materials");
+      if (materialsResponse.ok) {
+        const updatedMaterials = await materialsResponse.json();
+        setMaterials(updatedMaterials);
+      }
+
+      toast({
+        title: "Success",
+        description: `Matched ${materialIds.length} materials with Ökobaudat`,
+      });
+
+      setSelectedMaterials([]);
+      setShowOkobaudatSearch(false);
+    } catch (error) {
+      console.error("Error matching with Ökobaudat:", error);
+      toast({
+        title: "Error",
+        description: "Failed to match materials with Ökobaudat",
+        variant: "destructive",
+      });
+    } finally {
+      setIsMatchingInProgress(false);
+    }
   };
 
   const handleConfirmMatch = async (changesWithDensity: MaterialChange[]) => {
@@ -1288,44 +1395,57 @@ export function MaterialLibraryComponent() {
               </div>
             </div>
 
-            {/* Right Column - KBOB Materials */}
+            {/* Right Column - Database Materials */}
             <div className="flex flex-col border rounded-lg overflow-hidden h-full">
               <div className="p-4 border-b bg-secondary/10 flex-shrink-0">
-                <div className="flex items-center justify-between mb-2">
+                {/* Data Source Toggle */}
+                <DataSourceToggle 
+                  value={dataSource} 
+                  onChange={setDataSource}
+                  disabled={isMatchingInProgress}
+                />
+                
+                <div className="flex items-center justify-between mb-2 mt-4">
                   <h3 className="font-semibold flex items-center gap-2">
-                    <span>KBOB Materials Database</span>
-                    <Badge variant="outline">
-                      {kbobMaterials.length} materials
-                    </Badge>
+                    <span>{dataSource === 'kbob' ? 'KBOB Materials' : 'Ökobaudat Materials'}</span>
+                    {dataSource === 'kbob' && (
+                      <Badge variant="outline">
+                        {kbobMaterials.length} materials
+                      </Badge>
+                    )}
                   </h3>
-                  <div className="flex items-center gap-2">
-                    <Label
-                      htmlFor="auto-scroll"
-                      className="text-sm text-muted-foreground"
-                    >
-                      Auto-scroll
-                    </Label>
-                    <Switch
-                      id="auto-scroll"
-                      checked={autoScrollEnabled}
-                      onCheckedChange={setAutoScrollEnabled}
-                    />
-                  </div>
+                  {dataSource === 'kbob' && (
+                    <div className="flex items-center gap-2">
+                      <Label
+                        htmlFor="auto-scroll"
+                        className="text-sm text-muted-foreground"
+                      >
+                        Auto-scroll
+                      </Label>
+                      <Switch
+                        id="auto-scroll"
+                        checked={autoScrollEnabled}
+                        onCheckedChange={setAutoScrollEnabled}
+                      />
+                    </div>
+                  )}
                 </div>
                 <p className="text-sm text-muted-foreground mb-3">
-                  {activeSearchId
-                    ? "Select a KBOB material to match with your highlighted Ifc material"
-                    : "First select an Ifc material on the left to match it"}
+                  {selectedMaterials.length > 0
+                    ? `Select a ${dataSource === 'kbob' ? 'KBOB' : 'Ökobaudat'} material to match with ${selectedMaterials.length} selected materials`
+                    : "First select IFC materials on the left to match them"}
                 </p>
-                <div className="flex items-center gap-2">
-                  <MagnifyingGlassIcon className="h-4 w-4 text-muted-foreground" />
-                  <Input
-                    placeholder="Search KBOB materials..."
-                    value={kbobSearchTerm}
-                    onChange={(e) => setKbobSearchTerm(e.target.value)}
-                    className="flex-1"
-                  />
-                </div>
+                {dataSource === 'kbob' ? (
+                  <div className="flex items-center gap-2">
+                    <MagnifyingGlassIcon className="h-4 w-4 text-muted-foreground" />
+                    <Input
+                      placeholder="Search KBOB materials..."
+                      value={kbobSearchTerm}
+                      onChange={(e) => setKbobSearchTerm(e.target.value)}
+                      className="flex-1"
+                    />
+                  </div>
+                ) : null}
                 {kbobSearchTerm.length >= 2 && (
                   <div className="flex flex-wrap gap-1 mt-2">
                     {getSuggestions(kbobSearchTerm).map(
@@ -1359,8 +1479,9 @@ export function MaterialLibraryComponent() {
                 )}
               </div>
               <div className="flex-1 overflow-y-auto min-h-0" ref={kbobListRef}>
-                <div className="divide-y">
-                  {sortedKbobMaterials
+                {dataSource === 'kbob' ? (
+                  <div className="divide-y">
+                    {sortedKbobMaterials
                     .filter((material) => {
                       if (!material.Name) return false;
                       return normalizeText(material.Name).includes(
@@ -1417,7 +1538,17 @@ export function MaterialLibraryComponent() {
                         </div>
                       </div>
                     ))}
-                </div>
+                  </div>
+                ) : (
+                  // Ökobaudat Search Component
+                  <div className="p-4">
+                    <OkobaudatSearch
+                      onSelect={handleOkobaudatSelect}
+                      selectedMaterialIds={selectedMaterials}
+                      className="h-full"
+                    />
+                  </div>
+                )}
               </div>
             </div>
           </div>
@@ -1475,6 +1606,16 @@ export function MaterialLibraryComponent() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+      
+      {/* Density Input Modal */}
+      <DensityInputModal
+        open={densityModalData.open}
+        onClose={() => setDensityModalData({ open: false, materialName: '' })}
+        onConfirm={handleDensityConfirm}
+        materialName={densityModalData.materialName}
+        category={densityModalData.category}
+        suggestedDensity={densityModalData.suggestedDensity}
+      />
     </Card>
   );
 }

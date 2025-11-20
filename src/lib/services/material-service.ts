@@ -194,6 +194,103 @@ export class MaterialService {
     }
   }
 
+  static async getMatchPreview(
+    materialIds: string[],
+    matchId: string,
+    dataSource: 'kbob' | 'okobaudat' = 'kbob',
+    density?: number
+  ): Promise<IMaterialPreview> {
+    if (dataSource === 'okobaudat') {
+      return this.getOkobaudatMatchPreview(materialIds, matchId, density);
+    }
+    return this.getKBOBMatchPreview(materialIds, matchId, density);
+  }
+
+  static async getOkobaudatMatchPreview(
+    materialIds: string[],
+    okobaudatId: string,
+    density?: number
+  ): Promise<IMaterialPreview> {
+    const { OkobaudatService } = await import('./okobaudat-service');
+    const { DensityService } = await import('./density-service');
+    
+    const cacheKey = `preview-okobaudat-${materialIds.join("-")}-${okobaudatId}-${density}`;
+    const cached = MaterialService.materialCache.get(cacheKey);
+    if (cached?.timestamp > Date.now() - MaterialService.cacheTimeout) {
+      return cached.data;
+    }
+
+    try {
+      const objectIds = materialIds.map((id) => new mongoose.Types.ObjectId(id));
+      
+      const [materials, okobaudatMaterial, elements] = await Promise.all([
+        Material.find({ _id: { $in: objectIds } }).lean(),
+        OkobaudatService.getMaterialDetails(okobaudatId),
+        Element.find({ "materials.material": { $in: objectIds } })
+          .populate<{ projectId: { _id: Types.ObjectId; name: string } }>("projectId", "name")
+          .lean(),
+      ]);
+
+      if (!okobaudatMaterial) {
+        throw new Error("Ökobaudat material not found");
+      }
+
+      // Calculate or get density
+      let finalDensity = density || okobaudatMaterial.density;
+      if (!finalDensity && materials.length > 0) {
+        const fallback = await DensityService.getDensityFallback(
+          materials[0].name,
+          materials[0].category || okobaudatMaterial.category
+        );
+        if (fallback) {
+          finalDensity = fallback.typical;
+        }
+      }
+
+      // Calculate affected elements per material
+      const elementCounts = new Map<string, number>();
+      const projectMap = new Map<string, Set<string>>();
+
+      elements.forEach((element) => {
+        const projectName = element.projectId?.name;
+        if (!projectName) return;
+
+        element.materials.forEach((mat) => {
+          const materialId = mat.material.toString();
+          elementCounts.set(materialId, (elementCounts.get(materialId) || 0) + 1);
+
+          if (!projectMap.has(materialId)) {
+            projectMap.set(materialId, new Set());
+          }
+          projectMap.get(materialId)?.add(projectName);
+        });
+      });
+
+      const changes: IMaterialChange[] = materials.map((material) => ({
+        materialId: material._id.toString(),
+        materialName: material.name,
+        oldKbobMatch: material.kbobMatchId ? "Previous KBOB match" : material.okobaudatData?.name,
+        newKbobMatch: okobaudatMaterial.name,
+        oldDensity: material.density,
+        newDensity: Number(finalDensity || 0),
+        affectedElements: elementCounts.get(material._id.toString()) || 0,
+        projects: Array.from(projectMap.get(material._id.toString()) || new Set<string>()).sort(),
+        dataSource: 'okobaudat',
+      }));
+
+      const preview = { changes };
+      MaterialService.materialCache.set(cacheKey, {
+        data: preview,
+        timestamp: Date.now(),
+      });
+
+      return preview;
+    } catch (error) {
+      console.error("❌ [Material Service] Error in getOkobaudatMatchPreview:", error);
+      throw error;
+    }
+  }
+
   static async getKBOBMatchPreview(
     materialIds: string[],
     kbobMatchId: string,
@@ -281,6 +378,42 @@ export class MaterialService {
       );
       throw error;
     }
+  }
+
+  /**
+   * Finds best material match from specified data source
+   */
+  static async findBestMatch(
+    materialName: string,
+    dataSource: 'kbob' | 'okobaudat' = 'kbob'
+  ): Promise<{ material: any; score: number; source: string } | null> {
+    if (dataSource === 'okobaudat') {
+      const { OkobaudatMatcher } = await import('./okobaudat-matcher');
+      const matches = await OkobaudatMatcher.findBestMatches(materialName, {
+        limit: 1,
+        threshold: 0.3,
+        compliance: 'A2',
+      });
+      
+      if (matches.length > 0) {
+        return {
+          material: matches[0].material,
+          score: matches[0].score,
+          source: 'okobaudat',
+        };
+      }
+      return null;
+    }
+    
+    const kbobMatch = await this.findBestKBOBMatch(materialName);
+    if (kbobMatch) {
+      return {
+        material: kbobMatch.kbobMaterial,
+        score: kbobMatch.score,
+        source: 'kbob',
+      };
+    }
+    return null;
   }
 
   /**

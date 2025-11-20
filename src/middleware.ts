@@ -25,6 +25,23 @@ export default clerkMiddleware((auth, request) => {
   const { userId } = auth;
   const { pathname } = request.nextUrl;
 
+  // Allow static files and public assets
+  if (
+    pathname.includes('.') && (
+      pathname.endsWith('.webmanifest') ||
+      pathname.endsWith('.json') ||
+      pathname.endsWith('.png') ||
+      pathname.endsWith('.jpg') ||
+      pathname.endsWith('.jpeg') ||
+      pathname.endsWith('.ico') ||
+      pathname.endsWith('.xml') ||
+      pathname.endsWith('.txt') ||
+      pathname.endsWith('.svg')
+    )
+  ) {
+    return NextResponse.next();
+  }
+
   // Allow public routes
   if (publicRoutes.some((route) => pathname.startsWith(route))) {
     return NextResponse.next();
@@ -62,7 +79,7 @@ export default clerkMiddleware((auth, request) => {
   return NextResponse.next();
 });
 
-// Fixed matcher pattern
+// Fixed matcher pattern - excludes static files and public assets
 export const config = {
   matcher: [
     "/",
@@ -74,6 +91,7 @@ export const config = {
     "/settings/:path*",
     "/reports/:path*",
     "/api/:path*",
-    "/((?!_next/static|_next/image|favicon.ico).*)",
+    // Exclude all static files and public assets
+    "/((?!_next/static|_next/image|favicon.ico|site.webmanifest|manifest.json|.*\\.png|.*\\.jpg|.*\\.xml|robots.txt).*)",
   ],
 };

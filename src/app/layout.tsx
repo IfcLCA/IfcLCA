@@ -67,7 +67,8 @@ export const metadata: Metadata = {
     ],
     apple: "/apple-touch-icon.png",
     other: [
-      { rel: "manifest", url: "/site.webmanifest" },
+      { rel: "manifest", url: "/manifest.json" },
+      { rel: "manifest", url: "/site.webmanifest", crossOrigin: "use-credentials" },
       { rel: "mask-icon", url: "/safari-pinned-tab.svg", color: "#000000" },
       { rel: "msapplication-TileImage", url: "/mstile-150x150.png" },
     ],
