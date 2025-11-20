@@ -74,26 +74,20 @@ export class KbobService {
       uuid: apiMaterial.uuid,
       nameDE: apiMaterial.nameDE,
       nameFR: apiMaterial.nameFR,
-      Name: apiMaterial.nameDE, // Keep Name for backward compatibility
+      Name: apiMaterial.nameDE,
       group: apiMaterial.group,
-      Category: apiMaterial.group, // Map group to Category for backward compatibility
+      Category: apiMaterial.group,
       version: version,
       lastUpdated: new Date(),
 
-      // New environmental impact fields
+      // Environmental impact fields
       gwpTotal: apiMaterial.gwpTotal,
       ubp21Total: apiMaterial.ubp21Total,
       primaryEnergyNonRenewableTotal: apiMaterial.primaryEnergyNonRenewableTotal,
 
-      // Legacy fields for backward compatibility (map from new fields)
-      GWP: apiMaterial.gwpTotal ?? null,
-      UBP: apiMaterial.ubp21Total ?? null,
-      PENRE: apiMaterial.primaryEnergyNonRenewableTotal ?? null,
-
       // Density handling
       density: density,
       unit: apiMaterial.unit,
-      "kg/unit": density, // Map density to kg/unit for backward compatibility
     };
   }
 
@@ -272,12 +266,5 @@ export class KbobService {
     return await KBOBMaterial.findOne({ uuid }).lean();
   }
 
-  /**
-   * Get a single material by legacy KBOB_ID (for backward compatibility)
-   */
-  static async getMaterialByKbobId(kbobId: number): Promise<any | null> {
-    await connectToDatabase();
-    return await KBOBMaterial.findOne({ KBOB_ID: kbobId }).lean();
-  }
 }
 

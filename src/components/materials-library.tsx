@@ -67,24 +67,19 @@ interface Material {
 
 interface KbobMaterial {
   _id: string;
-  KBOB_ID?: number;
   Name: string;
-  // Legacy fields
-  GWP?: number;
-  UBP?: number;
-  PENRE?: number;
-  // New API fields
-  gwpTotal?: number | null;
-  ubp21Total?: number | null;
-  primaryEnergyNonRenewableTotal?: number | null;
   uuid?: string;
   nameDE?: string;
   nameFR?: string;
   group?: string;
+  gwpTotal?: number | null;
+  ubp21Total?: number | null;
+  primaryEnergyNonRenewableTotal?: number | null;
   density?: number | string | null;
+  // Legacy density fields (kept for DB compatibility, but prefer density field)
+  "kg/unit"?: number | string;
   "min density"?: number;
   "max density"?: number;
-  "kg/unit"?: number;
 }
 
 interface Project {

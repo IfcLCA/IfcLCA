@@ -52,9 +52,6 @@ interface KBOBMaterial {
   _id: string;
   Name: string;
   Category?: string;
-  GWP: number;
-  UBP: number;
-  PENRE: number;
 }
 
 interface Material {
@@ -77,11 +74,7 @@ interface MaterialEntry {
     kbobMatch?: {
       _id: string;
       Name: string;
-      KBOB_ID?: number;
       uuid?: string;
-      GWP?: number;
-      UBP?: number;
-      PENRE?: number;
     };
   };
   indicators?: {
@@ -154,9 +147,12 @@ export interface ExtendedProject extends Project {
 type IndicatorType = "gwp" | "ubp" | "penre";
 
 type KBOBIndicatorValues = {
-  GWP?: number;
-  UBP?: number;
-  PENRE?: number;
+  gwpTotal?: number | null;
+  ubp21Total?: number | null;
+  primaryEnergyNonRenewableTotal?: number | null;
+  _id?: string;
+  Name?: string;
+  uuid?: string;
 };
 
 type ElementMaterialForExport = {
@@ -172,10 +168,7 @@ type ElementMaterialForExport = {
     kbobMatch?: {
       _id: string;
       Name: string;
-      KBOB_ID: number;
-      GWP?: number;
-      UBP?: number;
-      PENRE?: number;
+      uuid?: string;
     };
   };
 };
@@ -214,9 +207,9 @@ interface MaterialWithVolume {
     density?: number;
     kbobMatch?: {
       Name?: string;
-      GWP?: number;
-      UBP?: number;
-      PENRE?: number;
+      gwpTotal?: number | null;
+      ubp21Total?: number | null;
+      primaryEnergyNonRenewableTotal?: number | null;
     };
   };
   volume: number;
@@ -541,8 +534,7 @@ export default function ProjectDetailsPage() {
         materials
           .map(mat => {
             if (mat.material?.kbobMatch && typeof mat.material.kbobMatch === 'object') {
-              // Prefer UUID from new API format, fallback to KBOB_ID for legacy materials
-              return mat.material.kbobMatch.uuid || mat.material.kbobMatch.KBOB_ID?.toString();
+              return mat.material.kbobMatch.uuid;
             }
             // Only use material _id if there's no KBOB match
             return mat.material?._id;

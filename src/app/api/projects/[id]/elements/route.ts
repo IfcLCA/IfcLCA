@@ -58,7 +58,7 @@ export async function GET(
           select: "name category density kbobMatchId",
           populate: {
             path: "kbobMatchId",
-            select: "Name GWP UBP PENRE"
+            select: "Name uuid gwpTotal ubp21Total primaryEnergyNonRenewableTotal"
           }
         })
         .skip(skip)

@@ -56,9 +56,9 @@ import {
 
 interface KBOBMaterial {
   Name: string;
-  GWP: number;
-  UBP: number;
-  PENRE: number;
+  gwpTotal?: number | null;
+  ubp21Total?: number | null;
+  primaryEnergyNonRenewableTotal?: number | null;
   "kg/unit"?: number;
   "min density"?: number;
   "max density"?: number;
@@ -337,15 +337,15 @@ export default function TryNowPage() {
             acc.gwp +=
               m.volume *
               m.material.density *
-              (m.material.kbobMatch.GWP ?? 0);
+              (m.material.kbobMatch.gwpTotal ?? 0);
             acc.ubp +=
               m.volume *
               m.material.density *
-              (m.material.kbobMatch.UBP ?? 0);
+              (m.material.kbobMatch.ubp21Total ?? 0);
             acc.penre +=
               m.volume *
               m.material.density *
-              (m.material.kbobMatch.PENRE ?? 0);
+              (m.material.kbobMatch.primaryEnergyNonRenewableTotal ?? 0);
           }
           return acc;
         },
@@ -383,11 +383,11 @@ export default function TryNowPage() {
         existing.volume += m.volume;
         if (m.material.kbobMatch && m.material.density) {
           existing.emissions.gwp +=
-            m.volume * m.material.density * (m.material.kbobMatch.GWP ?? 0);
+            m.volume * m.material.density * (m.material.kbobMatch.gwpTotal ?? 0);
           existing.emissions.ubp +=
-            m.volume * m.material.density * (m.material.kbobMatch.UBP ?? 0);
+            m.volume * m.material.density * (m.material.kbobMatch.ubp21Total ?? 0);
           existing.emissions.penre +=
-            m.volume * m.material.density * (m.material.kbobMatch.PENRE ?? 0);
+            m.volume * m.material.density * (m.material.kbobMatch.primaryEnergyNonRenewableTotal ?? 0);
         }
         matMap.set(key, existing);
       });

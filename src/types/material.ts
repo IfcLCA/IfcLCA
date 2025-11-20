@@ -8,15 +8,6 @@ export interface IKBOBMaterial {
   _id: string;
   Name: string;
   Category?: string;
-  // Legacy fields (for backward compatibility)
-  GWP?: number;
-  UBP?: number;
-  PENRE?: number;
-  KBOB_ID?: number;
-  "kg/unit"?: number | string;
-  "min density"?: number;
-  "max density"?: number;
-  // New API fields
   uuid?: string;
   nameDE?: string;
   nameFR?: string;
@@ -28,6 +19,10 @@ export interface IKBOBMaterial {
   primaryEnergyNonRenewableTotal?: number | null;
   density?: number | string | null;
   unit?: string;
+  // Legacy density fields (kept for DB compatibility, but prefer density field)
+  "kg/unit"?: number | string;
+  "min density"?: number;
+  "max density"?: number;
 }
 
 export interface IMaterial {

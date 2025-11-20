@@ -101,7 +101,7 @@ export class MaterialService {
         }
       }
     }
-    
+
     // Use kg/unit if available (handle both number and string)
     const kgPerUnit = kbobMaterial["kg/unit"];
     if (typeof kgPerUnit === "number" && !isNaN(kgPerUnit)) {
@@ -230,7 +230,7 @@ export class MaterialService {
 
       const [materials, newKBOBMaterial, elements] = await Promise.all([
         Material.find({ _id: { $in: objectIds } })
-          .populate("kbobMatchId", "Name GWP UBP PENRE gwpTotal ubp21Total primaryEnergyNonRenewableTotal density")
+          .populate("kbobMatchId", "Name uuid gwpTotal ubp21Total primaryEnergyNonRenewableTotal density")
           .lean(),
         KBOBMaterial.findById(kbobObjectId).lean(),
         Element.find({ "materials.material": { $in: objectIds } })
@@ -343,19 +343,14 @@ export class MaterialService {
       return undefined;
     }
 
-    // Check if material has ANY valid environmental indicators (legacy or new format)
-    const hasLegacyIndicators =
-      typeof kbobMaterial.GWP === "number" ||
-      typeof kbobMaterial.UBP === "number" ||
-      typeof kbobMaterial.PENRE === "number";
-    
-    const hasNewIndicators =
+    // Check if material has valid environmental indicators
+    const hasIndicators =
       typeof kbobMaterial.gwpTotal === "number" ||
       typeof kbobMaterial.ubp21Total === "number" ||
       typeof kbobMaterial.primaryEnergyNonRenewableTotal === "number";
-    
-    // If material has no indicators at all, return undefined
-    if (!hasLegacyIndicators && !hasNewIndicators) {
+
+    // If material has no indicators, return undefined
+    if (!hasIndicators) {
       return undefined;
     }
 
@@ -429,7 +424,7 @@ export class MaterialService {
         projectId: { $in: projectIds },
         kbobMatchId: { $exists: true },
       })
-        .populate("kbobMatchId", "Name GWP UBP PENRE gwpTotal ubp21Total primaryEnergyNonRenewableTotal density")
+        .populate("kbobMatchId", "Name uuid gwpTotal ubp21Total primaryEnergyNonRenewableTotal density")
         .lean() as (mongoose.Document & IMaterial) | null;
 
       if (exactMatch) {
@@ -442,7 +437,7 @@ export class MaterialService {
         projectId: { $in: projectIds },
         kbobMatchId: { $exists: true },
       })
-        .populate("kbobMatchId", "Name GWP UBP PENRE gwpTotal ubp21Total primaryEnergyNonRenewableTotal density")
+        .populate("kbobMatchId", "Name uuid gwpTotal ubp21Total primaryEnergyNonRenewableTotal density")
         .lean() as (mongoose.Document & IMaterial) | null;
 
       if (caseInsensitiveMatch) {
@@ -806,7 +801,7 @@ export class MaterialService {
       // Note: After populate(), kbobMatchId contains the populated KBOB material object
       const materials = await Material.find({ _id: { $in: materialIds } })
         .select("_id density kbobMatchId name")
-        .populate("kbobMatchId", "GWP UBP PENRE gwpTotal ubp21Total primaryEnergyNonRenewableTotal")
+        .populate("kbobMatchId", "gwpTotal ubp21Total primaryEnergyNonRenewableTotal")
         .session(session)
         .lean();
 
@@ -861,9 +856,7 @@ export class MaterialService {
                                 },
                                 {
                                   $ifNull: [
-                                    {
-                                      $ifNull: ["$$material.kbobMatchId.gwpTotal", "$$material.kbobMatchId.GWP"],
-                                    },
+                                    "$$material.kbobMatchId.gwpTotal",
                                     0,
                                   ],
                                 },
@@ -879,9 +872,7 @@ export class MaterialService {
                                 },
                                 {
                                   $ifNull: [
-                                    {
-                                      $ifNull: ["$$material.kbobMatchId.ubp21Total", "$$material.kbobMatchId.UBP"],
-                                    },
+                                    "$$material.kbobMatchId.ubp21Total",
                                     0,
                                   ],
                                 },
@@ -897,12 +888,7 @@ export class MaterialService {
                                 },
                                 {
                                   $ifNull: [
-                                    {
-                                      $ifNull: [
-                                        "$$material.kbobMatchId.primaryEnergyNonRenewableTotal",
-                                        "$$material.kbobMatchId.PENRE",
-                                      ],
-                                    },
+                                    "$$material.kbobMatchId.primaryEnergyNonRenewableTotal",
                                     0,
                                   ],
                                 },
