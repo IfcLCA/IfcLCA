@@ -705,7 +705,7 @@ export class MaterialService {
           select: "density kbobMatchId",
           populate: {
             path: "kbobMatchId",
-            select: "GWP UBP PENRE",
+            select: "gwpTotal ubp21Total primaryEnergyNonRenewableTotal",
           },
         })
         .session(session || null)
