@@ -37,7 +37,7 @@ export async function POST(request: Request) {
           }
         }
       }
-      
+
       // Fallback to old field names if new density field not available
       if (!density) {
         if (

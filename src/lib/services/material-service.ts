@@ -191,7 +191,7 @@ export class MaterialService {
 
       if (exactMatch) {
         if (isValidKbobMaterial(exactMatch)) {
-          return { kbobMaterial: exactMatch, score: 1.0 };
+        return { kbobMaterial: exactMatch, score: 1.0 };
         } else {
           logger.debug(`Exact match found for "${cleanedName}" but has invalid emissions or density, skipping`);
         }
@@ -204,7 +204,7 @@ export class MaterialService {
 
       if (caseInsensitiveMatch) {
         if (isValidKbobMaterial(caseInsensitiveMatch)) {
-          return { kbobMaterial: caseInsensitiveMatch, score: 0.99 };
+        return { kbobMaterial: caseInsensitiveMatch, score: 0.99 };
         } else {
           logger.debug(`Case-insensitive match found for "${cleanedName}" but has invalid emissions or density, skipping`);
         }
