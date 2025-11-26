@@ -7,13 +7,17 @@ import { usePathname, useSearchParams } from "next/navigation"
 
 export function PostHogProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
+    const isDev = process.env.NODE_ENV === "development";
+    
     posthog.init(process.env.NEXT_PUBLIC_POSTHOG_KEY!, {
-      api_host: "/ingest",
+      // Use direct URL in development to avoid 431 errors from cookie-heavy proxy
+      // In production, use /ingest proxy for ad-blocker bypass
+      api_host: isDev ? "https://eu.i.posthog.com" : "/ingest",
       ui_host: "https://eu.posthog.com",
       capture_pageview: false, // We capture pageviews manually
       capture_pageleave: true, // Enable pageleave capture
       capture_exceptions: true, // This enables capturing exceptions using Error Tracking
-      debug: process.env.NODE_ENV === "development",
+      debug: false, // Disable debug mode to reduce console noise
     })
   }, [])
 

@@ -59,6 +59,7 @@ interface KBOBMaterial {
   gwpTotal?: number | null;
   ubp21Total?: number | null;
   primaryEnergyNonRenewableTotal?: number | null;
+  density?: number | string | null; // New API field
   "kg/unit"?: number;
   "min density"?: number;
   "max density"?: number;
@@ -196,6 +197,20 @@ export default function TryNowPage() {
 
   const calcDensity = useCallback((m?: KBOBMaterial) => {
     if (!m) return undefined;
+    
+    // Check new density field first (from updated KBOB API)
+    if (m.density !== null && m.density !== undefined) {
+      if (typeof m.density === "number" && !isNaN(m.density) && m.density !== 0) {
+        return m.density;
+      } else if (typeof m.density === "string" && m.density !== "" && m.density !== "-") {
+        const parsed = parseFloat(m.density);
+        if (!isNaN(parsed) && parsed !== 0) {
+          return parsed;
+        }
+      }
+    }
+    
+    // Fallback to old fields
     if (typeof m["kg/unit"] === "number") return m["kg/unit"];
     if (
       typeof m["min density"] === "number" &&
@@ -556,6 +571,7 @@ export default function TryNowPage() {
 
                     <div className="relative z-10 text-center space-y-6">
                       <motion.div
+                        data-ph-no-capture
                         animate={{
                           scale: isDragging ? 1.1 : 1,
                           rotate: isDragging ? 5 : 0,
@@ -682,6 +698,7 @@ export default function TryNowPage() {
                 <CardContent className="p-8 space-y-6">
                   <div className="text-center space-y-4">
                     <motion.div
+                      data-ph-no-capture
                       animate={{
                         rotate: 360,
                       }}
@@ -766,6 +783,7 @@ export default function TryNowPage() {
                           )}
                           {isActive && (
                             <motion.div
+                              data-ph-no-capture
                               animate={{ scale: [1, 1.2, 1] }}
                               transition={{ repeat: Infinity, duration: 1.5 }}
                               className="ml-auto"
@@ -1038,6 +1056,7 @@ export default function TryNowPage() {
                 <Card className="bg-gradient-to-r from-orange-600 to-purple-600 text-white overflow-hidden relative">
                   <motion.div
                     className="absolute inset-0 bg-white/10"
+                    data-ph-no-capture
                     animate={{
                       backgroundImage: [
                         "radial-gradient(circle at 20% 50%, transparent 0%, transparent 50%, white 50%, white 60%, transparent 60%)",
