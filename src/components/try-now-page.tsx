@@ -59,6 +59,7 @@ interface KBOBMaterial {
   gwpTotal?: number | null;
   ubp21Total?: number | null;
   primaryEnergyNonRenewableTotal?: number | null;
+  density?: number | string | null; // New API field
   "kg/unit"?: number;
   "min density"?: number;
   "max density"?: number;
@@ -196,6 +197,20 @@ export default function TryNowPage() {
 
   const calcDensity = useCallback((m?: KBOBMaterial) => {
     if (!m) return undefined;
+
+    // Check new density field first (from updated KBOB API)
+    if (m.density !== null && m.density !== undefined) {
+      if (typeof m.density === "number" && !isNaN(m.density) && m.density !== 0) {
+        return m.density;
+      } else if (typeof m.density === "string" && m.density !== "" && m.density !== "-") {
+        const parsed = parseFloat(m.density);
+        if (!isNaN(parsed) && parsed !== 0) {
+          return parsed;
+        }
+      }
+    }
+
+    // Fallback to old fields
     if (typeof m["kg/unit"] === "number") return m["kg/unit"];
     if (
       typeof m["min density"] === "number" &&
@@ -473,7 +488,8 @@ export default function TryNowPage() {
     .sort((a, b) => b.emissions[selectedMetric] - a.emissions[selectedMetric])
     .slice(0, 10)
     .map(m => ({
-      name: m.name,
+      name: m.material.kbobMatch?.Name || m.name, // KBOB name for axis, fallback to IFC name
+      ifcName: m.name, // IFC name for tooltip
       value: m.emissions[selectedMetric],
       volume: m.volume,
     }));
@@ -483,7 +499,8 @@ export default function TryNowPage() {
     .sort((a, b) => b.emissions[selectedMetric] - a.emissions[selectedMetric])
     .slice(0, 5)
     .map(m => ({
-      name: m.name,
+      name: m.material.kbobMatch?.Name || m.name, // KBOB name for legend, fallback to IFC name
+      ifcName: m.name, // IFC name for tooltip
       value: m.emissions[selectedMetric],
     }));
 
@@ -556,6 +573,7 @@ export default function TryNowPage() {
 
                     <div className="relative z-10 text-center space-y-6">
                       <motion.div
+                        data-ph-no-capture
                         animate={{
                           scale: isDragging ? 1.1 : 1,
                           rotate: isDragging ? 5 : 0,
@@ -682,6 +700,7 @@ export default function TryNowPage() {
                 <CardContent className="p-8 space-y-6">
                   <div className="text-center space-y-4">
                     <motion.div
+                      data-ph-no-capture
                       animate={{
                         rotate: 360,
                       }}
@@ -766,6 +785,7 @@ export default function TryNowPage() {
                           )}
                           {isActive && (
                             <motion.div
+                              data-ph-no-capture
                               animate={{ scale: [1, 1.2, 1] }}
                               transition={{ repeat: Infinity, duration: 1.5 }}
                               className="ml-auto"
@@ -787,288 +807,497 @@ export default function TryNowPage() {
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              className="space-y-6"
+              className="space-y-8"
             >
-              {/* File info and actions */}
-              <Card>
-                <CardContent className="p-4">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-4">
-                      <div className="p-2 rounded-lg bg-green-100 dark:bg-green-900/30">
-                        <CheckCircle className="h-5 w-5 text-green-600 dark:text-green-400" />
-                      </div>
-                      <div>
-                        <h3 className="font-semibold text-gray-800 dark:text-white">
-                          {fileName}
-                        </h3>
-                        <p className="text-sm text-gray-600 dark:text-gray-400">
-                          Analysis complete • {fileSize} • {modelStats?.totalElements} elements
-                        </p>
-                      </div>
-                    </div>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={resetAnalysis}
-                      className="flex items-center gap-2"
+              {/* Hero Results Header */}
+              <motion.div
+                initial={{ opacity: 0, y: -20 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-white via-slate-50 to-slate-100 dark:from-slate-800 dark:via-slate-900 dark:to-slate-950 p-4 sm:p-6 md:p-8 text-slate-900 dark:text-white shadow-2xl border border-slate-200 dark:border-slate-700/50"
+              >
+                {/* Subtle gradient overlay matching logo colors */}
+                <div className="absolute inset-0 bg-gradient-to-br from-cyan-500/5 via-violet-500/5 to-pink-500/5 dark:from-cyan-500/10 dark:via-violet-500/10 dark:to-pink-500/10" />
+                <div className="absolute top-0 right-0 w-96 h-96 bg-gradient-to-bl from-cyan-500/10 via-transparent to-transparent blur-3xl dark:from-cyan-500/20" />
+                <div className="absolute bottom-0 left-0 w-96 h-96 bg-gradient-to-tr from-pink-500/8 via-transparent to-transparent blur-3xl dark:from-pink-500/15" />
+
+                <div className="relative z-10 flex flex-col md:flex-row items-start md:items-center justify-between gap-4 md:gap-6">
+                  <div className="flex items-center gap-3 sm:gap-5 flex-1 min-w-0">
+                    <motion.div
+                      initial={{ scale: 0 }}
+                      animate={{ scale: 1 }}
+                      transition={{ type: "spring", stiffness: 200, delay: 0.2 }}
+                      className="p-3 sm:p-4 rounded-xl sm:rounded-2xl bg-gradient-to-br from-cyan-500/20 to-pink-500/15 dark:from-cyan-500/30 dark:to-pink-500/20 backdrop-blur-sm border border-cyan-200/50 dark:border-white/10 flex-shrink-0"
                     >
-                      <RefreshCw className="h-4 w-4" />
+                      <CheckCircle className="h-8 w-8 sm:h-10 sm:w-10 text-cyan-600 dark:text-cyan-300" />
+                    </motion.div>
+                    <div className="min-w-0 flex-1">
+                      <motion.h2
+                        initial={{ opacity: 0, x: -20 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        transition={{ delay: 0.3 }}
+                        className="text-xl sm:text-2xl md:text-3xl font-bold text-slate-900 dark:text-white truncate"
+                      >
+                        Analysis Complete
+                      </motion.h2>
+                      <motion.p
+                        initial={{ opacity: 0, x: -20 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        transition={{ delay: 0.4 }}
+                        className="text-slate-600 dark:text-white/80 text-sm sm:text-base md:text-lg mt-1 truncate"
+                      >
+                        {fileName} • {fileSize}
+                      </motion.p>
+                    </div>
+                  </div>
+
+                  <motion.div
+                    initial={{ opacity: 0, scale: 0.8 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    transition={{ delay: 0.5 }}
+                    className="w-full md:w-auto"
+                  >
+                    <Button
+                      variant="secondary"
+                      size="lg"
+                      onClick={resetAnalysis}
+                      className="w-full md:w-auto bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-400 hover:to-blue-400 dark:from-cyan-500 dark:to-blue-500 dark:hover:from-cyan-400 dark:hover:to-blue-400 text-white border-0 shadow-lg shadow-cyan-500/25"
+                    >
+                      <RefreshCw className="h-5 w-5 mr-2" />
                       New Analysis
                     </Button>
-                  </div>
-                </CardContent>
-              </Card>
+                  </motion.div>
+                </div>
 
-              {/* Model Statistics - NEW */}
-              {modelStats && (
-                <motion.div
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4"
-                >
-                  {[
-                    { label: "Total Elements", value: modelStats.totalElements, icon: Building2 },
-                    { label: "Walls", value: modelStats.wallCount, icon: Square },
-                    { label: "Slabs", value: modelStats.slabCount, icon: Layers },
-                    { label: "Columns", value: modelStats.columnCount, icon: Columns3 },
-                    { label: "Beams", value: modelStats.beamCount, icon: Minus },
-                    { label: "Total Volume", value: modelStats.totalVolume, unit: "m³", icon: Cuboid },
-                    { label: "Materials", value: modelStats.uniqueMaterials, icon: Package },
-                  ].map((stat, index) => (
-                    <motion.div
-                      key={stat.label}
-                      initial={{ opacity: 0, scale: 0.9 }}
-                      animate={{ opacity: 1, scale: 1 }}
-                      transition={{ delay: index * 0.05 }}
-                    >
-                      <Card className="hover:shadow-md transition-shadow">
-                        <CardContent className="p-4 text-center">
-                          <stat.icon className="h-5 w-5 mx-auto mb-2 text-gray-400" />
-                          <p className="text-2xl font-bold text-gray-800 dark:text-white">
-                            {formatValue(stat.value)}{stat.unit ? ` ${stat.unit}` : ''}
-                          </p>
-                          <p className="text-xs text-gray-600 dark:text-gray-400">
-                            {stat.label}
-                          </p>
-                        </CardContent>
-                      </Card>
-                    </motion.div>
-                  ))}
-                </motion.div>
-              )}
+                {/* Key Stats Row */}
+                {modelStats && (
+                  <motion.div
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.6 }}
+                    className="relative z-10 mt-6 sm:mt-8 grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4"
+                  >
+                    {[
+                      { label: "Elements", value: modelStats.totalElements, icon: Building2, className: "bg-gradient-to-b from-cyan-50 to-cyan-100/50 dark:from-cyan-500/20 dark:to-cyan-500/5" },
+                      { label: "Volume", value: modelStats.totalVolume, unit: "m³", icon: Cuboid, className: "bg-gradient-to-b from-blue-50 to-blue-100/50 dark:from-blue-500/20 dark:to-blue-500/5" },
+                      { label: "Materials", value: modelStats.uniqueMaterials, icon: Package, className: "bg-gradient-to-b from-violet-50 to-violet-100/50 dark:from-violet-500/20 dark:to-violet-500/5" },
+                      ...(modelStats.wallCount > 0 ? [{ label: "Walls", value: modelStats.wallCount, icon: Square, className: "bg-gradient-to-b from-pink-50 to-pink-100/50 dark:from-pink-500/20 dark:to-pink-500/5" }] : []),
+                      ...(modelStats.slabCount > 0 ? [{ label: "Slabs", value: modelStats.slabCount, icon: Layers, className: "bg-gradient-to-b from-cyan-50 to-cyan-100/50 dark:from-cyan-500/20 dark:to-cyan-500/5" }] : []),
+                      ...(modelStats.columnCount > 0 ? [{ label: "Columns", value: modelStats.columnCount, icon: Columns3, className: "bg-gradient-to-b from-blue-50 to-blue-100/50 dark:from-blue-500/20 dark:to-blue-500/5" }] : []),
+                      ...(modelStats.beamCount > 0 ? [{ label: "Beams", value: modelStats.beamCount, icon: Minus, className: "bg-gradient-to-b from-violet-50 to-violet-100/50 dark:from-violet-500/20 dark:to-violet-500/5" }] : []),
+                    ].slice(0, 4).map((stat, index) => (
+                      <motion.div
+                        key={stat.label}
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: 0.7 + index * 0.1 }}
+                        className={`${stat.className} backdrop-blur-sm rounded-lg sm:rounded-xl p-3 sm:p-4 text-center border border-slate-200/50 dark:border-white/10 hover:border-cyan-300/50 dark:hover:border-white/20 transition-all bg-white/80 dark:bg-transparent`}
+                      >
+                        <stat.icon className="h-4 w-4 sm:h-5 sm:w-5 mx-auto mb-1.5 sm:mb-2 text-cyan-600 dark:text-cyan-300" />
+                        <p className="text-xl sm:text-2xl md:text-3xl font-bold text-slate-900 dark:text-white">
+                          {formatValue(stat.value)}{stat.unit ? <span className="text-sm sm:text-base md:text-lg ml-1 opacity-80">{stat.unit}</span> : ''}
+                        </p>
+                        <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-300">{stat.label}</p>
+                      </motion.div>
+                    ))}
+                  </motion.div>
+                )}
+              </motion.div>
 
-              {/* Emissions Summary */}
-              <Card>
-                <CardHeader>
-                  <CardTitle>Environmental Impact Summary</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <EmissionsSummaryCard project={projectForEmissions} />
-                </CardContent>
-              </Card>
+              {/* Emissions Impact Cards */}
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.8 }}
+                className="grid grid-cols-1 md:grid-cols-3 gap-6"
+              >
+                {[
+                  {
+                    label: "Global Warming",
+                    metric: "gwp" as const,
+                    value: totals.gwp,
+                    unit: "kg CO₂ eq",
+                    gradient: "from-orange-500 to-red-500",
+                    icon: "🌡️"
+                  },
+                  {
+                    label: "Environmental Impact",
+                    metric: "ubp" as const,
+                    value: totals.ubp,
+                    unit: "UBP",
+                    gradient: "from-purple-500 to-pink-500",
+                    icon: "🌍"
+                  },
+                  {
+                    label: "Primary Energy",
+                    metric: "penre" as const,
+                    value: totals.penre,
+                    unit: "kWh oil-eq",
+                    gradient: "from-amber-500 to-orange-500",
+                    icon: "⚡"
+                  },
+                ].map((item, index) => (
+                  <motion.div
+                    key={item.metric}
+                    initial={{ opacity: 0, scale: 0.9 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    transition={{ delay: 0.9 + index * 0.1 }}
+                    whileHover={{ scale: 1.02, y: -4 }}
+                    className={`relative overflow-hidden rounded-2xl bg-gradient-to-br ${item.gradient} p-6 text-white shadow-xl cursor-pointer`}
+                    onClick={() => setSelectedMetric(item.metric)}
+                  >
+                    <div className="absolute top-0 right-0 text-6xl opacity-20 -mr-2 -mt-2">
+                      {item.icon}
+                    </div>
+                    <p className="text-sm font-medium opacity-90 mb-1">{item.label}</p>
+                    <p className="text-3xl md:text-4xl font-bold mb-1">
+                      {item.value >= 1_000_000
+                        ? `${(item.value / 1_000_000).toLocaleString("de-CH", { maximumFractionDigits: 1 })} Mio.`
+                        : item.value.toLocaleString("de-CH", { maximumFractionDigits: 0 })}
+                    </p>
+                    <p className="text-sm opacity-80">{item.unit}</p>
+                    {selectedMetric === item.metric && (
+                      <motion.div
+                        layoutId="selected-metric"
+                        className="absolute bottom-2 right-2 bg-white/30 rounded-full px-2 py-0.5 text-xs"
+                      >
+                        Selected
+                      </motion.div>
+                    )}
+                  </motion.div>
+                ))}
+              </motion.div>
 
-              {/* Visualization Tabs */}
-              <Card>
-                <CardHeader>
-                  <div className="flex items-center justify-between">
-                    <CardTitle>Material Analysis</CardTitle>
-                    <Tabs value={selectedView} onValueChange={(v) => setSelectedView(v as any)}>
-                      <TabsList>
-                        <TabsTrigger value="chart">
-                          <BarChart3 className="h-4 w-4 mr-2" />
-                          Charts
-                        </TabsTrigger>
-                        <TabsTrigger value="table">
-                          <Eye className="h-4 w-4 mr-2" />
-                          Tables
-                        </TabsTrigger>
-                      </TabsList>
-                    </Tabs>
-                  </div>
-                </CardHeader>
-                <CardContent>
-                  {selectedView === "chart" ? (
-                    <div className="space-y-6">
-                      {/* Metric selector */}
-                      <div className="flex justify-center">
-                        <Tabs value={selectedMetric} onValueChange={(v) => setSelectedMetric(v as any)}>
-                          <TabsList>
-                            <TabsTrigger value="gwp">GWP</TabsTrigger>
-                            <TabsTrigger value="ubp">UBP</TabsTrigger>
-                            <TabsTrigger value="penre">PEnr</TabsTrigger>
+              {/* Material Analysis Section */}
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 1.0 }}
+              >
+                <Card className="overflow-hidden border-0 shadow-xl">
+                  <CardHeader className="bg-gradient-to-r from-slate-50 via-white to-slate-50 dark:from-slate-800 dark:to-slate-900 border-b border-slate-200 dark:border-slate-700 p-4 sm:p-6 pb-4 sm:pb-6">
+                    <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3 sm:gap-4">
+                      {/* Title Section */}
+                      <div className="flex-shrink-0">
+                        <CardTitle className="text-lg sm:text-xl mb-1 text-slate-900 dark:text-white">Material Breakdown</CardTitle>
+                        <p className="text-slate-600 dark:text-slate-300 text-xs sm:text-sm">Detailed analysis of environmental impact by material</p>
+                      </div>
+
+                      {/* Controls Section - Right aligned on large screens */}
+                      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-3 lg:gap-4 flex-shrink-0 w-full sm:w-auto">
+                        {/* Metric Selector - Only show when Charts tab is active, positioned left on large screens */}
+                        {selectedView === "chart" && (
+                          <motion.div
+                            initial={{ opacity: 0, scale: 0.95 }}
+                            animate={{ opacity: 1, scale: 1 }}
+                            className="flex flex-col w-full sm:w-auto lg:items-center gap-2 order-2 sm:order-1"
+                          >
+                            {/* Metric Toggle */}
+                            <div className="relative flex items-center gap-1 p-1 bg-gradient-to-r from-slate-100 via-slate-50 to-slate-100 dark:from-slate-800 dark:via-slate-900 dark:to-slate-800 rounded-lg border border-slate-200/50 dark:border-slate-700/50 shadow-sm backdrop-blur-sm w-full sm:w-auto">
+                              {[
+                                { value: "gwp" as const, label: "GWP", gradient: "from-orange-500 to-red-500" },
+                                { value: "ubp" as const, label: "UBP", gradient: "from-purple-500 to-pink-500" },
+                                { value: "penre" as const, label: "PEnr", gradient: "from-amber-500 to-orange-500" },
+                              ].map((metric) => (
+                                <button
+                                  key={metric.value}
+                                  onClick={() => setSelectedMetric(metric.value)}
+                                  className={`relative flex-1 sm:flex-initial px-3 sm:px-4 py-2 sm:py-1.5 rounded-md text-xs sm:text-xs font-semibold transition-all duration-300 min-h-[44px] sm:min-h-0 ${selectedMetric === metric.value
+                                    ? "text-white shadow-md transform scale-105"
+                                    : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 hover:bg-white/50 dark:hover:bg-slate-700/30"
+                                    }`}
+                                >
+                                  {selectedMetric === metric.value && (
+                                    <motion.div
+                                      layoutId="selected-metric-bg"
+                                      className={`absolute inset-0 bg-gradient-to-r ${metric.gradient} rounded-md`}
+                                      initial={false}
+                                      transition={{ type: "spring", stiffness: 500, damping: 30 }}
+                                    />
+                                  )}
+                                  <span className="relative z-10 flex items-center justify-center gap-1.5">
+                                    <span>{metric.label}</span>
+                                    {selectedMetric === metric.value && (
+                                      <motion.span
+                                        initial={{ opacity: 0, scale: 0 }}
+                                        animate={{ opacity: 1, scale: 1 }}
+                                        className="w-1 h-1 bg-white rounded-full"
+                                      />
+                                    )}
+                                  </span>
+                                </button>
+                              ))}
+                            </div>
+
+                            {/* Metric Description - Below toggle, hidden on large screens */}
+                            <motion.div
+                              key={selectedMetric}
+                              initial={{ opacity: 0, y: -5 }}
+                              animate={{ opacity: 1, y: 0 }}
+                              transition={{ duration: 0.2 }}
+                              className="text-xs text-slate-500 dark:text-slate-400 text-left lg:hidden w-full"
+                            >
+                              <span className="font-medium">
+                                {selectedMetric === "gwp" && "Global Warming Potential"}
+                                {selectedMetric === "ubp" && "Environmental Impact Points"}
+                                {selectedMetric === "penre" && "Primary Energy Non-Renewable"}
+                              </span>
+                              <span className="text-slate-400 dark:text-slate-500 ml-1">
+                                {selectedMetric === "gwp" && "(kg CO₂ eq)"}
+                                {selectedMetric === "ubp" && "(UBP)"}
+                                {selectedMetric === "penre" && "(kWh oil-eq)"}
+                              </span>
+                            </motion.div>
+                          </motion.div>
+                        )}
+
+                        {/* View Toggle (Charts/Data) */}
+                        <Tabs value={selectedView} onValueChange={(v) => setSelectedView(v as "chart" | "table")} className="order-1 sm:order-2">
+                          <TabsList className="bg-slate-100 dark:bg-white/10 w-full sm:w-auto">
+                            <TabsTrigger value="chart" className="flex-1 sm:flex-initial data-[state=active]:bg-white data-[state=active]:text-slate-900 dark:data-[state=active]:bg-white dark:data-[state=active]:text-slate-900">
+                              <BarChart3 className="h-4 w-4 mr-1.5 sm:mr-2" />
+                              Charts
+                            </TabsTrigger>
+                            <TabsTrigger value="table" className="flex-1 sm:flex-initial data-[state=active]:bg-white data-[state=active]:text-slate-900 dark:data-[state=active]:bg-white dark:data-[state=active]:text-slate-900">
+                              <Eye className="h-4 w-4 mr-1.5 sm:mr-2" />
+                              Data
+                            </TabsTrigger>
                           </TabsList>
                         </Tabs>
                       </div>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="p-4 sm:p-6">
+                    {selectedView === "chart" ? (
+                      <div className="space-y-6">
+                        {/* Charts Grid */}
+                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                          {/* Bar Chart */}
+                          <motion.div
+                            initial={{ opacity: 0, x: -20 }}
+                            animate={{ opacity: 1, x: 0 }}
+                            transition={{ delay: 1.1 }}
+                            className="space-y-4"
+                          >
+                            <div>
+                              <h4 className="font-semibold text-gray-800 dark:text-white">
+                                Top Materials by Impact
+                              </h4>
+                            </div>
+                            <div className="h-[350px] bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-800 dark:to-slate-900 rounded-xl p-4">
+                              <ResponsiveContainer width="100%" height="100%">
+                                <BarChart data={chartData} layout="vertical">
+                                  <CartesianGrid strokeDasharray="3 3" horizontal={true} vertical={false} />
+                                  <XAxis
+                                    type="number"
+                                    tick={{ fontSize: 11 }}
+                                    tickFormatter={formatAxisValue}
+                                  />
+                                  <YAxis
+                                    type="category"
+                                    dataKey="name"
+                                    width={120}
+                                    tick={{ fontSize: 11 }}
+                                    tickFormatter={(value) => value.length > 18 ? value.substring(0, 18) + "..." : value}
+                                  />
+                                  <Tooltip
+                                    content={({ active, payload }) => {
+                                      if (active && payload && payload.length) {
+                                        const data = payload[0].payload;
+                                        return (
+                                          <div className="rounded-xl border bg-white dark:bg-slate-800 p-3 shadow-xl">
+                                            <p className="font-semibold text-sm mb-1">{data.ifcName}</p>
+                                            <div className="space-y-1 text-xs">
+                                              <p className="text-orange-600 dark:text-orange-400 font-medium">
+                                                {getMetricLabel(selectedMetric)}: {formatValue(data.value)}
+                                              </p>
+                                              <p className="text-gray-500">
+                                                Volume: {data.volume.toFixed(2)} m³
+                                              </p>
+                                            </div>
+                                          </div>
+                                        );
+                                      }
+                                      return null;
+                                    }}
+                                  />
+                                  <Bar dataKey="value" radius={[0, 4, 4, 0]}>
+                                    {chartData.map((entry, index) => (
+                                      <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                                    ))}
+                                  </Bar>
+                                </BarChart>
+                              </ResponsiveContainer>
+                            </div>
+                          </motion.div>
 
-                      {/* Charts */}
-                      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                        {/* Bar Chart */}
-                        <div className="space-y-2">
-                          <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                            Top 10 Materials by {getMetricLabel(selectedMetric)}
-                          </h4>
-                          <div className="h-[400px]">
-                            <ResponsiveContainer width="100%" height="100%">
-                              <BarChart data={chartData}>
-                                <CartesianGrid strokeDasharray="3 3" />
-                                <XAxis
-                                  dataKey="name"
-                                  angle={-45}
-                                  textAnchor="end"
-                                  height={100}
-                                  interval={0}
-                                  tick={{ fontSize: 12 }}
-                                />
-                                <YAxis
-                                  tick={{ fontSize: 12 }}
-                                  tickFormatter={formatAxisValue}
-                                />
-                                <Tooltip
-                                  content={({ active, payload }) => {
-                                    if (active && payload && payload.length) {
-                                      const data = payload[0].payload;
+                          {/* Pie Chart */}
+                          <motion.div
+                            initial={{ opacity: 0, x: 20 }}
+                            animate={{ opacity: 1, x: 0 }}
+                            transition={{ delay: 1.2 }}
+                            className="space-y-4"
+                          >
+                            <div className="flex items-center justify-between">
+                              <h4 className="font-semibold text-gray-800 dark:text-white">
+                                Impact Distribution
+                              </h4>
+                              <span className="text-xs text-gray-500">Top 5 materials</span>
+                            </div>
+                            <div className="h-[420px] bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-800 dark:to-slate-900 rounded-xl p-6">
+                              <ResponsiveContainer width="100%" height="100%">
+                                <PieChart margin={{ top: 30, right: 30, bottom: 10, left: 30 }}>
+                                  <Pie
+                                    data={pieData}
+                                    dataKey="value"
+                                    nameKey="name"
+                                    cx="50%"
+                                    cy="45%"
+                                    innerRadius={55}
+                                    outerRadius={95}
+                                    paddingAngle={2}
+                                    label={({ cx, cy, midAngle, outerRadius, percent }) => {
+                                      const RADIAN = Math.PI / 180;
+                                      const radius = outerRadius + 25;
+                                      const x = cx + radius * Math.cos(-midAngle * RADIAN);
+                                      const y = cy + radius * Math.sin(-midAngle * RADIAN);
                                       return (
-                                        <div className="rounded-lg border bg-background p-2 shadow-md">
-                                          <p className="font-semibold">{data.name}</p>
-                                          <p className="text-sm">
-                                            {getMetricLabel(selectedMetric)}: {formatValue(data.value)}
-                                          </p>
-                                          <p className="text-sm text-muted-foreground">
-                                            Volume: {data.volume.toFixed(2)} m³
-                                          </p>
-                                        </div>
+                                        <text
+                                          x={x}
+                                          y={y}
+                                          fill="currentColor"
+                                          textAnchor={x > cx ? 'start' : 'end'}
+                                          dominantBaseline="central"
+                                          className="text-sm font-semibold fill-gray-700 dark:fill-gray-300"
+                                        >
+                                          {`${(percent * 100).toFixed(0)}%`}
+                                        </text>
                                       );
-                                    }
-                                    return null;
-                                  }}
-                                />
-                                <Bar dataKey="value" radius={[4, 4, 0, 0]}>
-                                  {chartData.map((entry, index) => (
-                                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                                  ))}
-                                </Bar>
-                              </BarChart>
-                            </ResponsiveContainer>
-                          </div>
-                        </div>
-
-                        {/* Pie Chart */}
-                        <div className="space-y-2">
-                          <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                            Distribution by {getMetricLabel(selectedMetric)}
-                          </h4>
-                          <div className="h-[400px]">
-                            <ResponsiveContainer width="100%" height="100%">
-                              <PieChart>
-                                <Pie
-                                  data={pieData}
-                                  dataKey="value"
-                                  nameKey="name"
-                                  cx="50%"
-                                  cy="50%"
-                                  outerRadius={120}
-                                  label={({ percent }) => `${(percent * 100).toFixed(1)}%`}
-                                  labelLine={false}
-                                >
-                                  {pieData.map((entry, index) => (
-                                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                                  ))}
-                                </Pie>
-                                <Tooltip
-                                  content={({ active, payload }) => {
-                                    if (active && payload && payload.length) {
-                                      const data = payload[0].payload;
-                                      return (
-                                        <div className="rounded-lg border bg-background p-2 shadow-md">
-                                          <p className="font-semibold">{data.name}</p>
-                                          <p className="text-sm">
-                                            {getMetricLabel(selectedMetric)}: {formatValue(data.value)}
-                                          </p>
-                                        </div>
-                                      );
-                                    }
-                                    return null;
-                                  }}
-                                />
-                                <Legend
-                                  verticalAlign="bottom"
-                                  height={36}
-                                  formatter={(value) => value.length > 20 ? value.substring(0, 20) + "..." : value}
-                                />
-                              </PieChart>
-                            </ResponsiveContainer>
-                          </div>
+                                    }}
+                                    labelLine={{ stroke: 'currentColor', strokeWidth: 1, className: 'stroke-gray-400 dark:stroke-gray-500' }}
+                                  >
+                                    {pieData.map((entry, index) => (
+                                      <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                                    ))}
+                                  </Pie>
+                                  <Tooltip
+                                    content={({ active, payload }) => {
+                                      if (active && payload && payload.length) {
+                                        const data = payload[0].payload;
+                                        return (
+                                          <div className="rounded-xl border bg-white dark:bg-slate-800 p-3 shadow-xl">
+                                            <p className="font-semibold text-sm">{data.ifcName}</p>
+                                            <p className="text-xs text-orange-600 dark:text-orange-400">
+                                              {formatValue(data.value)} {selectedMetric === 'gwp' ? 'kg CO₂' : selectedMetric === 'ubp' ? 'UBP' : 'kWh'}
+                                            </p>
+                                          </div>
+                                        );
+                                      }
+                                      return null;
+                                    }}
+                                  />
+                                  <Legend
+                                    verticalAlign="bottom"
+                                    height={50}
+                                    formatter={(value) => (
+                                      <span className="text-xs">{value.length > 15 ? value.substring(0, 15) + "..." : value}</span>
+                                    )}
+                                  />
+                                </PieChart>
+                              </ResponsiveContainer>
+                            </div>
+                          </motion.div>
                         </div>
                       </div>
-                    </div>
-                  ) : (
-                    <div className="space-y-6">
-                      <Tabs defaultValue="materials" className="w-full">
-                        <TabsList className="grid w-full grid-cols-2">
-                          <TabsTrigger value="materials">Materials</TabsTrigger>
-                          <TabsTrigger value="elements">Elements</TabsTrigger>
-                        </TabsList>
-                        <TabsContent value="materials" className="mt-6">
-                          <DataTable
-                            columns={materialsColumns}
-                            data={materials.map(m => ({
-                              ...m,
-                              material: {
-                                ...m.material,
-                                density: m.material.density ?? 0 // Provide default value of 0 if density is undefined
-                              }
-                            }))}
-                          />
-                        </TabsContent>
-                        <TabsContent value="elements" className="mt-6">
-                          <DataTable columns={elementsColumns} data={elements} />
-                        </TabsContent>
-                      </Tabs>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
+                    ) : (
+                      <motion.div
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        className="space-y-6"
+                      >
+                        <Tabs defaultValue="materials" className="w-full">
+                          <TabsList className="grid w-full grid-cols-2 max-w-md mx-auto">
+                            <TabsTrigger value="materials">
+                              <Package className="h-4 w-4 mr-2" />
+                              Materials ({materials.length})
+                            </TabsTrigger>
+                            <TabsTrigger value="elements">
+                              <Building2 className="h-4 w-4 mr-2" />
+                              Elements ({elements.length})
+                            </TabsTrigger>
+                          </TabsList>
+                          <TabsContent value="materials" className="mt-6">
+                            <DataTable
+                              columns={materialsColumns}
+                              data={materials.map(m => ({
+                                ...m,
+                                material: {
+                                  ...m.material,
+                                  density: m.material.density ?? 0
+                                }
+                              }))}
+                            />
+                          </TabsContent>
+                          <TabsContent value="elements" className="mt-6">
+                            <DataTable columns={elementsColumns} data={elements} />
+                          </TabsContent>
+                        </Tabs>
+                      </motion.div>
+                    )}
+                  </CardContent>
+                </Card>
+              </motion.div>
 
               {/* CTA */}
               <motion.div
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.3 }}
+                transition={{ delay: 1.3 }}
               >
-                <Card className="bg-gradient-to-r from-orange-600 to-purple-600 text-white overflow-hidden relative">
-                  <motion.div
-                    className="absolute inset-0 bg-white/10"
-                    animate={{
-                      backgroundImage: [
-                        "radial-gradient(circle at 20% 50%, transparent 0%, transparent 50%, white 50%, white 60%, transparent 60%)",
-                        "radial-gradient(circle at 80% 50%, transparent 0%, transparent 50%, white 50%, white 60%, transparent 60%)",
-                        "radial-gradient(circle at 20% 50%, transparent 0%, transparent 50%, white 50%, white 60%, transparent 60%)",
-                      ],
-                    }}
-                    transition={{
-                      duration: 4,
-                      repeat: Infinity,
-                      ease: "easeInOut",
-                    }}
-                  />
-                  <CardContent className="p-12 text-center relative z-10">
-                    <h2 className="text-4xl font-bold mb-4">
-                      Ready to Transform Your Life Cycle Analysis?
+                <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-violet-600 via-purple-600 to-fuchsia-600 p-10 md:p-14 text-white shadow-2xl">
+                  {/* Decorative elements */}
+                  <div className="absolute top-0 left-0 w-72 h-72 bg-white/10 rounded-full blur-3xl -translate-x-1/2 -translate-y-1/2" />
+                  <div className="absolute bottom-0 right-0 w-96 h-96 bg-fuchsia-400/20 rounded-full blur-3xl translate-x-1/3 translate-y-1/3" />
+
+                  <div className="relative z-10 max-w-3xl mx-auto text-center">
+                    <motion.div
+                      initial={{ scale: 0 }}
+                      animate={{ scale: 1 }}
+                      transition={{ type: "spring", delay: 1.4 }}
+                      className="inline-flex items-center gap-2 px-4 py-2 bg-white/20 backdrop-blur-sm rounded-full text-sm mb-6"
+                    >
+                      <Sparkles className="h-4 w-4" />
+                      Save your results & unlock more
+                    </motion.div>
+
+                    <h2 className="text-3xl md:text-4xl lg:text-5xl font-bold mb-4">
+                      Ready for Professional LCA?
                     </h2>
-                    <p className="text-xl mb-8 opacity-90">
-                      Create a free account to save your results and unlock advanced features.
+                    <p className="text-lg md:text-xl opacity-90 mb-8 max-w-xl mx-auto">
+                      Create a free account to save projects, collaborate with your team, and export detailed reports.
                     </p>
-                    <Link href="/sign-up">
-                      <Button
-                        size="lg"
-                        className="bg-white text-orange-600 hover:bg-gray-100 shadow-xl px-8 py-6 text-lg"
-                      >
-                        Create Free Account
-                        <ArrowRight className="ml-2 h-5 w-5" />
-                      </Button>
-                    </Link>
-                  </CardContent>
-                </Card>
+
+                    <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
+                      <Link href="/sign-up">
+                        <Button
+                          size="lg"
+                          className="bg-white text-purple-600 hover:bg-gray-100 shadow-xl px-8 py-6 text-lg font-semibold"
+                        >
+                          Get Started Free
+                          <ArrowRight className="ml-2 h-5 w-5" />
+                        </Button>
+                      </Link>
+                      <Link href="/features">
+                        <Button
+                          size="lg"
+                          variant="outline"
+                          className="border-white/50 bg-white/10 text-white hover:bg-white/20 px-8 py-6 text-lg backdrop-blur-sm"
+                        >
+                          Learn More
+                        </Button>
+                      </Link>
+                    </div>
+                  </div>
+                </div>
               </motion.div>
             </motion.div>
           )}

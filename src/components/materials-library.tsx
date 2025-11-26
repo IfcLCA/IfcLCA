@@ -572,11 +572,11 @@ export function MaterialLibraryComponent() {
         // Fallback to old field names if new density field not available
         if (newDensity === currentDensity || newDensity === 0) {
           newDensity =
-            typeof kbobMaterial["kg/unit"] === "number"
-              ? kbobMaterial["kg/unit"]
-              : hasDensityRange
-                ? ((kbobMaterial["min density"] || 0) + (kbobMaterial["max density"] || 0)) / 2
-                : currentDensity;
+          typeof kbobMaterial["kg/unit"] === "number"
+            ? kbobMaterial["kg/unit"]
+            : hasDensityRange
+              ? ((kbobMaterial["min density"] || 0) + (kbobMaterial["max density"] || 0)) / 2
+              : currentDensity;
         }
 
         return {
