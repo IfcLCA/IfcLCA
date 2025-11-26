@@ -88,39 +88,34 @@ export class MaterialService {
     });
   }
 
+  /**
+   * Parses a density value that can be a number, string, or other type.
+   * Returns the parsed number or null if invalid.
+   */
+  private static parseDensityValue(value: unknown): number | null {
+    if (value === null || value === undefined) return null;
+    if (typeof value === "number" && !isNaN(value)) return value;
+    if (typeof value === "string" && value !== "" && value !== "-") {
+      const parsed = parseFloat(value);
+      if (!isNaN(parsed)) return parsed;
+    }
+    return null;
+  }
+
   private static calculateDensityFromKBOB(kbobMaterial: IKBOBMaterial): number {
     // First try the new API density field
-    if (kbobMaterial.density !== null && kbobMaterial.density !== undefined) {
-      if (typeof kbobMaterial.density === "number" && !isNaN(kbobMaterial.density)) {
-        return kbobMaterial.density;
-      }
-      if (typeof kbobMaterial.density === "string" && kbobMaterial.density !== "" && kbobMaterial.density !== "-") {
-        const parsed = parseFloat(kbobMaterial.density);
-        if (!isNaN(parsed)) {
-          return parsed;
-        }
-      }
-    }
+    const density = this.parseDensityValue(kbobMaterial.density);
+    if (density !== null) return density;
 
-    // Use kg/unit if available (handle both number and string)
-    const kgPerUnit = kbobMaterial["kg/unit"];
-    if (typeof kgPerUnit === "number" && !isNaN(kgPerUnit)) {
-      return kgPerUnit;
-    }
-    if (typeof kgPerUnit === "string") {
-      const parsed = parseFloat(kgPerUnit);
-      if (!isNaN(parsed)) {
-        return parsed;
-      }
-    }
+    // Use kg/unit if available
+    const kgPerUnit = this.parseDensityValue(kbobMaterial["kg/unit"]);
+    if (kgPerUnit !== null) return kgPerUnit;
 
-    if (
-      typeof kbobMaterial["min density"] === "number" &&
-      typeof kbobMaterial["max density"] === "number" &&
-      !isNaN(kbobMaterial["min density"]) &&
-      !isNaN(kbobMaterial["max density"])
-    ) {
-      return (kbobMaterial["min density"] + kbobMaterial["max density"]) / 2;
+    // Calculate from min/max density
+    const minDensity = this.parseDensityValue(kbobMaterial["min density"]);
+    const maxDensity = this.parseDensityValue(kbobMaterial["max density"]);
+    if (minDensity !== null && maxDensity !== null) {
+      return (minDensity + maxDensity) / 2;
     }
 
     return 0;
@@ -315,38 +310,18 @@ export class MaterialService {
     if (!kbobMaterial) return null;
 
     // First try the new API density field
-    if (kbobMaterial.density !== null && kbobMaterial.density !== undefined) {
-      if (typeof kbobMaterial.density === "number" && !isNaN(kbobMaterial.density)) {
-        return kbobMaterial.density;
-      }
-      if (typeof kbobMaterial.density === "string" && kbobMaterial.density !== "" && kbobMaterial.density !== "-") {
-        const parsed = parseFloat(kbobMaterial.density);
-        if (!isNaN(parsed)) {
-          return parsed;
-        }
-      }
-    }
+    const density = this.parseDensityValue(kbobMaterial.density);
+    if (density !== null) return density;
 
-    // Use kg/unit if available (handle both number and string)
-    const kgPerUnit = kbobMaterial["kg/unit"];
-    if (typeof kgPerUnit === "number" && !isNaN(kgPerUnit)) {
-      return kgPerUnit;
-    }
-    if (typeof kgPerUnit === "string") {
-      const parsed = parseFloat(kgPerUnit);
-      if (!isNaN(parsed)) {
-        return parsed;
-      }
-    }
+    // Use kg/unit if available
+    const kgPerUnit = this.parseDensityValue(kbobMaterial["kg/unit"]);
+    if (kgPerUnit !== null) return kgPerUnit;
 
     // Calculate from min/max density
-    if (
-      typeof kbobMaterial["min density"] === "number" &&
-      typeof kbobMaterial["max density"] === "number" &&
-      !isNaN(kbobMaterial["min density"]) &&
-      !isNaN(kbobMaterial["max density"])
-    ) {
-      return (kbobMaterial["min density"] + kbobMaterial["max density"]) / 2;
+    const minDensity = this.parseDensityValue(kbobMaterial["min density"]);
+    const maxDensity = this.parseDensityValue(kbobMaterial["max density"]);
+    if (minDensity !== null && maxDensity !== null) {
+      return (minDensity + maxDensity) / 2;
     }
 
     return null;

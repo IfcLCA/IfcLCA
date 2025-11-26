@@ -72,7 +72,7 @@ export default function OpenSourcePhilosophyPage() {
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 transition={{ duration: 0.8 }}
-                className="relative py-20 px-4 overflow-hidden"
+                className="relative py-12 md:py-16 px-4 overflow-hidden"
             >
                 {/* Background decoration */}
                 <div className="absolute inset-0">
@@ -141,8 +141,7 @@ export default function OpenSourcePhilosophyPage() {
                 <motion.div
                     variants={containerVariants}
                     initial="hidden"
-                    whileInView="visible"
-                    viewport={{ once: true }}
+                    animate="visible"
                     className="max-w-4xl mx-auto"
                 >
                     {/* Introduction */}
