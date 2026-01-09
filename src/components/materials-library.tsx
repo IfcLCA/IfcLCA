@@ -41,6 +41,8 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import confetti from "canvas-confetti";
 import { CheckIcon } from "@radix-ui/react-icons";
+import { LcaSourceSelector, LcaSourceBadge } from "@/components/lca-source-selector";
+import type { LcaDataSource, LcaMaterialSearchResult } from "@/lib/types/lca";
 
 interface Material {
   id: string;
@@ -60,6 +62,19 @@ interface Material {
     gwpTotal?: number | null;
     ubp21Total?: number | null;
     primaryEnergyNonRenewableTotal?: number | null;
+  };
+  // New multi-source LCA match
+  lcaMatch?: {
+    source: LcaDataSource;
+    materialId: string;
+    sourceId: string;
+    name: string;
+    matchedAt: Date;
+    indicators?: {
+      gwp: number;
+      ubp?: number | null;
+      penre?: number | null;
+    };
   };
   projects?: string[];
   originalIds?: string[];
@@ -91,8 +106,24 @@ interface Project {
 // Add this new type for auto-suggested matches
 interface AutoSuggestedMatch {
   kbobId: string;
+  lcaMaterialId?: string; // For new multi-source matches
+  source?: LcaDataSource;
   score: number;
   name: string;
+}
+
+// Unified LCA material type for multi-source support
+interface LcaMaterial {
+  id: string;
+  sourceId: string;
+  source: LcaDataSource;
+  name: string;
+  nameDE?: string;
+  category?: string;
+  density: number | null;
+  gwp: number | null;
+  ubp?: number | null;
+  penre?: number | null;
 }
 
 export function MaterialLibraryComponent() {
@@ -139,6 +170,12 @@ export function MaterialLibraryComponent() {
   );
   // Track confetti display across sessions without causing re-renders
   const hasShownConfettiRef = useRef(false);
+
+  // Multi-source LCA support
+  const [lcaSource, setLcaSource] = useState<LcaDataSource>("kbob");
+  const [lcaMaterials, setLcaMaterials] = useState<LcaMaterial[]>([]);
+  const lcaListRef = useRef<HTMLDivElement>(null);
+  const lcaFuseRef = useRef<Fuse<LcaMaterial> | null>(null);
 
   useEffect(() => {
     try {
@@ -343,6 +380,45 @@ export function MaterialLibraryComponent() {
     fetchData();
   }, []);
 
+  // Fetch LCA materials when source changes
+  useEffect(() => {
+    async function fetchLcaMaterials() {
+      try {
+        const response = await fetch(`/api/lca-materials?source=${lcaSource}`);
+        if (response.ok) {
+          const data = await response.json();
+          setLcaMaterials(data.materials || []);
+
+          // Initialize Fuse for LCA materials
+          if (data.materials?.length > 0) {
+            lcaFuseRef.current = new Fuse(data.materials, {
+              keys: ["name", "nameDE"],
+              threshold: 0.8,
+              ignoreLocation: true,
+              findAllMatches: true,
+              getFn: (obj, path) => {
+                const value = Fuse.config.getFn(obj, path);
+                if (!value) return "";
+                return value
+                  .toString()
+                  .toLowerCase()
+                  .normalize("NFKD")
+                  .replace(/[\u0300-\u036f]/g, "")
+                  .replace(/[^a-z0-9\s]/g, " ")
+                  .replace(/\s+/g, " ")
+                  .trim();
+              },
+            });
+          }
+        }
+      } catch (error) {
+        console.error(`Error fetching ${lcaSource} materials:`, error);
+      }
+    }
+
+    fetchLcaMaterials();
+  }, [lcaSource]);
+
   const filteredAndSortedMaterials = useMemo(() => {
     // Ensure materials is an array
     const materialsList = Array.isArray(materials) ? materials : [];
@@ -453,16 +529,31 @@ export function MaterialLibraryComponent() {
 
       // Convert changes into the format expected by the API
       const matchPromises = changesWithDensity.map(async (change) => {
+        // Detect if this is a new-style LCA match (prefixed ID) or legacy KBOB match
+        const isLcaMatch = change.newMatch.id?.startsWith("KBOB_") ||
+                           change.newMatch.id?.startsWith("OKOBAU_") ||
+                           change.newMatch.id?.startsWith("OPENEPD_");
+
+        const body = isLcaMatch
+          ? {
+              materialIds: [change.materialId],
+              lcaMaterialId: change.newMatch.id,
+              source: change.newMatch.id?.split("_")[0]?.toLowerCase(),
+              density: change.selectedDensity || change.newMatch.Density,
+            }
+          : {
+              // Legacy KBOB match (MongoDB ObjectId)
+              materialIds: [change.materialId],
+              kbobMaterialId: change.newMatch.id,
+              density: change.selectedDensity || change.newMatch.Density,
+            };
+
         const response = await fetch("/api/materials/match", {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
           },
-          body: JSON.stringify({
-            materialIds: [change.materialId],
-            kbobMaterialId: change.newMatch.id,
-            density: change.selectedDensity || change.newMatch.Density,
-          }),
+          body: JSON.stringify(body),
         });
 
         if (!response.ok) {
@@ -531,76 +622,113 @@ export function MaterialLibraryComponent() {
     const elementCounts = await elementCountsResponse.json();
 
     return Object.entries(matchesToUse)
-      .map(([materialId, kbobId]) => {
+      .map(([materialId, matchId]) => {
         const material = materials.find((m) => m.id === materialId);
-        const kbobMaterial = kbobMaterials.find((m) => m._id === kbobId);
-        if (!material || !kbobMaterial) return null;
+        if (!material) return null;
 
-        // Get affected projects with both id and name for navigation
+        // Detect if this is a new LCA match (prefixed ID) or legacy KBOB match
+        const isLcaMatch = matchId.startsWith("KBOB_") ||
+                           matchId.startsWith("OKOBAU_") ||
+                           matchId.startsWith("OPENEPD_");
+
+        // Find the matched material from the appropriate source
+        let matchedMaterial: {
+          id: string;
+          name: string;
+          density: number;
+          gwp?: number;
+          ubp?: number | null;
+          penre?: number | null;
+          hasDensityRange?: boolean;
+          minDensity?: number;
+          maxDensity?: number;
+        } | null = null;
+
+        if (isLcaMatch) {
+          // Find in LCA materials
+          const lcaMat = lcaMaterials.find((m) => m.id === matchId);
+          if (lcaMat) {
+            matchedMaterial = {
+              id: lcaMat.id,
+              name: lcaMat.name,
+              density: lcaMat.density || 0,
+              gwp: lcaMat.gwp || undefined,
+              ubp: lcaMat.ubp,
+              penre: lcaMat.penre,
+            };
+          }
+        } else {
+          // Legacy KBOB match
+          const kbobMaterial = kbobMaterials.find((m) => m._id === matchId);
+          if (kbobMaterial) {
+            const hasDensityRange =
+              typeof kbobMaterial["min density"] === "number" &&
+              typeof kbobMaterial["max density"] === "number";
+
+            let density = 0;
+            if (kbobMaterial.density !== null && kbobMaterial.density !== undefined) {
+              if (typeof kbobMaterial.density === "number" && !isNaN(kbobMaterial.density)) {
+                density = kbobMaterial.density;
+              } else if (typeof kbobMaterial.density === "string" && kbobMaterial.density !== "" && kbobMaterial.density !== "-") {
+                const parsed = parseFloat(kbobMaterial.density);
+                if (!isNaN(parsed)) {
+                  density = parsed;
+                }
+              }
+            }
+            if (density === 0) {
+              density = typeof kbobMaterial["kg/unit"] === "number"
+                ? kbobMaterial["kg/unit"]
+                : hasDensityRange
+                  ? ((kbobMaterial["min density"] || 0) + (kbobMaterial["max density"] || 0)) / 2
+                  : 0;
+            }
+
+            matchedMaterial = {
+              id: kbobMaterial._id,
+              name: kbobMaterial.Name,
+              density,
+              gwp: kbobMaterial.gwpTotal || undefined,
+              ubp: kbobMaterial.ubp21Total,
+              penre: kbobMaterial.primaryEnergyNonRenewableTotal,
+              hasDensityRange,
+              minDensity: hasDensityRange ? (kbobMaterial["min density"] || 0) : undefined,
+              maxDensity: hasDensityRange ? (kbobMaterial["max density"] || 0) : undefined,
+            };
+          }
+        }
+
+        if (!matchedMaterial) return null;
+
+        // Get affected projects
         const affectedProjects = projects.filter((p) =>
           p.materialIds.includes(materialId)
         );
-
-        // Get the first project ID for navigation (assuming one material belongs to one project)
         const projectId = affectedProjects[0]?.id;
-
-        // Get element count from the fetched counts
         const elementCount = elementCounts[materialId] || 0;
-
-        // Get the current material's density from the existing match
         const currentDensity = material.density || 0;
 
-        // Check if material has a density range
-        const hasDensityRange =
-          typeof kbobMaterial["min density"] === "number" &&
-          typeof kbobMaterial["max density"] === "number";
-
-        // Get the new density from the KBOB material
-        // First try the new API density field
-        let newDensity = currentDensity;
-        if (kbobMaterial.density !== null && kbobMaterial.density !== undefined) {
-          if (typeof kbobMaterial.density === "number" && !isNaN(kbobMaterial.density)) {
-            newDensity = kbobMaterial.density;
-          } else if (typeof kbobMaterial.density === "string" && kbobMaterial.density !== "" && kbobMaterial.density !== "-") {
-            const parsed = parseFloat(kbobMaterial.density);
-            if (!isNaN(parsed)) {
-              newDensity = parsed;
-            }
-          }
-        }
-        
-        // Fallback to old field names if new density field not available
-        if (newDensity === currentDensity || newDensity === 0) {
-          newDensity =
-          typeof kbobMaterial["kg/unit"] === "number"
-            ? kbobMaterial["kg/unit"]
-            : hasDensityRange
-              ? ((kbobMaterial["min density"] || 0) + (kbobMaterial["max density"] || 0)) / 2
-              : currentDensity;
-        }
+        // Get old match name from either lcaMatch or kbobMatch
+        const oldMatchName = material.lcaMatch?.name || material.kbobMatch?.Name;
 
         return {
           materialId,
           materialName: material.name,
-          oldMatch: material.kbobMatch
+          oldMatch: oldMatchName
             ? {
-              Name: material.kbobMatch.Name,
+              Name: oldMatchName,
               Density: currentDensity,
               Elements: elementCount,
             }
             : null,
           newMatch: {
-            id: kbobMaterial._id,
-            Name: kbobMaterial.Name,
-            Density: newDensity,
+            id: matchedMaterial.id,
+            Name: matchedMaterial.name,
+            Density: matchedMaterial.density,
             Elements: elementCount,
-            hasDensityRange,
-            minDensity: hasDensityRange
-              ? (kbobMaterial["min density"] || 0)
-              : undefined,
-            maxDensity: hasDensityRange
-              ? (kbobMaterial["max density"] || 0)
-              : undefined,
+            hasDensityRange: matchedMaterial.hasDensityRange,
+            minDensity: matchedMaterial.minDensity,
+            maxDensity: matchedMaterial.maxDensity,
           },
           projects: affectedProjects.map((p) => p.name),
           projectId,
@@ -608,7 +736,7 @@ export function MaterialLibraryComponent() {
         };
       })
       .filter(Boolean);
-  }, [temporaryMatches, materials, kbobMaterials, projects]);
+  }, [temporaryMatches, materials, kbobMaterials, lcaMaterials, projects]);
 
   const handleShowPreview = useCallback(async (matchesToPreview?: Record<string, string>) => {
     setIsMatchingInProgress(true);
@@ -917,6 +1045,35 @@ export function MaterialLibraryComponent() {
       setActiveSearchId(null);
     },
     [selectedMaterials, handleMatch, maybeTriggerMatchConfetti]
+  );
+
+  // Handle matching with unified LCA materials (ÖKOBAUDAT, OpenEPD)
+  const handleLcaMatch = useCallback(
+    (lcaMaterialId: string) => {
+      if (selectedMaterials.length === 0) return;
+
+      // Store the match with lcaMaterialId instead of kbobId
+      setTemporaryMatches((prevMatches) => {
+        const newMatches = { ...prevMatches };
+        selectedMaterials.forEach((id) => {
+          // Store the full LCA material ID (e.g., "OKOBAU_uuid" or "OPENEPD_id")
+          newMatches[id] = lcaMaterialId;
+        });
+        return newMatches;
+      });
+
+      // Trigger confetti for successful match
+      if (selectedMaterials.length >= 3) {
+        maybeTriggerMatchConfetti();
+        setTimeout(maybeTriggerMatchConfetti, 150);
+      } else {
+        maybeTriggerMatchConfetti();
+      }
+
+      setSelectedMaterials([]);
+      setActiveSearchId(null);
+    },
+    [selectedMaterials, maybeTriggerMatchConfetti]
   );
 
   // Get filtered suggestions count based on project selection
@@ -1398,39 +1555,46 @@ export function MaterialLibraryComponent() {
               </div>
             </div>
 
-            {/* Right Column - KBOB Materials */}
+            {/* Right Column - LCA Materials Database */}
             <div className="flex flex-col border rounded-lg overflow-hidden h-full">
               <div className="p-4 border-b bg-secondary/10 flex-shrink-0">
                 <div className="flex items-center justify-between mb-2">
                   <h3 className="font-semibold flex items-center gap-2">
-                    <span>KBOB Materials Database</span>
+                    <span>LCA Materials Database</span>
                     <Badge variant="outline">
-                      {kbobMaterials.length} materials
+                      {lcaSource === "kbob" ? kbobMaterials.length : lcaMaterials.length} materials
                     </Badge>
                   </h3>
-                  <div className="flex items-center gap-2">
-                    <Label
-                      htmlFor="auto-scroll"
-                      className="text-sm text-muted-foreground"
-                    >
-                      Auto-scroll
-                    </Label>
-                    <Switch
-                      id="auto-scroll"
-                      checked={autoScrollEnabled}
-                      onCheckedChange={setAutoScrollEnabled}
+                  <div className="flex items-center gap-4">
+                    <LcaSourceSelector
+                      value={lcaSource}
+                      onChange={setLcaSource}
+                      className="w-[180px]"
                     />
+                    <div className="flex items-center gap-2">
+                      <Label
+                        htmlFor="auto-scroll"
+                        className="text-sm text-muted-foreground"
+                      >
+                        Auto-scroll
+                      </Label>
+                      <Switch
+                        id="auto-scroll"
+                        checked={autoScrollEnabled}
+                        onCheckedChange={setAutoScrollEnabled}
+                      />
+                    </div>
                   </div>
                 </div>
                 <p className="text-sm text-muted-foreground mb-3">
                   {activeSearchId
-                    ? "Select a KBOB material to match with your highlighted Ifc material"
-                    : "First select an Ifc material on the left to match it"}
+                    ? `Select a material from ${lcaSource === "kbob" ? "KBOB" : lcaSource === "okobaudat" ? "ÖKOBAUDAT" : "OpenEPD"} to match with your highlighted IFC material`
+                    : "First select an IFC material on the left to match it"}
                 </p>
                 <div className="flex items-center gap-2">
                   <MagnifyingGlassIcon className="h-4 w-4 text-muted-foreground" />
                   <Input
-                    placeholder="Search KBOB materials..."
+                    placeholder={`Search ${lcaSource === "kbob" ? "KBOB" : lcaSource === "okobaudat" ? "ÖKOBAUDAT" : "OpenEPD"} materials...`}
                     value={kbobSearchTerm}
                     onChange={(e) => setKbobSearchTerm(e.target.value)}
                     className="flex-1"
@@ -1467,9 +1631,10 @@ export function MaterialLibraryComponent() {
                   </div>
                 )}
               </div>
-              <div className="flex-1 overflow-y-auto min-h-0" ref={kbobListRef}>
+              <div className="flex-1 overflow-y-auto min-h-0" ref={lcaSource === "kbob" ? kbobListRef : lcaListRef}>
                 <div className="divide-y">
-                  {sortedKbobMaterials
+                  {/* KBOB Materials (legacy) */}
+                  {lcaSource === "kbob" && sortedKbobMaterials
                     .filter((material) => {
                       if (!material.Name) return false;
                       return normalizeText(material.Name).includes(
@@ -1520,6 +1685,61 @@ export function MaterialLibraryComponent() {
                               <p className="text-sm text-muted-foreground">
                                 PENRE: {getPENRE(material)}
                               </p>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+
+                  {/* Other LCA Sources (ÖKOBAUDAT, OpenEPD) */}
+                  {lcaSource !== "kbob" && lcaMaterials
+                    .filter((material) => {
+                      if (!material.name) return false;
+                      return normalizeText(material.name).includes(
+                        normalizeText(kbobSearchTerm)
+                      );
+                    })
+                    .map((material) => (
+                      <div
+                        key={material.id}
+                        data-lca-id={material.id}
+                        className={`p-4 transition-colors ${selectedMaterials.length > 0
+                          ? "hover:bg-primary/5 cursor-pointer"
+                          : "opacity-75"
+                          }`}
+                        onClick={() => {
+                          if (selectedMaterials.length > 0) {
+                            handleLcaMatch(material.id);
+                          }
+                        }}
+                      >
+                        <div className="flex justify-between items-start gap-4">
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2">
+                              <h3 className="font-medium truncate">
+                                {material.name}
+                              </h3>
+                              <LcaSourceBadge source={material.source} className="text-[10px]" />
+                            </div>
+                            <div className="mt-1 space-y-1">
+                              <p className="text-sm text-muted-foreground">
+                                GWP: {material.gwp?.toFixed(2) ?? "-"} kg CO₂-eq
+                              </p>
+                              {material.ubp !== null && material.ubp !== undefined && (
+                                <p className="text-sm text-muted-foreground">
+                                  UBP: {material.ubp}
+                                </p>
+                              )}
+                              {material.penre !== null && material.penre !== undefined && (
+                                <p className="text-sm text-muted-foreground">
+                                  PENRE: {material.penre?.toFixed(1)} MJ
+                                </p>
+                              )}
+                              {material.density && (
+                                <p className="text-sm text-muted-foreground">
+                                  Density: {material.density} kg/m³
+                                </p>
+                              )}
                             </div>
                           </div>
                         </div>
