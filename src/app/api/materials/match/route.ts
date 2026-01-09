@@ -1,88 +1,211 @@
 import { connectToDatabase } from "@/lib/mongodb";
 import { Element, KBOBMaterial, Material } from "@/models";
 import { getGWP, getUBP, getPENRE } from "@/lib/utils/kbob-indicators";
+import { getLcaService, getMaterialById } from "@/lib/services/lca";
+import { parseLcaMaterialId, type LcaDataSource } from "@/lib/types/lca";
 import mongoose from "mongoose";
 import { NextResponse } from "next/server";
+import { logger } from "@/lib/logger";
 
 export async function POST(request: Request) {
   try {
+    const body = await request.json();
     const {
       materialIds,
+      // New multi-source parameters
+      source,
+      lcaMaterialId,
+      // Legacy KBOB parameter (backward compatibility)
       kbobMaterialId,
       density: userDefinedDensity,
-    } = await request.json();
+    } = body;
+
     await connectToDatabase();
 
-    // First fetch the KBOB material
-    const kbobMaterial = await KBOBMaterial.findById(kbobMaterialId).lean();
+    // Determine if we're using new multi-source or legacy KBOB
+    const isLegacyRequest = kbobMaterialId && !lcaMaterialId;
 
-    if (!kbobMaterial) {
-      return NextResponse.json(
-        { error: "KBOB material not found" },
-        { status: 404 }
-      );
-    }
-
-    // Use user-defined density if provided, otherwise calculate from KBOB material data
     let density = userDefinedDensity;
-    if (!density) {
-      // First try the new API density field
-      if (kbobMaterial.density !== null && kbobMaterial.density !== undefined) {
-        if (typeof kbobMaterial.density === "number" && !isNaN(kbobMaterial.density)) {
-          density = kbobMaterial.density;
-        } else if (typeof kbobMaterial.density === "string" && kbobMaterial.density !== "" && kbobMaterial.density !== "-") {
-          const parsed = parseFloat(kbobMaterial.density);
-          if (!isNaN(parsed)) {
-            density = parsed;
+    let indicators = { gwp: 0, ubp: 0, penre: 0 };
+    let lcaMatch: any = null;
+    let kbobObjectId: mongoose.Types.ObjectId | null = null;
+
+    if (isLegacyRequest) {
+      // Legacy KBOB flow
+      const kbobMaterial = await KBOBMaterial.findById(kbobMaterialId).lean();
+
+      if (!kbobMaterial) {
+        return NextResponse.json(
+          { error: "KBOB material not found" },
+          { status: 404 }
+        );
+      }
+
+      // Extract density from KBOB material
+      if (!density) {
+        if (
+          kbobMaterial.density !== null &&
+          kbobMaterial.density !== undefined
+        ) {
+          if (
+            typeof kbobMaterial.density === "number" &&
+            !isNaN(kbobMaterial.density)
+          ) {
+            density = kbobMaterial.density;
+          } else if (
+            typeof kbobMaterial.density === "string" &&
+            kbobMaterial.density !== "" &&
+            kbobMaterial.density !== "-"
+          ) {
+            const parsed = parseFloat(kbobMaterial.density);
+            if (!isNaN(parsed)) {
+              density = parsed;
+            }
+          }
+        }
+
+        // Fallback to old field names
+        if (!density) {
+          if (
+            kbobMaterial["kg/unit"] &&
+            typeof kbobMaterial["kg/unit"] === "number"
+          ) {
+            density = kbobMaterial["kg/unit"];
+          } else if (
+            kbobMaterial["min density"] &&
+            kbobMaterial["max density"]
+          ) {
+            density =
+              (kbobMaterial["min density"] + kbobMaterial["max density"]) / 2;
           }
         }
       }
 
-      // Fallback to old field names if new density field not available
-      if (!density) {
-        if (
-          kbobMaterial["kg/unit"] &&
-          typeof kbobMaterial["kg/unit"] === "number"
-        ) {
-          density = kbobMaterial["kg/unit"];
-        } else if (kbobMaterial["min density"] && kbobMaterial["max density"]) {
-          density =
-            (kbobMaterial["min density"] + kbobMaterial["max density"]) / 2;
+      if (!density || density === 0) {
+        return NextResponse.json(
+          { error: "Invalid density in KBOB material" },
+          { status: 400 }
+        );
+      }
+
+      indicators = {
+        gwp: getGWP(kbobMaterial),
+        ubp: getUBP(kbobMaterial),
+        penre: getPENRE(kbobMaterial),
+      };
+
+      kbobObjectId = new mongoose.Types.ObjectId(kbobMaterialId);
+
+      // Also create lcaMatch for forward compatibility
+      lcaMatch = {
+        source: "kbob" as LcaDataSource,
+        materialId: `KBOB_${kbobMaterial.uuid}`,
+        sourceId: kbobMaterial.uuid,
+        name: kbobMaterial.Name || kbobMaterial.nameDE || "Unknown",
+        matchedAt: new Date(),
+        indicators: {
+          gwp: indicators.gwp,
+          ubp: indicators.ubp,
+          penre: indicators.penre,
+        },
+      };
+    } else {
+      // New multi-source flow
+      if (!lcaMaterialId) {
+        return NextResponse.json(
+          { error: "lcaMaterialId is required" },
+          { status: 400 }
+        );
+      }
+
+      // Parse the material ID to determine source
+      const parsed = parseLcaMaterialId(lcaMaterialId);
+      if (!parsed) {
+        return NextResponse.json(
+          { error: `Invalid LCA material ID format: ${lcaMaterialId}` },
+          { status: 400 }
+        );
+      }
+
+      const lcaSource = source || parsed.source;
+
+      // Fetch material from appropriate service
+      const lcaMaterial = await getMaterialById(lcaMaterialId);
+
+      if (!lcaMaterial) {
+        return NextResponse.json(
+          { error: `LCA material not found: ${lcaMaterialId}` },
+          { status: 404 }
+        );
+      }
+
+      // Use user density or material density
+      density = userDefinedDensity || lcaMaterial.density;
+
+      if (!density || density === 0) {
+        return NextResponse.json(
+          { error: "Invalid density in LCA material" },
+          { status: 400 }
+        );
+      }
+
+      indicators = {
+        gwp: lcaMaterial.gwp || 0,
+        ubp: lcaMaterial.ubp || 0,
+        penre: lcaMaterial.penre || 0,
+      };
+
+      lcaMatch = {
+        source: lcaSource,
+        materialId: lcaMaterialId,
+        sourceId: parsed.sourceId,
+        name: lcaMaterial.name,
+        matchedAt: new Date(),
+        indicators: {
+          gwp: indicators.gwp,
+          ubp: indicators.ubp || null,
+          penre: indicators.penre || null,
+        },
+      };
+
+      // For KBOB source, also set kbobMatchId for backward compatibility
+      if (lcaSource === "kbob") {
+        const kbobMaterial = await KBOBMaterial.findOne({
+          uuid: parsed.sourceId,
+        }).lean();
+        if (kbobMaterial) {
+          kbobObjectId = kbobMaterial._id as mongoose.Types.ObjectId;
         }
       }
-    }
-
-    if (!density || density === 0) {
-      return NextResponse.json(
-        { error: "Invalid density in KBOB material" },
-        { status: 400 }
-      );
     }
 
     const objectIds = materialIds.map(
       (id: string) => new mongoose.Types.ObjectId(id)
     );
 
-    // Update materials with KBOB match and density
-    await Material.updateMany(
-      { _id: { $in: objectIds } },
-      {
-        $set: {
-          kbobMatchId: new mongoose.Types.ObjectId(kbobMaterialId),
-          density: density,
-          updatedAt: new Date(),
-        },
-      }
-    );
+    // Build update object
+    const updateFields: any = {
+      lcaMatch,
+      density,
+      updatedAt: new Date(),
+    };
 
-    // Find elements that need updating - add batch processing
+    // Include kbobMatchId for KBOB matches (backward compatibility)
+    if (kbobObjectId) {
+      updateFields.kbobMatchId = kbobObjectId;
+    }
+
+    // Update materials with LCA match and density
+    await Material.updateMany({ _id: { $in: objectIds } }, { $set: updateFields });
+
+    // Find elements that need updating
     const batchSize = 500;
     const allElements = await Element.find({
       "materials.material": { $in: objectIds },
     })
       .populate({
         path: "materials.material",
-        select: "_id name kbobMatchId density",
+        select: "_id name kbobMatchId lcaMatch density",
       })
       .lean();
 
@@ -96,7 +219,6 @@ export async function POST(request: Request) {
     let totalMatched = 0;
 
     for (const elementBatch of batches) {
-      // Prepare bulk operations for updating elements
       const bulkOps = elementBatch.map((element) => ({
         updateOne: {
           filter: { _id: element._id },
@@ -110,9 +232,9 @@ export async function POST(request: Request) {
                     volume: mat.volume,
                     fraction: mat.fraction,
                     indicators: {
-                      gwp: mat.volume * density * getGWP(kbobMaterial),
-                      ubp: mat.volume * density * getUBP(kbobMaterial),
-                      penre: mat.volume * density * getPENRE(kbobMaterial),
+                      gwp: mat.volume * density * indicators.gwp,
+                      ubp: mat.volume * density * indicators.ubp,
+                      penre: mat.volume * density * indicators.penre,
                     },
                   };
                 }
@@ -133,36 +255,19 @@ export async function POST(request: Request) {
         totalModified += result.modifiedCount;
         totalMatched += result.matchedCount;
       } catch (error) {
-        console.error("Error in batch:", error);
-        // Continue processing other batches
+        logger.error("Error in batch:", error);
       }
     }
-
-    // Verify updates by sampling elements from different batches
-    const sampleSize = Math.min(5, allElements.length);
-    const sampleIndices = Array.from({ length: sampleSize }, () =>
-      Math.floor(Math.random() * allElements.length)
-    );
-
-    const sampledElements = await Element.find({
-      _id: { $in: sampleIndices.map((i) => allElements[i]._id) },
-    }).lean();
-
-    sampledElements.map((e: any) => ({
-      _id: e._id,
-      materialsCount: e.materials.length,
-      hasIndicators: e.materials.every((m: any) => m.indicators),
-      sampleIndicators: e.materials[0]?.indicators,
-    }));
 
     return NextResponse.json({
       message: "Successfully updated materials and elements",
       totalModified,
       totalMatched,
       totalElements: allElements.length,
+      source: lcaMatch?.source || "kbob",
     });
   } catch (error) {
-    console.error("Error matching materials:", error);
+    logger.error("Error matching materials:", error);
     return NextResponse.json(
       { error: "Failed to match materials" },
       { status: 500 }

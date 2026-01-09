@@ -30,8 +30,13 @@ interface IKBOBMaterial {
   unit?: string;
 }
 
+// Export interface for use in other files
+export type IKBOBMaterialDocument = IKBOBMaterial & mongoose.Document & {
+  _id: mongoose.Types.ObjectId;
+};
+
 interface KBOBMaterialModel extends mongoose.Model<IKBOBMaterial> {
-  findValidMaterials(): Promise<IKBOBMaterial[]>;
+  findValidMaterials(): mongoose.Query<IKBOBMaterialDocument[], IKBOBMaterialDocument>;
 }
 
 const kbobSchema = new mongoose.Schema<IKBOBMaterial, KBOBMaterialModel>(
