@@ -174,6 +174,8 @@ export function MaterialLibraryComponent() {
   // Multi-source LCA support
   const [lcaSource, setLcaSource] = useState<LcaDataSource>("kbob");
   const [lcaMaterials, setLcaMaterials] = useState<LcaMaterial[]>([]);
+  const [lcaSearchTerm, setLcaSearchTerm] = useState("");
+  const [lcaSearchLoading, setLcaSearchLoading] = useState(false);
   const lcaListRef = useRef<HTMLDivElement>(null);
   const lcaFuseRef = useRef<Fuse<LcaMaterial> | null>(null);
 
@@ -380,44 +382,50 @@ export function MaterialLibraryComponent() {
     fetchData();
   }, []);
 
-  // Fetch LCA materials when source changes
+  // Reset LCA search when source changes
   useEffect(() => {
-    async function fetchLcaMaterials() {
+    setLcaSearchTerm("");
+    setLcaMaterials([]);
+    lcaFuseRef.current = null;
+  }, [lcaSource]);
+
+  // Search LCA materials via API (for ÖKOBAUDAT/OpenEPD which don't have bulk data)
+  useEffect(() => {
+    // Skip for KBOB (uses local Fuse search on pre-loaded data)
+    if (lcaSource === "kbob") return;
+
+    // Need at least 2 characters to search
+    if (lcaSearchTerm.length < 2) {
+      setLcaMaterials([]);
+      return;
+    }
+
+    const controller = new AbortController();
+    const timeoutId = setTimeout(async () => {
+      setLcaSearchLoading(true);
       try {
-        const response = await fetch(`/api/lca-materials?source=${lcaSource}`);
+        const response = await fetch(
+          `/api/lca-materials?source=${lcaSource}&q=${encodeURIComponent(lcaSearchTerm)}&limit=50`,
+          { signal: controller.signal }
+        );
         if (response.ok) {
           const data = await response.json();
           setLcaMaterials(data.materials || []);
-
-          // Initialize Fuse for LCA materials
-          if (data.materials?.length > 0) {
-            lcaFuseRef.current = new Fuse(data.materials, {
-              keys: ["name", "nameDE"],
-              threshold: 0.8,
-              ignoreLocation: true,
-              findAllMatches: true,
-              getFn: (obj, path) => {
-                const value = Fuse.config.getFn(obj, path);
-                if (!value) return "";
-                return value
-                  .toString()
-                  .toLowerCase()
-                  .normalize("NFKD")
-                  .replace(/[\u0300-\u036f]/g, "")
-                  .replace(/[^a-z0-9\s]/g, " ")
-                  .replace(/\s+/g, " ")
-                  .trim();
-              },
-            });
-          }
         }
       } catch (error) {
-        console.error(`Error fetching ${lcaSource} materials:`, error);
+        if (error instanceof Error && error.name !== "AbortError") {
+          console.error(`Error searching ${lcaSource} materials:`, error);
+        }
+      } finally {
+        setLcaSearchLoading(false);
       }
-    }
+    }, 300); // 300ms debounce
 
-    fetchLcaMaterials();
-  }, [lcaSource]);
+    return () => {
+      clearTimeout(timeoutId);
+      controller.abort();
+    };
+  }, [lcaSource, lcaSearchTerm]);
 
   const filteredAndSortedMaterials = useMemo(() => {
     // Ensure materials is an array
@@ -1335,7 +1343,16 @@ export function MaterialLibraryComponent() {
                       onClick={() => {
                         handleSelect(material);
                         if (selectedMaterials.length === 0) {
-                          scrollToMatchingKbob(material.name);
+                          if (lcaSource === "kbob") {
+                            scrollToMatchingKbob(material.name);
+                          } else {
+                            // Auto-search for non-KBOB sources using the material name
+                            const searchTerm = material.name
+                              .replace(/[_-]/g, " ")
+                              .replace(/\d+/g, "")
+                              .trim();
+                            setLcaSearchTerm(searchTerm);
+                          }
                         }
                       }}
                     >
@@ -1595,12 +1612,16 @@ export function MaterialLibraryComponent() {
                   <MagnifyingGlassIcon className="h-4 w-4 text-muted-foreground" />
                   <Input
                     placeholder={`Search ${lcaSource === "kbob" ? "KBOB" : lcaSource === "okobaudat" ? "ÖKOBAUDAT" : "OpenEPD"} materials...`}
-                    value={kbobSearchTerm}
-                    onChange={(e) => setKbobSearchTerm(e.target.value)}
+                    value={lcaSource === "kbob" ? kbobSearchTerm : lcaSearchTerm}
+                    onChange={(e) => lcaSource === "kbob" ? setKbobSearchTerm(e.target.value) : setLcaSearchTerm(e.target.value)}
                     className="flex-1"
                   />
+                  {lcaSearchLoading && lcaSource !== "kbob" && (
+                    <div className="animate-spin h-4 w-4 border-2 border-primary border-t-transparent rounded-full" />
+                  )}
                 </div>
-                {kbobSearchTerm.length >= 2 && (
+                {/* KBOB suggestions (only for KBOB source) */}
+                {lcaSource === "kbob" && kbobSearchTerm.length >= 2 && (
                   <div className="flex flex-wrap gap-1 mt-2">
                     {getSuggestions(kbobSearchTerm).map(
                       ({ type, text, id }) => (
@@ -1629,6 +1650,12 @@ export function MaterialLibraryComponent() {
                       )
                     )}
                   </div>
+                )}
+                {/* Search hint for non-KBOB sources */}
+                {lcaSource !== "kbob" && lcaSearchTerm.length === 0 && (
+                  <p className="text-xs text-muted-foreground mt-2">
+                    Type at least 2 characters to search {lcaSource === "okobaudat" ? "ÖKOBAUDAT" : "OpenEPD"} database
+                  </p>
                 )}
               </div>
               <div className="flex-1 overflow-y-auto min-h-0" ref={lcaSource === "kbob" ? kbobListRef : lcaListRef}>
