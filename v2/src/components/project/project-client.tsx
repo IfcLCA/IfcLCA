@@ -110,18 +110,13 @@ export function ProjectClient({
         </div>
       </header>
 
-      {/* Main content */}
-      {!showViewer ? (
-        <div className="flex flex-1 items-center justify-center">
-          <UploadZone projectId={project.id} />
-        </div>
-      ) : (
+      {/* Main content — IfcViewer always mounted so WebGPU renderer initializes early */}
+      {showViewer ? (
         <div className="project-layout flex-1">
-          <div className="project-layout__viewer">
+          <div className="project-layout__viewer relative">
             <IfcViewer />
-            {/* Show upload zone overlay if loading but no model yet */}
-            {modelLoading && !hasModel && (
-              <div className="absolute inset-0 flex items-center justify-center">
+            {!hasModel && (
+              <div className="absolute inset-0 z-10 flex items-center justify-center bg-background/80">
                 <UploadZone projectId={project.id} />
               </div>
             )}
@@ -132,6 +127,14 @@ export function ProjectClient({
           <div className="project-layout__bottom">
             <BottomPanel />
           </div>
+        </div>
+      ) : (
+        <div className="relative flex flex-1 items-center justify-center">
+          {/* Hidden viewer to pre-init WebGPU renderer in background */}
+          <div className="absolute inset-0 -z-10 opacity-0 pointer-events-none">
+            <IfcViewer />
+          </div>
+          <UploadZone projectId={project.id} />
         </div>
       )}
     </div>

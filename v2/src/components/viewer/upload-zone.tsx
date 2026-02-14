@@ -39,32 +39,41 @@ export function UploadZone({ projectId }: UploadZoneProps) {
       setModelError(null);
 
       try {
+        console.log("[UploadZone] File dropped:", file.name, `(${(file.size / 1024 / 1024).toFixed(1)} MB)`);
+
         // Dynamic import to keep ifc-lite out of the initial bundle
+        console.log("[UploadZone] Importing loader...");
         const { loadIfcFile } = await import("@/lib/ifc/loader");
 
         // Read file into buffer
+        console.log("[UploadZone] Reading file into buffer...");
         const arrayBuffer = await file.arrayBuffer();
         const buffer = new Uint8Array(arrayBuffer);
 
         // Wait for the viewer component to initialize the WebGPU renderer.
         // viewerRefs.rendererReady resolves when the renderer calls rendererReadyResolve().
         if (!viewerRefs.renderer) {
+          console.log("[UploadZone] Renderer not ready, waiting (up to 15s)...");
           const timeout = new Promise<never>((_, reject) =>
             setTimeout(
-              () => reject(new Error("WebGPU renderer timed out. Your browser may not support WebGPU.")),
-              10_000
+              () => reject(new Error("WebGPU renderer timed out after 15s. Check browser console for [IfcViewer] logs.")),
+              15_000
             )
           );
           await Promise.race([viewerRefs.rendererReady, timeout]);
+          console.log("[UploadZone] Renderer ready signal received!");
+        } else {
+          console.log("[UploadZone] Renderer already available");
         }
 
         if (!viewerRefs.renderer) {
           throw new Error(
-            "WebGPU renderer not available. Your browser may not support WebGPU."
+            "WebGPU renderer not available after wait. Your browser may not support WebGPU."
           );
         }
 
         // Load IFC: stream geometry → parse data → bridge to app types
+        console.log("[UploadZone] Starting IFC load pipeline...");
         const result = await loadIfcFile(
           buffer,
           viewerRefs.renderer as any,
@@ -72,6 +81,7 @@ export function UploadZone({ projectId }: UploadZoneProps) {
             setLoadProgress(progress);
           }
         );
+        console.log("[UploadZone] IFC loaded:", result.parseResult.stats);
 
         // Store native refs
         viewerRefs.dataStore = result.dataStore;

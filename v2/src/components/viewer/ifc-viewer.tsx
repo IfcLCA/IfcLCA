@@ -38,19 +38,24 @@ export function IfcViewer() {
   // Detect WebGPU support on mount
   useEffect(() => {
     (async () => {
+      console.log("[IfcViewer] Detecting WebGPU support...");
       if (typeof navigator === "undefined" || !("gpu" in navigator)) {
+        console.warn("[IfcViewer] navigator.gpu not available");
         setWebGPUSupported(false);
         return;
       }
       try {
         const gpu = navigator.gpu as GPU | undefined;
         if (!gpu) {
+          console.warn("[IfcViewer] navigator.gpu is falsy");
           setWebGPUSupported(false);
           return;
         }
         const adapter = await gpu.requestAdapter();
+        console.log("[IfcViewer] WebGPU adapter:", adapter ? "found" : "null");
         setWebGPUSupported(adapter !== null);
-      } catch {
+      } catch (err) {
+        console.error("[IfcViewer] WebGPU detection error:", err);
         setWebGPUSupported(false);
       }
     })();
@@ -61,17 +66,22 @@ export function IfcViewer() {
     if (webGPUSupported !== true || !canvasRef.current || initRef.current)
       return;
     initRef.current = true;
+    console.log("[IfcViewer] Initializing renderer...");
 
     let disposed = false;
 
     (async () => {
       try {
+        console.log("[IfcViewer] Importing @ifc-lite/renderer...");
         const { Renderer } = await import("@ifc-lite/renderer");
+        console.log("[IfcViewer] Renderer imported, creating instance...");
         if (disposed) return;
 
         const canvas = canvasRef.current!;
         const renderer = new Renderer(canvas);
+        console.log("[IfcViewer] Calling renderer.init()...");
         await renderer.init();
+        console.log("[IfcViewer] Renderer initialized successfully!");
 
         if (disposed) return;
 
@@ -80,6 +90,7 @@ export function IfcViewer() {
         viewerRefs.canvas = canvas;
 
         // Notify waiting upload zone that renderer is ready
+        console.log("[IfcViewer] Signaling renderer ready to upload zone");
         viewerRefs.rendererReadyResolve?.();
 
         const camera = (renderer as any).camera;
