@@ -1,7 +1,7 @@
 import { auth } from "@clerk/nextjs/server";
 import { redirect, notFound } from "next/navigation";
 import { db } from "@/db";
-import { projects, materials, elements, elementMaterials } from "@/db/schema";
+import { projects, materials } from "@/db/schema";
 import { eq, and } from "drizzle-orm";
 import { ProjectClient } from "@/components/project/project-client";
 

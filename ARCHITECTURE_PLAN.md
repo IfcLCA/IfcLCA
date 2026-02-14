@@ -311,31 +311,23 @@ interface SyncResult {
 | **3D rendering** | None (placeholder) | `@ifc-lite/renderer` (WebGPU) | First-class 3D viewer |
 | **IFC querying** | Custom Python scripts in WASM | `@ifc-lite/query` | Native JS, typed API |
 | **Framework** | Next.js 15 (App Router) | Next.js (App Router) | Keep — works well |
-| **Database** | MongoDB + Mongoose | Consider lighter options (see below) | TBD based on requirements |
+| **Database** | MongoDB + Mongoose | **Turso (libSQL) + Drizzle ORM** | Edge-native SQLite, type-safe ORM, lighter than Mongo |
 | **Auth** | Clerk | Clerk | Keep — works well |
 | **State mgmt** | React hooks + minimal Zustand | Zustand (expanded) | Need shared state for viewer ↔ panels |
 | **Charts** | Recharts | Recharts or similar | Keep or upgrade |
 | **Styling** | Tailwind + Radix | Tailwind + Radix | Keep — works well |
 
-### Database Strategy: Options
+### Database Strategy: Turso (libSQL) + Drizzle ORM (IMPLEMENTED)
 
-**Option A: Keep MongoDB (lower risk)**
-- Replace `KBOBMaterial` collection with generic `LCASource` collection
-- Add `source` discriminator field
-- Keep existing Material/Element/Project models
-- Replace `kbobMatchId` with `lcaMatchId` + `lcaMatchSource`
+We chose **Option C** — Turso (libSQL) for the edge-native SQLite backend with Drizzle ORM for type-safe queries.
 
-**Option B: Hybrid (MongoDB + client-side cache)**
-- MongoDB for projects, materials, elements (server-side persistence)
-- IndexedDB/ifc-lite cache for IFC geometry (client-side, avoids uploading models)
-- Parquet export via `@ifc-lite/export` for data interchange
-
-**Option C: Lighter backend (higher risk, more rewrite)**
-- SQLite/Turso for structured data (projects, materials, matches)
-- S3-compatible storage for cached IFC data
-- Potential for fully client-side with sync
-
-**Recommendation: Option B** — MongoDB handles what it's good at (documents, user data, LCA sources), while ifc-lite handles geometry client-side.
+**Why Turso over MongoDB:**
+- SQLite-compatible — structured relational data (projects → elements → materials) maps naturally
+- Edge-native — runs at Vercel's edge, no cold start penalty
+- Drizzle ORM — fully type-safe queries, migrations, and schema from TypeScript
+- Batch operations with `INSERT...ON CONFLICT DO UPDATE` for efficient syncs
+- Transactions for atomic multi-table writes (upload processing)
+- Lightweight — no separate DB server to manage
 
 ### High-Level Architecture
 
@@ -389,9 +381,10 @@ interface SyncResult {
 │         │                │           └────────────┬───────────┘ │
 │         ▼                ▼                        ▼             │
 │  ┌─────────────────────────────────────────────────────────────┐│
-│  │  MongoDB                                                    ││
+│  │  Turso (libSQL) + Drizzle ORM                               ││
 │  │                                                             ││
-│  │  projects | materials | elements | lca_sources | uploads    ││
+│  │  projects | materials | elements | lca_materials | uploads  ││
+│  │  element_materials (junction table for layers)              ││
 │  └─────────────────────────────────────────────────────────────┘│
 └──────────────────────────────────────────────────────────────────┘
 ```
@@ -400,7 +393,7 @@ interface SyncResult {
 
 ## Part 6: New Data Model
 
-### MongoDB Collections (Redesigned)
+### Drizzle ORM Tables (Implemented — see `v2/src/db/schema.ts`)
 
 #### `projects`
 ```
@@ -767,14 +760,14 @@ This gives us a much better starting point than pure name matching.
 - Next.js (App Router)
 - Tailwind + Radix UI
 - Clerk auth
-- MongoDB (restructured)
-- Privacy-first (no IFC upload to server)
+- Privacy-first (no IFC geometry uploaded to server)
 - Core LCA calculation: `volume × density × indicator`
 
 ### Changes
 - **IfcOpenShell/Pyodide → ifc-lite** (100x smaller, 5x faster, includes 3D)
 - **No 3D viewer → 3D model as centerpiece** (WebGPU)
 - **KBOB-only → pluggable data sources** (adapter pattern)
+- **MongoDB → Turso (libSQL) + Drizzle ORM** (edge-native SQLite)
 - **Multi-page workflow → single-page viewer** with context panels
 - **Table-first UI → model-first UI** with tables as secondary views
 - **Name-only matching → multi-signal matching** (classification, fuzzy, cross-source)

@@ -264,7 +264,9 @@ export class OekobaudatAdapter implements LCADataSourceAdapter {
     const conditions = [eq(lcaMaterials.source, SOURCE_ID)];
 
     if (query) {
-      conditions.push(like(lcaMaterials.name, `%${query}%`));
+      // Escape SQL LIKE wildcards in user input
+      const escaped = query.replace(/[%_]/g, (ch) => `\\${ch}`);
+      conditions.push(like(lcaMaterials.name, `%${escaped}%`));
     }
     if (filters?.category) {
       conditions.push(eq(lcaMaterials.category, filters.category));

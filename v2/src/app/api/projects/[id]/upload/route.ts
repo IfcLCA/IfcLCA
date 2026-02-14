@@ -1,14 +1,81 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import { nanoid } from "nanoid";
+import { z } from "zod";
 import { db } from "@/db";
 import { projects, uploads, materials, elements, elementMaterials } from "@/db/schema";
-import { eq, and } from "drizzle-orm";
-import type { IFCParseResult } from "@/types/ifc";
+import { eq, and, sql } from "drizzle-orm";
 
 interface RouteParams {
   params: Promise<{ id: string }>;
 }
+
+// ---------------------------------------------------------------------------
+// Zod schema — runtime validation for client-supplied parseResult
+// ---------------------------------------------------------------------------
+
+const materialLayerSchema = z.object({
+  name: z.string().min(1),
+  volume: z.number(),
+  fraction: z.number(),
+  thickness: z.number().optional(),
+});
+
+const elementSchema = z.object({
+  guid: z.string().min(1),
+  name: z.string().min(1),
+  type: z.string().min(1),
+  loadBearing: z.boolean().optional().default(false),
+  isExternal: z.boolean().optional().default(false),
+  classification: z
+    .object({
+      system: z.string().optional(),
+      code: z.string().optional(),
+      name: z.string().optional(),
+    })
+    .optional(),
+  materials: z.array(materialLayerSchema),
+  totalVolume: z.number().optional().default(0),
+});
+
+const parseResultSchema = z.object({
+  elements: z.array(elementSchema),
+  materials: z.array(
+    z.object({
+      name: z.string().min(1),
+      totalVolume: z.number(),
+      elementCount: z.number().optional(),
+      elementTypes: z.array(z.string()).optional(),
+    })
+  ),
+  projectInfo: z
+    .object({
+      name: z.string().optional(),
+      schema: z.string().optional(),
+    })
+    .optional(),
+  storeys: z
+    .array(
+      z.object({
+        guid: z.string(),
+        name: z.string(),
+        elevation: z.number(),
+      })
+    )
+    .optional(),
+  stats: z.object({
+    parseTimeMs: z.number(),
+    elementCount: z.number(),
+    materialCount: z.number(),
+    fileSizeBytes: z.number(),
+  }),
+});
+
+type ValidatedParseResult = z.infer<typeof parseResultSchema>;
+
+// ---------------------------------------------------------------------------
+// Route handler
+// ---------------------------------------------------------------------------
 
 export async function POST(request: NextRequest, { params }: RouteParams) {
   const { userId } = await auth();
@@ -29,7 +96,16 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
-  const formData = await request.formData();
+  let formData: FormData;
+  try {
+    formData = await request.formData();
+  } catch {
+    return NextResponse.json(
+      { error: "Invalid form data" },
+      { status: 400 }
+    );
+  }
+
   const file = formData.get("file") as File | null;
   const parseResultJson = formData.get("parseResult") as string | null;
 
@@ -40,10 +116,18 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     );
   }
 
-  let parseResult: IFCParseResult;
+  // Parse + validate with Zod
+  let parseResult: ValidatedParseResult;
   try {
-    parseResult = JSON.parse(parseResultJson);
-  } catch {
+    const raw = JSON.parse(parseResultJson);
+    parseResult = parseResultSchema.parse(raw);
+  } catch (err) {
+    if (err instanceof z.ZodError) {
+      return NextResponse.json(
+        { error: "Invalid parseResult", details: err.issues },
+        { status: 400 }
+      );
+    }
     return NextResponse.json(
       { error: "Invalid parseResult JSON" },
       { status: 400 }
@@ -64,73 +148,123 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
   });
 
   try {
-    // Upsert materials (unique per project + name)
-    const materialIdMap = new Map<string, string>();
+    // Run all inserts inside a transaction for atomicity
+    await db.transaction(async (tx) => {
+      const BATCH_SIZE = 100;
 
-    for (const mat of parseResult.materials) {
-      const matId = nanoid();
-      materialIdMap.set(mat.name, matId);
-
-      // Check if material already exists for this project
-      const [existing] = await db
-        .select({ id: materials.id })
-        .from(materials)
-        .where(
-          and(eq(materials.projectId, projectId), eq(materials.name, mat.name))
-        )
-        .limit(1);
-
-      if (existing) {
-        materialIdMap.set(mat.name, existing.id);
-        await db
-          .update(materials)
-          .set({
-            totalVolume: mat.totalVolume,
-            updatedAt: new Date(),
-          })
-          .where(eq(materials.id, existing.id));
-      } else {
-        await db.insert(materials).values({
-          id: matId,
+      // Batch upsert materials (uses unique index on projectId + name)
+      for (let i = 0; i < parseResult.materials.length; i += BATCH_SIZE) {
+        const batch = parseResult.materials.slice(i, i + BATCH_SIZE);
+        const rows = batch.map((mat) => ({
+          id: nanoid(),
           projectId,
           name: mat.name,
           totalVolume: mat.totalVolume,
-        });
+        }));
+
+        await tx
+          .insert(materials)
+          .values(rows)
+          .onConflictDoUpdate({
+            target: [materials.projectId, materials.name],
+            set: {
+              totalVolume: sql`excluded.total_volume`,
+              updatedAt: new Date(),
+            },
+          });
       }
-    }
 
-    // Insert elements + element-material junctions
-    for (const el of parseResult.elements) {
-      const elementId = nanoid();
+      // Re-fetch material IDs (ON CONFLICT may have kept existing IDs)
+      const existingMats = await tx
+        .select({ id: materials.id, name: materials.name })
+        .from(materials)
+        .where(eq(materials.projectId, projectId));
 
-      await db.insert(elements).values({
-        id: elementId,
-        projectId,
-        uploadId,
-        guid: el.guid,
-        name: el.name,
-        type: el.type,
-        isLoadBearing: el.loadBearing,
-        isExternal: el.isExternal,
-        classificationSystem: el.classification?.system,
-        classificationCode: el.classification?.code,
-        classificationName: el.classification?.name,
-      });
+      const materialIdMap = new Map<string, string>();
+      for (const m of existingMats) {
+        materialIdMap.set(m.name, m.id);
+      }
 
-      for (const mat of el.materials) {
-        const materialId = materialIdMap.get(mat.name);
-        if (!materialId) continue;
-
-        await db.insert(elementMaterials).values({
+      // Batch upsert elements (uses unique index on projectId + guid)
+      for (let i = 0; i < parseResult.elements.length; i += BATCH_SIZE) {
+        const batch = parseResult.elements.slice(i, i + BATCH_SIZE);
+        const rows = batch.map((el) => ({
           id: nanoid(),
-          elementId,
-          materialId,
-          volume: mat.volume,
-          fraction: mat.fraction,
-          thickness: mat.thickness,
-        });
+          projectId,
+          uploadId,
+          guid: el.guid,
+          name: el.name,
+          type: el.type,
+          isLoadBearing: el.loadBearing,
+          isExternal: el.isExternal,
+          classificationSystem: el.classification?.system,
+          classificationCode: el.classification?.code,
+          classificationName: el.classification?.name,
+        }));
+
+        await tx
+          .insert(elements)
+          .values(rows)
+          .onConflictDoUpdate({
+            target: [elements.projectId, elements.guid],
+            set: {
+              name: sql`excluded.name`,
+              type: sql`excluded.type`,
+              uploadId: sql`excluded.upload_id`,
+              isLoadBearing: sql`excluded.is_load_bearing`,
+              isExternal: sql`excluded.is_external`,
+              classificationSystem: sql`excluded.classification_system`,
+              classificationCode: sql`excluded.classification_code`,
+              classificationName: sql`excluded.classification_name`,
+            },
+          });
       }
-    }
+
+      // Re-fetch element IDs
+      const existingEls = await tx
+        .select({ id: elements.id, guid: elements.guid })
+        .from(elements)
+        .where(eq(elements.projectId, projectId));
+
+      const elementIdMap = new Map<string, string>();
+      for (const e of existingEls) {
+        elementIdMap.set(e.guid, e.id);
+      }
+
+      // Batch insert element-material junctions
+      const junctionRows: Array<{
+        id: string;
+        elementId: string;
+        materialId: string;
+        volume: number;
+        fraction: number;
+        thickness?: number;
+      }> = [];
+
+      for (const el of parseResult.elements) {
+        const elementId = elementIdMap.get(el.guid);
+        if (!elementId) continue;
+
+        for (const mat of el.materials) {
+          const materialId = materialIdMap.get(mat.name);
+          if (!materialId) continue;
+
+          junctionRows.push({
+            id: nanoid(),
+            elementId,
+            materialId,
+            volume: mat.volume,
+            fraction: mat.fraction,
+            thickness: mat.thickness,
+          });
+        }
+      }
+
+      for (let i = 0; i < junctionRows.length; i += BATCH_SIZE) {
+        const batch = junctionRows.slice(i, i + BATCH_SIZE);
+        await tx.insert(elementMaterials).values(batch);
+      }
+    });
 
     // Mark upload as complete
     await db

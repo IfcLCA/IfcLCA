@@ -9,8 +9,8 @@
  * All heavy work happens client-side via WASM.
  */
 
-import type { GeometryProcessor, StreamingGeometryEvent, MeshData, CoordinateInfo } from "@ifc-lite/geometry";
-import type { ColumnarParser, IfcDataStore, EntityRef } from "@ifc-lite/parser";
+import type { GeometryProcessor, CoordinateInfo } from "@ifc-lite/geometry";
+import type { IfcDataStore, EntityRef } from "@ifc-lite/parser";
 import type { Renderer } from "@ifc-lite/renderer";
 import { bridgeToParseResult } from "./bridge";
 import type { IFCParseResult } from "@/types/ifc";

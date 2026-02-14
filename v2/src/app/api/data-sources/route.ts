@@ -8,16 +8,26 @@ export async function GET() {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const sources = registry.listInfo();
+  try {
+    const sources = registry.listInfo();
 
-  // Add last sync time for each source
-  const sourcesWithSync = await Promise.all(
-    sources.map(async (info) => {
-      const adapter = registry.get(info.id);
-      const lastSynced = await adapter.getLastSyncTime();
-      return { ...info, lastSynced };
-    })
-  );
+    // Add last sync time for each source
+    const sourcesWithSync = await Promise.all(
+      sources.map(async (info) => {
+        const adapter = registry.get(info.id);
+        const lastSynced = await adapter.getLastSyncTime();
+        return { ...info, lastSynced };
+      })
+    );
 
-  return NextResponse.json({ sources: sourcesWithSync });
+    return NextResponse.json({ sources: sourcesWithSync });
+  } catch (err) {
+    return NextResponse.json(
+      {
+        error: "Failed to load data sources",
+        details: err instanceof Error ? err.message : String(err),
+      },
+      { status: 500 }
+    );
+  }
 }

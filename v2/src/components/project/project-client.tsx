@@ -31,6 +31,7 @@ export function ProjectClient({
     parseResult,
     modelLoading,
     setProject,
+    setMaterials,
     matchedCount,
     totalMaterialCount,
   } = useAppStore();
@@ -42,6 +43,29 @@ export function ProjectClient({
       preferredDataSource: project.preferredDataSource ?? "kbob",
     });
   }, [project, setProject]);
+
+  // Hydrate store with server-side materials (match state, etc.)
+  useEffect(() => {
+    if (serverMaterials.length > 0) {
+      const hydrated = serverMaterials.map((m) => ({
+        name: m.name,
+        totalVolume: m.totalVolume ?? 0,
+        elementCount: 0,
+        elementTypes: [] as string[],
+        dbId: m.id,
+        match: m.lcaMaterialId
+          ? {
+              lcaMaterialId: m.lcaMaterialId,
+              source: m.matchSource ?? "",
+              sourceId: m.matchSourceId ?? "",
+              method: m.matchMethod ?? "manual",
+              score: m.matchScore ?? 1,
+            }
+          : undefined,
+      }));
+      setMaterials(hydrated);
+    }
+  }, [serverMaterials, setMaterials]);
 
   const hasModel = parseResult !== null;
   const showViewer = hasModel || modelLoading;
