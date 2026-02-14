@@ -4,6 +4,9 @@ import { registry } from "@/lib/lca/registry";
 
 export const dynamic = "force-dynamic";
 
+/** Track in-flight auto-sync to avoid duplicates */
+let autoSyncPromise: Promise<void> | null = null;
+
 export async function GET(request: NextRequest) {
   const { userId } = await auth();
   if (!userId) {
@@ -20,6 +23,29 @@ export async function GET(request: NextRequest) {
   }
 
   try {
+    // Auto-sync: if a specific source has never been synced, sync now before searching
+    if (source && registry.has(source)) {
+      const adapter = registry.get(source);
+      const lastSync = await adapter.getLastSyncTime();
+      if (!lastSync) {
+        console.log(`[search] No ${source} data found — auto-syncing...`);
+        if (!autoSyncPromise) {
+          autoSyncPromise = adapter
+            .sync()
+            .then((r) =>
+              console.log(`[search] Auto-sync done: ${r.added} materials`)
+            )
+            .catch((err) =>
+              console.error(`[search] Auto-sync failed:`, err)
+            )
+            .finally(() => {
+              autoSyncPromise = null;
+            });
+        }
+        await autoSyncPromise;
+      }
+    }
+
     let results;
 
     if (source) {
@@ -29,11 +55,9 @@ export async function GET(request: NextRequest) {
           { status: 400 }
         );
       }
-      // Search a specific data source
       const adapter = registry.get(source);
       results = await adapter.search(query, { category });
     } else {
-      // Search all sources
       results = await registry.searchAll(query, { category });
     }
 

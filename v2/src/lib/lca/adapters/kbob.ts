@@ -71,19 +71,13 @@ function parseKbobDensity(raw: string | number | null): number | null {
 }
 
 function isValidKbobMaterial(m: KbobApiMaterial): boolean {
-  const hasIndicators =
-    m.gwpTotal != null &&
-    m.ubp21Total != null &&
-    m.primaryEnergyNonRenewableTotal != null;
+  // Require at least one environmental indicator with a non-zero value
+  const hasAnyIndicator =
+    (m.gwpTotal != null && m.gwpTotal !== 0) ||
+    (m.ubp21Total != null && m.ubp21Total !== 0) ||
+    (m.primaryEnergyNonRenewableTotal != null && m.primaryEnergyNonRenewableTotal !== 0);
 
-  if (!hasIndicators) return false;
-
-  const hasNonZero =
-    (m.gwpTotal ?? 0) !== 0 ||
-    (m.ubp21Total ?? 0) !== 0 ||
-    (m.primaryEnergyNonRenewableTotal ?? 0) !== 0;
-
-  return hasNonZero && parseKbobDensity(m.density) !== null;
+  return hasAnyIndicator && !!m.nameDE;
 }
 
 function normalizeApiMaterial(

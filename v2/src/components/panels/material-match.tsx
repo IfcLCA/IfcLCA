@@ -10,6 +10,8 @@ import {
   Check,
   Loader2,
   Database,
+  RefreshCw,
+  AlertCircle,
 } from "lucide-react";
 import type { NormalizedMaterial } from "@/types/lca";
 
@@ -36,9 +38,13 @@ export function MaterialMatch() {
     (m) => m.name === selectedMaterialName
   );
 
+  const [searchError, setSearchError] = useState<string | null>(null);
+  const [syncing, setSyncing] = useState(false);
+
   const handleSearch = useCallback(async (searchQuery: string) => {
     if (!searchQuery.trim()) return;
     setLoading(true);
+    setSearchError(null);
 
     try {
       const params = new URLSearchParams({
@@ -46,14 +52,43 @@ export function MaterialMatch() {
         source: activeDataSource,
       });
       const res = await fetch(`/api/materials/search?${params}`);
+      const data = await res.json();
       if (res.ok) {
-        const data = await res.json();
         setResults(data.materials ?? []);
+      } else {
+        setSearchError(data.details || data.error || `Search failed (${res.status})`);
       }
+    } catch (err) {
+      setSearchError(err instanceof Error ? err.message : "Network error");
     } finally {
       setLoading(false);
     }
   }, [activeDataSource]);
+
+  const handleSync = useCallback(async () => {
+    setSyncing(true);
+    setSearchError(null);
+    try {
+      const res = await fetch("/api/data-sources/sync", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ source: activeDataSource }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setSearchError(data.details || data.error || "Sync failed");
+        return;
+      }
+      // Re-search after sync
+      if (query.trim()) {
+        await handleSearch(query);
+      }
+    } catch (err) {
+      setSearchError(err instanceof Error ? err.message : "Sync failed");
+    } finally {
+      setSyncing(false);
+    }
+  }, [activeDataSource, query, handleSearch]);
 
   // Auto-search when material is selected
   useEffect(() => {
@@ -186,7 +221,7 @@ export function MaterialMatch() {
             size="sm"
             variant="outline"
             onClick={() => handleSearch(query)}
-            disabled={loading}
+            disabled={loading || syncing}
           >
             {loading ? (
               <Loader2 className="h-4 w-4 animate-spin" />
@@ -203,12 +238,29 @@ export function MaterialMatch() {
 
       {/* Results */}
       <div className="flex-1 overflow-y-auto">
-        {results.length === 0 && !loading && (
-          <div className="flex flex-col items-center justify-center p-8 text-center">
-            <Search className="mb-3 h-8 w-8 text-muted-foreground/30" />
+        {searchError && !loading && (
+          <div className="flex flex-col items-center justify-center gap-3 p-8 text-center">
+            <AlertCircle className="h-8 w-8 text-destructive/60" />
+            <p className="text-sm text-destructive">{searchError}</p>
+            <Button size="sm" variant="outline" onClick={handleSync} disabled={syncing}>
+              {syncing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-2 h-4 w-4" />}
+              Sync {activeDataSource.toUpperCase()} data
+            </Button>
+          </div>
+        )}
+
+        {!searchError && results.length === 0 && !loading && (
+          <div className="flex flex-col items-center justify-center gap-3 p-8 text-center">
+            <Search className="mb-1 h-8 w-8 text-muted-foreground/30" />
             <p className="text-sm text-muted-foreground">
               {query ? "No results found" : "Search for LCA materials"}
             </p>
+            {query && (
+              <Button size="sm" variant="outline" onClick={handleSync} disabled={syncing}>
+                {syncing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-2 h-4 w-4" />}
+                Sync {activeDataSource.toUpperCase()} database
+              </Button>
+            )}
           </div>
         )}
 
