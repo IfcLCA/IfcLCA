@@ -223,6 +223,7 @@ export const useAppStore = create<AppState>((set) => ({
               match: match ?? undefined,
               matchedMaterial: matchedMaterial ?? undefined,
               density: matchedMaterial?.density ?? m.density,
+              indicators: matchedMaterial?.indicators ?? m.indicators,
             }
           : m
       );

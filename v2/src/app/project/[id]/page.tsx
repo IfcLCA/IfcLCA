@@ -1,7 +1,7 @@
 import { auth } from "@clerk/nextjs/server";
 import { redirect, notFound } from "next/navigation";
 import { db } from "@/db";
-import { projects, materials } from "@/db/schema";
+import { projects, materials, lcaMaterials } from "@/db/schema";
 import { eq, and } from "drizzle-orm";
 import { ProjectClient } from "@/components/project/project-client";
 
@@ -25,15 +25,23 @@ export default async function ProjectPage({ params }: PageProps) {
 
   if (!project) notFound();
 
+  // Fetch materials with their LCA match data (left join)
   const projectMaterials = await db
-    .select()
+    .select({
+      material: materials,
+      lcaMaterial: lcaMaterials,
+    })
     .from(materials)
+    .leftJoin(lcaMaterials, eq(materials.lcaMaterialId, lcaMaterials.id))
     .where(eq(materials.projectId, id));
 
   return (
     <ProjectClient
       project={project}
-      materials={projectMaterials}
+      materials={projectMaterials.map((row) => row.material)}
+      lcaMaterials={projectMaterials
+        .filter((row) => row.lcaMaterial !== null)
+        .map((row) => row.lcaMaterial!)}
     />
   );
 }

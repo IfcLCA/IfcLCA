@@ -12,6 +12,7 @@ import {
   Database,
   RefreshCw,
   AlertCircle,
+  X,
 } from "lucide-react";
 import type { NormalizedMaterial } from "@/types/lca";
 
@@ -182,11 +183,37 @@ export function MaterialMatch() {
         {/* Current match */}
         {currentMaterial?.match && (
           <div className="mt-3 rounded-lg border border-green-200 bg-green-50 p-3 dark:border-green-900 dark:bg-green-950/30">
-            <div className="flex items-center gap-2">
-              <Check className="h-4 w-4 text-green-600" />
-              <span className="text-sm font-medium text-green-800 dark:text-green-300">
-                Currently matched
-              </span>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Check className="h-4 w-4 text-green-600" />
+                <span className="text-sm font-medium text-green-800 dark:text-green-300">
+                  Currently matched
+                </span>
+              </div>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-6 w-6 p-0 text-red-500 hover:bg-red-100 hover:text-red-700 dark:hover:bg-red-950"
+                title="Remove match"
+                onClick={async () => {
+                  if (!selectedMaterialName || !project) return;
+                  updateMaterialMatch(selectedMaterialName, null, null);
+                  try {
+                    await fetch("/api/materials/unmatch", {
+                      method: "POST",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({
+                        projectId: project.id,
+                        materialName: selectedMaterialName,
+                      }),
+                    });
+                  } catch (err) {
+                    console.error("Failed to unmatch:", err);
+                  }
+                }}
+              >
+                <X className="h-3.5 w-3.5" />
+              </Button>
             </div>
             <p className="mt-1 text-xs text-green-700 dark:text-green-400">
               {currentMaterial.matchedMaterial?.name}

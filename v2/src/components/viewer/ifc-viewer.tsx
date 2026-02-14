@@ -7,15 +7,12 @@ import { AlertCircle } from "lucide-react";
 /**
  * IFC 3D viewer component — integrates ifc-lite Renderer with WebGPU.
  *
- * Lifecycle:
- * 1. Mount → detect WebGPU → create <canvas>, init Renderer, store in viewerRefs
- * 2. Model loaded → meshes are already streamed in by the loader
- * 3. Click → pick() → resolve expressId → selectElement(guid)
- * 4. Hover → pick() → resolve expressId → setHoveredElement(guid)
- * 5. Unmount → dispose renderer
- *
- * The render loop runs on RAF and only re-renders when the camera moves
- * or selection/visibility state changes.
+ * Camera controls:
+ * - Left-click drag → orbit
+ * - Right-click / middle-click / Shift+left drag → pan
+ * - Scroll wheel → zoom (towards mouse)
+ * - Click → pick element
+ * - Ctrl/Cmd+click → toggle multi-select
  */
 export function IfcViewer() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -25,6 +22,12 @@ export function IfcViewer() {
   const animFrameRef = useRef<number>(0);
   const initRef = useRef(false);
   const [webGPUSupported, setWebGPUSupported] = useState<boolean | null>(null);
+
+  // Camera drag state — refs so we don't trigger re-renders
+  const isDraggingRef = useRef(false);
+  const isPanningRef = useRef(false);
+  const lastMouseRef = useRef({ x: 0, y: 0 });
+  const didDragRef = useRef(false);
 
   const {
     parseResult,
@@ -95,6 +98,11 @@ export function IfcViewer() {
 
         const camera = (renderer as any).camera;
         cameraRef.current = camera;
+
+        // ----------------------------------------------------------
+        // Camera controls: orbit, pan, zoom
+        // ----------------------------------------------------------
+        setupCameraControls(canvas, renderer, cameraRef, isDraggingRef, isPanningRef, lastMouseRef, didDragRef);
 
         // Start render loop
         let lastTime = performance.now();
@@ -206,9 +214,12 @@ export function IfcViewer() {
     });
   }, [selectedElementIds]);
 
-  // Handle click → pick
+  // Handle click → pick (only if user didn't drag)
   const handleClick = useCallback(
     async (e: React.MouseEvent<HTMLCanvasElement>) => {
+      // If the user dragged the mouse, don't pick
+      if (didDragRef.current) return;
+
       const r = rendererRef.current as any;
       if (!r) return;
 
@@ -234,10 +245,13 @@ export function IfcViewer() {
     [selectElement, toggleElementSelection, deselectAll]
   );
 
-  // Handle mouse move → hover (throttled)
+  // Handle mouse move → hover (throttled, only when not dragging)
   const lastHoverRef = useRef(0);
   const handleMouseMove = useCallback(
     async (e: React.MouseEvent<HTMLCanvasElement>) => {
+      // Don't hover-pick while dragging camera
+      if (isDraggingRef.current) return;
+
       const now = Date.now();
       if (now - lastHoverRef.current < 50) return; // 20fps throttle
       lastHoverRef.current = now;
@@ -316,11 +330,105 @@ export function IfcViewer() {
         onClick={handleClick}
         onMouseMove={handleMouseMove}
         className="h-full w-full"
-        style={{ touchAction: "none" }}
+        style={{ touchAction: "none", cursor: "grab" }}
       />
       <LoadingOverlay />
     </div>
   );
+}
+
+// ---------------------------------------------------------------------------
+// Camera controls setup — orbit, pan, zoom
+// ---------------------------------------------------------------------------
+
+function setupCameraControls(
+  canvas: HTMLCanvasElement,
+  renderer: any,
+  cameraRef: React.MutableRefObject<unknown>,
+  isDraggingRef: React.MutableRefObject<boolean>,
+  isPanningRef: React.MutableRefObject<boolean>,
+  lastMouseRef: React.MutableRefObject<{ x: number; y: number }>,
+  didDragRef: React.MutableRefObject<boolean>,
+) {
+  const camera = (renderer as any).camera;
+
+  const DRAG_THRESHOLD = 4; // px — movement under this is a click, not a drag
+
+  // Mouse down — start drag
+  const onMouseDown = (e: MouseEvent) => {
+    isDraggingRef.current = true;
+    didDragRef.current = false;
+    // Middle click (1), right click (2), or shift+left = pan
+    isPanningRef.current = e.button === 1 || e.button === 2 || e.shiftKey;
+    lastMouseRef.current = { x: e.clientX, y: e.clientY };
+    canvas.style.cursor = isPanningRef.current ? "move" : "grabbing";
+  };
+
+  // Mouse move — orbit or pan
+  const onMouseMove = (e: MouseEvent) => {
+    if (!isDraggingRef.current) return;
+
+    const deltaX = e.clientX - lastMouseRef.current.x;
+    const deltaY = e.clientY - lastMouseRef.current.y;
+
+    // Check if we've moved enough to consider it a drag
+    if (!didDragRef.current && (Math.abs(deltaX) > DRAG_THRESHOLD || Math.abs(deltaY) > DRAG_THRESHOLD)) {
+      didDragRef.current = true;
+    }
+
+    lastMouseRef.current = { x: e.clientX, y: e.clientY };
+
+    const cam = cameraRef.current as any;
+    if (!cam) return;
+
+    if (isPanningRef.current) {
+      cam.pan(deltaX, deltaY);
+    } else {
+      cam.orbit(deltaX, deltaY);
+    }
+
+    renderer.render();
+  };
+
+  // Mouse up — stop drag
+  const onMouseUp = () => {
+    isDraggingRef.current = false;
+    isPanningRef.current = false;
+    canvas.style.cursor = "grab";
+  };
+
+  // Mouse leave — stop drag
+  const onMouseLeave = () => {
+    isDraggingRef.current = false;
+    isPanningRef.current = false;
+  };
+
+  // Scroll wheel — zoom towards mouse position
+  const onWheel = (e: WheelEvent) => {
+    e.preventDefault();
+
+    const cam = cameraRef.current as any;
+    if (!cam) return;
+
+    const rect = canvas.getBoundingClientRect();
+    const mouseX = e.clientX - rect.left;
+    const mouseY = e.clientY - rect.top;
+
+    cam.zoom(e.deltaY, false, mouseX, mouseY, canvas.width, canvas.height);
+    renderer.render();
+  };
+
+  // Prevent context menu on right-click
+  const onContextMenu = (e: Event) => e.preventDefault();
+
+  canvas.addEventListener("mousedown", onMouseDown);
+  canvas.addEventListener("mousemove", onMouseMove);
+  canvas.addEventListener("mouseup", onMouseUp);
+  canvas.addEventListener("mouseleave", onMouseLeave);
+  canvas.addEventListener("wheel", onWheel, { passive: false });
+  canvas.addEventListener("contextmenu", onContextMenu);
+
+  canvas.style.cursor = "grab";
 }
 
 function LoadingOverlay() {
