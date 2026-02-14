@@ -13,6 +13,7 @@ import { ViewerToolbar } from "@/components/viewer/toolbar";
 import { ContextPanel } from "@/components/panels/context-panel";
 import { BottomPanel } from "@/components/panels/bottom-panel";
 import type { projects, materials } from "@/db/schema";
+import type { MatchMethod } from "@/types/lca";
 
 type Project = typeof projects.$inferSelect;
 type Material = typeof materials.$inferSelect;
@@ -58,8 +59,9 @@ export function ProjectClient({
               lcaMaterialId: m.lcaMaterialId,
               source: m.matchSource ?? "",
               sourceId: m.matchSourceId ?? "",
-              method: m.matchMethod ?? "manual",
+              method: (m.matchMethod ?? "manual") as MatchMethod,
               score: m.matchScore ?? 1,
+              matchedAt: m.matchedAt ?? new Date(),
             }
           : undefined,
       }));
