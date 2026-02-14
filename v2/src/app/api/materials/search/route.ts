@@ -20,7 +20,13 @@ export async function GET(request: NextRequest) {
   try {
     let results;
 
-    if (source && registry.has(source)) {
+    if (source) {
+      if (!registry.has(source)) {
+        return NextResponse.json(
+          { error: `Unknown data source: "${source}". Available: ${registry.listIds().join(", ")}` },
+          { status: 400 }
+        );
+      }
       // Search a specific data source
       const adapter = registry.get(source);
       results = await adapter.search(query, { category });

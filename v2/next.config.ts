@@ -42,6 +42,16 @@ const nextConfig: NextConfig = {
         ],
       },
       {
+        // Immutable cache for Next.js static assets (JS/CSS/fonts)
+        source: "/_next/static/:path*",
+        headers: [
+          {
+            key: "Cache-Control",
+            value: "public, max-age=31536000, immutable",
+          },
+        ],
+      },
+      {
         // SharedArrayBuffer headers scoped to viewer routes only.
         // Using "credentialless" so Clerk's cross-origin auth iframes still load.
         source: "/project/:path*",

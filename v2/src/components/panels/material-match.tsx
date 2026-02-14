@@ -10,7 +10,6 @@ import {
   Check,
   Loader2,
   Database,
-  Zap,
 } from "lucide-react";
 import type { NormalizedMaterial } from "@/types/lca";
 
@@ -32,7 +31,6 @@ export function MaterialMatch() {
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<NormalizedMaterial[]>([]);
   const [loading, setLoading] = useState(false);
-  const [autoMatching, setAutoMatching] = useState(false);
 
   const currentMaterial = materials.find(
     (m) => m.name === selectedMaterialName
@@ -68,37 +66,57 @@ export function MaterialMatch() {
   async function handleSelectMatch(lcaMaterial: NormalizedMaterial) {
     if (!selectedMaterialName || !project) return;
 
-    // Update local state immediately
-    updateMaterialMatch(
-      selectedMaterialName,
-      {
-        lcaMaterialId: lcaMaterial.id,
-        sourceId: lcaMaterial.sourceId,
-        source: lcaMaterial.source,
-        score: 1.0,
-        method: "manual",
-        matchedAt: new Date(),
-      },
-      lcaMaterial
+    // Save previous state for rollback
+    const previousMaterial = materials.find(
+      (m) => m.name === selectedMaterialName
     );
+    const previousMatch = previousMaterial?.match;
+    const previousMatchedMaterial = previousMaterial?.matchedMaterial;
 
-    // Persist to server
-    await fetch("/api/materials/match", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        projectId: project.id,
-        materialName: selectedMaterialName,
-        lcaMaterialId: lcaMaterial.id,
-        source: lcaMaterial.source,
-        sourceId: lcaMaterial.sourceId,
-        method: "manual",
-        score: 1.0,
-      }),
-    });
+    // Update local state immediately (optimistic)
+    const matchData = {
+      lcaMaterialId: lcaMaterial.id,
+      sourceId: lcaMaterial.sourceId,
+      source: lcaMaterial.source,
+      score: 1.0,
+      method: "manual" as const,
+      matchedAt: new Date(),
+    };
+    updateMaterialMatch(selectedMaterialName, matchData, lcaMaterial);
 
-    // Go back to element view
-    setContextPanelMode("element");
+    try {
+      // Persist to server
+      const res = await fetch("/api/materials/match", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          projectId: project.id,
+          materialName: selectedMaterialName,
+          lcaMaterialId: lcaMaterial.id,
+          source: lcaMaterial.source,
+          sourceId: lcaMaterial.sourceId,
+          method: "manual",
+          score: 1.0,
+        }),
+      });
+
+      if (!res.ok) {
+        throw new Error(`Server returned ${res.status}`);
+      }
+
+      // Go back to element view
+      setContextPanelMode("element");
+    } catch (err) {
+      console.error("Failed to persist material match:", err);
+      // Revert optimistic update
+      if (previousMatch && previousMatchedMaterial) {
+        updateMaterialMatch(
+          selectedMaterialName,
+          previousMatch,
+          previousMatchedMaterial
+        );
+      }
+    }
   }
 
   return (

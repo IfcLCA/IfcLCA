@@ -65,7 +65,10 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
   if (body.areaValue !== undefined) updateData.areaValue = body.areaValue;
   if (body.amortization !== undefined) updateData.amortization = body.amortization;
 
-  await db.update(projects).set(updateData).where(eq(projects.id, id));
+  await db
+    .update(projects)
+    .set(updateData)
+    .where(and(eq(projects.id, id), eq(projects.userId, userId)));
 
   return NextResponse.json({ success: true });
 }
@@ -89,7 +92,9 @@ export async function DELETE(_request: NextRequest, { params }: RouteParams) {
   }
 
   // Cascade delete handles related records
-  await db.delete(projects).where(eq(projects.id, id));
+  await db
+    .delete(projects)
+    .where(and(eq(projects.id, id), eq(projects.userId, userId)));
 
   return NextResponse.json({ success: true });
 }

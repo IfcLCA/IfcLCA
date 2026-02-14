@@ -75,6 +75,13 @@ export async function loadIfcFile(
 ): Promise<LoadResult> {
   const startTime = performance.now();
 
+  // Get a clean ArrayBuffer that exactly matches the Uint8Array bounds.
+  // buffer.buffer may be larger if the Uint8Array is a view into a shared buffer.
+  const arrayBuffer =
+    buffer.byteOffset === 0 && buffer.byteLength === buffer.buffer.byteLength
+      ? buffer.buffer
+      : buffer.buffer.slice(buffer.byteOffset, buffer.byteOffset + buffer.byteLength);
+
   // Phase 1: Stream geometry → 3D model visible fast
   onProgress?.({
     phase: "geometry",
@@ -92,7 +99,7 @@ export async function loadIfcFile(
     message: "Processing geometry...",
   });
 
-  for await (const event of gp.processAdaptive(buffer.buffer as ArrayBuffer)) {
+  for await (const event of gp.processAdaptive(arrayBuffer)) {
     switch (event.type) {
       case "batch":
         renderer.addMeshes(event.meshes, true);
@@ -125,20 +132,17 @@ export async function loadIfcFile(
     message: "Parsing IFC data model...",
   });
 
-  const { ColumnarParser: CP } = await import("@ifc-lite/parser");
+  const { ColumnarParser: CP, IfcParser } = await import("@ifc-lite/parser");
   const parser = new CP();
 
-  // Build entity refs from the buffer for the columnar parser
-  const { IfcParser } = await import("@ifc-lite/parser");
+  // Quick index scan to get entity refs for the columnar parser
   const indexParser = new IfcParser();
-
-  // Quick index scan to get entity refs
-  const quickResult = indexParser.parse();
+  const quickResult = indexParser.parse(arrayBuffer);
   const entityRefs: EntityRef[] = Array.from(
     quickResult.entityIndex.byId.values()
   );
 
-  const dataStore = await parser.parseLite(buffer.buffer as ArrayBuffer, entityRefs, {
+  const dataStore = await parser.parseLite(arrayBuffer, entityRefs, {
     onProgress: (p: { phase: string; percent: number }) => {
       onProgress?.({
         phase: "parsing",
