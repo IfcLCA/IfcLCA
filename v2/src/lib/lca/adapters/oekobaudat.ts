@@ -209,27 +209,66 @@ export class OekobaudatAdapter implements LCADataSourceAdapter {
     let hasMore = true;
 
     while (hasMore) {
-      const response = await fetch(
-        `${listUrl}&startIndex=${pageNumber * 500}`,
-        {
-          headers: { Accept: "application/json" },
-          signal: AbortSignal.timeout(60_000),
-        }
-      );
-
-      if (!response.ok) {
-        throw new Error(
-          `Ökobaudat API error: ${response.status} ${response.statusText}`
+      let response: Response;
+      try {
+        response = await fetch(
+          `${listUrl}&startIndex=${pageNumber * 500}`,
+          {
+            headers: { Accept: "application/json" },
+            signal: AbortSignal.timeout(60_000),
+          }
         );
+      } catch (err) {
+        console.error(`[oekobaudat] List fetch failed (page ${pageNumber}):`, err);
+        break;
       }
 
-      const data: OekobaudatListResponse = await response.json();
+      if (!response.ok) {
+        console.error(`[oekobaudat] API error: ${response.status} ${response.statusText}`);
+        break;
+      }
 
-      for (const item of data.data) {
-        const detail = await this.fetchProcessDetail(item.uuid);
-        if (detail) {
-          allMaterials.push(normalizeProcess(detail));
+      // Validate response is JSON before parsing
+      const contentType = response.headers.get("content-type") ?? "";
+      let data: OekobaudatListResponse;
+      try {
+        const text = await response.text();
+        if (!contentType.includes("json") && !text.startsWith("{") && !text.startsWith("[")) {
+          console.error("[oekobaudat] List response is not JSON:", text.slice(0, 200));
+          break;
         }
+        data = JSON.parse(text);
+      } catch (err) {
+        console.error("[oekobaudat] Failed to parse list JSON:", err);
+        break;
+      }
+
+      if (!data.data || !Array.isArray(data.data)) {
+        console.error("[oekobaudat] Unexpected list response shape");
+        break;
+      }
+
+      // Insert basic materials from list (name + uuid) — no individual detail fetches
+      // This gets us searchable materials quickly without 1000s of API calls.
+      // Detailed indicators can be fetched on-demand later.
+      for (const item of data.data) {
+        allMaterials.push({
+          id: "",
+          sourceId: item.uuid,
+          source: SOURCE_ID,
+          name: item.name,
+          nameOriginal: item.name,
+          category: item.classification ?? "Uncategorized",
+          density: null,
+          unit: "kg",
+          indicators: {},
+          metadata: {
+            version: "current",
+            lastSynced: new Date(),
+            scope: "A1-A3",
+            standard: "EN 15804+A2",
+          },
+        });
       }
 
       hasMore = data.data.length === 500;
@@ -251,7 +290,15 @@ export class OekobaudatAdapter implements LCADataSourceAdapter {
         }
       );
       if (!response.ok) return null;
-      return (await response.json()) as OekobaudatProcess;
+
+      // Validate response is actually JSON
+      const contentType = response.headers.get("content-type") ?? "";
+      const text = await response.text();
+      if (!contentType.includes("json") && !text.startsWith("{") && !text.startsWith("[")) {
+        console.warn("[oekobaudat] Detail response not JSON for", uuid);
+        return null;
+      }
+      return JSON.parse(text) as OekobaudatProcess;
     } catch {
       return null;
     }

@@ -140,8 +140,9 @@ export function MaterialMatch() {
         throw new Error(`Server returned ${res.status}`);
       }
 
-      // Go back to element view
-      setContextPanelMode("element");
+      // Go back: element view if an element is selected, otherwise summary
+      const state = useAppStore.getState();
+      setContextPanelMode(state.selectedElementIds.size > 0 ? "element" : "summary");
     } catch (err) {
       console.error("Failed to persist material match:", err);
       // Revert optimistic update — clear the match if this was a first-time
