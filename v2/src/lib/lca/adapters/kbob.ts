@@ -2,9 +2,13 @@
  * KBOB data source adapter.
  *
  * Connects to the Swiss lcadata.ch API and normalizes KBOB materials
- * into the generic NormalizedMaterial format.
+ * into the generic NormalizedMaterial format. Persists to Turso via Drizzle.
  */
 
+import { eq, and, like, gte, lte, desc, sql } from "drizzle-orm";
+import { nanoid } from "nanoid";
+import { db } from "@/db";
+import { lcaMaterials } from "@/db/schema";
 import type {
   LCADataSourceAdapter,
   DataSourceInfo,
@@ -13,8 +17,6 @@ import type {
   SyncResult,
   IndicatorKey,
 } from "@/types/lca";
-import { LCASourceModel } from "@/lib/db/models/lca-source";
-import { connectDB } from "@/lib/db/connect";
 
 // ---------------------------------------------------------------------------
 // KBOB API types (source-specific, not exported)
@@ -44,10 +46,10 @@ interface KbobApiMaterial {
 // Constants
 // ---------------------------------------------------------------------------
 
-const KBOB_SOURCE_ID = "kbob";
+const SOURCE_ID = "kbob";
 
-const KBOB_INFO: DataSourceInfo = {
-  id: KBOB_SOURCE_ID,
+const INFO: DataSourceInfo = {
+  id: SOURCE_ID,
   name: "KBOB",
   region: "CH",
   url: "https://www.lcadata.ch",
@@ -56,8 +58,6 @@ const KBOB_INFO: DataSourceInfo = {
   availableIndicators: ["gwpTotal", "penreTotal", "ubp"] as IndicatorKey[],
   requiresAuth: true,
 };
-
-const SYNC_BATCH_SIZE = 100;
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -70,14 +70,30 @@ function parseKbobDensity(raw: string | number | null): number | null {
   return !isNaN(parsed) && parsed > 0 ? parsed : null;
 }
 
-function normalizeKbobMaterial(
+function isValidKbobMaterial(m: KbobApiMaterial): boolean {
+  const hasIndicators =
+    m.gwpTotal != null &&
+    m.ubp21Total != null &&
+    m.primaryEnergyNonRenewableTotal != null;
+
+  if (!hasIndicators) return false;
+
+  const hasNonZero =
+    (m.gwpTotal ?? 0) !== 0 ||
+    (m.ubp21Total ?? 0) !== 0 ||
+    (m.primaryEnergyNonRenewableTotal ?? 0) !== 0;
+
+  return hasNonZero && parseKbobDensity(m.density) !== null;
+}
+
+function normalizeApiMaterial(
   api: KbobApiMaterial,
   version: string
 ): NormalizedMaterial {
   return {
-    id: "", // Set by the DB layer on insert
+    id: "",
     sourceId: api.uuid,
-    source: KBOB_SOURCE_ID,
+    source: SOURCE_ID,
     name: api.nameDE,
     nameOriginal: api.nameDE,
     category: api.group || "Uncategorized",
@@ -98,33 +114,39 @@ function normalizeKbobMaterial(
   };
 }
 
-function isValidKbobMaterial(m: KbobApiMaterial): boolean {
-  const hasIndicators =
-    m.gwpTotal !== null &&
-    m.gwpTotal !== undefined &&
-    m.ubp21Total !== null &&
-    m.ubp21Total !== undefined &&
-    m.primaryEnergyNonRenewableTotal !== null &&
-    m.primaryEnergyNonRenewableTotal !== undefined;
-
-  if (!hasIndicators) return false;
-
-  const hasNonZero =
-    (m.gwpTotal ?? 0) !== 0 ||
-    (m.ubp21Total ?? 0) !== 0 ||
-    (m.primaryEnergyNonRenewableTotal ?? 0) !== 0;
-
-  const hasDensity = parseKbobDensity(m.density) !== null;
-
-  return hasNonZero && hasDensity;
+/** Convert a Drizzle row to NormalizedMaterial */
+function rowToNormalized(row: typeof lcaMaterials.$inferSelect): NormalizedMaterial {
+  return {
+    id: row.id,
+    sourceId: row.sourceId,
+    source: row.source,
+    name: row.name,
+    nameOriginal: row.nameOriginal ?? undefined,
+    category: row.category ?? "Uncategorized",
+    categoryOriginal: row.categoryOriginal ?? undefined,
+    density: row.density,
+    unit: row.unit ?? "kg",
+    indicators: {
+      gwpTotal: row.gwpTotal,
+      penreTotal: row.penreTotal,
+      ubp: row.ubp,
+    },
+    metadata: {
+      version: row.version ?? "unknown",
+      lastSynced: row.lastSynced,
+      validUntil: row.validUntil ?? undefined,
+      scope: row.scope ?? undefined,
+      standard: row.standard ?? undefined,
+    },
+  };
 }
 
 // ---------------------------------------------------------------------------
-// Adapter implementation
+// Adapter
 // ---------------------------------------------------------------------------
 
 export class KBOBAdapter implements LCADataSourceAdapter {
-  info = KBOB_INFO;
+  info = INFO;
 
   private get apiUrl(): string {
     return process.env.KBOB_API_URL || "https://www.lcadata.ch";
@@ -149,7 +171,9 @@ export class KBOBAdapter implements LCADataSourceAdapter {
     );
 
     if (!response.ok) {
-      throw new Error(`KBOB API error: ${response.status} ${response.statusText}`);
+      throw new Error(
+        `KBOB API error: ${response.status} ${response.statusText}`
+      );
     }
 
     const data: KbobApiResponse = await response.json();
@@ -157,57 +181,61 @@ export class KBOBAdapter implements LCADataSourceAdapter {
 
     return data.materials
       .filter(isValidKbobMaterial)
-      .map((m) => normalizeKbobMaterial(m, version));
+      .map((m) => normalizeApiMaterial(m, version));
   }
 
-  async search(query: string, filters?: SearchFilters): Promise<NormalizedMaterial[]> {
-    await connectDB();
-
-    const dbQuery: Record<string, unknown> = { source: KBOB_SOURCE_ID };
+  async search(
+    query: string,
+    filters?: SearchFilters
+  ): Promise<NormalizedMaterial[]> {
+    const conditions = [eq(lcaMaterials.source, SOURCE_ID)];
 
     if (query) {
-      dbQuery.$text = { $search: query };
+      conditions.push(like(lcaMaterials.name, `%${query}%`));
     }
-
     if (filters?.category) {
-      dbQuery.category = filters.category;
+      conditions.push(eq(lcaMaterials.category, filters.category));
+    }
+    if (filters?.minDensity !== undefined) {
+      conditions.push(gte(lcaMaterials.density, filters.minDensity));
+    }
+    if (filters?.maxDensity !== undefined) {
+      conditions.push(lte(lcaMaterials.density, filters.maxDensity));
     }
 
-    if (filters?.minDensity !== undefined || filters?.maxDensity !== undefined) {
-      dbQuery.density = {};
-      if (filters.minDensity !== undefined) {
-        (dbQuery.density as Record<string, number>).$gte = filters.minDensity;
-      }
-      if (filters.maxDensity !== undefined) {
-        (dbQuery.density as Record<string, number>).$lte = filters.maxDensity;
-      }
-    }
+    const rows = await db
+      .select()
+      .from(lcaMaterials)
+      .where(and(...conditions))
+      .limit(50);
 
-    const docs = await LCASourceModel.find(dbQuery).limit(50).lean();
-    return docs.map(docToNormalized);
+    return rows.map(rowToNormalized);
   }
 
   async getById(sourceId: string): Promise<NormalizedMaterial | null> {
-    await connectDB();
-    const doc = await LCASourceModel.findOne({
-      source: KBOB_SOURCE_ID,
-      sourceId,
-    }).lean();
-    return doc ? docToNormalized(doc) : null;
+    const [row] = await db
+      .select()
+      .from(lcaMaterials)
+      .where(
+        and(eq(lcaMaterials.source, SOURCE_ID), eq(lcaMaterials.sourceId, sourceId))
+      )
+      .limit(1);
+
+    return row ? rowToNormalized(row) : null;
   }
 
   async getLastSyncTime(): Promise<Date | null> {
-    await connectDB();
-    const latest = await LCASourceModel.findOne({ source: KBOB_SOURCE_ID })
-      .sort({ "metadata.lastSynced": -1 })
-      .select("metadata.lastSynced")
-      .lean();
-    return latest?.metadata?.lastSynced ?? null;
+    const [row] = await db
+      .select({ lastSynced: lcaMaterials.lastSynced })
+      .from(lcaMaterials)
+      .where(eq(lcaMaterials.source, SOURCE_ID))
+      .orderBy(desc(lcaMaterials.lastSynced))
+      .limit(1);
+
+    return row?.lastSynced ?? null;
   }
 
   async sync(): Promise<SyncResult> {
-    await connectDB();
-
     const materials = await this.fetchAll();
     const result: SyncResult = {
       added: 0,
@@ -217,70 +245,68 @@ export class KBOBAdapter implements LCADataSourceAdapter {
       timestamp: new Date(),
     };
 
-    // Process in batches
-    for (let i = 0; i < materials.length; i += SYNC_BATCH_SIZE) {
-      const batch = materials.slice(i, i + SYNC_BATCH_SIZE);
-      const ops = batch.map((m) => ({
-        updateOne: {
-          filter: { source: KBOB_SOURCE_ID, sourceId: m.sourceId },
-          update: {
-            $set: {
+    for (const m of materials) {
+      try {
+        const [existing] = await db
+          .select({ id: lcaMaterials.id })
+          .from(lcaMaterials)
+          .where(
+            and(
+              eq(lcaMaterials.source, SOURCE_ID),
+              eq(lcaMaterials.sourceId, m.sourceId)
+            )
+          )
+          .limit(1);
+
+        if (existing) {
+          await db
+            .update(lcaMaterials)
+            .set({
               name: m.name,
               nameOriginal: m.nameOriginal,
               category: m.category,
               categoryOriginal: m.categoryOriginal,
               density: m.density,
               unit: m.unit,
-              indicators: m.indicators,
-              metadata: m.metadata,
-            },
-            $setOnInsert: {
-              source: m.source,
-              sourceId: m.sourceId,
-            },
-          },
-          upsert: true,
-        },
-      }));
-
-      try {
-        const bulkResult = await LCASourceModel.bulkWrite(ops);
-        result.added += bulkResult.upsertedCount;
-        result.updated += bulkResult.modifiedCount;
+              gwpTotal: m.indicators.gwpTotal ?? null,
+              penreTotal: m.indicators.penreTotal ?? null,
+              ubp: m.indicators.ubp ?? null,
+              version: m.metadata.version,
+              lastSynced: new Date(),
+              scope: m.metadata.scope,
+              standard: m.metadata.standard,
+              updatedAt: new Date(),
+            })
+            .where(eq(lcaMaterials.id, existing.id));
+          result.updated++;
+        } else {
+          await db.insert(lcaMaterials).values({
+            id: nanoid(),
+            source: SOURCE_ID,
+            sourceId: m.sourceId,
+            name: m.name,
+            nameOriginal: m.nameOriginal,
+            category: m.category,
+            categoryOriginal: m.categoryOriginal,
+            density: m.density,
+            unit: m.unit,
+            gwpTotal: m.indicators.gwpTotal ?? null,
+            penreTotal: m.indicators.penreTotal ?? null,
+            ubp: m.indicators.ubp ?? null,
+            version: m.metadata.version,
+            lastSynced: new Date(),
+            scope: m.metadata.scope,
+            standard: m.metadata.standard,
+          });
+          result.added++;
+        }
       } catch (err) {
         result.errors.push(
-          `Batch ${i}-${i + SYNC_BATCH_SIZE}: ${err instanceof Error ? err.message : String(err)}`
+          `${m.sourceId}: ${err instanceof Error ? err.message : String(err)}`
         );
       }
     }
 
     return result;
   }
-}
-
-// ---------------------------------------------------------------------------
-// DB document → NormalizedMaterial
-// ---------------------------------------------------------------------------
-
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function docToNormalized(doc: any): NormalizedMaterial {
-  return {
-    id: doc._id.toString(),
-    sourceId: doc.sourceId,
-    source: doc.source,
-    name: doc.name,
-    nameOriginal: doc.nameOriginal,
-    category: doc.category,
-    categoryOriginal: doc.categoryOriginal,
-    density: doc.density,
-    unit: doc.unit,
-    indicators: doc.indicators ?? {},
-    metadata: {
-      version: doc.metadata?.version ?? "unknown",
-      lastSynced: doc.metadata?.lastSynced ?? new Date(),
-      validUntil: doc.metadata?.validUntil,
-      scope: doc.metadata?.scope,
-      standard: doc.metadata?.standard,
-    },
-  };
 }

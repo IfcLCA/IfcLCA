@@ -3,10 +3,12 @@
  *
  * Connects to the German Ökobaudat ILCD+EPD API and normalizes
  * materials into the generic NormalizedMaterial format.
- *
- * API docs: https://oekobaudat.de/en/guidance/software-developers.html
  */
 
+import { eq, and, like, gte, lte, desc } from "drizzle-orm";
+import { nanoid } from "nanoid";
+import { db } from "@/db";
+import { lcaMaterials } from "@/db/schema";
 import type {
   LCADataSourceAdapter,
   DataSourceInfo,
@@ -15,14 +17,11 @@ import type {
   SyncResult,
   IndicatorKey,
 } from "@/types/lca";
-import { LCASourceModel } from "@/lib/db/models/lca-source";
-import { connectDB } from "@/lib/db/connect";
 
 // ---------------------------------------------------------------------------
-// Ökobaudat API types (source-specific)
+// Ökobaudat API types
 // ---------------------------------------------------------------------------
 
-/** Simplified representation of an ILCD+EPD process dataset */
 interface OekobaudatProcess {
   uuid: string;
   name: string;
@@ -31,19 +30,10 @@ interface OekobaudatProcess {
       class?: Array<{ value: string; level: number }>;
     }>;
   };
-  lciMethodAndAllocation?: {
-    typeOfDataSet?: string;
-  };
-  /** Environmental indicators from the LCIA results */
   lciaResults?: Array<{
     method: { uuid: string; name: string };
-    /** Module indicator values (A1-A3, B1-B7, C1-C4, D) */
-    amounts?: Array<{
-      module: string;
-      value: number;
-    }>;
+    amounts?: Array<{ module: string; value: number }>;
   }>;
-  /** Technical flow properties for density etc. */
   flowProperties?: Array<{
     name: string;
     meanValue: number;
@@ -52,11 +42,7 @@ interface OekobaudatProcess {
 }
 
 interface OekobaudatListResponse {
-  data: Array<{
-    uuid: string;
-    name: string;
-    classification?: string;
-  }>;
+  data: Array<{ uuid: string; name: string; classification?: string }>;
   totalCount: number;
   pageSize: number;
   pageNumber: number;
@@ -66,9 +52,8 @@ interface OekobaudatListResponse {
 // Constants
 // ---------------------------------------------------------------------------
 
-const OEKOBAUDAT_SOURCE_ID = "oekobaudat";
+const SOURCE_ID = "oekobaudat";
 
-/** Well-known LCIA method UUIDs in Ökobaudat (EN 15804+A2) */
 const LCIA_METHOD_UUIDS: Record<string, IndicatorKey> = {
   "77e416eb-a363-4258-a04e-171d843a6460": "gwpTotal",
   "06dcd26f-025f-401a-a7c1-5e457eb54637": "gwpFossil",
@@ -83,30 +68,20 @@ const LCIA_METHOD_UUIDS: Record<string, IndicatorKey> = {
   "804ebede-a544-4d93-b3a0-6cf4d1f4f7c3": "adpFossil",
 };
 
-const OEKOBAUDAT_INFO: DataSourceInfo = {
-  id: OEKOBAUDAT_SOURCE_ID,
+const INFO: DataSourceInfo = {
+  id: SOURCE_ID,
   name: "Ökobaudat",
   region: "DE",
   url: "https://oekobaudat.de",
   description:
-    "German construction materials database with full EN 15804+A2 indicators including all GWP variants, acidification, ozone depletion, and more.",
+    "German construction materials database with full EN 15804+A2 indicators.",
   availableIndicators: [
-    "gwpTotal",
-    "gwpFossil",
-    "gwpBiogenic",
-    "gwpLuluc",
-    "penreTotal",
-    "pereTotal",
-    "ap",
-    "odp",
-    "pocp",
-    "adpMineral",
-    "adpFossil",
+    "gwpTotal", "gwpFossil", "gwpBiogenic", "gwpLuluc",
+    "penreTotal", "pereTotal", "ap", "odp", "pocp",
+    "adpMineral", "adpFossil",
   ] as IndicatorKey[],
   requiresAuth: false,
 };
-
-const SYNC_BATCH_SIZE = 100;
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -116,22 +91,17 @@ function extractIndicators(
   lciaResults?: OekobaudatProcess["lciaResults"]
 ): Record<string, number | null> {
   const indicators: Record<string, number | null> = {};
-
   if (!lciaResults) return indicators;
 
   for (const result of lciaResults) {
-    const indicatorKey = LCIA_METHOD_UUIDS[result.method.uuid];
-    if (!indicatorKey) continue;
-
-    // Sum A1-A3 modules for production stage
-    const a1a3Value =
+    const key = LCIA_METHOD_UUIDS[result.method.uuid];
+    if (!key) continue;
+    const a1a3 =
       result.amounts
         ?.filter((a) => ["A1", "A2", "A3", "A1-A3"].includes(a.module))
         .reduce((sum, a) => sum + a.value, 0) ?? null;
-
-    indicators[indicatorKey] = a1a3Value;
+    indicators[key] = a1a3;
   }
-
   return indicators;
 }
 
@@ -139,30 +109,27 @@ function extractDensity(
   flowProps?: OekobaudatProcess["flowProperties"]
 ): number | null {
   if (!flowProps) return null;
-  const densityProp = flowProps.find(
+  const prop = flowProps.find(
     (fp) =>
       fp.name.toLowerCase().includes("density") ||
       fp.name.toLowerCase().includes("rohdichte")
   );
-  return densityProp?.meanValue ?? null;
+  return prop?.meanValue ?? null;
 }
 
 function extractCategory(proc: OekobaudatProcess): string {
   const classes =
     proc.classificationInformation?.classification?.[0]?.class ?? [];
   if (classes.length === 0) return "Uncategorized";
-  // Take the most specific (highest level) class
   const sorted = [...classes].sort((a, b) => b.level - a.level);
   return sorted[0]?.value ?? "Uncategorized";
 }
 
-function normalizeOekobaudatProcess(
-  proc: OekobaudatProcess
-): NormalizedMaterial {
+function normalizeProcess(proc: OekobaudatProcess): NormalizedMaterial {
   return {
     id: "",
     sourceId: proc.uuid,
-    source: OEKOBAUDAT_SOURCE_ID,
+    source: SOURCE_ID,
     name: proc.name,
     nameOriginal: proc.name,
     category: extractCategory(proc),
@@ -178,12 +145,48 @@ function normalizeOekobaudatProcess(
   };
 }
 
+function rowToNormalized(
+  row: typeof lcaMaterials.$inferSelect
+): NormalizedMaterial {
+  return {
+    id: row.id,
+    sourceId: row.sourceId,
+    source: row.source,
+    name: row.name,
+    nameOriginal: row.nameOriginal ?? undefined,
+    category: row.category ?? "Uncategorized",
+    categoryOriginal: row.categoryOriginal ?? undefined,
+    density: row.density,
+    unit: row.unit ?? "kg",
+    indicators: {
+      gwpTotal: row.gwpTotal,
+      gwpFossil: row.gwpFossil,
+      gwpBiogenic: row.gwpBiogenic,
+      gwpLuluc: row.gwpLuluc,
+      penreTotal: row.penreTotal,
+      pereTotal: row.pereTotal,
+      ap: row.ap,
+      odp: row.odp,
+      pocp: row.pocp,
+      adpMineral: row.adpMineral,
+      adpFossil: row.adpFossil,
+    },
+    metadata: {
+      version: row.version ?? "unknown",
+      lastSynced: row.lastSynced,
+      validUntil: row.validUntil ?? undefined,
+      scope: row.scope ?? undefined,
+      standard: row.standard ?? undefined,
+    },
+  };
+}
+
 // ---------------------------------------------------------------------------
-// Adapter implementation
+// Adapter
 // ---------------------------------------------------------------------------
 
 export class OekobaudatAdapter implements LCADataSourceAdapter {
-  info = OEKOBAUDAT_INFO;
+  info = INFO;
 
   private get apiUrl(): string {
     return (
@@ -200,8 +203,6 @@ export class OekobaudatAdapter implements LCADataSourceAdapter {
   }
 
   async fetchAll(): Promise<NormalizedMaterial[]> {
-    // Ökobaudat requires paginated fetching — first get the list,
-    // then fetch details for each process.
     const listUrl = `${this.apiUrl}/datastocks/${this.datastockId}/processes?format=json&pageSize=500`;
     const allMaterials: NormalizedMaterial[] = [];
     let pageNumber = 0;
@@ -224,13 +225,10 @@ export class OekobaudatAdapter implements LCADataSourceAdapter {
 
       const data: OekobaudatListResponse = await response.json();
 
-      // For the list endpoint, we get summary data.
-      // Full indicator data requires fetching each process individually.
-      // For sync, we fetch details in batches.
       for (const item of data.data) {
         const detail = await this.fetchProcessDetail(item.uuid);
         if (detail) {
-          allMaterials.push(normalizeOekobaudatProcess(detail));
+          allMaterials.push(normalizeProcess(detail));
         }
       }
 
@@ -252,7 +250,6 @@ export class OekobaudatAdapter implements LCADataSourceAdapter {
           signal: AbortSignal.timeout(30_000),
         }
       );
-
       if (!response.ok) return null;
       return (await response.json()) as OekobaudatProcess;
     } catch {
@@ -264,57 +261,57 @@ export class OekobaudatAdapter implements LCADataSourceAdapter {
     query: string,
     filters?: SearchFilters
   ): Promise<NormalizedMaterial[]> {
-    await connectDB();
-
-    const dbQuery: Record<string, unknown> = {
-      source: OEKOBAUDAT_SOURCE_ID,
-    };
+    const conditions = [eq(lcaMaterials.source, SOURCE_ID)];
 
     if (query) {
-      dbQuery.$text = { $search: query };
+      conditions.push(like(lcaMaterials.name, `%${query}%`));
     }
-
     if (filters?.category) {
-      dbQuery.category = filters.category;
+      conditions.push(eq(lcaMaterials.category, filters.category));
+    }
+    if (filters?.minDensity !== undefined) {
+      conditions.push(gte(lcaMaterials.density, filters.minDensity));
+    }
+    if (filters?.maxDensity !== undefined) {
+      conditions.push(lte(lcaMaterials.density, filters.maxDensity));
     }
 
-    if (filters?.minDensity !== undefined || filters?.maxDensity !== undefined) {
-      dbQuery.density = {};
-      if (filters.minDensity !== undefined) {
-        (dbQuery.density as Record<string, number>).$gte = filters.minDensity;
-      }
-      if (filters.maxDensity !== undefined) {
-        (dbQuery.density as Record<string, number>).$lte = filters.maxDensity;
-      }
-    }
+    const rows = await db
+      .select()
+      .from(lcaMaterials)
+      .where(and(...conditions))
+      .limit(50);
 
-    const docs = await LCASourceModel.find(dbQuery).limit(50).lean();
-    return docs.map(docToNormalized);
+    return rows.map(rowToNormalized);
   }
 
   async getById(sourceId: string): Promise<NormalizedMaterial | null> {
-    await connectDB();
-    const doc = await LCASourceModel.findOne({
-      source: OEKOBAUDAT_SOURCE_ID,
-      sourceId,
-    }).lean();
-    return doc ? docToNormalized(doc) : null;
+    const [row] = await db
+      .select()
+      .from(lcaMaterials)
+      .where(
+        and(
+          eq(lcaMaterials.source, SOURCE_ID),
+          eq(lcaMaterials.sourceId, sourceId)
+        )
+      )
+      .limit(1);
+
+    return row ? rowToNormalized(row) : null;
   }
 
   async getLastSyncTime(): Promise<Date | null> {
-    await connectDB();
-    const latest = await LCASourceModel.findOne({
-      source: OEKOBAUDAT_SOURCE_ID,
-    })
-      .sort({ "metadata.lastSynced": -1 })
-      .select("metadata.lastSynced")
-      .lean();
-    return latest?.metadata?.lastSynced ?? null;
+    const [row] = await db
+      .select({ lastSynced: lcaMaterials.lastSynced })
+      .from(lcaMaterials)
+      .where(eq(lcaMaterials.source, SOURCE_ID))
+      .orderBy(desc(lcaMaterials.lastSynced))
+      .limit(1);
+
+    return row?.lastSynced ?? null;
   }
 
   async sync(): Promise<SyncResult> {
-    await connectDB();
-
     const materials = await this.fetchAll();
     const result: SyncResult = {
       added: 0,
@@ -324,69 +321,83 @@ export class OekobaudatAdapter implements LCADataSourceAdapter {
       timestamp: new Date(),
     };
 
-    for (let i = 0; i < materials.length; i += SYNC_BATCH_SIZE) {
-      const batch = materials.slice(i, i + SYNC_BATCH_SIZE);
-      const ops = batch.map((m) => ({
-        updateOne: {
-          filter: { source: OEKOBAUDAT_SOURCE_ID, sourceId: m.sourceId },
-          update: {
-            $set: {
+    for (const m of materials) {
+      try {
+        const ind = m.indicators;
+        const [existing] = await db
+          .select({ id: lcaMaterials.id })
+          .from(lcaMaterials)
+          .where(
+            and(
+              eq(lcaMaterials.source, SOURCE_ID),
+              eq(lcaMaterials.sourceId, m.sourceId)
+            )
+          )
+          .limit(1);
+
+        if (existing) {
+          await db
+            .update(lcaMaterials)
+            .set({
               name: m.name,
               nameOriginal: m.nameOriginal,
               category: m.category,
-              categoryOriginal: m.categoryOriginal,
               density: m.density,
               unit: m.unit,
-              indicators: m.indicators,
-              metadata: m.metadata,
-            },
-            $setOnInsert: {
-              source: m.source,
-              sourceId: m.sourceId,
-            },
-          },
-          upsert: true,
-        },
-      }));
-
-      try {
-        const bulkResult = await LCASourceModel.bulkWrite(ops);
-        result.added += bulkResult.upsertedCount;
-        result.updated += bulkResult.modifiedCount;
+              gwpTotal: ind.gwpTotal ?? null,
+              gwpFossil: ind.gwpFossil ?? null,
+              gwpBiogenic: ind.gwpBiogenic ?? null,
+              gwpLuluc: ind.gwpLuluc ?? null,
+              penreTotal: ind.penreTotal ?? null,
+              pereTotal: ind.pereTotal ?? null,
+              ap: ind.ap ?? null,
+              odp: ind.odp ?? null,
+              pocp: ind.pocp ?? null,
+              adpMineral: ind.adpMineral ?? null,
+              adpFossil: ind.adpFossil ?? null,
+              version: m.metadata.version,
+              lastSynced: new Date(),
+              scope: m.metadata.scope,
+              standard: m.metadata.standard,
+              updatedAt: new Date(),
+            })
+            .where(eq(lcaMaterials.id, existing.id));
+          result.updated++;
+        } else {
+          await db.insert(lcaMaterials).values({
+            id: nanoid(),
+            source: SOURCE_ID,
+            sourceId: m.sourceId,
+            name: m.name,
+            nameOriginal: m.nameOriginal,
+            category: m.category,
+            density: m.density,
+            unit: m.unit,
+            gwpTotal: ind.gwpTotal ?? null,
+            gwpFossil: ind.gwpFossil ?? null,
+            gwpBiogenic: ind.gwpBiogenic ?? null,
+            gwpLuluc: ind.gwpLuluc ?? null,
+            penreTotal: ind.penreTotal ?? null,
+            pereTotal: ind.pereTotal ?? null,
+            ap: ind.ap ?? null,
+            odp: ind.odp ?? null,
+            pocp: ind.pocp ?? null,
+            adpMineral: ind.adpMineral ?? null,
+            adpFossil: ind.adpFossil ?? null,
+            version: m.metadata.version,
+            lastSynced: new Date(),
+            scope: m.metadata.scope,
+            standard: m.metadata.standard,
+          });
+          result.added++;
+        }
       } catch (err) {
         result.errors.push(
-          `Batch ${i}-${i + SYNC_BATCH_SIZE}: ${err instanceof Error ? err.message : String(err)}`
+          `${m.sourceId}: ${err instanceof Error ? err.message : String(err)}`
         );
       }
     }
 
     return result;
   }
-}
-
-// ---------------------------------------------------------------------------
-// DB document → NormalizedMaterial
-// ---------------------------------------------------------------------------
-
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function docToNormalized(doc: any): NormalizedMaterial {
-  return {
-    id: doc._id.toString(),
-    sourceId: doc.sourceId,
-    source: doc.source,
-    name: doc.name,
-    nameOriginal: doc.nameOriginal,
-    category: doc.category,
-    categoryOriginal: doc.categoryOriginal,
-    density: doc.density,
-    unit: doc.unit,
-    indicators: doc.indicators ?? {},
-    metadata: {
-      version: doc.metadata?.version ?? "unknown",
-      lastSynced: doc.metadata?.lastSynced ?? new Date(),
-      validUntil: doc.metadata?.validUntil,
-      scope: doc.metadata?.scope,
-      standard: doc.metadata?.standard,
-    },
-  };
 }
