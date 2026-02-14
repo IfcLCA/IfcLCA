@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "engines": {
-    "node": ">=18.18.0"
+    "node": "20.x"
   },
   "scripts": {
     "dev": "next dev --port 3001",
@@ -36,6 +36,7 @@
     "date-fns": "^4.1.0",
     "@ifc-lite/geometry": "^1.8.0",
     "@ifc-lite/parser": "^1.8.0",
+    "@ifc-lite/query": "^1.8.0",
     "@ifc-lite/renderer": "^1.8.0",
     "drizzle-orm": "^0.36.0",
     "lucide-react": "^0.454.0",

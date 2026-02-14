@@ -114,7 +114,22 @@ interface ViewerRefs {
   expressIdToGuid: Map<number, string>;
   /** globalId → expressId mapping for selection → renderer */
   guidToExpressId: Map<string, number>;
+  /** Promise that resolves when the renderer is initialized */
+  rendererReady: Promise<void>;
+  /** Call to signal renderer is ready (set internally by viewer) */
+  rendererReadyResolve: (() => void) | null;
 }
+
+function createRendererReadyPromise() {
+  let resolve: () => void;
+  const promise = new Promise<void>((r) => {
+    resolve = r;
+  });
+  return { promise, resolve: resolve! };
+}
+
+const { promise: rendererReadyPromise, resolve: rendererReadyResolve } =
+  createRendererReadyPromise();
 
 export const viewerRefs: ViewerRefs = {
   renderer: null,
@@ -123,6 +138,8 @@ export const viewerRefs: ViewerRefs = {
   canvas: null,
   expressIdToGuid: new Map(),
   guidToExpressId: new Map(),
+  rendererReady: rendererReadyPromise,
+  rendererReadyResolve,
 };
 
 // ---------------------------------------------------------------------------
@@ -278,6 +295,10 @@ export const useAppStore = create<AppState>((set) => ({
     viewerRefs.canvas = null;
     viewerRefs.expressIdToGuid.clear();
     viewerRefs.guidToExpressId.clear();
+    // Recreate renderer ready promise for next load cycle
+    const { promise, resolve } = createRendererReadyPromise();
+    viewerRefs.rendererReady = promise;
+    viewerRefs.rendererReadyResolve = resolve;
     set(initialState);
   },
 }));

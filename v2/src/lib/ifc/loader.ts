@@ -156,7 +156,7 @@ export async function loadIfcFile(
   });
 
   const parseTimeMs = performance.now() - startTime;
-  const parseResult = bridgeToParseResult(dataStore, buffer.byteLength, parseTimeMs);
+  const parseResult = await bridgeToParseResult(dataStore, buffer.byteLength, parseTimeMs);
 
   onProgress?.({
     phase: "complete",

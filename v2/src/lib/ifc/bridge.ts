@@ -82,12 +82,15 @@ const LCA_ELEMENT_TYPES = new Set([
  *
  * This does the heavy extraction work — iterates all building elements,
  * pulls attributes, materials, classifications, and aggregates.
+ *
+ * Async because it lazy-loads the extraction functions on first call.
  */
-export function bridgeToParseResult(
+export async function bridgeToParseResult(
   store: IfcDataStore,
   fileSizeBytes: number,
   parseTimeMs: number
-): IFCParseResult {
+): Promise<IFCParseResult> {
+  await ensureBridge();
   const elements: IFCElement[] = [];
   const materialAgg = new Map<
     string,
@@ -265,6 +268,38 @@ export function bridgeToParseResult(
       materialCount: materials.length,
       fileSizeBytes,
     },
+  };
+}
+
+/**
+ * Lazy per-element detail extraction.
+ *
+ * Instead of extracting all property sets for every element upfront,
+ * this function extracts full details for a single element on demand
+ * (e.g., when the user clicks an element in the viewer).
+ */
+export async function getElementDetail(
+  store: IfcDataStore,
+  expressId: number
+): Promise<{
+  attrs: { globalId: string; name: string; description: string; objectType: string; tag: string };
+  materials: ReturnType<typeof extractMaterials>;
+  classifications: ReturnType<typeof extractClassifications>;
+  propertySets: ReturnType<typeof extractProperties>;
+} | null> {
+  await ensureBridge();
+
+  const typeName = store.entities.getTypeName(expressId);
+  if (!LCA_ELEMENT_TYPES.has(typeName)) return null;
+
+  const attrs = extractEntityAttributes(store, expressId);
+  if (!attrs.globalId) return null;
+
+  return {
+    attrs,
+    materials: extractMaterials(store, expressId),
+    classifications: extractClassifications(store, expressId),
+    propertySets: extractProperties(store, expressId),
   };
 }
 

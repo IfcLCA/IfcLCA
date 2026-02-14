@@ -46,11 +46,16 @@ export function UploadZone({ projectId }: UploadZoneProps) {
         const arrayBuffer = await file.arrayBuffer();
         const buffer = new Uint8Array(arrayBuffer);
 
-        // Ensure renderer is initialized
+        // Wait for the viewer component to initialize the WebGPU renderer.
+        // viewerRefs.rendererReady resolves when the renderer calls rendererReadyResolve().
         if (!viewerRefs.renderer) {
-          // The viewer component will initialize the renderer when it mounts.
-          // Wait a tick for it to be ready.
-          await new Promise((resolve) => setTimeout(resolve, 100));
+          const timeout = new Promise<never>((_, reject) =>
+            setTimeout(
+              () => reject(new Error("WebGPU renderer timed out. Your browser may not support WebGPU.")),
+              10_000
+            )
+          );
+          await Promise.race([viewerRefs.rendererReady, timeout]);
         }
 
         if (!viewerRefs.renderer) {

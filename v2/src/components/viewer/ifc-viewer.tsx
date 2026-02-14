@@ -1,13 +1,14 @@
 "use client";
 
-import { useRef, useEffect, useCallback } from "react";
+import { useRef, useEffect, useCallback, useState } from "react";
 import { useAppStore, viewerRefs } from "@/lib/store/app-store";
+import { AlertCircle } from "lucide-react";
 
 /**
  * IFC 3D viewer component — integrates ifc-lite Renderer with WebGPU.
  *
  * Lifecycle:
- * 1. Mount → create <canvas>, init Renderer, store in viewerRefs
+ * 1. Mount → detect WebGPU → create <canvas>, init Renderer, store in viewerRefs
  * 2. Model loaded → meshes are already streamed in by the loader
  * 3. Click → pick() → resolve expressId → selectElement(guid)
  * 4. Hover → pick() → resolve expressId → setHoveredElement(guid)
@@ -23,22 +24,37 @@ export function IfcViewer() {
   const cameraRef = useRef<unknown>(null);
   const animFrameRef = useRef<number>(0);
   const initRef = useRef(false);
+  const [webGPUSupported, setWebGPUSupported] = useState<boolean | null>(null);
 
   const {
     parseResult,
     selectedElementIds,
-    hoveredElementId,
-    colorMode,
-    visibilityByType,
     selectElement,
     toggleElementSelection,
     setHoveredElement,
     deselectAll,
   } = useAppStore();
 
-  // Initialize renderer on mount
+  // Detect WebGPU support on mount
   useEffect(() => {
-    if (!canvasRef.current || initRef.current) return;
+    (async () => {
+      if (typeof navigator === "undefined" || !("gpu" in navigator)) {
+        setWebGPUSupported(false);
+        return;
+      }
+      try {
+        const adapter = await navigator.gpu.requestAdapter();
+        setWebGPUSupported(adapter !== null);
+      } catch {
+        setWebGPUSupported(false);
+      }
+    })();
+  }, []);
+
+  // Initialize renderer once WebGPU is confirmed
+  useEffect(() => {
+    if (webGPUSupported !== true || !canvasRef.current || initRef.current)
+      return;
     initRef.current = true;
 
     let disposed = false;
@@ -58,7 +74,9 @@ export function IfcViewer() {
         viewerRefs.renderer = renderer;
         viewerRefs.canvas = canvas;
 
-        // Access camera for orbit controls
+        // Notify waiting upload zone that renderer is ready
+        viewerRefs.rendererReadyResolve?.();
+
         const camera = (renderer as any).camera;
         cameraRef.current = camera;
 
@@ -77,22 +95,27 @@ export function IfcViewer() {
             const moved = cam.update(dt);
             if (moved) {
               const r = rendererRef.current as any;
-              // Build hidden IDs from visibility state
-              const hiddenIds = new Set<number>();
               const state = useAppStore.getState();
-              for (const [type, visible] of Object.entries(state.visibilityByType)) {
-                if (!visible) {
-                  // Find all expressIds of this type and hide them
-                  // This requires the data store to be loaded
-                  // For now, render without type filtering
-                }
-              }
 
               // Build selected IDs
               const selectedIds = new Set<number>();
               for (const guid of state.selectedElementIds) {
                 const eid = viewerRefs.guidToExpressId.get(guid);
                 if (eid !== undefined) selectedIds.add(eid);
+              }
+
+              // Build hidden IDs from type visibility
+              const hiddenIds = new Set<number>();
+              const ds = viewerRefs.dataStore as any;
+              if (ds?.entities) {
+                for (const [type, visible] of Object.entries(
+                  state.visibilityByType
+                )) {
+                  if (!visible) {
+                    const ids = ds.entities.getByType?.(type) ?? [];
+                    for (const id of ids) hiddenIds.add(id);
+                  }
+                }
               }
 
               r?.render({
@@ -106,11 +129,10 @@ export function IfcViewer() {
         }
 
         animFrameRef.current = requestAnimationFrame(renderLoop);
-
-        // Initial render
         renderer.render();
       } catch (err) {
         console.error("Failed to initialize WebGPU renderer:", err);
+        setWebGPUSupported(false);
       }
     })();
 
@@ -125,7 +147,7 @@ export function IfcViewer() {
       viewerRefs.canvas = null;
       initRef.current = false;
     };
-  }, []);
+  }, [webGPUSupported]);
 
   // Handle canvas resize
   useEffect(() => {
@@ -196,9 +218,14 @@ export function IfcViewer() {
     [selectElement, toggleElementSelection, deselectAll]
   );
 
-  // Handle mouse move → hover
+  // Handle mouse move → hover (throttled)
+  const lastHoverRef = useRef(0);
   const handleMouseMove = useCallback(
     async (e: React.MouseEvent<HTMLCanvasElement>) => {
+      const now = Date.now();
+      if (now - lastHoverRef.current < 50) return; // 20fps throttle
+      lastHoverRef.current = now;
+
       const r = rendererRef.current as any;
       if (!r) return;
 
@@ -234,7 +261,37 @@ export function IfcViewer() {
     }
   }, [parseResult]);
 
-  if (!parseResult && !useAppStore.getState().modelLoading) return null;
+  // WebGPU not supported fallback
+  if (webGPUSupported === false) {
+    return (
+      <div className="flex h-full items-center justify-center bg-muted/30 p-8">
+        <div className="max-w-md rounded-lg border bg-card p-8 text-center shadow-sm">
+          <AlertCircle className="mx-auto mb-4 h-12 w-12 text-destructive" />
+          <h3 className="mb-2 text-lg font-semibold">WebGPU Not Available</h3>
+          <p className="text-sm text-muted-foreground">
+            Your browser doesn&apos;t support WebGPU, which is required for the
+            3D viewer. Please use Chrome 113+, Edge 113+, or Firefox Nightly
+            with WebGPU enabled.
+          </p>
+          <p className="mt-3 text-xs text-muted-foreground/60">
+            The materials table and LCA matching still work without the 3D
+            viewer.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  // Still detecting
+  if (webGPUSupported === null) {
+    return (
+      <div className="flex h-full items-center justify-center">
+        <p className="text-sm text-muted-foreground">
+          Checking WebGPU support...
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div ref={containerRef} className="viewer-container">
@@ -245,16 +302,16 @@ export function IfcViewer() {
         className="h-full w-full"
         style={{ touchAction: "none" }}
       />
-      {/* Loading overlay */}
-      {useAppStore.getState().modelLoading && (
-        <LoadingOverlay />
-      )}
+      <LoadingOverlay />
     </div>
   );
 }
 
 function LoadingOverlay() {
+  const modelLoading = useAppStore((s) => s.modelLoading);
   const loadProgress = useAppStore((s) => s.loadProgress);
+
+  if (!modelLoading) return null;
 
   return (
     <div className="absolute inset-0 flex items-center justify-center bg-background/80 backdrop-blur-sm">
