@@ -36,6 +36,10 @@ export function ProjectClient({
     modelLoading,
     setProject,
     setMaterials,
+    setParseResult,
+    setModelLoading,
+    setModelError,
+    setLoadProgress,
     matchedCount,
     totalMaterialCount,
     materials: storeMaterials,
@@ -43,6 +47,7 @@ export function ProjectClient({
     setActiveDataSource,
   } = useAppStore();
   const [dsOpen, setDsOpen] = useState(false);
+  const [autoLoadAttempted, setAutoLoadAttempted] = useState(false);
 
   useEffect(() => {
     setProject({
@@ -124,6 +129,65 @@ export function ProjectClient({
       setMaterials(hydrated);
     }
   }, [serverMaterials, serverLcaMaterials, setMaterials]);
+
+  // Auto-load cached IFC from IndexedDB on revisit
+  useEffect(() => {
+    if (autoLoadAttempted || parseResult || modelLoading) return;
+    setAutoLoadAttempted(true);
+
+    (async () => {
+      try {
+        const { loadIfcFile: loadCachedFile } = await import("@/lib/ifc/cache");
+        const cached = await loadCachedFile(project.id);
+        if (!cached) return;
+
+        console.log("[ProjectClient] Found cached IFC:", cached.fileName);
+        setModelLoading(true);
+
+        const { viewerRefs } = await import("@/lib/store/app-store");
+
+        // Wait for renderer
+        if (!viewerRefs.renderer) {
+          const timeout = new Promise<never>((_, reject) =>
+            setTimeout(() => reject(new Error("Renderer timeout")), 15_000)
+          );
+          await Promise.race([viewerRefs.rendererReady, timeout]);
+        }
+        if (!viewerRefs.renderer) return;
+
+        const { loadIfcFile: loadIfc } = await import("@/lib/ifc/loader");
+        const buffer = new Uint8Array(cached.buffer);
+
+        const result = await loadIfc(buffer, viewerRefs.renderer as any, (progress) => {
+          setLoadProgress(progress);
+        });
+
+        viewerRefs.dataStore = result.dataStore;
+        viewerRefs.coordinateInfo = result.coordinateInfo;
+
+        // Build expressId ↔ GUID mappings
+        const dataStore = result.dataStore as any;
+        if (dataStore?.entities) {
+          const { extractEntityAttributesOnDemand } = await import("@ifc-lite/parser");
+          const entities = dataStore.entities;
+          for (let i = 0; i < entities.expressId.length; i++) {
+            const expressId = entities.expressId[i];
+            const attrs = extractEntityAttributesOnDemand(dataStore, expressId);
+            if (attrs.globalId) {
+              viewerRefs.expressIdToGuid.set(expressId, attrs.globalId);
+              viewerRefs.guidToExpressId.set(attrs.globalId, expressId);
+            }
+          }
+        }
+
+        setParseResult(result.parseResult);
+        console.log("[ProjectClient] Cached IFC loaded successfully");
+      } catch (err) {
+        console.warn("[ProjectClient] Auto-load from cache failed:", err);
+        setModelLoading(false);
+      }
+    })();
+  }, [autoLoadAttempted, parseResult, modelLoading, project.id, setParseResult, setModelLoading, setModelError, setLoadProgress]);
 
   const hasModel = parseResult !== null;
   const showViewer = hasModel || modelLoading;

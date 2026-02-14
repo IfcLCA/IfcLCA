@@ -107,6 +107,13 @@ export function UploadZone({ projectId }: UploadZoneProps) {
         // Populate store (triggers UI update)
         setParseResult(result.parseResult);
 
+        // Cache IFC file locally in IndexedDB (non-blocking)
+        import("@/lib/ifc/cache").then(({ saveIfcFile: cacheFile }) =>
+          cacheFile(projectId, file.name, arrayBuffer).catch((err) =>
+            console.warn("Failed to cache IFC file:", err)
+          )
+        );
+
         // Send to server for persistence (non-blocking)
         persistToServer(projectId, file, result.parseResult).catch((err) =>
           console.error("Failed to persist upload:", err)
