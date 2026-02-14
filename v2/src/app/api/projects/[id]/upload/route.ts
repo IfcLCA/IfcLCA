@@ -3,6 +3,8 @@ import { auth } from "@clerk/nextjs/server";
 import { nanoid } from "nanoid";
 import { z } from "zod";
 import { db } from "@/db";
+
+export const dynamic = "force-dynamic";
 import { projects, uploads, materials, elements, elementMaterials } from "@/db/schema";
 import { eq, and, sql } from "drizzle-orm";
 

@@ -5,6 +5,8 @@ import { projects, materials } from "@/db/schema";
 import { eq, and } from "drizzle-orm";
 import { ProjectClient } from "@/components/project/project-client";
 
+export const dynamic = "force-dynamic";
+
 interface PageProps {
   params: Promise<{ id: string }>;
 }

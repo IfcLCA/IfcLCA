@@ -4,6 +4,8 @@ import { db } from "@/db";
 import { materials, projects } from "@/db/schema";
 import { eq, and } from "drizzle-orm";
 
+export const dynamic = "force-dynamic";
+
 export async function POST(request: NextRequest) {
   const { userId } = await auth();
   if (!userId) {

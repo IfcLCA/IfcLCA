@@ -3,6 +3,9 @@ import { ClerkProvider } from "@clerk/nextjs";
 import { ThemeProvider } from "next-themes";
 import "./globals.css";
 
+// All pages require Clerk auth (runtime env vars) — skip static prerendering
+export const dynamic = "force-dynamic";
+
 export const metadata: Metadata = {
   title: "IfcLCA v2",
   description: "Life Cycle Assessment for IFC building models",
