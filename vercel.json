@@ -2,11 +2,5 @@
   "buildCommand": "cd v2 && npm install && npm run build",
   "outputDirectory": "v2/.next",
   "installCommand": "cd v2 && npm install",
-  "framework": "nextjs",
-  "functions": {
-    "v2/src/app/api/**/*": {
-      "memory": 1024,
-      "maxDuration": 300
-    }
-  }
+  "framework": "nextjs"
 }
