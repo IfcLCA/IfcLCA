@@ -43,7 +43,12 @@ export function IfcViewer() {
         return;
       }
       try {
-        const adapter = await navigator.gpu.requestAdapter();
+        const gpu = navigator.gpu as GPU | undefined;
+        if (!gpu) {
+          setWebGPUSupported(false);
+          return;
+        }
+        const adapter = await gpu.requestAdapter();
         setWebGPUSupported(adapter !== null);
       } catch {
         setWebGPUSupported(false);

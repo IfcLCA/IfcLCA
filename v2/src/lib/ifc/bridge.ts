@@ -35,9 +35,11 @@ let extractClassifications: (store: IfcDataStore, id: number) => Array<{
   identification?: string;
   name?: string;
 }>;
+import type { PropertyValue } from "@ifc-lite/data";
 let extractProperties: (store: IfcDataStore, id: number) => Array<{
   name: string;
-  properties: Map<string, { type: string; value: unknown }>;
+  globalId?: string;
+  properties: Array<{ name: string; type: number; value: PropertyValue }>;
 }>;
 
 let bridgeInitialized = false;
@@ -187,10 +189,10 @@ export async function bridgeToParseResult(
     const propSets = extractProperties(store, expressId);
     for (const pset of propSets) {
       if (pset.name === "Pset_WallCommon" || pset.name === "Pset_SlabCommon" || pset.name === "Pset_ColumnCommon") {
-        const lb = pset.properties.get("LoadBearing");
+        const lb = pset.properties.find((p) => p.name === "LoadBearing");
         if (lb && lb.value === true) isLoadBearing = true;
 
-        const ext = pset.properties.get("IsExternal");
+        const ext = pset.properties.find((p) => p.name === "IsExternal");
         if (ext && ext.value === true) isExternal = true;
       }
     }

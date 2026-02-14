@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useAppStore } from "@/lib/store";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -36,15 +36,7 @@ export function MaterialMatch() {
     (m) => m.name === selectedMaterialName
   );
 
-  // Auto-search when material is selected
-  useEffect(() => {
-    if (selectedMaterialName) {
-      setQuery(selectedMaterialName);
-      handleSearch(selectedMaterialName);
-    }
-  }, [selectedMaterialName]);
-
-  async function handleSearch(searchQuery: string) {
+  const handleSearch = useCallback(async (searchQuery: string) => {
     if (!searchQuery.trim()) return;
     setLoading(true);
 
@@ -61,7 +53,15 @@ export function MaterialMatch() {
     } finally {
       setLoading(false);
     }
-  }
+  }, [activeDataSource]);
+
+  // Auto-search when material is selected
+  useEffect(() => {
+    if (selectedMaterialName) {
+      setQuery(selectedMaterialName);
+      handleSearch(selectedMaterialName);
+    }
+  }, [selectedMaterialName, handleSearch]);
 
   async function handleSelectMatch(lcaMaterial: NormalizedMaterial) {
     if (!selectedMaterialName || !project) return;

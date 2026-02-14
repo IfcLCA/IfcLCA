@@ -77,10 +77,10 @@ export async function loadIfcFile(
 
   // Get a clean ArrayBuffer that exactly matches the Uint8Array bounds.
   // buffer.buffer may be larger if the Uint8Array is a view into a shared buffer.
-  const arrayBuffer =
+  const arrayBuffer: ArrayBuffer =
     buffer.byteOffset === 0 && buffer.byteLength === buffer.buffer.byteLength
-      ? buffer.buffer
-      : buffer.buffer.slice(buffer.byteOffset, buffer.byteOffset + buffer.byteLength);
+      ? (buffer.buffer as ArrayBuffer)
+      : (buffer.buffer.slice(buffer.byteOffset, buffer.byteOffset + buffer.byteLength) as ArrayBuffer);
 
   // Phase 1: Stream geometry → 3D model visible fast
   onProgress?.({
@@ -99,7 +99,7 @@ export async function loadIfcFile(
     message: "Processing geometry...",
   });
 
-  for await (const event of gp.processAdaptive(arrayBuffer)) {
+  for await (const event of gp.processAdaptive(buffer)) {
     switch (event.type) {
       case "batch":
         renderer.addMeshes(event.meshes, true);

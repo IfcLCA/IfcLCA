@@ -69,12 +69,12 @@ export const lcaMaterials = sqliteTable(
       .notNull()
       .$defaultFn(() => new Date()),
   },
-  (t) => [
-    uniqueIndex("lca_source_unique").on(t.source, t.sourceId),
-    index("lca_source_idx").on(t.source),
-    index("lca_category_idx").on(t.source, t.category),
-    index("lca_name_idx").on(t.name),
-  ]
+  (t) => ({
+    sourceUnique: uniqueIndex("lca_source_unique").on(t.source, t.sourceId),
+    sourceIdx: index("lca_source_idx").on(t.source),
+    categoryIdx: index("lca_category_idx").on(t.source, t.category),
+    nameIdx: index("lca_name_idx").on(t.name),
+  })
 );
 
 // ---------------------------------------------------------------------------
@@ -116,9 +116,9 @@ export const projects = sqliteTable(
       .notNull()
       .$defaultFn(() => new Date()),
   },
-  (t) => [
-    index("project_user_idx").on(t.userId),
-  ]
+  (t) => ({
+    userIdx: index("project_user_idx").on(t.userId),
+  })
 );
 
 // ---------------------------------------------------------------------------
@@ -145,9 +145,9 @@ export const uploads = sqliteTable(
       .notNull()
       .$defaultFn(() => new Date()),
   },
-  (t) => [
-    index("upload_project_idx").on(t.projectId),
-  ]
+  (t) => ({
+    projectIdx: index("upload_project_idx").on(t.projectId),
+  })
 );
 
 // ---------------------------------------------------------------------------
@@ -182,11 +182,11 @@ export const materials = sqliteTable(
       .notNull()
       .$defaultFn(() => new Date()),
   },
-  (t) => [
-    uniqueIndex("material_project_name").on(t.projectId, t.name),
-    index("material_project_idx").on(t.projectId),
-    index("material_match_idx").on(t.lcaMaterialId),
-  ]
+  (t) => ({
+    projectNameUnique: uniqueIndex("material_project_name").on(t.projectId, t.name),
+    projectIdx: index("material_project_idx").on(t.projectId),
+    matchIdx: index("material_match_idx").on(t.lcaMaterialId),
+  })
 );
 
 // ---------------------------------------------------------------------------
@@ -226,12 +226,12 @@ export const elements = sqliteTable(
       .notNull()
       .$defaultFn(() => new Date()),
   },
-  (t) => [
-    uniqueIndex("element_project_guid").on(t.projectId, t.guid),
-    index("element_project_idx").on(t.projectId),
-    index("element_upload_idx").on(t.uploadId),
-    index("element_type_idx").on(t.projectId, t.type),
-  ]
+  (t) => ({
+    projectGuidUnique: uniqueIndex("element_project_guid").on(t.projectId, t.guid),
+    projectIdx: index("element_project_idx").on(t.projectId),
+    uploadIdx: index("element_upload_idx").on(t.uploadId),
+    typeIdx: index("element_type_idx").on(t.projectId, t.type),
+  })
 );
 
 // ---------------------------------------------------------------------------
@@ -258,10 +258,10 @@ export const elementMaterials = sqliteTable(
     penreTotal: real("penre_total"),
     ubp: real("ubp"),
   },
-  (t) => [
-    index("em_element_idx").on(t.elementId),
-    index("em_material_idx").on(t.materialId),
-  ]
+  (t) => ({
+    elementIdx: index("em_element_idx").on(t.elementId),
+    materialIdx: index("em_material_idx").on(t.materialId),
+  })
 );
 
 // ---------------------------------------------------------------------------
