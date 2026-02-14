@@ -1,6 +1,6 @@
 {
   "installCommand": "npm install",
-  "buildCommand": "cd v2 && npm install && npm run build",
+  "buildCommand": "cd v2 && npm install && npx drizzle-kit push && npm run build",
   "outputDirectory": "v2/.next",
   "framework": "nextjs"
 }
