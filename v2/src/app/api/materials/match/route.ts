@@ -16,15 +16,14 @@ export async function POST(request: NextRequest) {
   } catch {
     return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
   }
-  const {
-    projectId,
-    materialName,
-    lcaMaterialId,
-    source,
-    sourceId,
-    method,
-    score,
-  } = body as Record<string, string | number | undefined>;
+
+  const projectId = body.projectId as string | undefined;
+  const materialName = body.materialName as string | undefined;
+  const lcaMaterialId = body.lcaMaterialId as string | undefined;
+  const source = body.source as string | undefined;
+  const sourceId = body.sourceId as string | undefined;
+  const method = body.method as string | undefined;
+  const score = typeof body.score === "number" ? body.score : undefined;
 
   if (!projectId || !materialName || !lcaMaterialId) {
     return NextResponse.json(
@@ -62,9 +61,9 @@ export async function POST(request: NextRequest) {
     .update(materials)
     .set({
       lcaMaterialId,
-      matchSource: source,
-      matchSourceId: sourceId,
-      matchMethod: method ?? "manual",
+      matchSource: source ?? null,
+      matchSourceId: sourceId ?? null,
+      matchMethod: (method ?? "manual") as string,
       matchScore: score ?? 1.0,
       matchedAt: new Date(),
       updatedAt: new Date(),
