@@ -1,0 +1,180 @@
+/**
+ * IFC loading orchestrator — coordinates ifc-lite parsing and geometry processing.
+ *
+ * Flow:
+ * 1. Stream geometry (processAdaptive) → user sees 3D model immediately
+ * 2. Parse data model (parseLite) → extract elements, materials, properties
+ * 3. Bridge to app types (IFCParseResult) → populate store
+ *
+ * All heavy work happens client-side via WASM.
+ */
+
+import type { GeometryProcessor, StreamingGeometryEvent, MeshData, CoordinateInfo } from "@ifc-lite/geometry";
+import type { ColumnarParser, IfcDataStore, EntityRef } from "@ifc-lite/parser";
+import type { Renderer } from "@ifc-lite/renderer";
+import { bridgeToParseResult } from "./bridge";
+import type { IFCParseResult } from "@/types/ifc";
+
+// ---------------------------------------------------------------------------
+// Loading progress
+// ---------------------------------------------------------------------------
+
+export interface LoadProgress {
+  phase: "geometry" | "parsing" | "extracting" | "complete";
+  percent: number;
+  meshCount?: number;
+  message: string;
+}
+
+export type ProgressCallback = (progress: LoadProgress) => void;
+
+// ---------------------------------------------------------------------------
+// Loader result
+// ---------------------------------------------------------------------------
+
+export interface LoadResult {
+  /** Bridged parse result (app-level types) */
+  parseResult: IFCParseResult;
+  /** Raw ifc-lite data store (for on-demand queries) */
+  dataStore: IfcDataStore;
+  /** Coordinate info from geometry processing */
+  coordinateInfo: CoordinateInfo | null;
+}
+
+// ---------------------------------------------------------------------------
+// Singleton geometry processor (expensive to init, reuse across loads)
+// ---------------------------------------------------------------------------
+
+let geometryProcessor: GeometryProcessor | null = null;
+
+async function getGeometryProcessor(): Promise<GeometryProcessor> {
+  if (geometryProcessor) return geometryProcessor;
+
+  const { GeometryProcessor: GP } = await import("@ifc-lite/geometry");
+  geometryProcessor = new GP();
+  await geometryProcessor.init();
+  return geometryProcessor;
+}
+
+// ---------------------------------------------------------------------------
+// Main loading function
+// ---------------------------------------------------------------------------
+
+/**
+ * Load an IFC file: stream geometry to the renderer, then parse the data model.
+ *
+ * @param buffer  - Raw file contents
+ * @param renderer - The ifc-lite Renderer instance (already initialized)
+ * @param onProgress - Progress callback
+ * @returns LoadResult with parse data and raw data store
+ */
+export async function loadIfcFile(
+  buffer: Uint8Array,
+  renderer: Renderer,
+  onProgress?: ProgressCallback
+): Promise<LoadResult> {
+  const startTime = performance.now();
+
+  // Phase 1: Stream geometry → 3D model visible fast
+  onProgress?.({
+    phase: "geometry",
+    percent: 0,
+    message: "Initializing geometry processor...",
+  });
+
+  const gp = await getGeometryProcessor();
+  let meshCount = 0;
+  let coordinateInfo: CoordinateInfo | null = null;
+
+  onProgress?.({
+    phase: "geometry",
+    percent: 5,
+    message: "Processing geometry...",
+  });
+
+  for await (const event of gp.processAdaptive(buffer.buffer as ArrayBuffer)) {
+    switch (event.type) {
+      case "batch":
+        renderer.addMeshes(event.meshes, true);
+        meshCount += event.meshes.length;
+        if (event.coordinateInfo) coordinateInfo = event.coordinateInfo;
+        onProgress?.({
+          phase: "geometry",
+          percent: Math.min(80, 5 + (meshCount / Math.max(event.totalSoFar, 1)) * 75),
+          meshCount,
+          message: `Loaded ${meshCount} meshes...`,
+        });
+        break;
+      case "complete":
+        meshCount = event.totalMeshes;
+        coordinateInfo = event.coordinateInfo;
+        onProgress?.({
+          phase: "geometry",
+          percent: 80,
+          meshCount,
+          message: `Geometry complete: ${meshCount} meshes`,
+        });
+        break;
+    }
+  }
+
+  // Phase 2: Parse data model (runs after geometry is visible)
+  onProgress?.({
+    phase: "parsing",
+    percent: 85,
+    message: "Parsing IFC data model...",
+  });
+
+  const { ColumnarParser: CP } = await import("@ifc-lite/parser");
+  const parser = new CP();
+
+  // Build entity refs from the buffer for the columnar parser
+  const { IfcParser } = await import("@ifc-lite/parser");
+  const indexParser = new IfcParser();
+
+  // Quick index scan to get entity refs
+  const quickResult = indexParser.parse();
+  const entityRefs: EntityRef[] = Array.from(
+    quickResult.entityIndex.byId.values()
+  );
+
+  const dataStore = await parser.parseLite(buffer.buffer as ArrayBuffer, entityRefs, {
+    onProgress: (p: { phase: string; percent: number }) => {
+      onProgress?.({
+        phase: "parsing",
+        percent: 85 + (p.percent / 100) * 10,
+        message: `Parsing: ${p.phase}...`,
+      });
+    },
+  });
+
+  // Phase 3: Bridge to app types
+  onProgress?.({
+    phase: "extracting",
+    percent: 95,
+    message: "Extracting elements and materials...",
+  });
+
+  const parseTimeMs = performance.now() - startTime;
+  const parseResult = bridgeToParseResult(dataStore, buffer.byteLength, parseTimeMs);
+
+  onProgress?.({
+    phase: "complete",
+    percent: 100,
+    meshCount,
+    message: `Loaded ${parseResult.stats.elementCount} elements, ${parseResult.stats.materialCount} materials`,
+  });
+
+  return { parseResult, dataStore, coordinateInfo };
+}
+
+/**
+ * Cleanup geometry processor resources.
+ * Call when the app unmounts or user navigates away.
+ */
+export function disposeLoader(): void {
+  if (geometryProcessor) {
+    geometryProcessor.dispose();
+    geometryProcessor = null;
+  }
+}

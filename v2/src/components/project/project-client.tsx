@@ -22,10 +22,18 @@ interface ProjectClientProps {
   materials: Material[];
 }
 
-export function ProjectClient({ project, materials: serverMaterials }: ProjectClientProps) {
+export function ProjectClient({
+  project,
+  materials: serverMaterials,
+}: ProjectClientProps) {
   const router = useRouter();
-  const { parseResult, setProject, matchedCount, totalMaterialCount } =
-    useAppStore();
+  const {
+    parseResult,
+    modelLoading,
+    setProject,
+    matchedCount,
+    totalMaterialCount,
+  } = useAppStore();
 
   useEffect(() => {
     setProject({
@@ -36,6 +44,7 @@ export function ProjectClient({ project, materials: serverMaterials }: ProjectCl
   }, [project, setProject]);
 
   const hasModel = parseResult !== null;
+  const showViewer = hasModel || modelLoading;
 
   return (
     <div className="flex h-screen flex-col">
@@ -76,7 +85,7 @@ export function ProjectClient({ project, materials: serverMaterials }: ProjectCl
       </header>
 
       {/* Main content */}
-      {!hasModel ? (
+      {!showViewer ? (
         <div className="flex flex-1 items-center justify-center">
           <UploadZone projectId={project.id} />
         </div>
@@ -84,6 +93,12 @@ export function ProjectClient({ project, materials: serverMaterials }: ProjectCl
         <div className="project-layout flex-1">
           <div className="project-layout__viewer">
             <IfcViewer />
+            {/* Show upload zone overlay if loading but no model yet */}
+            {modelLoading && !hasModel && (
+              <div className="absolute inset-0 flex items-center justify-center">
+                <UploadZone projectId={project.id} />
+              </div>
+            )}
           </div>
           <div className="project-layout__context">
             <ContextPanel />

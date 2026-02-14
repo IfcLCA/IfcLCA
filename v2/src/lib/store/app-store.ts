@@ -1,6 +1,9 @@
 /**
  * Main application store — manages viewer state, selections,
  * project data, and LCA matching state.
+ *
+ * Also holds refs to ifc-lite native objects (Renderer, IfcDataStore)
+ * outside of Zustand's immutable state for performance.
  */
 
 import { create } from "zustand";
@@ -11,7 +14,8 @@ import type {
   MaterialMatch,
   NormalizedMaterial,
 } from "@/types/lca";
-import type { IFCElement, IFCMaterialSummary, IFCParseResult } from "@/types/ifc";
+import type { IFCMaterialSummary, IFCParseResult } from "@/types/ifc";
+import type { LoadProgress } from "@/lib/ifc/loader";
 
 // ---------------------------------------------------------------------------
 // State types
@@ -34,65 +38,41 @@ export interface MaterialWithMatch extends IFCMaterialSummary {
 export type ContextPanelMode = "summary" | "element" | "material";
 
 export interface AppState {
-  // -----------------------------------------------------------------------
   // IFC model data (client-side, from ifc-lite parsing)
-  // -----------------------------------------------------------------------
-  /** Raw parse result from ifc-lite */
   parseResult: IFCParseResult | null;
-  /** Whether the model is currently loading */
   modelLoading: boolean;
-  /** Error from parsing */
   modelError: string | null;
+  loadProgress: LoadProgress | null;
 
-  // -----------------------------------------------------------------------
   // Project data (from server)
-  // -----------------------------------------------------------------------
   project: ProjectData | null;
 
-  // -----------------------------------------------------------------------
   // Materials with match state
-  // -----------------------------------------------------------------------
   materials: MaterialWithMatch[];
-  /** Count of matched materials */
   matchedCount: number;
-  /** Count of total materials */
   totalMaterialCount: number;
 
-  // -----------------------------------------------------------------------
   // Viewer state
-  // -----------------------------------------------------------------------
-  /** Currently selected element GUIDs */
   selectedElementIds: Set<string>;
-  /** Currently hovered element GUID */
   hoveredElementId: string | null;
-  /** Color mode for the 3D model */
   colorMode: ColorMode;
-  /** Which indicator to use for heatmap color modes */
   heatmapIndicator: IndicatorKey;
-  /** Visibility toggles by IFC type */
   visibilityByType: Record<string, boolean>;
-  /** Visibility toggles by storey */
   visibilityByStorey: Record<string, boolean>;
 
-  // -----------------------------------------------------------------------
   // UI state
-  // -----------------------------------------------------------------------
   contextPanelMode: ContextPanelMode;
-  /** The material currently being viewed/matched in context panel */
   selectedMaterialName: string | null;
   bottomPanelOpen: boolean;
 
-  // -----------------------------------------------------------------------
   // Active data source
-  // -----------------------------------------------------------------------
   activeDataSource: string;
 
-  // -----------------------------------------------------------------------
   // Actions
-  // -----------------------------------------------------------------------
   setParseResult: (result: IFCParseResult) => void;
   setModelLoading: (loading: boolean) => void;
   setModelError: (error: string | null) => void;
+  setLoadProgress: (progress: LoadProgress | null) => void;
   setProject: (project: ProjectData) => void;
 
   setMaterials: (materials: MaterialWithMatch[]) => void;
@@ -121,6 +101,31 @@ export interface AppState {
 }
 
 // ---------------------------------------------------------------------------
+// Mutable refs — ifc-lite objects live outside Zustand for performance.
+// These are NOT reactive state; components that need them access directly.
+// ---------------------------------------------------------------------------
+
+interface ViewerRefs {
+  renderer: unknown | null; // Renderer — typed as unknown to avoid SSR import
+  dataStore: unknown | null; // IfcDataStore
+  coordinateInfo: unknown | null; // CoordinateInfo
+  canvas: HTMLCanvasElement | null;
+  /** expressId → globalId mapping for pick results */
+  expressIdToGuid: Map<number, string>;
+  /** globalId → expressId mapping for selection → renderer */
+  guidToExpressId: Map<string, number>;
+}
+
+export const viewerRefs: ViewerRefs = {
+  renderer: null,
+  dataStore: null,
+  coordinateInfo: null,
+  canvas: null,
+  expressIdToGuid: new Map(),
+  guidToExpressId: new Map(),
+};
+
+// ---------------------------------------------------------------------------
 // Initial state
 // ---------------------------------------------------------------------------
 
@@ -128,6 +133,7 @@ const initialState = {
   parseResult: null,
   modelLoading: false,
   modelError: null,
+  loadProgress: null,
   project: null,
   materials: [],
   matchedCount: 0,
@@ -148,10 +154,9 @@ const initialState = {
 // Store
 // ---------------------------------------------------------------------------
 
-export const useAppStore = create<AppState>((set, get) => ({
+export const useAppStore = create<AppState>((set) => ({
   ...initialState,
 
-  // -- Model loading --
   setParseResult: (result) => {
     const materials: MaterialWithMatch[] = result.materials.map((m) => ({
       ...m,
@@ -174,14 +179,17 @@ export const useAppStore = create<AppState>((set, get) => ({
       visibilityByStorey,
       modelLoading: false,
       modelError: null,
+      loadProgress: null,
+      bottomPanelOpen: materials.length > 0,
     });
   },
 
   setModelLoading: (loading) => set({ modelLoading: loading }),
   setModelError: (error) => set({ modelError: error, modelLoading: false }),
-  setProject: (project) => set({ project, activeDataSource: project.preferredDataSource }),
+  setLoadProgress: (progress) => set({ loadProgress: progress }),
+  setProject: (project) =>
+    set({ project, activeDataSource: project.preferredDataSource }),
 
-  // -- Materials --
   setMaterials: (materials) =>
     set({
       materials,
@@ -207,7 +215,6 @@ export const useAppStore = create<AppState>((set, get) => ({
       };
     }),
 
-  // -- Viewer selection --
   selectElement: (guid) =>
     set({
       selectedElementIds: new Set([guid]),
@@ -234,7 +241,6 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   setHoveredElement: (guid) => set({ hoveredElementId: guid }),
 
-  // -- Viewer display --
   setColorMode: (mode) => set({ colorMode: mode }),
   setHeatmapIndicator: (indicator) => set({ heatmapIndicator: indicator }),
 
@@ -254,7 +260,6 @@ export const useAppStore = create<AppState>((set, get) => ({
       },
     })),
 
-  // -- UI state --
   setContextPanelMode: (mode) => set({ contextPanelMode: mode }),
 
   setSelectedMaterial: (name) =>
@@ -266,6 +271,13 @@ export const useAppStore = create<AppState>((set, get) => ({
   setBottomPanelOpen: (open) => set({ bottomPanelOpen: open }),
   setActiveDataSource: (source) => set({ activeDataSource: source }),
 
-  // -- Reset --
-  reset: () => set(initialState),
+  reset: () => {
+    viewerRefs.renderer = null;
+    viewerRefs.dataStore = null;
+    viewerRefs.coordinateInfo = null;
+    viewerRefs.canvas = null;
+    viewerRefs.expressIdToGuid.clear();
+    viewerRefs.guidToExpressId.clear();
+    set(initialState);
+  },
 }));
