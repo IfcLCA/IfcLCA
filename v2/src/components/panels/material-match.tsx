@@ -108,13 +108,17 @@ export function MaterialMatch() {
       setContextPanelMode("element");
     } catch (err) {
       console.error("Failed to persist material match:", err);
-      // Revert optimistic update
+      // Revert optimistic update — clear the match if this was a first-time
+      // match (previousMatch undefined), or restore the previous match.
       if (previousMatch && previousMatchedMaterial) {
         updateMaterialMatch(
           selectedMaterialName,
           previousMatch,
           previousMatchedMaterial
         );
+      } else {
+        // First match attempt failed — clear the optimistic state
+        updateMaterialMatch(selectedMaterialName, null, null);
       }
     }
   }
@@ -226,7 +230,7 @@ export function MaterialMatch() {
               </Badge>
             </div>
             <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
-              {mat.density && <span>Density: {mat.density} kg/m³</span>}
+              {mat.density != null && <span>Density: {mat.density} kg/m³</span>}
               {mat.indicators.gwpTotal != null && (
                 <span>GWP: {mat.indicators.gwpTotal.toFixed(3)} kg CO₂-eq</span>
               )}

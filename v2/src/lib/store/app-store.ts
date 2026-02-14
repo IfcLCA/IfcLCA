@@ -78,8 +78,8 @@ export interface AppState {
   setMaterials: (materials: MaterialWithMatch[]) => void;
   updateMaterialMatch: (
     materialName: string,
-    match: MaterialMatch,
-    matchedMaterial: NormalizedMaterial
+    match: MaterialMatch | null,
+    matchedMaterial: NormalizedMaterial | null
   ) => void;
 
   selectElement: (guid: string) => void;
@@ -220,9 +220,9 @@ export const useAppStore = create<AppState>((set) => ({
         m.name === materialName
           ? {
               ...m,
-              match,
-              matchedMaterial,
-              density: matchedMaterial.density ?? m.density,
+              match: match ?? undefined,
+              matchedMaterial: matchedMaterial ?? undefined,
+              density: matchedMaterial?.density ?? m.density,
             }
           : m
       );

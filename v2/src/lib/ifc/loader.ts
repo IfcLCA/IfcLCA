@@ -137,7 +137,7 @@ export async function loadIfcFile(
 
   // Quick index scan to get entity refs for the columnar parser
   const indexParser = new IfcParser();
-  const quickResult = indexParser.parse(arrayBuffer);
+  const quickResult = await indexParser.parse(arrayBuffer);
   const entityRefs: EntityRef[] = Array.from(
     quickResult.entityIndex.byId.values()
   );
