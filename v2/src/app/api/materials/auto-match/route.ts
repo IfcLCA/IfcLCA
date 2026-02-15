@@ -8,6 +8,7 @@ import { findBestMatch } from "@/lib/lca/matching";
 import {
   cleanIfcQuery,
   extractOekobaudatSearchTerms,
+  extractKbobSearchTerms,
 } from "@/lib/lca/preprocessing";
 import type { NormalizedMaterial, MaterialMatch } from "@/types/lca";
 
@@ -231,12 +232,32 @@ export async function POST(request: NextRequest) {
 
         if (activeSource === "oekobaudat") {
           const keywords = extractOekobaudatSearchTerms(materialName);
+          console.log(`[match] Ökobaudat keywords for "${materialName}": ${keywords.join(", ")}`);
           for (const keyword of keywords) {
             candidates = await adapter.search(keyword);
-            if (candidates.length > 0) break;
+            if (candidates.length > 0) {
+              console.log(`[match] Found ${candidates.length} candidates for keyword "${keyword}"`);
+              break;
+            }
           }
         } else {
+          // KBOB: translate EN/NL/FR queries to German search terms
           candidates = await adapter.search(searchQuery);
+          console.log(`[match] KBOB search "${searchQuery}" → ${candidates.length} candidates`);
+
+          if (candidates.length === 0) {
+            const kbobTerms = extractKbobSearchTerms(materialName);
+            console.log(`[match] KBOB translated terms for "${materialName}": ${kbobTerms.join(", ")}`);
+            for (const term of kbobTerms) {
+              candidates = await adapter.search(term);
+              if (candidates.length > 0) {
+                console.log(`[match] Found ${candidates.length} candidates for KBOB term "${term}"`);
+                break;
+              }
+            }
+          }
+
+          // Last resort: raw name
           if (candidates.length === 0 && searchQuery !== materialName) {
             candidates = await adapter.search(materialName);
           }

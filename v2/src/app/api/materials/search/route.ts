@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import { registry } from "@/lib/lca/registry";
-import { cleanIfcQuery, extractOekobaudatSearchTerms } from "@/lib/lca/preprocessing";
+import { cleanIfcQuery, extractOekobaudatSearchTerms, extractKbobSearchTerms } from "@/lib/lca/preprocessing";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60; // Sync + search can take time on first use
@@ -74,6 +74,7 @@ export async function GET(request: NextRequest) {
       const adapter = registry.get(source);
 
       if (source === "oekobaudat") {
+        // Ökobaudat API does AND matching — use keyword extraction
         const keywords = extractOekobaudatSearchTerms(query);
         console.log(`[search] Ökobaudat keywords: ${keywords.join(", ")}`);
         results = [];
@@ -88,9 +89,28 @@ export async function GET(request: NextRequest) {
           results = await adapter.search(cleanedQuery, { category });
         }
       } else {
+        // KBOB: names are in German — translate EN/NL/FR queries to German search terms
+        const kbobTerms = extractKbobSearchTerms(query);
+        console.log(`[search] KBOB search terms: ${kbobTerms.join(", ")}`);
+
+        // Try cleaned query first (works for already-German queries)
         results = await adapter.search(cleanedQuery, { category });
+        console.log(`[search] Cleaned query "${cleanedQuery}" → ${results.length} results`);
+
+        // If no results, try each translated German term
+        if (results.length === 0) {
+          for (const term of kbobTerms) {
+            results = await adapter.search(term, { category });
+            if (results.length > 0) {
+              console.log(`[search] Found ${results.length} results for KBOB term "${term}"`);
+              break;
+            }
+          }
+        }
+
+        // Last fallback: raw query
         if (results.length === 0 && cleanedQuery !== query) {
-          console.log(`[search] No results for cleaned query, trying raw`);
+          console.log(`[search] No results for any term, trying raw query`);
           results = await adapter.search(query, { category });
         }
       }

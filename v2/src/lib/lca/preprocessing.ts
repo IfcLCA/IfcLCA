@@ -121,29 +121,132 @@ const SYNONYM_MAP: Record<string, string[]> = {
   randen: ["Rand", "Betonfertigteil"],
   ihwg: ["Hochbaubeton"],
 
-  // English → German
+  // English → German (comprehensive BIM material coverage)
+  // Concrete
   concrete: ["Beton", "Hochbaubeton"],
   "cast in situ": ["Ortbeton", "Hochbaubeton"],
+  "cast-in-place": ["Ortbeton", "Hochbaubeton"],
+  "precast concrete": ["Betonfertigteil"],
+  "reinforced concrete": ["Hochbaubeton"],
+  "lightweight concrete": ["Leichtzementstein", "Porenbetonstein"],
+
+  // Steel / Metal
   steel: ["Stahl", "Stahlprofil"],
+  "stainless steel": ["Edelstahl", "Chromstahl"],
+  "structural steel": ["Stahlprofil", "Stahl"],
+  metal: ["Stahl", "Stahlprofil"],
+  "metal stud": ["Metallständer", "Ständerwerk"],
+  "stud layer": ["Ständerwerk", "Metallständer"],
+  aluminum: ["Aluminiumblech", "Aluminium"],
+  aluminium: ["Aluminiumblech", "Aluminium"],
+  copper: ["Kupferblech", "Kupfer"],
+  zinc: ["Zinkblech", "Zink"],
+
+  // Insulation
   insulation: ["Dämmung", "Wärmedämmung"],
   "rigid insulation": ["Polystyrol extrudiert", "XPS", "EPS"],
   "semi-rigid insulation": ["Glaswolle", "Steinwolle"],
   "thermal barriers": ["Wärmedämmung"],
+  "thermal insulation": ["Wärmedämmung", "Dämmung"],
+  "mineral wool": ["Mineralwolle", "Steinwolle", "Glaswolle"],
+  "glass wool": ["Glaswolle"],
+  "rock wool": ["Steinwolle"],
+  "stone wool": ["Steinwolle"],
+  "foam glass": ["Schaumglas"],
+  polystyrene: ["Polystyrol"],
+  styrofoam: ["Polystyrol expandiert EPS"],
+  xps: ["Polystyrol extrudiert XPS"],
+  eps: ["Polystyrol expandiert EPS"],
+
+  // Wood
+  wood: ["Holz", "Konstruktionsholz"],
+  timber: ["Holz", "Konstruktionsholz", "Brettschichtholz"],
+  lumber: ["Konstruktionsholz", "Schnittholz"],
+  "dimensional lumber": ["Konstruktionsholz", "Brettschichtholz"],
+  "glulam": ["Brettschichtholz"],
+  "laminated timber": ["Brettschichtholz"],
+  plywood: ["Sperrholzplatte"],
+  "wood flooring": ["Parkett"],
+  hardwood: ["Laubholz", "Parkett"],
+  softwood: ["Nadelholz", "Konstruktionsholz"],
+  "wood panel": ["Holzwerkstoff", "Sperrholzplatte"],
+  sheathing: ["Holzwerkstoff", "Sperrholzplatte"],
+  osb: ["Spanplatte", "Holzwerkstoff"],
+
+  // Masonry
   masonry: ["Mauerwerk"],
   brick: ["Backstein", "Mauerwerk"],
   "concrete block": ["Zementstein", "Betonstein"],
+  "concrete masonry": ["Betonstein", "Mauerwerk"],
+  "sand lime brick": ["Kalksandstein"],
+  "aerated concrete": ["Porenbetonstein"],
+
+  // Gypsum / Drywall
+  gypsum: ["Gips", "Gipskartonplatte"],
+  "gypsum board": ["Gipskartonplatte"],
+  "gypsum wall board": ["Gipskartonplatte"],
+  drywall: ["Gipskartonplatte"],
   plasterboard: ["Gipskartonplatte"],
-  plywood: ["Sperrholzplatte"],
-  "dimensional lumber": ["Konstruktionsholz", "Brettschichtholz"],
-  "wood flooring": ["Parkett"],
-  sheathing: ["Holzwerkstoff", "Sperrholzplatte"],
+  plaster: ["Gipsputz", "Putz"],
+  stucco: ["Putz", "Aussenputz"],
+
+  // Glass
+  glass: ["Glas"],
+  glazing: ["Verglasung", "Glas"],
+  "double glazing": ["Isolierverglasung"],
+  "triple glazing": ["Isolierverglasung"],
+
+  // Waterproofing / Membrane
+  membrane: ["Abdichtung", "Dichtungsbahn"],
+  "vapor barrier": ["Dampfbremse", "Dampfsperre"],
+  "vapor retarder": ["Dampfbremse"],
+  waterproofing: ["Abdichtung"],
   "epdm membrane": ["Dichtungsbahn Gummi EPDM"],
   epdm: ["Dichtungsbahn Gummi EPDM"],
+  bitumen: ["Bitumen", "Bitumenbahn"],
   roofing: ["Dachdeckung", "Dichtungsbahn"],
+  "roofing felt": ["Bitumenbahn", "Dachdeckung"],
+
+  // Finishes / Cladding
   "ceramic tile": ["Keramikplatte", "Steinzeugplatte"],
+  tile: ["Keramikplatte", "Fliese"],
+  ceramic: ["Keramik", "Fliese"],
+  "natural stone": ["Natursteinplatte"],
+  granite: ["Granit", "Naturstein"],
+  marble: ["Marmor", "Naturstein"],
+  slate: ["Schiefer", "Naturstein"],
+  carpet: ["Teppich", "Bodenbelag"],
+  linoleum: ["Linoleum", "Bodenbelag"],
+  vinyl: ["Vinyl", "Bodenbelag"],
+  "floor covering": ["Bodenbelag"],
+  paint: ["Anstrich", "Farbe"],
+  coating: ["Beschichtung", "Anstrich"],
+  render: ["Putz", "Aussenputz"],
+  cladding: ["Fassadenbekleidung", "Bekleidung"],
+
+  // Mortar / Adhesive
+  mortar: ["Mörtel", "Zementmörtel"],
   grout: ["Mörtel", "Zementmörtel"],
+  adhesive: ["Klebstoff", "Mörtel"],
+  sealant: ["Dichtungsmasse", "Fugendichtung"],
+
+  // Misc
   "air space": ["Luftschicht"],
-  "stud layer": ["Ständerwerk", "Metallständer"],
+  "air gap": ["Luftschicht"],
+  gravel: ["Kies", "Kiessand"],
+  sand: ["Sand", "Kiessand"],
+  earth: ["Erdreich", "Aushub"],
+  soil: ["Erdreich", "Aushub"],
+  asphalt: ["Asphalt", "Gussasphalt"],
+  "fiber cement": ["Faserzement"],
+  "fibre cement": ["Faserzement"],
+  "cement board": ["Faserzement"],
+  rubber: ["Gummi", "Kautschuk"],
+  pvc: ["PVC", "Kunststoff"],
+  plastic: ["Kunststoff"],
+  polyethylene: ["Polyethylen"],
+  polycarbonate: ["Polycarbonat"],
+  acrylic: ["Acrylglas"],
 
   // Generic German → specific KBOB
   "wärmedämmung druckfest": [
@@ -174,7 +277,6 @@ const SYNONYM_MAP: Record<string, string[]> = {
   naturstein: ["Natursteinplatte"],
   edelstahl: ["Edelstahl", "Chromstahl"],
   zink: ["Zinkblech"],
-  aluminium: ["Aluminiumblech"],
   vorfabriziert: ["Betonfertigteil"],
   fertigbeton: ["Betonfertigteil"],
 };
@@ -420,6 +522,105 @@ export function extractOekobaudatSearchTerms(query: string): string[] {
   }
 
   return [query.trim().slice(0, 30)];
+}
+
+// ---------------------------------------------------------------------------
+// 2b. KBOB Search-Term Extraction (uses SYNONYM_MAP for retrieval)
+// ---------------------------------------------------------------------------
+
+/**
+ * Derive German search terms for KBOB SQL LIKE queries.
+ *
+ * The KBOB database stores material names in German. IFC files often use
+ * English, Dutch, or French names. This function translates the query into
+ * German search terms BEFORE the SQL query, using the same synonym map
+ * used for scoring. Returns an array ordered most-specific → most-general.
+ *
+ * Also extracts raw words from the cleaned query as fallback terms,
+ * since some abbreviations (XPS, EPS, EPDM) appear in KBOB names verbatim.
+ */
+export function extractKbobSearchTerms(query: string): string[] {
+  const cleaned = cleanIfcQuery(query).toLowerCase();
+
+  // Collect all synonym matches with position and length
+  const matches: Array<{
+    pos: number;
+    len: number;
+    keyword: string;
+    terms: string[];
+  }> = [];
+
+  // Sort keys by length descending (most specific first)
+  const keys = Object.keys(SYNONYM_MAP).sort(
+    (a, b) => b.length - a.length
+  );
+
+  for (const keyword of keys) {
+    const pos = cleaned.indexOf(keyword);
+    if (pos !== -1) {
+      matches.push({
+        pos,
+        len: keyword.length,
+        keyword,
+        terms: SYNONYM_MAP[keyword],
+      });
+    }
+  }
+
+  if (matches.length > 0) {
+    // Remove subsumed matches (e.g. "stahl" inside "edelstahl")
+    const nonSubsumed = matches.filter((m) => {
+      return !matches.some(
+        (other) =>
+          other.len > m.len &&
+          other.pos <= m.pos &&
+          other.pos + other.len >= m.pos + m.len
+      );
+    });
+
+    // Flatten terms, deduplicated, preserving specificity order
+    const seen = new Set<string>();
+    const allTerms: string[] = [];
+    for (const m of nonSubsumed) {
+      for (const t of m.terms) {
+        if (!seen.has(t)) {
+          seen.add(t);
+          allTerms.push(t);
+        }
+      }
+    }
+
+    // Also add raw words from query (catches abbreviations like XPS, EPS, EPDM)
+    const rawWords = cleaned
+      .split(/[\s\-_/,;()|]+/)
+      .filter((w) => w.length >= 2)
+      .map((w) => w.toUpperCase());
+    for (const w of rawWords) {
+      if (!seen.has(w)) {
+        seen.add(w);
+        allTerms.push(w);
+      }
+    }
+
+    return allTerms;
+  }
+
+  // No synonym matches — try the Ökobaudat keyword map as fallback
+  // (it has many of the same EN→DE mappings)
+  const oekTerms = extractOekobaudatSearchTerms(query);
+  if (oekTerms.length > 0 && oekTerms[0] !== query.trim().slice(0, 30)) {
+    return oekTerms;
+  }
+
+  // Final fallback: individual words from cleaned query
+  const words = cleaned
+    .split(/[\s\-_/,;()|]+/)
+    .filter((w) => w.length >= 3);
+  if (words.length > 0) {
+    return words.map((w) => w.charAt(0).toUpperCase() + w.slice(1));
+  }
+
+  return [query.trim()];
 }
 
 // ---------------------------------------------------------------------------
