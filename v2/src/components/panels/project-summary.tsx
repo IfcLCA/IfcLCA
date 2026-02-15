@@ -67,7 +67,7 @@ export function ProjectSummary() {
     return { totals, byCategory: sortedCategories };
   }, [materials]);
 
-  // Auto-match all unmatched materials
+  // Auto-match all unmatched materials via SSE streaming
   const handleAutoMatch = useCallback(async () => {
     if (!project) return;
     setAutoMatching(true);
@@ -85,12 +85,15 @@ export function ProjectSummary() {
         phase: "matching",
         matched: 0,
         total,
-        message: `Matching ${total} materials...`,
+        message: `Matching 0/${total} materials...`,
       });
 
       const res = await fetch("/api/materials/auto-match", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          Accept: "text/event-stream",
+        },
         body: JSON.stringify({
           projectId: project.id,
           source: activeDataSource,
@@ -98,22 +101,53 @@ export function ProjectSummary() {
         }),
       });
 
-      const data = await res.json();
-      if (!res.ok) {
+      if (!res.ok || !res.body) {
+        const data = await res.json().catch(() => ({}));
         setAutoMatchResult(data.error || "Auto-match failed");
         setAutoMatchProgress({ phase: "idle", matched: 0, total: 0, message: "" });
         return;
       }
 
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
       let matched = 0;
       let reapplied = 0;
       let auto = 0;
-      for (const result of data.matches ?? []) {
-        if (result.match && result.matchedMaterial) {
-          updateMaterialMatch(result.materialName, result.match, result.matchedMaterial);
-          matched++;
-          if (result.match.method === "reapplied") reapplied++;
-          else auto++;
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split("\n");
+        buffer = lines.pop() ?? "";
+
+        for (const line of lines) {
+          if (!line.startsWith("data: ")) continue;
+          const payload = line.slice(6);
+          if (payload === "[DONE]") continue;
+
+          try {
+            const event = JSON.parse(payload);
+            if (event.error) continue;
+
+            const r = event.result;
+            if (r?.match && r?.matchedMaterial) {
+              updateMaterialMatch(r.materialName, r.match, r.matchedMaterial);
+              matched++;
+              if (r.match.method === "reapplied") reapplied++;
+              else auto++;
+            }
+            setAutoMatchProgress({
+              phase: "matching",
+              matched: event.matched,
+              total: event.total,
+              message: `Matching ${event.matched}/${event.total} materials...`,
+            });
+          } catch {
+            // Ignore malformed SSE lines
+          }
         }
       }
 
@@ -130,7 +164,6 @@ export function ProjectSummary() {
         setAutoMatchProgress({ phase: "done", matched: 0, total, message: msg });
       }
 
-      // Clear progress after 8 seconds
       setTimeout(() => {
         const { autoMatchProgress: p } = useAppStore.getState();
         if (p.phase === "done") {

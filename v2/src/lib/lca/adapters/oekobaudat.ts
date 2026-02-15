@@ -5,7 +5,11 @@
  * materials into the generic NormalizedMaterial format.
  */
 
-import { eq, and, like, gte, lte, desc, sql } from "drizzle-orm";
+import { eq, and, or, like, gte, lte, desc, sql } from "drizzle-orm";
+import {
+  cleanIfcQuery,
+  extractOekobaudatSearchTerms,
+} from "@/lib/lca/preprocessing";
 import { nanoid } from "nanoid";
 import { db } from "@/db";
 import { lcaMaterials } from "@/db/schema";
@@ -311,9 +315,24 @@ export class OekobaudatAdapter implements LCADataSourceAdapter {
     const conditions = [eq(lcaMaterials.source, SOURCE_ID)];
 
     if (query) {
-      // Escape SQL LIKE wildcards in user input
-      const escaped = query.replace(/[%_]/g, (ch) => `\\${ch}`);
-      conditions.push(like(lcaMaterials.name, `%${escaped}%`));
+      // Ökobaudat names are German — translate queries via keyword extraction.
+      // Build OR clause: cleaned query + extracted German keywords.
+      const cleaned = cleanIfcQuery(query);
+      const keywords = extractOekobaudatSearchTerms(query);
+      const allTerms = new Set([cleaned, query, ...keywords]);
+
+      const likeClauses = [...allTerms]
+        .filter(Boolean)
+        .map((t) => {
+          const escaped = t.replace(/[%_]/g, (ch) => `\\${ch}`);
+          return like(lcaMaterials.name, `%${escaped}%`);
+        });
+
+      if (likeClauses.length === 1) {
+        conditions.push(likeClauses[0]);
+      } else if (likeClauses.length > 1) {
+        conditions.push(or(...likeClauses)!);
+      }
     }
     if (filters?.category) {
       conditions.push(eq(lcaMaterials.category, filters.category));

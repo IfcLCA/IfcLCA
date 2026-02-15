@@ -114,60 +114,96 @@ export function UploadZone({ projectId }: UploadZoneProps) {
           )
         );
 
-        // Send to server for persistence, then auto-match all materials
+        // Send to server for persistence, then auto-match via SSE streaming
         persistToServer(projectId, file, result.parseResult)
-          .then(() => {
+          .then(async () => {
             const { activeDataSource, materials, updateMaterialMatch, setAutoMatchProgress } =
               useAppStore.getState();
             const materialNames = materials.map((m) => m.name);
             if (materialNames.length === 0) return;
 
             const total = materialNames.length;
-            console.log(
-              `[UploadZone] Triggering auto-match for ${total} materials`
-            );
+            console.log(`[UploadZone] Triggering auto-match for ${total} materials (SSE)`);
             setAutoMatchProgress({
               phase: "matching",
               matched: 0,
               total,
-              message: `Matching ${total} materials...`,
+              message: `Matching 0/${total} materials...`,
             });
 
-            return fetch("/api/materials/auto-match", {
+            const res = await fetch("/api/materials/auto-match", {
               method: "POST",
-              headers: { "Content-Type": "application/json" },
+              headers: {
+                "Content-Type": "application/json",
+                Accept: "text/event-stream",
+              },
               body: JSON.stringify({
                 projectId,
                 source: activeDataSource,
                 materialNames,
               }),
-            })
-              .then((r) => r.json())
-              .then((data) => {
-                let matched = 0;
-                for (const r of data.matches ?? []) {
-                  if (r.match && r.matchedMaterial) {
+            });
+
+            if (!res.ok || !res.body) {
+              const data = await res.json().catch(() => ({}));
+              throw new Error(data.error || `Auto-match failed: ${res.status}`);
+            }
+
+            const reader = res.body.getReader();
+            const decoder = new TextDecoder();
+            let buffer = "";
+            let matched = 0;
+
+            while (true) {
+              const { done, value } = await reader.read();
+              if (done) break;
+
+              buffer += decoder.decode(value, { stream: true });
+              const lines = buffer.split("\n");
+              buffer = lines.pop() ?? "";
+
+              for (const line of lines) {
+                if (!line.startsWith("data: ")) continue;
+                const payload = line.slice(6);
+                if (payload === "[DONE]") continue;
+
+                try {
+                  const event = JSON.parse(payload);
+                  if (event.error) {
+                    console.error("[UploadZone] SSE error:", event.error);
+                    continue;
+                  }
+                  // Apply match to store in real-time
+                  const r = event.result;
+                  if (r?.match && r?.matchedMaterial) {
                     updateMaterialMatch(r.materialName, r.match, r.matchedMaterial);
                     matched++;
                   }
+                  setAutoMatchProgress({
+                    phase: "matching",
+                    matched: event.matched,
+                    total: event.total,
+                    message: `Matching ${event.matched}/${event.total} materials...`,
+                  });
+                } catch {
+                  // Ignore malformed SSE lines
                 }
-                console.log(
-                  `[UploadZone] Auto-match complete: ${matched}/${total} matched`
-                );
-                setAutoMatchProgress({
-                  phase: "done",
-                  matched,
-                  total,
-                  message: `Auto-matched ${matched}/${total} materials`,
-                });
-                // Clear the "done" message after 8 seconds
-                setTimeout(() => {
-                  const { autoMatchProgress } = useAppStore.getState();
-                  if (autoMatchProgress.phase === "done") {
-                    setAutoMatchProgress({ phase: "idle", matched: 0, total: 0, message: "" });
-                  }
-                }, 8000);
-              });
+              }
+            }
+
+            console.log(`[UploadZone] Auto-match complete: ${matched}/${total} matched`);
+            setAutoMatchProgress({
+              phase: "done",
+              matched,
+              total,
+              message: `Auto-matched ${matched}/${total} materials`,
+            });
+            setTimeout(() => {
+              const { autoMatchProgress } = useAppStore.getState();
+              if (autoMatchProgress.phase === "done") {
+                setAutoMatchProgress({ phase: "idle", matched: 0, total: 0, message: "" });
+              }
+            }, 8000);
           })
           .catch((err) => {
             console.error("Failed to persist/auto-match upload:", err);

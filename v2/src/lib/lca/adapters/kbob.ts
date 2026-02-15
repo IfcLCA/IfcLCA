@@ -5,7 +5,11 @@
  * into the generic NormalizedMaterial format. Persists to Turso via Drizzle.
  */
 
-import { eq, and, like, gte, lte, desc, sql } from "drizzle-orm";
+import { eq, and, or, like, gt, gte, lte, desc, sql } from "drizzle-orm";
+import {
+  cleanIfcQuery,
+  extractKbobSearchTerms,
+} from "@/lib/lca/preprocessing";
 import { nanoid } from "nanoid";
 import { db } from "@/db";
 import { lcaMaterials } from "@/db/schema";
@@ -182,12 +186,32 @@ export class KBOBAdapter implements LCADataSourceAdapter {
     query: string,
     filters?: SearchFilters
   ): Promise<NormalizedMaterial[]> {
-    const conditions = [eq(lcaMaterials.source, SOURCE_ID)];
+    const conditions = [
+      eq(lcaMaterials.source, SOURCE_ID),
+      // KBOB entries without density are unusable for LCA volume calculations
+      gt(lcaMaterials.density, 0),
+    ];
 
     if (query) {
-      // Escape SQL LIKE wildcards in user input
-      const escaped = query.replace(/[%_]/g, (ch) => `\\${ch}`);
-      conditions.push(like(lcaMaterials.name, `%${escaped}%`));
+      // KBOB names are German — translate EN/NL/FR queries before SQL LIKE.
+      // Build OR clause: cleaned query + all translated German terms.
+      const cleaned = cleanIfcQuery(query);
+      const terms = extractKbobSearchTerms(query);
+      // Always include the cleaned query + raw query as search candidates
+      const allTerms = new Set([cleaned, query, ...terms]);
+
+      const likeClauses = [...allTerms]
+        .filter(Boolean)
+        .map((t) => {
+          const escaped = t.replace(/[%_]/g, (ch) => `\\${ch}`);
+          return like(lcaMaterials.name, `%${escaped}%`);
+        });
+
+      if (likeClauses.length === 1) {
+        conditions.push(likeClauses[0]);
+      } else if (likeClauses.length > 1) {
+        conditions.push(or(...likeClauses)!);
+      }
     }
     if (filters?.category) {
       conditions.push(eq(lcaMaterials.category, filters.category));

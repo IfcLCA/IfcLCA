@@ -1,10 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import { registry } from "@/lib/lca/registry";
-import { cleanIfcQuery, extractOekobaudatSearchTerms, extractKbobSearchTerms } from "@/lib/lca/preprocessing";
 
 export const dynamic = "force-dynamic";
-export const maxDuration = 60; // Sync + search can take time on first use
+export const maxDuration = 60;
 
 /** Track in-flight auto-sync to avoid duplicates */
 let autoSyncPromise: Promise<void> | null = null;
@@ -27,7 +26,7 @@ export async function GET(request: NextRequest) {
   try {
     console.log(`[search] q="${query}" source=${source ?? "all"}`);
 
-    // Auto-sync: if a specific source has never been synced, sync now before searching
+    // Auto-sync: if a specific source has never been synced, sync now
     if (source && registry.has(source)) {
       const adapter = registry.get(source);
       const lastSync = await adapter.getLastSyncTime();
@@ -46,7 +45,6 @@ export async function GET(request: NextRequest) {
               autoSyncPromise = null;
             });
         }
-        // Wait with a timeout to prevent hanging forever
         const timeout = new Promise<void>((_, reject) =>
           setTimeout(() => reject(new Error("Sync timed out after 30s")), 30_000)
         );
@@ -54,14 +52,12 @@ export async function GET(request: NextRequest) {
           await Promise.race([autoSyncPromise, timeout]);
         } catch (syncErr) {
           console.error(`[search] Sync timeout/error:`, syncErr);
-          // Continue with search even if sync fails — may have partial data
         }
       }
     }
 
-    // Preprocess query: clean IFC naming noise
-    const cleanedQuery = cleanIfcQuery(query);
-    console.log(`[search] cleaned="${cleanedQuery}"`);
+    // Each adapter handles its own query translation (EN→DE synonyms,
+    // keyword extraction, density filtering) internally.
     let results: Awaited<ReturnType<typeof registry.searchAll>>;
 
     if (source) {
@@ -72,50 +68,9 @@ export async function GET(request: NextRequest) {
         );
       }
       const adapter = registry.get(source);
-
-      if (source === "oekobaudat") {
-        // Ökobaudat API does AND matching — use keyword extraction
-        const keywords = extractOekobaudatSearchTerms(query);
-        console.log(`[search] Ökobaudat keywords: ${keywords.join(", ")}`);
-        results = [];
-        for (const keyword of keywords) {
-          results = await adapter.search(keyword, { category });
-          if (results.length > 0) {
-            console.log(`[search] Found ${results.length} results for keyword "${keyword}"`);
-            break;
-          }
-        }
-        if (results.length === 0) {
-          results = await adapter.search(cleanedQuery, { category });
-        }
-      } else {
-        // KBOB: names are in German — translate EN/NL/FR queries to German search terms
-        const kbobTerms = extractKbobSearchTerms(query);
-        console.log(`[search] KBOB search terms: ${kbobTerms.join(", ")}`);
-
-        // Try cleaned query first (works for already-German queries)
-        results = await adapter.search(cleanedQuery, { category });
-        console.log(`[search] Cleaned query "${cleanedQuery}" → ${results.length} results`);
-
-        // If no results, try each translated German term
-        if (results.length === 0) {
-          for (const term of kbobTerms) {
-            results = await adapter.search(term, { category });
-            if (results.length > 0) {
-              console.log(`[search] Found ${results.length} results for KBOB term "${term}"`);
-              break;
-            }
-          }
-        }
-
-        // Last fallback: raw query
-        if (results.length === 0 && cleanedQuery !== query) {
-          console.log(`[search] No results for any term, trying raw query`);
-          results = await adapter.search(query, { category });
-        }
-      }
+      results = await adapter.search(query, { category });
     } else {
-      results = await registry.searchAll(cleanedQuery, { category });
+      results = await registry.searchAll(query, { category });
     }
 
     console.log(`[search] Returning ${results.length} results`);

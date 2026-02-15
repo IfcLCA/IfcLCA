@@ -5,15 +5,11 @@ import { materials, projects, lcaMaterials } from "@/db/schema";
 import { eq, and, inArray, isNotNull } from "drizzle-orm";
 import { registry } from "@/lib/lca/registry";
 import { findBestMatch } from "@/lib/lca/matching";
-import {
-  cleanIfcQuery,
-  extractOekobaudatSearchTerms,
-  extractKbobSearchTerms,
-} from "@/lib/lca/preprocessing";
+import { cleanIfcQuery } from "@/lib/lca/preprocessing";
 import type { NormalizedMaterial, MaterialMatch } from "@/types/lca";
 
 export const dynamic = "force-dynamic";
-export const maxDuration = 120; // Auto-matching many materials can be slow
+export const maxDuration = 120;
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -50,7 +46,8 @@ function rowToNormalized(row: typeof lcaMaterials.$inferSelect): NormalizedMater
 }
 
 // ---------------------------------------------------------------------------
-// Route handler
+// Route handler — streams progress via SSE if Accept: text/event-stream,
+// otherwise returns JSON batch response for backwards compatibility.
 // ---------------------------------------------------------------------------
 
 export async function POST(request: NextRequest) {
@@ -88,15 +85,22 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Project not found" }, { status: 404 });
   }
 
-  const activeSource =
-    source || project.preferredDataSource || "kbob";
+  const activeSource = source || project.preferredDataSource || "kbob";
+  // These are narrowed to non-null above but TypeScript doesn't track into closures
+  const verifiedUserId = userId!;
+  const verifiedProjectId = projectId!;
+  const verifiedNames = materialNames!;
+  const wantsSSE = request.headers.get("accept")?.includes("text/event-stream");
 
   console.log(
-    `[match] Auto-match started: ${materialNames.length} materials, source=${activeSource}, project=${projectId}`
+    `[match] Auto-match started: ${verifiedNames.length} materials, source=${activeSource}, project=${projectId}, sse=${!!wantsSSE}`
   );
 
-  try {
-    // Ensure the data source is synced
+  // Core matching logic — shared between SSE and batch modes
+  async function runMatching(
+    onProgress?: (matched: number, total: number, materialName: string, result: unknown) => void
+  ) {
+    // Ensure synced
     if (registry.has(activeSource)) {
       const adapter = registry.get(activeSource);
       const lastSync = await adapter.getLastSyncTime();
@@ -106,9 +110,7 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // -----------------------------------------------------------------------
-    // Step 1: Look up previous manual mappings by this user (reapply)
-    // -----------------------------------------------------------------------
+    // Step 1: Reapply previous manual mappings
     const previousMappings = await db
       .select({
         materialName: materials.name,
@@ -120,15 +122,14 @@ export async function POST(request: NextRequest) {
       .innerJoin(projects, eq(materials.projectId, projects.id))
       .where(
         and(
-          eq(projects.userId, userId),
-          inArray(materials.name, materialNames),
+          eq(projects.userId, verifiedUserId),
+          inArray(materials.name, verifiedNames),
           eq(materials.matchMethod, "manual"),
           isNotNull(materials.lcaMaterialId),
           eq(materials.matchSource, activeSource)
         )
       );
 
-    // Build lookup: material name → best previous mapping
     const reapplyMap = new Map<
       string,
       { lcaMaterialId: string; matchSource: string; matchSourceId: string }
@@ -143,43 +144,33 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    console.log(
-      `[match] Found ${reapplyMap.size} previous manual mappings to reapply`
-    );
+    console.log(`[match] Found ${reapplyMap.size} previous manual mappings to reapply`);
 
-    // Fetch LCA material records for reapply targets
-    const reapplyLcaIds = [...reapplyMap.values()].map(
-      (v) => v.lcaMaterialId
-    );
+    const reapplyLcaIds = [...reapplyMap.values()].map((v) => v.lcaMaterialId);
     const reapplyLcaRows =
       reapplyLcaIds.length > 0
-        ? await db
-            .select()
-            .from(lcaMaterials)
-            .where(inArray(lcaMaterials.id, reapplyLcaIds))
+        ? await db.select().from(lcaMaterials).where(inArray(lcaMaterials.id, reapplyLcaIds))
         : [];
     const reapplyLcaMaterialMap = new Map<string, NormalizedMaterial>();
     for (const row of reapplyLcaRows) {
       reapplyLcaMaterialMap.set(row.id, rowToNormalized(row));
     }
 
-    // -----------------------------------------------------------------------
     // Step 2: Match each material
-    // -----------------------------------------------------------------------
     const matches: Array<{
       materialName: string;
       match: MaterialMatch | null;
       matchedMaterial: NormalizedMaterial | null;
     }> = [];
 
-    for (const materialName of materialNames) {
+    let matchedSoFar = 0;
+
+    for (const materialName of verifiedNames) {
       try {
-        // --- Priority 1: Reapply from previous manual mapping ---
+        // Priority 1: Reapply from previous manual mapping
         const prevMapping = reapplyMap.get(materialName);
         if (prevMapping) {
-          const lcaMat = reapplyLcaMaterialMap.get(
-            prevMapping.lcaMaterialId
-          );
+          const lcaMat = reapplyLcaMaterialMap.get(prevMapping.lcaMaterialId);
           if (lcaMat) {
             const match: MaterialMatch = {
               lcaMaterialId: prevMapping.lcaMaterialId,
@@ -190,16 +181,10 @@ export async function POST(request: NextRequest) {
               matchedAt: new Date(),
             };
 
-            // Persist
             const [mat] = await db
               .select()
               .from(materials)
-              .where(
-                and(
-                  eq(materials.projectId, projectId),
-                  eq(materials.name, materialName)
-                )
-              )
+              .where(and(eq(materials.projectId, verifiedProjectId), eq(materials.name, materialName)))
               .limit(1);
 
             if (mat) {
@@ -217,97 +202,40 @@ export async function POST(request: NextRequest) {
                 .where(eq(materials.id, mat.id));
             }
 
-            console.log(
-              `[match] REAPPLIED "${materialName}" → "${lcaMat.name}" (from previous manual mapping)`
-            );
-            matches.push({ materialName, match, matchedMaterial: lcaMat });
+            console.log(`[match] REAPPLIED "${materialName}" → "${lcaMat.name}"`);
+            const entry = { materialName, match, matchedMaterial: lcaMat };
+            matches.push(entry);
+            matchedSoFar++;
+            onProgress?.(matchedSoFar, verifiedNames.length, materialName, entry);
             continue;
           }
         }
 
-        // --- Priority 2: Auto-match by search + scoring ---
+        // Priority 2: Auto-match via adapter search + scoring.
+        // Each adapter handles its own query translation (EN→DE, keyword
+        // extraction) and quality filtering (e.g. KBOB density > 0) internally.
         const adapter = registry.get(activeSource);
-        const searchQuery = cleanIfcQuery(materialName);
-        let candidates: NormalizedMaterial[] = [];
-
-        if (activeSource === "oekobaudat") {
-          const keywords = extractOekobaudatSearchTerms(materialName);
-          console.log(`[match] Ökobaudat keywords for "${materialName}": ${keywords.join(", ")}`);
-          for (const keyword of keywords) {
-            candidates = await adapter.search(keyword);
-            if (candidates.length > 0) {
-              console.log(`[match] Found ${candidates.length} candidates for keyword "${keyword}"`);
-              break;
-            }
-          }
-        } else {
-          // KBOB: translate EN/NL/FR queries to German search terms
-          candidates = await adapter.search(searchQuery);
-          console.log(`[match] KBOB search "${searchQuery}" → ${candidates.length} candidates`);
-
-          if (candidates.length === 0) {
-            const kbobTerms = extractKbobSearchTerms(materialName);
-            console.log(`[match] KBOB translated terms for "${materialName}": ${kbobTerms.join(", ")}`);
-            for (const term of kbobTerms) {
-              candidates = await adapter.search(term);
-              if (candidates.length > 0) {
-                console.log(`[match] Found ${candidates.length} candidates for KBOB term "${term}"`);
-                break;
-              }
-            }
-          }
-
-          // Last resort: raw name
-          if (candidates.length === 0 && searchQuery !== materialName) {
-            candidates = await adapter.search(materialName);
-          }
-        }
+        const candidates = await adapter.search(materialName);
 
         if (candidates.length === 0) {
-          console.log(
-            `[match] NO CANDIDATES for "${materialName}" (cleaned: "${searchQuery}")`
-          );
-          matches.push({ materialName, match: null, matchedMaterial: null });
+          console.log(`[match] NO CANDIDATES for "${materialName}"`);
+          const entry = { materialName, match: null, matchedMaterial: null };
+          matches.push(entry);
+          onProgress?.(matchedSoFar, verifiedNames.length, materialName, entry);
           continue;
         }
 
-        // For KBOB, only consider candidates that have density set —
-        // entries without density are not usable for LCA calculations
-        if (activeSource === "kbob") {
-          const before = candidates.length;
-          candidates = candidates.filter((c) => c.density != null && c.density > 0);
-          if (before !== candidates.length) {
-            console.log(`[match] KBOB density filter: ${before} → ${candidates.length} candidates`);
-          }
-          if (candidates.length === 0) {
-            console.log(`[match] NO CANDIDATES with density for "${materialName}"`);
-            matches.push({ materialName, match: null, matchedMaterial: null });
-            continue;
-          }
-        }
-
-        // Always pick the best match unless score is really poor (< 0.2)
+        const searchQuery = cleanIfcQuery(materialName);
         const result = findBestMatch({ materialName: searchQuery }, candidates, 0.2);
 
         if (result.match && result.alternatives.length > 0) {
           const bestMaterial = result.alternatives[0].material;
+          const autoMatch: MaterialMatch = { ...result.match, method: "auto" };
 
-          // Override method to "auto" for transparency
-          const autoMatch: MaterialMatch = {
-            ...result.match,
-            method: "auto",
-          };
-
-          // Persist
           const [mat] = await db
             .select()
             .from(materials)
-            .where(
-              and(
-                eq(materials.projectId, projectId),
-                eq(materials.name, materialName)
-              )
-            )
+            .where(and(eq(materials.projectId, verifiedProjectId), eq(materials.name, materialName)))
             .limit(1);
 
           if (mat) {
@@ -326,39 +254,75 @@ export async function POST(request: NextRequest) {
           }
 
           console.log(
-            `[match] AUTO "${materialName}" → "${bestMaterial.name}" (score=${autoMatch.score.toFixed(2)}, method=${result.alternatives[0].method})`
+            `[match] AUTO "${materialName}" → "${bestMaterial.name}" (score=${autoMatch.score.toFixed(2)})`
           );
-          matches.push({
-            materialName,
-            match: autoMatch,
-            matchedMaterial: bestMaterial,
-          });
+          const entry = { materialName, match: autoMatch, matchedMaterial: bestMaterial };
+          matches.push(entry);
+          matchedSoFar++;
+          onProgress?.(matchedSoFar, verifiedNames.length, materialName, entry);
         } else {
           const topScore = result.alternatives[0]?.score;
           console.log(
-            `[match] BELOW THRESHOLD "${materialName}" (best=${topScore?.toFixed(2) ?? "none"}, candidates=${candidates.length})`
+            `[match] BELOW THRESHOLD "${materialName}" (best=${topScore?.toFixed(2) ?? "none"})`
           );
-          matches.push({ materialName, match: null, matchedMaterial: null });
+          const entry = { materialName, match: null, matchedMaterial: null };
+          matches.push(entry);
+          onProgress?.(matchedSoFar, verifiedNames.length, materialName, entry);
         }
       } catch (err) {
-        console.error(
-          `[match] ERROR "${materialName}":`,
-          err instanceof Error ? err.message : err
-        );
-        matches.push({ materialName, match: null, matchedMaterial: null });
+        console.error(`[match] ERROR "${materialName}":`, err instanceof Error ? err.message : err);
+        const entry = { materialName, match: null, matchedMaterial: null };
+        matches.push(entry);
+        onProgress?.(matchedSoFar, verifiedNames.length, materialName, entry);
       }
     }
 
     const matched = matches.filter((m) => m.match).length;
-    const reapplied = matches.filter(
-      (m) => m.match?.method === "reapplied"
-    ).length;
+    const reapplied = matches.filter((m) => m.match?.method === "reapplied").length;
     const auto = matches.filter((m) => m.match?.method === "auto").length;
-
     console.log(
-      `[match] Auto-match complete: ${matched}/${materialNames.length} matched (${reapplied} reapplied, ${auto} auto)`
+      `[match] Auto-match complete: ${matched}/${verifiedNames.length} (${reapplied} reapplied, ${auto} auto)`
     );
 
+    return matches;
+  }
+
+  // -------------------------------------------------------------------------
+  // SSE mode: stream progress per material
+  // -------------------------------------------------------------------------
+  if (wantsSSE) {
+    const encoder = new TextEncoder();
+    const stream = new ReadableStream({
+      async start(controller) {
+        try {
+          await runMatching((matched, total, materialName, result) => {
+            const event = JSON.stringify({ matched, total, materialName, result });
+            controller.enqueue(encoder.encode(`data: ${event}\n\n`));
+          });
+          controller.enqueue(encoder.encode(`data: [DONE]\n\n`));
+        } catch (err) {
+          const msg = err instanceof Error ? err.message : String(err);
+          controller.enqueue(encoder.encode(`data: ${JSON.stringify({ error: msg })}\n\n`));
+        } finally {
+          controller.close();
+        }
+      },
+    });
+
+    return new Response(stream, {
+      headers: {
+        "Content-Type": "text/event-stream",
+        "Cache-Control": "no-cache",
+        Connection: "keep-alive",
+      },
+    });
+  }
+
+  // -------------------------------------------------------------------------
+  // Batch mode: return all matches at once (backwards compatible)
+  // -------------------------------------------------------------------------
+  try {
+    const matches = await runMatching();
     return NextResponse.json({ matches });
   } catch (err) {
     console.error("[match] Auto-match failed:", err);
