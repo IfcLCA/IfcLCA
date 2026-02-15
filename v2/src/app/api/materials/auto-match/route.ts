@@ -5,6 +5,7 @@ import { materials, projects } from "@/db/schema";
 import { eq, and } from "drizzle-orm";
 import { registry } from "@/lib/lca/registry";
 import { findBestMatch } from "@/lib/lca/matching";
+import { cleanIfcQuery, extractOekobaudatSearchTerms } from "@/lib/lca/preprocessing";
 import type { NormalizedMaterial, MaterialMatch } from "@/types/lca";
 
 export const dynamic = "force-dynamic";
@@ -66,7 +67,26 @@ export async function POST(request: NextRequest) {
     for (const materialName of materialNames) {
       try {
         const adapter = registry.get(activeSource);
-        const candidates = await adapter.search(materialName);
+
+        // Preprocess query: clean IFC noise, then use keyword extraction
+        // for Ökobaudat (AND full-text search needs single German keywords)
+        let searchQuery = cleanIfcQuery(materialName);
+        let candidates: NormalizedMaterial[] = [];
+
+        if (activeSource === "oekobaudat") {
+          // Ökobaudat: try each extracted keyword until we get results
+          const keywords = extractOekobaudatSearchTerms(materialName);
+          for (const keyword of keywords) {
+            candidates = await adapter.search(keyword);
+            if (candidates.length > 0) break;
+          }
+        } else {
+          candidates = await adapter.search(searchQuery);
+          // If no results with cleaned query, try original
+          if (candidates.length === 0 && searchQuery !== materialName) {
+            candidates = await adapter.search(materialName);
+          }
+        }
 
         const result = findBestMatch(
           { materialName },

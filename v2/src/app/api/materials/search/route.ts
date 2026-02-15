@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import { registry } from "@/lib/lca/registry";
+import { cleanIfcQuery, extractOekobaudatSearchTerms } from "@/lib/lca/preprocessing";
 
 export const dynamic = "force-dynamic";
 
@@ -46,7 +47,9 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    let results;
+    // Preprocess query: clean IFC naming noise
+    const cleanedQuery = cleanIfcQuery(query);
+    let results: Awaited<ReturnType<typeof registry.searchAll>>;
 
     if (source) {
       if (!registry.has(source)) {
@@ -56,9 +59,29 @@ export async function GET(request: NextRequest) {
         );
       }
       const adapter = registry.get(source);
-      results = await adapter.search(query, { category });
+
+      if (source === "oekobaudat") {
+        // Ökobaudat API does AND matching — use keyword extraction
+        // to derive clean German search terms from noisy IFC queries
+        const keywords = extractOekobaudatSearchTerms(query);
+        results = [];
+        for (const keyword of keywords) {
+          results = await adapter.search(keyword, { category });
+          if (results.length > 0) break;
+        }
+        // Fallback to cleaned query if keywords didn't match
+        if (results.length === 0) {
+          results = await adapter.search(cleanedQuery, { category });
+        }
+      } else {
+        results = await adapter.search(cleanedQuery, { category });
+        // Fallback to raw query if cleaned query didn't match
+        if (results.length === 0 && cleanedQuery !== query) {
+          results = await adapter.search(query, { category });
+        }
+      }
     } else {
-      results = await registry.searchAll(query, { category });
+      results = await registry.searchAll(cleanedQuery, { category });
     }
 
     return NextResponse.json({ materials: results });

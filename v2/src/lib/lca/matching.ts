@@ -11,6 +11,7 @@ import type {
   MaterialMatch,
   MatchMethod,
 } from "@/types/lca";
+import { cleanIfcQuery, expandQueryWithSynonyms } from "./preprocessing";
 
 // ---------------------------------------------------------------------------
 // Matching strategies
@@ -160,7 +161,11 @@ export function findBestMatch(
 ): MatchResult {
   const alternatives: MatchCandidate[] = [];
 
-  // Try each strategy in order
+  // Preprocess: clean IFC noise, expand with cross-lingual synonyms
+  const cleaned = cleanIfcQuery(input.materialName);
+  const expanded = expandQueryWithSynonyms(cleaned);
+
+  // Try each strategy with both raw and preprocessed names
   const exact = tryExactMatch(input.materialName, candidates);
   if (exact) alternatives.push(exact);
 
@@ -170,8 +175,20 @@ export function findBestMatch(
   );
   if (caseInsensitive && !exact) alternatives.push(caseInsensitive);
 
+  // Also try cleaned name for case-insensitive
+  if (cleaned !== input.materialName) {
+    const cleanedCi = tryCaseInsensitiveMatch(cleaned, candidates);
+    if (cleanedCi) alternatives.push(cleanedCi);
+  }
+
   const normalized = tryNormalizedMatch(input.materialName, candidates);
   if (normalized) alternatives.push(normalized);
+
+  // Try normalized match with cleaned query too
+  if (cleaned !== input.materialName) {
+    const cleanedNorm = tryNormalizedMatch(cleaned, candidates);
+    if (cleanedNorm) alternatives.push(cleanedNorm);
+  }
 
   const classification = tryClassificationMatch(
     input.classificationCode,
@@ -179,8 +196,15 @@ export function findBestMatch(
   );
   if (classification) alternatives.push(classification);
 
-  const fuzzy = tryFuzzyMatch(input.materialName, candidates, 0.5);
+  // Fuzzy match with the expanded query (includes cross-lingual synonyms)
+  const fuzzy = tryFuzzyMatch(expanded, candidates, 0.5);
   if (fuzzy) alternatives.push(fuzzy);
+
+  // Also try fuzzy with just the cleaned name
+  if (cleaned !== expanded) {
+    const cleanedFuzzy = tryFuzzyMatch(cleaned, candidates, 0.5);
+    if (cleanedFuzzy) alternatives.push(cleanedFuzzy);
+  }
 
   // Deduplicate and sort by score
   const seen = new Set<string>();
