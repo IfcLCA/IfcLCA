@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { UserButton } from "@clerk/nextjs";
-import { Plus, Building2, BarChart3, Clock } from "lucide-react";
+import { Plus, Building2, BarChart3, Clock, Leaf, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -25,6 +25,7 @@ export function DashboardClient({ projects }: DashboardClientProps) {
   const router = useRouter();
   const [creating, setCreating] = useState(false);
   const [name, setName] = useState("");
+  const [deleting, setDeleting] = useState<string | null>(null);
 
   async function handleCreate() {
     if (!name.trim()) return;
@@ -46,6 +47,27 @@ export function DashboardClient({ projects }: DashboardClientProps) {
     }
   }
 
+  async function handleDelete(projectId: string, e: React.MouseEvent) {
+    e.stopPropagation();
+    if (!confirm("Delete this project? This cannot be undone.")) return;
+    setDeleting(projectId);
+    try {
+      await fetch(`/api/projects/${projectId}`, { method: "DELETE" });
+      router.refresh();
+    } finally {
+      setDeleting(null);
+    }
+  }
+
+  // Dashboard summary stats
+  const totalGwp = projects.reduce(
+    (sum, p) => sum + (p.gwpTotal ?? 0),
+    0
+  );
+  const projectsWithGwp = projects.filter(
+    (p) => p.gwpTotal != null && p.gwpTotal > 0
+  ).length;
+
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
@@ -64,6 +86,39 @@ export function DashboardClient({ projects }: DashboardClientProps) {
 
       {/* Content */}
       <main className="mx-auto max-w-7xl px-6 py-8">
+        {/* Summary stats */}
+        {projects.length > 0 && (
+          <div className="mb-6 grid grid-cols-2 gap-4 sm:grid-cols-4">
+            <Card>
+              <CardContent className="p-4">
+                <p className="text-xs text-muted-foreground">Projects</p>
+                <p className="text-2xl font-bold">{projects.length}</p>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="p-4">
+                <p className="text-xs text-muted-foreground">With LCA Results</p>
+                <p className="text-2xl font-bold">{projectsWithGwp}</p>
+              </CardContent>
+            </Card>
+            {totalGwp > 0 && (
+              <Card className="sm:col-span-2">
+                <CardContent className="flex items-center gap-3 p-4">
+                  <Leaf className="h-5 w-5 text-green-600" />
+                  <div>
+                    <p className="text-xs text-muted-foreground">Total GWP (all projects)</p>
+                    <p className="text-xl font-bold tabular-nums">
+                      {totalGwp >= 1000
+                        ? `${(totalGwp / 1000).toFixed(1)}t CO₂-eq`
+                        : `${totalGwp.toFixed(0)} kg CO₂-eq`}
+                    </p>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+          </div>
+        )}
+
         <div className="mb-8 flex items-center justify-between">
           <div>
             <h2 className="text-2xl font-bold">Projects</h2>
@@ -124,28 +179,44 @@ export function DashboardClient({ projects }: DashboardClientProps) {
                 </CardHeader>
                 <CardContent>
                   <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                    {project.gwpTotal != null && (
+                    {project.gwpTotal != null && project.gwpTotal > 0 && (
                       <div className="flex items-center gap-1">
-                        <BarChart3 className="h-3.5 w-3.5" />
-                        <span>
-                          {project.gwpTotal.toFixed(0)} kg CO₂-eq
+                        <Leaf className="h-3.5 w-3.5 text-green-600" />
+                        <span className="tabular-nums">
+                          {project.gwpTotal >= 1000
+                            ? `${(project.gwpTotal / 1000).toFixed(1)}t`
+                            : `${project.gwpTotal.toFixed(0)} kg`}{" "}
+                          CO₂-eq
                         </span>
                       </div>
                     )}
                     <div className="flex items-center gap-1">
                       <Clock className="h-3.5 w-3.5" />
                       <span>
-                        {new Date(project.createdAt).toLocaleDateString()}
+                        {new Date(project.updatedAt ?? project.createdAt).toLocaleDateString()}
                       </span>
                     </div>
                   </div>
-                  <div className="mt-2 flex gap-2">
-                    <Badge variant="outline" className="text-xs">
-                      {project.preferredDataSource ?? "kbob"}
-                    </Badge>
-                    <Badge variant="outline" className="text-xs">
-                      {project.classificationSystem ?? "eBKP-H"}
-                    </Badge>
+                  <div className="mt-2 flex items-center justify-between">
+                    <div className="flex gap-2">
+                      <Badge variant="outline" className="text-xs">
+                        {project.preferredDataSource ?? "kbob"}
+                      </Badge>
+                      {project.areaValue && project.areaValue > 0 && (
+                        <Badge variant="outline" className="text-xs">
+                          {project.areaType ?? "Area"}: {project.areaValue.toLocaleString()} m²
+                        </Badge>
+                      )}
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-7 w-7 text-muted-foreground hover:text-destructive"
+                      onClick={(e) => handleDelete(project.id, e)}
+                      disabled={deleting === project.id}
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </Button>
                   </div>
                 </CardContent>
               </Card>

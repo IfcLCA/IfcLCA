@@ -15,6 +15,8 @@ import {
   Zap,
   Flame,
 } from "lucide-react";
+import { EmissionsChart } from "@/components/charts/emissions-chart";
+import type { ChartDataRow } from "@/components/charts/emissions-chart";
 
 export function ProjectSummary() {
   const {
@@ -37,21 +39,29 @@ export function ProjectSummary() {
       ? Math.round((matchedCount / totalMaterialCount) * 100)
       : 0;
 
-  // Compute emission totals from matched materials
+  // Compute emission totals: volume × density × indicator_factor
   const emissions = useMemo(() => {
     const totals = { gwp: 0, ubp: 0, penre: 0 };
     const byCategory: Record<string, { gwp: number; ubp: number; penre: number }> = {};
+    const byMaterial: Array<{ name: string; gwp: number; ubp: number; penre: number }> = [];
 
     for (const mat of materials) {
       if (!mat.matchedMaterial?.indicators) continue;
+      const vol = mat.totalVolume ?? 0;
+      const density = mat.density ?? 0;
+      if (vol <= 0 || density <= 0) continue;
+
+      const mass = vol * density;
       const ind = mat.matchedMaterial.indicators;
-      const gwp = ind.gwpTotal ?? 0;
-      const ubp = ind.ubp ?? 0;
-      const penre = ind.penreTotal ?? 0;
+      const gwp = (ind.gwpTotal ?? 0) * mass;
+      const ubp = (ind.ubp ?? 0) * mass;
+      const penre = (ind.penreTotal ?? 0) * mass;
 
       totals.gwp += gwp;
       totals.ubp += ubp;
       totals.penre += penre;
+
+      byMaterial.push({ name: mat.name, gwp, ubp, penre });
 
       const cat = mat.matchedMaterial.category || "Other";
       if (!byCategory[cat]) byCategory[cat] = { gwp: 0, ubp: 0, penre: 0 };
@@ -64,7 +74,11 @@ export function ProjectSummary() {
       ([, a], [, b]) => Math.abs(b.gwp) - Math.abs(a.gwp)
     );
 
-    return { totals, byCategory: sortedCategories };
+    const sortedMaterials = byMaterial.sort(
+      (a, b) => Math.abs(b.gwp) - Math.abs(a.gwp)
+    );
+
+    return { totals, byCategory: sortedCategories, byMaterial: sortedMaterials };
   }, [materials]);
 
   // Auto-match all unmatched materials via SSE streaming
@@ -269,7 +283,7 @@ export function ProjectSummary() {
       {matchedCount > 0 && (
         <div className="space-y-3">
           <h4 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
-            Environmental Indicators (per unit)
+            Environmental Impact
           </h4>
 
           {hasEmissions ? (
@@ -298,41 +312,71 @@ export function ProjectSummary() {
                 />
               </div>
 
-              {/* Breakdown by category */}
-              {emissions.byCategory.length > 0 && (
+              {/* Relative emissions per m²·a */}
+              {project?.areaValue && project.areaValue > 0 && (
                 <div className="space-y-2">
                   <h5 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                    GWP by Category
+                    Relative (per m²·a)
                   </h5>
-                  {emissions.byCategory.slice(0, 6).map(([cat, vals]) => {
-                    const pct =
-                      emissions.totals.gwp !== 0
-                        ? Math.abs((vals.gwp / emissions.totals.gwp) * 100)
-                        : 0;
-                    return (
-                      <div key={cat} className="space-y-1">
-                        <div className="flex items-center justify-between text-xs">
-                          <span className="truncate text-muted-foreground">{cat}</span>
-                          <span className="tabular-nums">{vals.gwp.toFixed(2)} kg CO₂-eq</span>
-                        </div>
-                        <div className="h-1.5 w-full rounded-full bg-muted">
-                          <div
-                            className="h-1.5 rounded-full bg-green-600/70"
-                            style={{ width: `${Math.min(pct, 100)}%` }}
-                          />
-                        </div>
-                      </div>
-                    );
-                  })}
+                  <div className="grid gap-2">
+                    {(() => {
+                      const area = project.areaValue!;
+                      const amort = project.amortization ?? 50;
+                      const divisor = area * amort;
+                      return (
+                        <>
+                          <div className="flex items-center justify-between rounded-md border px-3 py-2 text-sm">
+                            <span className="text-muted-foreground">GWP</span>
+                            <span className="font-medium tabular-nums">
+                              {(emissions.totals.gwp / divisor).toFixed(2)} kg CO₂-eq/m²·a
+                            </span>
+                          </div>
+                          <div className="flex items-center justify-between rounded-md border px-3 py-2 text-sm">
+                            <span className="text-muted-foreground">PENRE</span>
+                            <span className="font-medium tabular-nums">
+                              {(emissions.totals.penre / divisor).toFixed(2)} MJ/m²·a
+                            </span>
+                          </div>
+                          <div className="flex items-center justify-between rounded-md border px-3 py-2 text-sm">
+                            <span className="text-muted-foreground">UBP</span>
+                            <span className="font-medium tabular-nums">
+                              {(emissions.totals.ubp / divisor).toFixed(0)} UBP/m²·a
+                            </span>
+                          </div>
+                          <p className="text-[10px] text-muted-foreground">
+                            {project.areaType ?? "Area"}: {area.toLocaleString()} m² · {amort} years
+                          </p>
+                        </>
+                      );
+                    })()}
+                  </div>
                 </div>
+              )}
+
+              {/* Chart: by material */}
+              {emissions.byMaterial.length > 0 && (
+                <EmissionsChart
+                  data={emissions.byMaterial}
+                  title="By Material"
+                />
+              )}
+
+              {/* Chart: by category */}
+              {emissions.byCategory.length > 0 && (
+                <EmissionsChart
+                  data={emissions.byCategory.map(([name, vals]) => ({
+                    name,
+                    ...vals,
+                  }))}
+                  title="By Category"
+                />
               )}
             </>
           ) : (
             <div className="rounded-lg border bg-muted/30 p-4 text-center">
               <BarChart3 className="mx-auto mb-2 h-8 w-8 text-muted-foreground/40" />
               <p className="text-sm text-muted-foreground">
-                Matched materials have no indicator data yet. Try syncing the{" "}
-                {activeDataSource.toUpperCase()} database.
+                Match materials and ensure volumes are available to see environmental impact.
               </p>
             </div>
           )}

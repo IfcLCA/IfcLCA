@@ -4,6 +4,11 @@
  * ifc-lite uses a columnar, lazy-extraction architecture.
  * We iterate entities, extract attributes/materials/classifications
  * on demand, and produce our app-level types.
+ *
+ * Volume extraction strategy (hybrid):
+ *   1. Try IfcElementQuantity property sets (NetVolume / GrossVolume)
+ *   2. Fall back to mesh geometry volume calculation
+ *   3. Distribute element volume to layers via their fraction
  */
 
 import type { IfcDataStore } from "@ifc-lite/parser";
@@ -55,6 +60,99 @@ async function ensureBridge(): Promise<void> {
   bridgeInitialized = true;
 }
 
+// ---------------------------------------------------------------------------
+// Volume extraction from IFC property sets
+// ---------------------------------------------------------------------------
+
+/** Property names that represent element volume (in priority order) */
+const VOLUME_PROPERTY_NAMES = [
+  "NetVolume",
+  "GrossVolume",
+  "Volume",
+  "NetSideArea", // fallback — some slabs only have area
+];
+
+/**
+ * Extract volume from IfcElementQuantity / Pset_*Common property sets.
+ * Many IFC exporters include BaseQuantities with NetVolume or GrossVolume.
+ */
+function extractVolumeFromProperties(
+  propSets: Array<{
+    name: string;
+    properties: Array<{ name: string; type: number; value: PropertyValue }>;
+  }>
+): number {
+  for (const pset of propSets) {
+    // Look in BaseQuantities and Qto_*BaseQuantities
+    const isQuantitySet =
+      pset.name === "BaseQuantities" ||
+      pset.name.startsWith("Qto_") ||
+      pset.name.includes("Quantities");
+
+    if (!isQuantitySet) continue;
+
+    for (const propName of VOLUME_PROPERTY_NAMES) {
+      const prop = pset.properties.find((p) => p.name === propName);
+      if (prop && typeof prop.value === "number" && prop.value > 0) {
+        return prop.value;
+      }
+    }
+  }
+
+  // Second pass: look in any property set (some exporters put volume in custom psets)
+  for (const pset of propSets) {
+    for (const propName of VOLUME_PROPERTY_NAMES.slice(0, 3)) {
+      const prop = pset.properties.find((p) => p.name === propName);
+      if (prop && typeof prop.value === "number" && prop.value > 0) {
+        return prop.value;
+      }
+    }
+  }
+
+  return 0;
+}
+
+// ---------------------------------------------------------------------------
+// Mesh volume calculation from geometry (fallback)
+// ---------------------------------------------------------------------------
+
+/** Element mesh data cached during geometry processing */
+export interface ElementMeshData {
+  expressId: number;
+  vertices: Float32Array;
+  indices: Uint32Array;
+}
+
+/**
+ * Calculate signed volume of a triangulated mesh using the divergence theorem.
+ * For closed meshes, this gives exact volume; for open meshes, an approximation.
+ */
+function calculateMeshVolume(
+  vertices: Float32Array,
+  indices: Uint32Array
+): number {
+  let vol = 0;
+  for (let i = 0; i < indices.length; i += 3) {
+    const a = indices[i] * 3;
+    const b = indices[i + 1] * 3;
+    const c = indices[i + 2] * 3;
+
+    // Signed volume of tetrahedron formed by origin and triangle
+    vol +=
+      (vertices[a] *
+        (vertices[b + 1] * vertices[c + 2] -
+          vertices[b + 2] * vertices[c + 1]) -
+        vertices[a + 1] *
+          (vertices[b] * vertices[c + 2] -
+            vertices[b + 2] * vertices[c]) +
+        vertices[a + 2] *
+          (vertices[b] * vertices[c + 1] -
+            vertices[b + 1] * vertices[c])) /
+      6;
+  }
+  return Math.abs(vol);
+}
+
 // Element types we care about for LCA
 const LCA_ELEMENT_TYPES = new Set([
   "IfcWall",
@@ -85,12 +183,21 @@ const LCA_ELEMENT_TYPES = new Set([
  * This does the heavy extraction work — iterates all building elements,
  * pulls attributes, materials, classifications, and aggregates.
  *
+ * Volume extraction: tries IfcElementQuantity property sets first,
+ * falls back to mesh geometry volume calculation if meshData is provided.
+ *
  * Async because it lazy-loads the extraction functions on first call.
+ *
+ * @param store        ifc-lite data store
+ * @param fileSizeBytes IFC file size in bytes
+ * @param parseTimeMs  Total parse time
+ * @param meshData     Optional mesh data for geometry-based volume calculation
  */
 export async function bridgeToParseResult(
   store: IfcDataStore,
   fileSizeBytes: number,
-  parseTimeMs: number
+  parseTimeMs: number,
+  meshData?: ElementMeshData[]
 ): Promise<IFCParseResult> {
   await ensureBridge();
   const elements: IFCElement[] = [];
@@ -101,6 +208,18 @@ export async function bridgeToParseResult(
 
   const entities = store.entities;
   const hierarchy = store.spatialHierarchy;
+
+  // Build mesh lookup: expressId → mesh data (for geometry volume fallback)
+  const meshLookup = new Map<number, ElementMeshData>();
+  if (meshData) {
+    for (const mesh of meshData) {
+      meshLookup.set(mesh.expressId, mesh);
+    }
+  }
+
+  let volumeFromProps = 0;
+  let volumeFromMesh = 0;
+  let volumeMissing = 0;
 
   // Iterate all entities
   for (let i = 0; i < entities.expressId.length; i++) {
@@ -134,7 +253,7 @@ export async function bridgeToParseResult(
 
           layers.push({
             name,
-            volume: 0, // Will be calculated per-element when we have geometry volumes
+            volume: 0, // Will be calculated after we know element volume
             fraction,
             thickness: layer.thickness,
           });
@@ -182,7 +301,7 @@ export async function bridgeToParseResult(
         }
       : undefined;
 
-    // Extract properties for isLoadBearing / isExternal
+    // Extract properties for isLoadBearing / isExternal + volume
     let isLoadBearing = false;
     let isExternal = false;
 
@@ -197,9 +316,27 @@ export async function bridgeToParseResult(
       }
     }
 
-    // Total volume — approximate from layers or use a default
-    // (real volume comes from geometry, which we can calculate later)
-    const totalVolume = 0; // Placeholder — updated when geometry volumes are computed
+    // --- Volume extraction (hybrid strategy) ---
+    // 1. Try IfcElementQuantity property sets (most reliable)
+    let totalVolume = extractVolumeFromProperties(propSets);
+    if (totalVolume > 0) {
+      volumeFromProps++;
+    } else {
+      // 2. Fall back to mesh geometry calculation
+      const mesh = meshLookup.get(expressId);
+      if (mesh && mesh.vertices.length > 0 && mesh.indices.length > 0) {
+        totalVolume = calculateMeshVolume(mesh.vertices, mesh.indices);
+        if (totalVolume > 0) volumeFromMesh++;
+        else volumeMissing++;
+      } else {
+        volumeMissing++;
+      }
+    }
+
+    // Distribute volume to layers by their fraction
+    for (const layer of layers) {
+      layer.volume = totalVolume * layer.fraction;
+    }
 
     const element: IFCElement = {
       guid: attrs.globalId,
@@ -230,6 +367,10 @@ export async function bridgeToParseResult(
       }
     }
   }
+
+  console.log(
+    `[bridge] Volume sources: ${volumeFromProps} from properties, ${volumeFromMesh} from mesh, ${volumeMissing} missing`
+  );
 
   // Build material summaries
   const materials: IFCMaterialSummary[] = Array.from(materialAgg.entries()).map(

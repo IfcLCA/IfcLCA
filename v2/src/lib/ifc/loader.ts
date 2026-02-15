@@ -13,6 +13,7 @@ import type { GeometryProcessor, CoordinateInfo } from "@ifc-lite/geometry";
 import type { IfcDataStore, EntityRef } from "@ifc-lite/parser";
 import type { Renderer } from "@ifc-lite/renderer";
 import { bridgeToParseResult } from "./bridge";
+import type { ElementMeshData } from "./bridge";
 import type { IFCParseResult } from "@/types/ifc";
 
 // ---------------------------------------------------------------------------
@@ -93,6 +94,9 @@ export async function loadIfcFile(
   let meshCount = 0;
   let coordinateInfo: CoordinateInfo | null = null;
 
+  // Collect mesh geometry data for volume calculation
+  const meshDataMap = new Map<number, ElementMeshData>();
+
   onProgress?.({
     phase: "geometry",
     percent: 5,
@@ -105,6 +109,44 @@ export async function loadIfcFile(
         renderer.addMeshes(event.meshes, true);
         meshCount += event.meshes.length;
         if (event.coordinateInfo) coordinateInfo = event.coordinateInfo;
+
+        // Capture mesh geometry for volume calculation
+        // MeshData from @ifc-lite/geometry uses `positions` (Float32Array) and `indices` (Uint32Array)
+        for (const mesh of event.meshes) {
+          if (mesh.expressId != null && mesh.positions && mesh.indices) {
+            const existing = meshDataMap.get(mesh.expressId);
+            if (existing) {
+              // Merge mesh data: concatenate positions and offset indices
+              const vertexOffset = existing.vertices.length / 3;
+              const newVertices = new Float32Array(
+                existing.vertices.length + mesh.positions.length
+              );
+              newVertices.set(existing.vertices);
+              newVertices.set(mesh.positions, existing.vertices.length);
+
+              const newIndices = new Uint32Array(
+                existing.indices.length + mesh.indices.length
+              );
+              newIndices.set(existing.indices);
+              for (let j = 0; j < mesh.indices.length; j++) {
+                newIndices[existing.indices.length + j] =
+                  mesh.indices[j] + vertexOffset;
+              }
+              meshDataMap.set(mesh.expressId, {
+                expressId: mesh.expressId,
+                vertices: newVertices,
+                indices: newIndices,
+              });
+            } else {
+              meshDataMap.set(mesh.expressId, {
+                expressId: mesh.expressId,
+                vertices: new Float32Array(mesh.positions),
+                indices: new Uint32Array(mesh.indices),
+              });
+            }
+          }
+        }
+
         onProgress?.({
           phase: "geometry",
           percent: Math.min(80, 5 + (meshCount / Math.max(event.totalSoFar, 1)) * 75),
@@ -160,7 +202,13 @@ export async function loadIfcFile(
   });
 
   const parseTimeMs = performance.now() - startTime;
-  const parseResult = await bridgeToParseResult(dataStore, buffer.byteLength, parseTimeMs);
+  const meshDataArray = Array.from(meshDataMap.values());
+  const parseResult = await bridgeToParseResult(
+    dataStore,
+    buffer.byteLength,
+    parseTimeMs,
+    meshDataArray
+  );
 
   onProgress?.({
     phase: "complete",

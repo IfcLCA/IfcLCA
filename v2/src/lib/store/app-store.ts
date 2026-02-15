@@ -25,6 +25,10 @@ export interface ProjectData {
   id: string;
   name: string;
   preferredDataSource: string;
+  areaType?: string | null;
+  areaValue?: number | null;
+  amortization?: number | null;
+  description?: string | null;
 }
 
 export interface MaterialWithMatch extends IFCMaterialSummary {

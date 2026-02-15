@@ -32,6 +32,23 @@ export function BottomPanel() {
     updateMaterialMatch,
   } = useAppStore();
 
+  // Compute calculated emissions: volume × density × factor per material
+  const materialEmissions = useMemo(() => {
+    return materials.map((mat) => {
+      const vol = mat.totalVolume ?? 0;
+      const density = mat.density ?? 0;
+      const indicators = mat.matchedMaterial?.indicators;
+      if (!indicators || density <= 0 || vol <= 0) {
+        return { gwp: null as number | null, ubp: null as number | null };
+      }
+      const mass = vol * density;
+      return {
+        gwp: indicators.gwpTotal != null ? mass * indicators.gwpTotal : null,
+        ubp: indicators.ubp != null ? mass * indicators.ubp : null,
+      };
+    });
+  }, [materials]);
+
   // Compute totals row
   const totals = useMemo(() => {
     let gwp = 0;
@@ -39,17 +56,18 @@ export function BottomPanel() {
     let volume = 0;
     let hasAny = false;
 
-    for (const mat of materials) {
-      volume += mat.totalVolume;
-      if (mat.matchedMaterial?.indicators) {
-        gwp += mat.matchedMaterial.indicators.gwpTotal ?? 0;
-        ubp += mat.matchedMaterial.indicators.ubp ?? 0;
+    for (let i = 0; i < materials.length; i++) {
+      volume += materials[i].totalVolume;
+      const em = materialEmissions[i];
+      if (em.gwp != null || em.ubp != null) {
+        gwp += em.gwp ?? 0;
+        ubp += em.ubp ?? 0;
         hasAny = true;
       }
     }
 
     return { gwp, ubp, volume, hasAny };
-  }, [materials]);
+  }, [materials, materialEmissions]);
 
   // Export to CSV
   const handleExportCSV = useCallback(() => {
@@ -66,18 +84,21 @@ export function BottomPanel() {
       "Match Score",
     ];
 
-    const rows = materials.map((mat) => [
-      mat.name,
-      mat.match ? "Matched" : "Unmatched",
-      mat.totalVolume.toFixed(4),
-      mat.density?.toFixed(0) ?? "",
-      mat.matchedMaterial?.indicators?.gwpTotal?.toFixed(4) ?? "",
-      mat.matchedMaterial?.indicators?.ubp?.toFixed(0) ?? "",
-      mat.matchedMaterial?.name ?? "",
-      mat.match?.source ?? "",
-      mat.match?.method ?? "",
-      mat.match?.score?.toFixed(2) ?? "",
-    ]);
+    const rows = materials.map((mat, i) => {
+      const em = materialEmissions[i];
+      return [
+        mat.name,
+        mat.match ? "Matched" : "Unmatched",
+        mat.totalVolume.toFixed(4),
+        mat.density?.toFixed(0) ?? "",
+        em?.gwp?.toFixed(4) ?? "",
+        em?.ubp?.toFixed(0) ?? "",
+        mat.matchedMaterial?.name ?? "",
+        mat.match?.source ?? "",
+        mat.match?.method ?? "",
+        mat.match?.score?.toFixed(2) ?? "",
+      ];
+    });
 
     const csv = [headers, ...rows]
       .map((row) =>
@@ -92,7 +113,7 @@ export function BottomPanel() {
     a.download = `${project?.name ?? "materials"}-lca-export.csv`;
     a.click();
     URL.revokeObjectURL(url);
-  }, [materials, project]);
+  }, [materials, materialEmissions, project]);
 
   // Unmatch a material
   const handleUnmatch = useCallback(
@@ -203,8 +224,10 @@ export function BottomPanel() {
             <tbody>
               {sortedMaterials.map((mat) => {
                 const isMatched = !!mat.match;
-                const gwp = mat.matchedMaterial?.indicators?.gwpTotal;
-                const ubp = mat.matchedMaterial?.indicators?.ubp;
+                const origIdx = materials.indexOf(mat);
+                const em = origIdx >= 0 ? materialEmissions[origIdx] : null;
+                const gwp = em?.gwp;
+                const ubp = em?.ubp;
 
                 return (
                   <tr

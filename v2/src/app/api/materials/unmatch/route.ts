@@ -3,6 +3,7 @@ import { auth } from "@clerk/nextjs/server";
 import { db } from "@/db";
 import { materials, projects } from "@/db/schema";
 import { eq, and } from "drizzle-orm";
+import { recalculateProject } from "@/lib/lca/calculations-server";
 
 export const dynamic = "force-dynamic";
 
@@ -66,6 +67,11 @@ export async function POST(request: NextRequest) {
       updatedAt: new Date(),
     })
     .where(eq(materials.id, material.id));
+
+  // Recalculate project emissions without this match
+  await recalculateProject(projectId).catch((err) => {
+    console.error("[unmatch] Recalculation failed:", err);
+  });
 
   return NextResponse.json({ success: true });
 }

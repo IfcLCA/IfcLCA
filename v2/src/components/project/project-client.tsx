@@ -12,6 +12,9 @@ import { UploadZone } from "@/components/viewer/upload-zone";
 import { ViewerToolbar } from "@/components/viewer/toolbar";
 import { ContextPanel } from "@/components/panels/context-panel";
 import { BottomPanel } from "@/components/panels/bottom-panel";
+import { ExportButton } from "@/components/export/export-dialog";
+import { ProjectSettings } from "@/components/project/project-settings";
+import { PrintReport, PrintButton } from "@/components/print/print-report";
 import type { projects, materials, lcaMaterials } from "@/db/schema";
 import type { MatchMethod, NormalizedMaterial, IndicatorValues } from "@/types/lca";
 
@@ -56,6 +59,10 @@ export function ProjectClient({
       id: project.id,
       name: project.name,
       preferredDataSource: project.preferredDataSource ?? "kbob",
+      areaType: project.areaType,
+      areaValue: project.areaValue,
+      amortization: project.amortization,
+      description: project.description,
     });
   }, [project, setProject]);
 
@@ -305,6 +312,19 @@ export function ProjectClient({
         </div>
         <div className="flex items-center gap-2">
           {hasModel && <ViewerToolbar />}
+          {hasModel && <PrintButton />}
+          {hasModel && <ExportButton />}
+          <ProjectSettings
+            projectId={project.id}
+            initialValues={{
+              name: project.name,
+              description: project.description,
+              areaType: project.areaType,
+              areaValue: project.areaValue,
+              amortization: project.amortization,
+            }}
+            onSaved={() => router.refresh()}
+          />
           <UserButton />
         </div>
       </header>
@@ -365,6 +385,9 @@ export function ProjectClient({
           </div>
         </>
       )}
+
+      {/* Print report — hidden in normal view, shown on print */}
+      <PrintReport />
     </div>
   );
 }

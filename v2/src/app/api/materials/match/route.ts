@@ -3,6 +3,7 @@ import { auth } from "@clerk/nextjs/server";
 import { db } from "@/db";
 import { materials, projects } from "@/db/schema";
 import { eq, and, isNotNull } from "drizzle-orm";
+import { recalculateProject } from "@/lib/lca/calculations-server";
 
 export const dynamic = "force-dynamic";
 
@@ -75,7 +76,13 @@ export async function POST(request: NextRequest) {
     })
     .where(eq(materials.id, material.id));
 
-  return NextResponse.json({ success: true });
+  // Recalculate project emissions with new match
+  const calcResult = await recalculateProject(projectId).catch((err) => {
+    console.error("[match] Recalculation failed:", err);
+    return null;
+  });
+
+  return NextResponse.json({ success: true, emissions: calcResult?.totals });
 }
 
 /**
@@ -127,6 +134,11 @@ export async function DELETE(request: NextRequest) {
         isNotNull(materials.lcaMaterialId)
       )
     );
+
+  // Recalculate with cleared matches
+  await recalculateProject(projectId).catch((err) => {
+    console.error("[match/DELETE] Recalculation failed:", err);
+  });
 
   return NextResponse.json({ success: true });
 }
