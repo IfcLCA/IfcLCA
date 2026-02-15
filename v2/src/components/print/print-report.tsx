@@ -71,6 +71,22 @@ export function PrintReport() {
     <div className="print-report hidden print:block">
       <style>{`
         @media print {
+          /* Hide the app UI — header, viewer layout, dialogs */
+          .screen-only, header, .project-layout,
+          .project-layout + div, [role="dialog"],
+          .fixed { display: none !important; }
+
+          /* Reset body/html constraints for print */
+          body, html {
+            height: auto !important;
+            overflow: visible !important;
+          }
+          .flex.h-screen {
+            height: auto !important;
+            display: block !important;
+          }
+
+          /* Show the print report */
           .print-report {
             display: block !important;
             font-family: system-ui, -apple-system, sans-serif;
@@ -90,20 +106,20 @@ export function PrintReport() {
             text-align: left;
           }
           .print-report th {
-            background-color: #f0f0f0;
+            background-color: #f0f0f0 !important;
             font-weight: 600;
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
           }
           .print-report .text-right {
             text-align: right;
           }
           .print-report .totals-row {
             font-weight: 600;
-            background-color: #f5f5f5;
+            background-color: #f5f5f5 !important;
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
           }
-
-          /* Hide everything except print report */
-          body > *:not(.print-overlay) { display: none !important; }
-          .print-overlay { display: block !important; }
         }
       `}</style>
 

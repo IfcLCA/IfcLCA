@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useCallback } from "react";
+import { useMemo, useCallback, useState } from "react";
 import { useAppStore } from "@/lib/store";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -16,6 +16,9 @@ import {
   RotateCcw,
   Sparkles,
   Eye,
+  CheckSquare,
+  Square,
+  MinusSquare,
 } from "lucide-react";
 import type { MatchMethod } from "@/types/lca";
 import { frameElements } from "@/components/viewer/ifc-viewer";
@@ -24,6 +27,7 @@ import { groupByMaterial } from "@/lib/viewer/element-groups";
 /**
  * Bottom panel — materials table showing all materials
  * with their match status, volumes, and indicators.
+ * Supports multi-select for batch matching.
  */
 export function BottomPanel() {
   const {
@@ -31,12 +35,16 @@ export function BottomPanel() {
     bottomPanelOpen,
     setBottomPanelOpen,
     setSelectedMaterial,
+    setBatchMatchMaterials,
     project,
     updateMaterialMatch,
     parseResult,
     selectedElementIds,
     isolateElements,
   } = useAppStore();
+
+  // Multi-select state
+  const [checkedNames, setCheckedNames] = useState<Set<string>>(new Set());
 
   // Compute calculated emissions: volume × density × factor per material
   const materialEmissions = useMemo(() => {
@@ -189,9 +197,35 @@ export function BottomPanel() {
     });
   }, [materials]);
 
+  // Checkbox handlers
+  const toggleCheck = useCallback((name: string) => {
+    setCheckedNames((prev) => {
+      const next = new Set(prev);
+      if (next.has(name)) next.delete(name);
+      else next.add(name);
+      return next;
+    });
+  }, []);
+
+  const toggleAll = useCallback(() => {
+    if (checkedNames.size === sortedMaterials.length) {
+      setCheckedNames(new Set());
+    } else {
+      setCheckedNames(new Set(sortedMaterials.map((m) => m.name)));
+    }
+  }, [checkedNames.size, sortedMaterials]);
+
+  const handleBatchMatch = useCallback(() => {
+    const names = Array.from(checkedNames);
+    if (names.length === 0) return;
+    setBatchMatchMaterials(names);
+  }, [checkedNames, setBatchMatchMaterials]);
+
   if (materials.length === 0) return null;
 
   const matchedCount = materials.filter((m) => m.match).length;
+  const allChecked = checkedNames.size === sortedMaterials.length && sortedMaterials.length > 0;
+  const someChecked = checkedNames.size > 0 && !allChecked;
 
   return (
     <div>
@@ -229,12 +263,52 @@ export function BottomPanel() {
         </div>
       </button>
 
+      {/* Batch action bar */}
+      {bottomPanelOpen && checkedNames.size > 0 && (
+        <div className="flex items-center gap-3 border-b bg-primary/5 px-4 py-2">
+          <span className="text-xs font-medium">
+            {checkedNames.size} selected
+          </span>
+          <Button
+            size="sm"
+            className="h-7 px-3 text-xs"
+            onClick={handleBatchMatch}
+          >
+            Match selected
+            <ArrowRight className="ml-1 h-3 w-3" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-7 px-2 text-xs"
+            onClick={() => setCheckedNames(new Set())}
+          >
+            Clear
+          </Button>
+        </div>
+      )}
+
       {/* Table */}
       {bottomPanelOpen && (
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b bg-muted/50 text-left text-xs uppercase tracking-wider text-muted-foreground">
+                <th className="w-8 px-2 py-2">
+                  <button
+                    onClick={toggleAll}
+                    className="flex items-center text-muted-foreground hover:text-foreground"
+                    title={allChecked ? "Deselect all" : "Select all"}
+                  >
+                    {allChecked ? (
+                      <CheckSquare className="h-4 w-4" />
+                    ) : someChecked ? (
+                      <MinusSquare className="h-4 w-4" />
+                    ) : (
+                      <Square className="h-4 w-4" />
+                    )}
+                  </button>
+                </th>
                 <th className="px-4 py-2">Status</th>
                 <th className="px-4 py-2">Material</th>
                 <th className="px-4 py-2 text-right">Volume (m³)</th>
@@ -254,14 +328,27 @@ export function BottomPanel() {
                 const gwp = em?.gwp;
                 const ubp = em?.ubp;
                 const isHighlighted = selectedMaterialNames.has(mat.name);
+                const isChecked = checkedNames.has(mat.name);
 
                 return (
                   <tr
                     key={mat.name}
                     className={`border-b transition-colors hover:bg-accent/50 ${
                       isHighlighted ? "bg-primary/10 ring-1 ring-inset ring-primary/20" : ""
-                    }`}
+                    } ${isChecked ? "bg-primary/5" : ""}`}
                   >
+                    <td className="w-8 px-2 py-2">
+                      <button
+                        onClick={() => toggleCheck(mat.name)}
+                        className="flex items-center text-muted-foreground hover:text-foreground"
+                      >
+                        {isChecked ? (
+                          <CheckSquare className="h-4 w-4 text-primary" />
+                        ) : (
+                          <Square className="h-4 w-4" />
+                        )}
+                      </button>
+                    </td>
                     <td className="px-4 py-2">
                       {isMatched ? (
                         <CheckCircle2 className="h-4 w-4 text-green-600" />
@@ -356,6 +443,7 @@ export function BottomPanel() {
             {totals.hasAny && (
               <tfoot>
                 <tr className="border-t-2 bg-muted/30 font-semibold">
+                  <td className="px-2 py-2"></td>
                   <td className="px-4 py-2"></td>
                   <td className="px-4 py-2">Total</td>
                   <td className="px-4 py-2 text-right tabular-nums">

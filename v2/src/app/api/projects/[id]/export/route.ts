@@ -95,15 +95,20 @@ export async function GET(_request: NextRequest, { params }: RouteParams) {
     ],
   }));
 
+  // Compute totals from actual element data (not cached project values, which may be stale)
+  const computedGwp = rows.reduce((sum, r) => sum + (r.gwpTotal ?? 0), 0);
+  const computedPenre = rows.reduce((sum, r) => sum + (r.penreTotal ?? 0), 0);
+  const computedUbp = rows.reduce((sum, r) => sum + (r.ubp ?? 0), 0);
+
   const exportData = {
     projectName: project.name,
     projectId: project.id,
     exportedAt: new Date().toISOString(),
     dataSource: project.preferredDataSource,
     totals: {
-      gwpTotal: project.gwpTotal ?? 0,
-      penreTotal: project.penreTotal ?? 0,
-      ubpTotal: project.ubpTotal ?? 0,
+      gwpTotal: Math.round(computedGwp * 100) / 100,
+      penreTotal: Math.round(computedPenre * 100) / 100,
+      ubpTotal: Math.round(computedUbp),
     },
     elementCount: rows.length,
     elementsWithResults: hasResults.length,

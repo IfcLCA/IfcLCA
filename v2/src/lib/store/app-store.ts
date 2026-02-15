@@ -78,6 +78,7 @@ export interface AppState {
   // UI state
   contextPanelMode: ContextPanelMode;
   selectedMaterialName: string | null;
+  batchMatchMaterials: string[]; // multi-select batch matching
   bottomPanelOpen: boolean;
 
   // Active data source
@@ -116,6 +117,7 @@ export interface AppState {
 
   setContextPanelMode: (mode: ContextPanelMode) => void;
   setSelectedMaterial: (name: string | null) => void;
+  setBatchMatchMaterials: (names: string[]) => void;
   setBottomPanelOpen: (open: boolean) => void;
   setActiveDataSource: (source: string) => void;
   setAutoMatchProgress: (progress: AutoMatchProgress) => void;
@@ -198,6 +200,7 @@ const initialState = {
   visibilityByStorey: {} as Record<string, boolean>,
   contextPanelMode: "summary" as ContextPanelMode,
   selectedMaterialName: null as string | null,
+  batchMatchMaterials: [] as string[],
   bottomPanelOpen: false,
   activeDataSource: "kbob",
   autoMatchProgress: { phase: "idle", matched: 0, total: 0, message: "" } as AutoMatchProgress,
@@ -207,13 +210,28 @@ const initialState = {
 // Store
 // ---------------------------------------------------------------------------
 
-export const useAppStore = create<AppState>((set) => ({
+export const useAppStore = create<AppState>((set, get) => ({
   ...initialState,
 
   setParseResult: (result) => {
-    const materials: MaterialWithMatch[] = result.materials.map((m) => ({
-      ...m,
-    }));
+    // Preserve existing match data (from server hydration) when IFC loads from cache
+    const existing = get().materials;
+    const existingByName = new Map<string, MaterialWithMatch>();
+    for (const m of existing) existingByName.set(m.name, m);
+
+    const materials: MaterialWithMatch[] = result.materials.map((m) => {
+      const prev = existingByName.get(m.name);
+      if (prev?.match) {
+        // Keep match data, update parse-derived fields
+        return {
+          ...prev,
+          totalVolume: m.totalVolume,
+          elementCount: m.elementCount,
+          elementTypes: m.elementTypes,
+        };
+      }
+      return { ...m };
+    });
 
     // Initialize visibility toggles
     const types = new Set(result.elements.map((e) => e.type));
@@ -227,7 +245,7 @@ export const useAppStore = create<AppState>((set) => ({
       parseResult: result,
       materials,
       totalMaterialCount: materials.length,
-      matchedCount: 0,
+      matchedCount: materials.filter((m) => m.match).length,
       visibilityByType,
       visibilityByStorey,
       modelLoading: false,
@@ -323,7 +341,15 @@ export const useAppStore = create<AppState>((set) => ({
   setSelectedMaterial: (name) =>
     set({
       selectedMaterialName: name,
+      batchMatchMaterials: [],
       contextPanelMode: name ? "material" : "summary",
+    }),
+
+  setBatchMatchMaterials: (names) =>
+    set({
+      batchMatchMaterials: names,
+      selectedMaterialName: names.length > 0 ? names[0] : null,
+      contextPanelMode: names.length > 0 ? "material" : "summary",
     }),
 
   setBottomPanelOpen: (open) => set({ bottomPanelOpen: open }),

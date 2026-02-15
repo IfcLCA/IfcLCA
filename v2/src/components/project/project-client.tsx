@@ -251,7 +251,7 @@ export function ProjectClient({
   return (
     <div className="flex h-screen flex-col">
       {/* Top bar */}
-      <header className="flex h-14 shrink-0 items-center justify-between border-b px-4">
+      <header className="flex h-14 shrink-0 items-center justify-between border-b px-4 print:hidden">
         <div className="flex items-center gap-3">
           <Button
             variant="ghost"
@@ -337,7 +337,7 @@ export function ProjectClient({
 
       {/* Main content — IfcViewer always mounted so WebGPU renderer initializes early */}
       {showViewer ? (
-        <div className="project-layout flex-1">
+        <div className="project-layout flex-1 print:hidden">
           <div className="project-layout__viewer relative">
             <IfcViewer />
             {!hasModel && (
@@ -354,7 +354,7 @@ export function ProjectClient({
           </div>
         </div>
       ) : (
-        <div className="relative flex flex-1 items-center justify-center">
+        <div className="relative flex flex-1 items-center justify-center print:hidden">
           {/* Hidden viewer to pre-init WebGPU renderer in background */}
           <div className="absolute inset-0 -z-10 opacity-0 pointer-events-none">
             <IfcViewer />

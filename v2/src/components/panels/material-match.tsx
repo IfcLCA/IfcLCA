@@ -13,20 +13,23 @@ import {
   RefreshCw,
   AlertCircle,
   X,
+  Layers,
 } from "lucide-react";
 import type { NormalizedMaterial } from "@/types/lca";
 
 /**
  * Material matching panel — search and assign LCA materials
- * to an IFC material name.
+ * to an IFC material name. Supports single and batch matching.
  */
 export function MaterialMatch() {
   const {
     selectedMaterialName,
+    batchMatchMaterials,
     materials,
     activeDataSource,
     project,
     setSelectedMaterial,
+    setBatchMatchMaterials,
     setContextPanelMode,
     updateMaterialMatch,
   } = useAppStore();
@@ -34,6 +37,10 @@ export function MaterialMatch() {
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<NormalizedMaterial[]>([]);
   const [loading, setLoading] = useState(false);
+  const [applying, setApplying] = useState(false);
+
+  const isBatchMode = batchMatchMaterials.length > 1;
+  const batchNames = isBatchMode ? batchMatchMaterials : [];
 
   const currentMaterial = materials.find(
     (m) => m.name === selectedMaterialName
@@ -110,7 +117,24 @@ export function MaterialMatch() {
     }
   }, [selectedMaterialName, handleSearch]);
 
+  function handleBack() {
+    setBatchMatchMaterials([]);
+    setSelectedMaterial(null);
+  }
+
   async function handleSelectMatch(lcaMaterial: NormalizedMaterial) {
+    if (!project) return;
+
+    if (isBatchMode) {
+      // Batch mode: apply to all selected materials
+      await applyBatchMatch(lcaMaterial);
+    } else {
+      // Single mode: apply to one material
+      await applySingleMatch(lcaMaterial);
+    }
+  }
+
+  async function applySingleMatch(lcaMaterial: NormalizedMaterial) {
     if (!selectedMaterialName || !project) return;
 
     // Save previous state for rollback
@@ -156,8 +180,6 @@ export function MaterialMatch() {
       setContextPanelMode(state.selectedElementIds.size > 0 ? "element" : "summary");
     } catch (err) {
       console.error("Failed to persist material match:", err);
-      // Revert optimistic update — clear the match if this was a first-time
-      // match (previousMatch undefined), or restore the previous match.
       if (previousMatch && previousMatchedMaterial) {
         updateMaterialMatch(
           selectedMaterialName,
@@ -165,10 +187,61 @@ export function MaterialMatch() {
           previousMatchedMaterial
         );
       } else {
-        // First match attempt failed — clear the optimistic state
         updateMaterialMatch(selectedMaterialName, null, null);
       }
     }
+  }
+
+  async function applyBatchMatch(lcaMaterial: NormalizedMaterial) {
+    if (!project || batchNames.length === 0) return;
+    setApplying(true);
+
+    const matchData = {
+      lcaMaterialId: lcaMaterial.id,
+      sourceId: lcaMaterial.sourceId,
+      source: lcaMaterial.source,
+      score: 1.0,
+      method: "manual" as const,
+      matchedAt: new Date(),
+    };
+
+    // Optimistic: update all locally
+    for (const name of batchNames) {
+      updateMaterialMatch(name, matchData, lcaMaterial);
+    }
+
+    // Persist each to server (sequentially to avoid overwhelming)
+    let failed = 0;
+    for (const name of batchNames) {
+      try {
+        const res = await fetch("/api/materials/match", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            projectId: project.id,
+            materialName: name,
+            lcaMaterialId: lcaMaterial.id,
+            source: lcaMaterial.source,
+            sourceId: lcaMaterial.sourceId,
+            method: "manual",
+            score: 1.0,
+          }),
+        });
+        if (!res.ok) failed++;
+      } catch {
+        failed++;
+      }
+    }
+
+    setApplying(false);
+
+    if (failed > 0) {
+      console.error(`[batch-match] ${failed}/${batchNames.length} failed to persist`);
+    }
+
+    // Go back to summary
+    setBatchMatchMaterials([]);
+    setContextPanelMode("summary");
   }
 
   return (
@@ -180,20 +253,48 @@ export function MaterialMatch() {
             variant="ghost"
             size="icon"
             className="h-7 w-7"
-            onClick={() => setSelectedMaterial(null)}
+            onClick={handleBack}
           >
             <ArrowLeft className="h-4 w-4" />
           </Button>
           <div>
             <h3 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
-              Match Material
+              {isBatchMode ? "Batch Match" : "Match Material"}
             </h3>
-            <p className="text-sm font-medium">{selectedMaterialName}</p>
+            {isBatchMode ? (
+              <p className="text-sm font-medium">
+                {batchNames.length} materials selected
+              </p>
+            ) : (
+              <p className="text-sm font-medium">{selectedMaterialName}</p>
+            )}
           </div>
         </div>
 
-        {/* Current match */}
-        {currentMaterial?.match && (
+        {/* Batch mode: show selected material names */}
+        {isBatchMode && (
+          <div className="mt-3 rounded-lg border bg-muted/30 p-3">
+            <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
+              <Layers className="h-3.5 w-3.5" />
+              Applying match to:
+            </div>
+            <div className="mt-2 flex flex-wrap gap-1">
+              {batchNames.slice(0, 10).map((name) => (
+                <Badge key={name} variant="outline" className="text-xs">
+                  {name}
+                </Badge>
+              ))}
+              {batchNames.length > 10 && (
+                <Badge variant="outline" className="text-xs">
+                  +{batchNames.length - 10} more
+                </Badge>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Current match (single mode only) */}
+        {!isBatchMode && currentMaterial?.match && (
           <div className="mt-3 rounded-lg border border-green-200 bg-green-50 p-3 dark:border-green-900 dark:bg-green-950/30">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
@@ -260,7 +361,7 @@ export function MaterialMatch() {
             size="sm"
             variant="outline"
             onClick={() => handleSearch(query)}
-            disabled={loading || syncing}
+            disabled={loading || syncing || applying}
           >
             {loading ? (
               <Loader2 className="h-4 w-4 animate-spin" />
@@ -274,6 +375,16 @@ export function MaterialMatch() {
           Searching in: {activeDataSource.toUpperCase()}
         </div>
       </div>
+
+      {/* Applying overlay */}
+      {applying && (
+        <div className="flex items-center gap-3 border-b bg-primary/5 px-4 py-3">
+          <Loader2 className="h-4 w-4 animate-spin text-primary" />
+          <span className="text-sm">
+            Applying match to {batchNames.length} materials...
+          </span>
+        </div>
+      )}
 
       {/* Results */}
       <div className="flex-1 overflow-y-auto">
@@ -306,8 +417,9 @@ export function MaterialMatch() {
         {results.map((mat) => (
           <button
             key={mat.id}
-            className="w-full border-b p-4 text-left transition-colors hover:bg-accent"
+            className="w-full border-b p-4 text-left transition-colors hover:bg-accent disabled:opacity-50"
             onClick={() => handleSelectMatch(mat)}
+            disabled={applying}
           >
             <div className="flex items-start justify-between">
               <div className="flex-1">
@@ -332,6 +444,11 @@ export function MaterialMatch() {
                 <span>PENRE: {mat.indicators.penreTotal.toFixed(1)} MJ</span>
               )}
             </div>
+            {isBatchMode && (
+              <div className="mt-1 text-xs text-primary">
+                Click to apply to {batchNames.length} materials
+              </div>
+            )}
           </button>
         ))}
       </div>
