@@ -1,8 +1,6 @@
 {
-  "functions": {
-    "src/app/api/**/*": {
-      "memory": 1024,
-      "maxDuration": 300
-    }
-  }
+  "installCommand": "npm install",
+  "buildCommand": "cd v2 && npm install --include=dev && npm run db:push && npm run build",
+  "outputDirectory": "v2/.next",
+  "framework": "nextjs"
 }
