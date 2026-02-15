@@ -127,6 +127,7 @@ export function ProjectSummary() {
       const decoder = new TextDecoder();
       let buffer = "";
       let matched = 0;
+      let processed = 0;
       let reapplied = 0;
       let auto = 0;
 
@@ -146,6 +147,8 @@ export function ProjectSummary() {
           try {
             const event = JSON.parse(payload);
             if (event.error) continue;
+            // Skip non-match events (e.g. recalculated totals)
+            if (event.matched == null || event.total == null) continue;
 
             const r = event.result;
             if (r?.match && r?.matchedMaterial) {
@@ -154,11 +157,12 @@ export function ProjectSummary() {
               if (r.match.method === "reapplied") reapplied++;
               else auto++;
             }
+            processed++;
             setAutoMatchProgress({
               phase: "matching",
               matched: event.matched,
               total: event.total,
-              message: `Matching ${event.matched}/${event.total} materials...`,
+              message: `Processing materials... (${processed}/${event.total})`,
             });
           } catch {
             // Ignore malformed SSE lines
@@ -170,11 +174,11 @@ export function ProjectSummary() {
         const parts = [];
         if (reapplied > 0) parts.push(`${reapplied} reapplied`);
         if (auto > 0) parts.push(`${auto} auto`);
-        const msg = `Matched ${matched}/${total} (${parts.join(", ")})`;
+        const msg = `Done — ${matched} of ${total} matched (${parts.join(", ")})`;
         setAutoMatchResult(msg);
         setAutoMatchProgress({ phase: "done", matched, total, message: msg });
       } else {
-        const msg = `No automatic matches found for ${total} materials`;
+        const msg = `Done — no matches found for ${total} materials`;
         setAutoMatchResult(msg);
         setAutoMatchProgress({ phase: "done", matched: 0, total, message: msg });
       }
@@ -184,7 +188,7 @@ export function ProjectSummary() {
         if (p.phase === "done") {
           setAutoMatchProgress({ phase: "idle", matched: 0, total: 0, message: "" });
         }
-      }, 8000);
+      }, 4000);
     } catch {
       setAutoMatchResult("Auto-match failed");
       setAutoMatchProgress({ phase: "idle", matched: 0, total: 0, message: "" });

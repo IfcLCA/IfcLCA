@@ -153,6 +153,7 @@ export function UploadZone({ projectId }: UploadZoneProps) {
             const decoder = new TextDecoder();
             let buffer = "";
             let matched = 0;
+            let processed = 0;
 
             while (true) {
               const { done, value } = await reader.read();
@@ -173,17 +174,21 @@ export function UploadZone({ projectId }: UploadZoneProps) {
                     console.error("[UploadZone] SSE error:", event.error);
                     continue;
                   }
+                  // Skip non-match events (e.g. recalculated totals)
+                  if (event.matched == null || event.total == null) continue;
+
                   // Apply match to store in real-time
                   const r = event.result;
                   if (r?.match && r?.matchedMaterial) {
                     updateMaterialMatch(r.materialName, r.match, r.matchedMaterial);
                     matched++;
                   }
+                  processed++;
                   setAutoMatchProgress({
                     phase: "matching",
                     matched: event.matched,
                     total: event.total,
-                    message: `Matching ${event.matched}/${event.total} materials...`,
+                    message: `Processing materials... (${processed}/${event.total})`,
                   });
                 } catch {
                   // Ignore malformed SSE lines
@@ -192,18 +197,21 @@ export function UploadZone({ projectId }: UploadZoneProps) {
             }
 
             console.log(`[UploadZone] Auto-match complete: ${matched}/${total} matched`);
+            const doneMsg = matched > 0
+              ? `Done — ${matched} of ${total} materials matched`
+              : `Done — no matches found for ${total} materials`;
             setAutoMatchProgress({
               phase: "done",
               matched,
               total,
-              message: `Auto-matched ${matched}/${total} materials`,
+              message: doneMsg,
             });
             setTimeout(() => {
               const { autoMatchProgress } = useAppStore.getState();
               if (autoMatchProgress.phase === "done") {
                 setAutoMatchProgress({ phase: "idle", matched: 0, total: 0, message: "" });
               }
-            }, 8000);
+            }, 4000);
           })
           .catch((err) => {
             console.error("Failed to persist/auto-match upload:", err);

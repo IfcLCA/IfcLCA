@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { UserButton } from "@clerk/nextjs";
-import { Plus, Building2, BarChart3, Clock, Leaf, Trash2 } from "lucide-react";
+import { Plus, Building2, Clock, Leaf, Trash2, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -21,15 +21,21 @@ interface DashboardClientProps {
   projects: Project[];
 }
 
-export function DashboardClient({ projects }: DashboardClientProps) {
+export function DashboardClient({ projects: initialProjects }: DashboardClientProps) {
   const router = useRouter();
   const [creating, setCreating] = useState(false);
   const [name, setName] = useState("");
   const [deleting, setDeleting] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  // Optimistic: track deleted project IDs to remove from list immediately
+  const [removedIds, setRemovedIds] = useState<Set<string>>(new Set());
+
+  const projects = initialProjects.filter((p) => !removedIds.has(p.id));
 
   async function handleCreate() {
     if (!name.trim()) return;
     setCreating(true);
+    setError(null);
 
     try {
       const res = await fetch("/api/projects", {
@@ -40,8 +46,14 @@ export function DashboardClient({ projects }: DashboardClientProps) {
 
       if (res.ok) {
         const { id } = await res.json();
+        setName("");
         router.push(`/project/${id}`);
+      } else {
+        const data = await res.json().catch(() => ({}));
+        setError(data.error || `Failed to create project (${res.status})`);
       }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to create project");
     } finally {
       setCreating(false);
     }
@@ -50,10 +62,34 @@ export function DashboardClient({ projects }: DashboardClientProps) {
   async function handleDelete(projectId: string, e: React.MouseEvent) {
     e.stopPropagation();
     if (!confirm("Delete this project? This cannot be undone.")) return;
+
+    // Optimistic: remove from list immediately
     setDeleting(projectId);
+    setRemovedIds((prev) => new Set(prev).add(projectId));
+    setError(null);
+
     try {
-      await fetch(`/api/projects/${projectId}`, { method: "DELETE" });
-      router.refresh();
+      const res = await fetch(`/api/projects/${projectId}`, { method: "DELETE" });
+      if (!res.ok) {
+        // Revert optimistic removal
+        setRemovedIds((prev) => {
+          const next = new Set(prev);
+          next.delete(projectId);
+          return next;
+        });
+        const data = await res.json().catch(() => ({}));
+        setError(data.error || `Failed to delete project (${res.status})`);
+      } else {
+        router.refresh();
+      }
+    } catch (err) {
+      // Revert optimistic removal
+      setRemovedIds((prev) => {
+        const next = new Set(prev);
+        next.delete(projectId);
+        return next;
+      });
+      setError(err instanceof Error ? err.message : "Failed to delete project");
     } finally {
       setDeleting(null);
     }
@@ -137,17 +173,27 @@ export function DashboardClient({ projects }: DashboardClientProps) {
               value={name}
               onChange={(e) => setName(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && handleCreate()}
-              className="flex-1 rounded-md border border-input bg-background px-3 py-2 text-sm outline-none ring-offset-background focus:ring-2 focus:ring-ring focus:ring-offset-2 placeholder:text-muted-foreground"
+              disabled={creating}
+              className="flex-1 rounded-md border border-input bg-background px-3 py-2 text-sm outline-none ring-offset-background focus:ring-2 focus:ring-ring focus:ring-offset-2 placeholder:text-muted-foreground disabled:opacity-50"
             />
             <Button
               size="sm"
               onClick={handleCreate}
               disabled={!name.trim() || creating}
             >
-              <Plus className="mr-2 h-4 w-4" />
-              Create
+              {creating ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <Plus className="mr-2 h-4 w-4" />
+              )}
+              {creating ? "Creating..." : "Create"}
             </Button>
           </CardContent>
+          {error && (
+            <div className="border-t px-4 py-2 text-sm text-destructive">
+              {error}
+            </div>
+          )}
         </Card>
 
         {/* Project grid */}
@@ -166,7 +212,9 @@ export function DashboardClient({ projects }: DashboardClientProps) {
             {projects.map((project) => (
               <Card
                 key={project.id}
-                className="cursor-pointer transition-shadow hover:shadow-md"
+                className={`cursor-pointer transition-all hover:shadow-md ${
+                  deleting === project.id ? "opacity-50 pointer-events-none" : ""
+                }`}
                 onClick={() => router.push(`/project/${project.id}`)}
               >
                 <CardHeader className="pb-3">
@@ -215,7 +263,11 @@ export function DashboardClient({ projects }: DashboardClientProps) {
                       onClick={(e) => handleDelete(project.id, e)}
                       disabled={deleting === project.id}
                     >
-                      <Trash2 className="h-3.5 w-3.5" />
+                      {deleting === project.id ? (
+                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      ) : (
+                        <Trash2 className="h-3.5 w-3.5" />
+                      )}
                     </Button>
                   </div>
                 </CardContent>
