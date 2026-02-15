@@ -1,9 +1,8 @@
 /**
  * Material matching engine.
  *
- * Multi-signal matching algorithm that tries several strategies
- * in order of confidence to find the best LCA material match
- * for an IFC material name.
+ * Multi-signal scoring: every candidate gets a composite score from
+ * string similarity + domain-specific bonuses/penalties, then we pick the best.
  */
 
 import type {
@@ -14,148 +13,104 @@ import type {
 import { cleanIfcQuery, expandQueryWithSynonyms } from "./preprocessing";
 
 // ---------------------------------------------------------------------------
-// Matching strategies
+// Domain-specific filters & bonuses
 // ---------------------------------------------------------------------------
 
-interface MatchCandidate {
+/**
+ * LCA entries that describe disposal / end-of-life — never auto-match these
+ * to production materials. Users can still pick them manually.
+ */
+const EOL_PATTERNS = [
+  /\bend[- ]?of[- ]?life\b/i,
+  /\bentsorgung\b/i,
+  /\bmva\b/i, // Müllverbrennungsanlage
+  /\bdeponierung?\b/i,
+  /\brückbau\b/i,
+  /\bdemolition\b/i,
+  /\bdisposal\b/i,
+  /\bincinerat/i,
+  /\blandfill\b/i,
+  /\brecyclingpotential\b/i,
+  /\bmodul\s*[CD]\b/i, // Module C/D = end-of-life in EN 15804
+];
+
+function isEndOfLife(name: string): boolean {
+  return EOL_PATTERNS.some((p) => p.test(name));
+}
+
+/**
+ * Preferred LCA entries get a score bonus. These are national/regional
+ * averages that are most appropriate for generic IFC material matching.
+ */
+const PREFERRED_PATTERNS = [
+  /durchschnitt/i, // "Durchschnitt DE" — German national average
+  /durchschn\./i, // abbreviated
+  /\baverage\b/i,
+  /\bgeneric\b/i,
+  /\btypical\b/i,
+];
+
+function isPreferredEntry(name: string): boolean {
+  return PREFERRED_PATTERNS.some((p) => p.test(name));
+}
+
+// ---------------------------------------------------------------------------
+// Scoring helpers
+// ---------------------------------------------------------------------------
+
+interface ScoredCandidate {
   material: NormalizedMaterial;
   score: number;
   method: MatchMethod;
+  detail: string; // for logging
 }
 
-/** Exact string match */
-function tryExactMatch(
-  name: string,
-  candidates: NormalizedMaterial[]
-): MatchCandidate | null {
-  const match = candidates.find((c) => c.name === name);
-  if (match) {
-    return { material: match, score: 1.0, method: "exact" };
+/** Tokenize a name into lowercase words (2+ chars) */
+function tokenize(name: string): string[] {
+  return name
+    .toLowerCase()
+    .replace(/[^a-zäöüàéèêïôùûç0-9\s]/g, " ")
+    .split(/\s+/)
+    .filter((w) => w.length >= 2);
+}
+
+function normalizeName(name: string): string {
+  return name
+    .toLowerCase()
+    .replace(/[^a-zäöüàéèêïôùûç\s]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function trigrams(s: string): Set<string> {
+  const padded = `  ${s} `;
+  const set = new Set<string>();
+  for (let i = 0; i < padded.length - 2; i++) {
+    set.add(padded.substring(i, i + 3));
   }
-  return null;
+  return set;
 }
 
-/** Case-insensitive match */
-function tryCaseInsensitiveMatch(
-  name: string,
-  candidates: NormalizedMaterial[]
-): MatchCandidate | null {
-  const lower = name.toLowerCase();
-  const match = candidates.find((c) => c.name.toLowerCase() === lower);
-  if (match) {
-    return { material: match, score: 0.99, method: "case_insensitive" };
+function trigramSimilarity(a: Set<string>, b: Set<string>): number {
+  if (a.size === 0 && b.size === 0) return 1;
+  if (a.size === 0 || b.size === 0) return 0;
+  let intersection = 0;
+  for (const t of a) {
+    if (b.has(t)) intersection++;
   }
-  return null;
+  return intersection / (a.size + b.size - intersection);
 }
 
-/** Normalized name match — strips common prefixes, suffixes, numbers */
-function tryNormalizedMatch(
-  name: string,
-  candidates: NormalizedMaterial[]
-): MatchCandidate | null {
-  const normalized = normalizeName(name);
-  if (!normalized) return null;
-
-  let best: MatchCandidate | null = null;
-
-  for (const c of candidates) {
-    const cNorm = normalizeName(c.name);
-    if (!cNorm) continue;
-
-    if (cNorm === normalized) {
-      const score = 0.95;
-      if (!best || score > best.score) {
-        best = { material: c, score, method: "fuzzy" };
-      }
+/** Token overlap: how many query tokens appear in the candidate name */
+function tokenOverlapScore(queryTokens: string[], candidateTokens: string[]): number {
+  if (queryTokens.length === 0) return 0;
+  let hits = 0;
+  for (const qt of queryTokens) {
+    if (candidateTokens.some((ct) => ct.includes(qt) || qt.includes(ct))) {
+      hits++;
     }
   }
-
-  return best;
-}
-
-/** Token overlap match — works well for short queries against long candidate names */
-function tryTokenOverlapMatch(
-  name: string,
-  candidates: NormalizedMaterial[],
-  minScore = 0.4
-): MatchCandidate | null {
-  const queryTokens = tokenize(name);
-  if (queryTokens.length === 0) return null;
-
-  let best: MatchCandidate | null = null;
-
-  for (const c of candidates) {
-    const candidateTokens = tokenize(c.name);
-    if (candidateTokens.length === 0) continue;
-
-    // How many query tokens appear in the candidate?
-    let queryHits = 0;
-    for (const qt of queryTokens) {
-      if (candidateTokens.some((ct) => ct.includes(qt) || qt.includes(ct))) {
-        queryHits++;
-      }
-    }
-    const queryRecall = queryHits / queryTokens.length;
-
-    // Prefer shorter, more specific candidates (less noise)
-    const lengthRatio = Math.min(queryTokens.length, candidateTokens.length) /
-      Math.max(queryTokens.length, candidateTokens.length);
-
-    // Score: heavy weight on query recall, light weight on conciseness
-    const score = queryRecall * 0.75 + lengthRatio * 0.15 + (queryHits > 0 ? 0.1 : 0);
-
-    if (score >= minScore && (!best || score > best.score)) {
-      best = { material: c, score, method: "fuzzy" };
-    }
-  }
-
-  return best;
-}
-
-/** Trigram similarity match */
-function tryFuzzyMatch(
-  name: string,
-  candidates: NormalizedMaterial[],
-  minScore = 0.6
-): MatchCandidate | null {
-  const nameTokens = trigrams(name.toLowerCase());
-  let best: MatchCandidate | null = null;
-
-  for (const c of candidates) {
-    const cTokens = trigrams(c.name.toLowerCase());
-    const score = trigramSimilarity(nameTokens, cTokens);
-
-    if (score >= minScore && (!best || score > best.score)) {
-      best = { material: c, score, method: "fuzzy" };
-    }
-  }
-
-  return best;
-}
-
-/** Classification-based match using eBKP-H code → material category mapping */
-function tryClassificationMatch(
-  classificationCode: string | undefined,
-  candidates: NormalizedMaterial[]
-): MatchCandidate | null {
-  if (!classificationCode) return null;
-
-  const categoryKeywords = CLASSIFICATION_TO_KEYWORDS[classificationCode];
-  if (!categoryKeywords) return null;
-
-  // Find candidates whose category matches any of the keywords
-  for (const c of candidates) {
-    const catLower = c.category.toLowerCase();
-    const nameLower = c.name.toLowerCase();
-
-    for (const kw of categoryKeywords) {
-      if (catLower.includes(kw) || nameLower.includes(kw)) {
-        return { material: c, score: 0.7, method: "classification" };
-      }
-    }
-  }
-
-  return null;
+  return hits / queryTokens.length;
 }
 
 // ---------------------------------------------------------------------------
@@ -163,15 +118,12 @@ function tryClassificationMatch(
 // ---------------------------------------------------------------------------
 
 export interface MatchInput {
-  /** Material name from IFC */
   materialName: string;
-  /** Optional classification code (e.g., eBKP-H "C 2.1") */
   classificationCode?: string;
 }
 
 export interface MatchResult {
   match: MaterialMatch | null;
-  /** All candidates considered, sorted by score desc */
   alternatives: Array<{
     material: NormalizedMaterial;
     score: number;
@@ -180,89 +132,124 @@ export interface MatchResult {
 }
 
 /**
- * Find the best LCA material match for an IFC material.
+ * Score every candidate with a composite algorithm, then pick the best.
  *
- * Tries strategies in order of confidence:
- * 1. Exact name match (1.0)
- * 2. Case-insensitive name match (0.99)
- * 3. Normalized name match (0.95)
- * 4. Classification-based match (0.7)
- * 5. Fuzzy trigram match (0.6-0.9)
+ * Score = base_similarity + domain_bonuses + domain_penalties
  *
- * @param input      Material name + optional classification
- * @param candidates Available LCA materials to match against
- * @param autoMatchThreshold Minimum score for automatic matching (default 0.9)
+ * Base similarity: max of (exact, case-insensitive, normalized, trigram, token-overlap)
+ * Domain bonuses:  +0.10 for "Durchschnitt" / average entries
+ * Domain penalties: -1.0 for end-of-life/disposal entries (effectively excluded)
  */
 export function findBestMatch(
   input: MatchInput,
   candidates: NormalizedMaterial[],
   autoMatchThreshold = 0.9
 ): MatchResult {
-  const alternatives: MatchCandidate[] = [];
-
-  // Preprocess: clean IFC noise, expand with cross-lingual synonyms
+  // Preprocess
   const cleaned = cleanIfcQuery(input.materialName);
   const expanded = expandQueryWithSynonyms(cleaned);
 
-  // Try each strategy with both raw and preprocessed names
-  const exact = tryExactMatch(input.materialName, candidates);
-  if (exact) alternatives.push(exact);
+  // Pre-compute query representations
+  const queryLower = cleaned.toLowerCase();
+  const queryNorm = normalizeName(cleaned);
+  const queryTrigrams = trigrams(queryLower);
+  const queryTokens = tokenize(cleaned);
+  const expandedTokens = tokenize(expanded);
+  const expandedTrigrams = trigrams(expanded.toLowerCase());
 
-  const caseInsensitive = tryCaseInsensitiveMatch(
-    input.materialName,
-    candidates
-  );
-  if (caseInsensitive && !exact) alternatives.push(caseInsensitive);
+  // Score every candidate
+  const scored: ScoredCandidate[] = [];
 
-  // Also try cleaned name for case-insensitive
-  if (cleaned !== input.materialName) {
-    const cleanedCi = tryCaseInsensitiveMatch(cleaned, candidates);
-    if (cleanedCi) alternatives.push(cleanedCi);
+  for (const c of candidates) {
+    const cLower = c.name.toLowerCase();
+    const cNorm = normalizeName(c.name);
+    const cTokens = tokenize(c.name);
+    const cTrigrams = trigrams(cLower);
+
+    // --- Base similarity (max of all strategies) ---
+    let baseScore = 0;
+    let method: MatchMethod = "fuzzy";
+    let detail = "";
+
+    // Exact match
+    if (c.name === input.materialName || c.name === cleaned) {
+      baseScore = 1.0;
+      method = "exact";
+      detail = "exact";
+    }
+
+    // Case-insensitive match
+    if (cLower === queryLower || cLower === input.materialName.toLowerCase()) {
+      const s = 0.99;
+      if (s > baseScore) { baseScore = s; method = "case_insensitive"; detail = "case_insensitive"; }
+    }
+
+    // Normalized match
+    if (queryNorm && cNorm && cNorm === queryNorm) {
+      const s = 0.95;
+      if (s > baseScore) { baseScore = s; method = "fuzzy"; detail = "normalized"; }
+    }
+
+    // Token overlap with cleaned query
+    const overlapClean = tokenOverlapScore(queryTokens, cTokens);
+    // Token overlap with expanded (synonym-enriched) query
+    const overlapExpanded = tokenOverlapScore(expandedTokens, cTokens);
+    const bestOverlap = Math.max(overlapClean, overlapExpanded);
+    if (bestOverlap > 0) {
+      // Scale: full overlap = 0.85, partial scales down
+      const s = bestOverlap * 0.85;
+      if (s > baseScore) { baseScore = s; method = "fuzzy"; detail = `overlap=${bestOverlap.toFixed(2)}`; }
+    }
+
+    // Trigram similarity with cleaned query
+    const triSim = Math.max(
+      trigramSimilarity(queryTrigrams, cTrigrams),
+      trigramSimilarity(expandedTrigrams, cTrigrams)
+    );
+    if (triSim > 0) {
+      const s = triSim * 0.80; // Scale: perfect trigram = 0.80
+      if (s > baseScore) { baseScore = s; method = "fuzzy"; detail = `trigram=${triSim.toFixed(2)}`; }
+    }
+
+    // --- Domain bonuses ---
+
+    // Prefer "Durchschnitt" (average) entries
+    if (isPreferredEntry(c.name)) {
+      baseScore += 0.10;
+      detail += "+avg";
+    }
+
+    // Prefer shorter, more specific names (less noise)
+    // Candidates with fewer tokens relative to query are more focused
+    if (cTokens.length > 0 && queryTokens.length > 0) {
+      const conciseness = Math.min(1, queryTokens.length / cTokens.length);
+      baseScore += conciseness * 0.05;
+    }
+
+    // --- Domain penalties ---
+
+    // End-of-life / disposal entries: hard exclude from auto-matching
+    if (isEndOfLife(c.name)) {
+      baseScore = Math.min(baseScore, 0.1); // Crush score but keep in alternatives for transparency
+      detail += " [EOL]";
+    }
+
+    // Skip candidates with zero relevance
+    if (baseScore < 0.15) continue;
+
+    scored.push({ material: c, score: baseScore, method, detail });
   }
 
-  const normalized = tryNormalizedMatch(input.materialName, candidates);
-  if (normalized) alternatives.push(normalized);
+  // Sort by score descending
+  scored.sort((a, b) => b.score - a.score);
 
-  // Try normalized match with cleaned query too
-  if (cleaned !== input.materialName) {
-    const cleanedNorm = tryNormalizedMatch(cleaned, candidates);
-    if (cleanedNorm) alternatives.push(cleanedNorm);
-  }
-
-  const classification = tryClassificationMatch(
-    input.classificationCode,
-    candidates
-  );
-  if (classification) alternatives.push(classification);
-
-  // Token overlap match — effective for short queries against long names
-  const tokenOverlap = tryTokenOverlapMatch(cleaned, candidates, 0.4);
-  if (tokenOverlap) alternatives.push(tokenOverlap);
-
-  // Also try with expanded query
-  if (expanded !== cleaned) {
-    const expandedOverlap = tryTokenOverlapMatch(expanded, candidates, 0.4);
-    if (expandedOverlap) alternatives.push(expandedOverlap);
-  }
-
-  // Fuzzy match with the expanded query (includes cross-lingual synonyms)
-  const fuzzy = tryFuzzyMatch(expanded, candidates, 0.4);
-  if (fuzzy) alternatives.push(fuzzy);
-
-  // Also try fuzzy with just the cleaned name
-  if (cleaned !== expanded) {
-    const cleanedFuzzy = tryFuzzyMatch(cleaned, candidates, 0.4);
-    if (cleanedFuzzy) alternatives.push(cleanedFuzzy);
-  }
-
-  // Deduplicate and sort by score
+  // Deduplicate by sourceId (keep highest score)
   const seen = new Set<string>();
-  const unique = alternatives.filter((a) => {
-    if (seen.has(a.material.sourceId)) return false;
-    seen.add(a.material.sourceId);
+  const unique = scored.filter((s) => {
+    if (seen.has(s.material.sourceId)) return false;
+    seen.add(s.material.sourceId);
     return true;
   });
-  unique.sort((a, b) => b.score - a.score);
 
   // Auto-match if best candidate exceeds threshold
   const best = unique[0] ?? null;
@@ -280,13 +267,13 @@ export function findBestMatch(
 
   // Logging
   console.log(
-    `[match:score] "${input.materialName}" → cleaned="${cleaned}" expanded="${expanded.slice(0, 80)}" candidates=${candidates.length} alternatives=${unique.length} best=${best?.score.toFixed(2) ?? "none"}/${best?.method ?? "-"} threshold=${autoMatchThreshold} accepted=${!!match}`
+    `[match:score] "${input.materialName}" → cleaned="${cleaned}" candidates=${candidates.length} scored=${unique.length} best=${best?.score.toFixed(2) ?? "none"}(${best?.detail ?? ""}) threshold=${autoMatchThreshold} accepted=${!!match}`
   );
   if (unique.length > 0) {
     console.log(
       `[match:score] Top 3: ${unique
         .slice(0, 3)
-        .map((a) => `"${a.material.name.slice(0, 40)}" ${a.score.toFixed(2)}/${a.method}`)
+        .map((a) => `"${a.material.name.slice(0, 50)}" ${a.score.toFixed(2)}(${a.detail})`)
         .join(" | ")}`
     );
   }
@@ -302,54 +289,11 @@ export function findBestMatch(
 }
 
 // ---------------------------------------------------------------------------
-// String utilities
-// ---------------------------------------------------------------------------
-
-/** Tokenize a name into lowercase words (3+ chars) */
-function tokenize(name: string): string[] {
-  return name
-    .toLowerCase()
-    .replace(/[^a-zäöüàéèêïôùûç0-9\s]/g, " ")
-    .split(/\s+/)
-    .filter((w) => w.length >= 3);
-}
-
-function normalizeName(name: string): string {
-  return name
-    .toLowerCase()
-    .replace(/[^a-zäöüàéèêïôùûç\s]/g, " ") // Keep letters (including accented)
-    .replace(/\s+/g, " ")
-    .trim();
-}
-
-function trigrams(s: string): Set<string> {
-  const padded = `  ${s} `;
-  const set = new Set<string>();
-  for (let i = 0; i < padded.length - 2; i++) {
-    set.add(padded.substring(i, i + 3));
-  }
-  return set;
-}
-
-function trigramSimilarity(a: Set<string>, b: Set<string>): number {
-  if (a.size === 0 && b.size === 0) return 1;
-  if (a.size === 0 || b.size === 0) return 0;
-
-  let intersection = 0;
-  for (const t of a) {
-    if (b.has(t)) intersection++;
-  }
-
-  return intersection / (a.size + b.size - intersection);
-}
-
-// ---------------------------------------------------------------------------
 // Classification → keyword mapping (eBKP-H)
 // ---------------------------------------------------------------------------
 
 /** Maps eBKP-H codes to likely material category keywords */
 const CLASSIFICATION_TO_KEYWORDS: Record<string, string[]> = {
-  // C - Structure
   "C 1": ["beton", "concrete", "stahlbeton"],
   "C 1.1": ["beton", "concrete", "foundation"],
   "C 2": ["mauerwerk", "masonry", "wand", "wall"],
@@ -359,18 +303,12 @@ const CLASSIFICATION_TO_KEYWORDS: Record<string, string[]> = {
   "C 4": ["dach", "roof"],
   "C 4.1": ["dach", "roof", "holz", "wood", "timber"],
   "C 4.3": ["flachdach", "flat roof"],
-
-  // D - Enclosure
   "D 1": ["fassade", "facade", "aussenwand"],
   "D 2": ["fenster", "window", "glass", "glas"],
   "D 3": ["dach", "roof", "abdichtung"],
-
-  // E - Interior
   "E 1": ["innenwand", "partition", "gips", "gypsum"],
   "E 2": ["bodenbelag", "floor", "parkett", "parquet"],
   "E 3": ["deckenbelag", "ceiling"],
-
-  // G - Installations
   "G 1": ["sanitär", "sanitary"],
   "G 2": ["heizung", "heating", "wärme"],
   "G 3": ["lüftung", "ventilation"],

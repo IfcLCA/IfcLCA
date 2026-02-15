@@ -117,14 +117,22 @@ export function UploadZone({ projectId }: UploadZoneProps) {
         // Send to server for persistence, then auto-match all materials
         persistToServer(projectId, file, result.parseResult)
           .then(() => {
-            const { activeDataSource, materials, updateMaterialMatch } =
+            const { activeDataSource, materials, updateMaterialMatch, setAutoMatchProgress } =
               useAppStore.getState();
             const materialNames = materials.map((m) => m.name);
             if (materialNames.length === 0) return;
 
+            const total = materialNames.length;
             console.log(
-              `[UploadZone] Triggering auto-match for ${materialNames.length} materials`
+              `[UploadZone] Triggering auto-match for ${total} materials`
             );
+            setAutoMatchProgress({
+              phase: "matching",
+              matched: 0,
+              total,
+              message: `Matching ${total} materials...`,
+            });
+
             return fetch("/api/materials/auto-match", {
               method: "POST",
               headers: { "Content-Type": "application/json" },
@@ -144,13 +152,32 @@ export function UploadZone({ projectId }: UploadZoneProps) {
                   }
                 }
                 console.log(
-                  `[UploadZone] Auto-match complete: ${matched}/${materialNames.length} matched`
+                  `[UploadZone] Auto-match complete: ${matched}/${total} matched`
                 );
+                setAutoMatchProgress({
+                  phase: "done",
+                  matched,
+                  total,
+                  message: `Auto-matched ${matched}/${total} materials`,
+                });
+                // Clear the "done" message after 8 seconds
+                setTimeout(() => {
+                  const { autoMatchProgress } = useAppStore.getState();
+                  if (autoMatchProgress.phase === "done") {
+                    setAutoMatchProgress({ phase: "idle", matched: 0, total: 0, message: "" });
+                  }
+                }, 8000);
               });
           })
-          .catch((err) =>
-            console.error("Failed to persist/auto-match upload:", err)
-          );
+          .catch((err) => {
+            console.error("Failed to persist/auto-match upload:", err);
+            useAppStore.getState().setAutoMatchProgress({
+              phase: "done",
+              matched: 0,
+              total: 0,
+              message: "Auto-match failed",
+            });
+          });
       } catch (err) {
         console.error("IFC loading failed:", err);
         setModelError(

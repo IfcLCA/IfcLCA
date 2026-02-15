@@ -25,6 +25,8 @@ export function ProjectSummary() {
     parseResult,
     activeDataSource,
     updateMaterialMatch,
+    autoMatchProgress,
+    setAutoMatchProgress,
   } = useAppStore();
 
   const [autoMatching, setAutoMatching] = useState(false);
@@ -78,6 +80,14 @@ export function ProjectSummary() {
         return;
       }
 
+      const total = unmatched.length;
+      setAutoMatchProgress({
+        phase: "matching",
+        matched: 0,
+        total,
+        message: `Matching ${total} materials...`,
+      });
+
       const res = await fetch("/api/materials/auto-match", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -91,6 +101,7 @@ export function ProjectSummary() {
       const data = await res.json();
       if (!res.ok) {
         setAutoMatchResult(data.error || "Auto-match failed");
+        setAutoMatchProgress({ phase: "idle", matched: 0, total: 0, message: "" });
         return;
       }
 
@@ -110,20 +121,29 @@ export function ProjectSummary() {
         const parts = [];
         if (reapplied > 0) parts.push(`${reapplied} reapplied`);
         if (auto > 0) parts.push(`${auto} auto`);
-        setAutoMatchResult(
-          `Matched ${matched}/${unmatched.length} (${parts.join(", ")})`
-        );
+        const msg = `Matched ${matched}/${total} (${parts.join(", ")})`;
+        setAutoMatchResult(msg);
+        setAutoMatchProgress({ phase: "done", matched, total, message: msg });
       } else {
-        setAutoMatchResult(
-          `No automatic matches found for ${unmatched.length} materials`
-        );
+        const msg = `No automatic matches found for ${total} materials`;
+        setAutoMatchResult(msg);
+        setAutoMatchProgress({ phase: "done", matched: 0, total, message: msg });
       }
+
+      // Clear progress after 8 seconds
+      setTimeout(() => {
+        const { autoMatchProgress: p } = useAppStore.getState();
+        if (p.phase === "done") {
+          setAutoMatchProgress({ phase: "idle", matched: 0, total: 0, message: "" });
+        }
+      }, 8000);
     } catch {
       setAutoMatchResult("Auto-match failed");
+      setAutoMatchProgress({ phase: "idle", matched: 0, total: 0, message: "" });
     } finally {
       setAutoMatching(false);
     }
-  }, [project, materials, activeDataSource, updateMaterialMatch]);
+  }, [project, materials, activeDataSource, updateMaterialMatch, setAutoMatchProgress]);
 
   const hasEmissions =
     matchedCount > 0 &&
@@ -178,7 +198,20 @@ export function ProjectSummary() {
               Auto-match unmatched materials
             </Button>
           )}
-          {autoMatchResult && (
+          {/* Auto-match progress (from upload or button) */}
+          {autoMatchProgress.phase === "matching" && (
+            <div className="flex items-center gap-2 rounded-md border bg-muted/50 px-3 py-2 text-xs">
+              <Loader2 className="h-3 w-3 animate-spin text-primary" />
+              <span className="text-muted-foreground">{autoMatchProgress.message}</span>
+            </div>
+          )}
+          {autoMatchProgress.phase === "done" && (
+            <div className="flex items-center gap-2 rounded-md border border-green-200 bg-green-50 px-3 py-2 text-xs dark:border-green-900 dark:bg-green-950">
+              <CheckCircle2 className="h-3 w-3 text-green-600" />
+              <span className="text-green-700 dark:text-green-400">{autoMatchProgress.message}</span>
+            </div>
+          )}
+          {autoMatchResult && autoMatchProgress.phase === "idle" && (
             <p className="text-xs text-muted-foreground">{autoMatchResult}</p>
           )}
         </div>

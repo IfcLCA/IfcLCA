@@ -35,6 +35,13 @@ export interface MaterialWithMatch extends IFCMaterialSummary {
   indicators?: IndicatorValues;
 }
 
+export interface AutoMatchProgress {
+  phase: "idle" | "matching" | "done";
+  matched: number;
+  total: number;
+  message: string;
+}
+
 export type ContextPanelMode = "summary" | "element" | "material";
 
 export interface AppState {
@@ -68,6 +75,9 @@ export interface AppState {
   // Active data source
   activeDataSource: string;
 
+  // Auto-match progress
+  autoMatchProgress: AutoMatchProgress;
+
   // Actions
   setParseResult: (result: IFCParseResult) => void;
   setModelLoading: (loading: boolean) => void;
@@ -96,6 +106,7 @@ export interface AppState {
   setSelectedMaterial: (name: string | null) => void;
   setBottomPanelOpen: (open: boolean) => void;
   setActiveDataSource: (source: string) => void;
+  setAutoMatchProgress: (progress: AutoMatchProgress) => void;
   clearAllMatches: () => void;
 
   reset: () => void;
@@ -166,6 +177,7 @@ const initialState = {
   selectedMaterialName: null as string | null,
   bottomPanelOpen: false,
   activeDataSource: "kbob",
+  autoMatchProgress: { phase: "idle", matched: 0, total: 0, message: "" } as AutoMatchProgress,
 };
 
 // ---------------------------------------------------------------------------
@@ -289,6 +301,7 @@ export const useAppStore = create<AppState>((set) => ({
 
   setBottomPanelOpen: (open) => set({ bottomPanelOpen: open }),
   setActiveDataSource: (source) => set({ activeDataSource: source }),
+  setAutoMatchProgress: (progress) => set({ autoMatchProgress: progress }),
   clearAllMatches: () =>
     set((state) => ({
       materials: state.materials.map((m) => ({
