@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import { db } from "@/db";
 import { materials, projects } from "@/db/schema";
-import { eq, and } from "drizzle-orm";
+import { eq, and, isNotNull } from "drizzle-orm";
 
 export const dynamic = "force-dynamic";
 
@@ -71,6 +71,59 @@ export async function POST(request: NextRequest) {
       updatedAt: new Date(),
     })
     .where(eq(materials.id, material.id));
+
+  return NextResponse.json({ success: true });
+}
+
+/**
+ * DELETE — Clear all material matches for a project.
+ * Used when switching data source to avoid stale cross-source matches.
+ */
+export async function DELETE(request: NextRequest) {
+  const { userId } = await auth();
+  if (!userId) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const { searchParams } = new URL(request.url);
+  const projectId = searchParams.get("projectId");
+
+  if (!projectId) {
+    return NextResponse.json(
+      { error: "projectId is required" },
+      { status: 400 }
+    );
+  }
+
+  // Verify project ownership
+  const [project] = await db
+    .select()
+    .from(projects)
+    .where(and(eq(projects.id, projectId), eq(projects.userId, userId)))
+    .limit(1);
+
+  if (!project) {
+    return NextResponse.json({ error: "Project not found" }, { status: 404 });
+  }
+
+  // Clear all matches for this project
+  await db
+    .update(materials)
+    .set({
+      lcaMaterialId: null,
+      matchSource: null,
+      matchSourceId: null,
+      matchMethod: null,
+      matchScore: null,
+      matchedAt: null,
+      updatedAt: new Date(),
+    })
+    .where(
+      and(
+        eq(materials.projectId, projectId),
+        isNotNull(materials.lcaMaterialId)
+      )
+    );
 
   return NextResponse.json({ success: true });
 }

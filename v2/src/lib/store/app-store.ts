@@ -96,6 +96,7 @@ export interface AppState {
   setSelectedMaterial: (name: string | null) => void;
   setBottomPanelOpen: (open: boolean) => void;
   setActiveDataSource: (source: string) => void;
+  clearAllMatches: () => void;
 
   reset: () => void;
 }
@@ -288,6 +289,16 @@ export const useAppStore = create<AppState>((set) => ({
 
   setBottomPanelOpen: (open) => set({ bottomPanelOpen: open }),
   setActiveDataSource: (source) => set({ activeDataSource: source }),
+  clearAllMatches: () =>
+    set((state) => ({
+      materials: state.materials.map((m) => ({
+        ...m,
+        match: undefined,
+        matchedMaterial: undefined,
+        indicators: undefined,
+      })),
+      matchedCount: 0,
+    })),
 
   reset: () => {
     viewerRefs.renderer = null;

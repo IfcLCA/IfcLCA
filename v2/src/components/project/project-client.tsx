@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { UserButton } from "@clerk/nextjs";
-import { Building2, ArrowLeft, Database, ChevronDown, Download } from "lucide-react";
+import { Building2, ArrowLeft, Database, ChevronDown, Download, AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useAppStore } from "@/lib/store";
@@ -45,9 +45,11 @@ export function ProjectClient({
     materials: storeMaterials,
     activeDataSource,
     setActiveDataSource,
+    clearAllMatches,
   } = useAppStore();
   const [dsOpen, setDsOpen] = useState(false);
   const [autoLoadAttempted, setAutoLoadAttempted] = useState(false);
+  const [pendingDataSource, setPendingDataSource] = useState<string | null>(null);
 
   useEffect(() => {
     setProject({
@@ -192,6 +194,50 @@ export function ProjectClient({
   const hasModel = parseResult !== null;
   const showViewer = hasModel || modelLoading;
 
+  async function handleDataSourceSwitch(newSource: string) {
+    if (newSource === activeDataSource) return;
+
+    // If there are matched materials, ask for confirmation
+    if (matchedCount > 0) {
+      setPendingDataSource(newSource);
+      return;
+    }
+
+    applyDataSourceSwitch(newSource);
+  }
+
+  async function applyDataSourceSwitch(newSource: string) {
+    setPendingDataSource(null);
+
+    // Clear all matches in DB
+    if (matchedCount > 0 && project.id) {
+      try {
+        await fetch(`/api/materials/match?projectId=${project.id}`, {
+          method: "DELETE",
+        });
+      } catch (err) {
+        console.error("Failed to clear matches:", err);
+      }
+    }
+
+    // Clear local state
+    clearAllMatches();
+
+    // Update data source
+    setActiveDataSource(newSource);
+
+    // Persist to project
+    try {
+      await fetch(`/api/projects/${project.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ preferredDataSource: newSource }),
+      });
+    } catch (err) {
+      console.error("Failed to persist data source:", err);
+    }
+  }
+
   return (
     <div className="flex h-screen flex-col">
       {/* Top bar */}
@@ -227,7 +273,7 @@ export function ProjectClient({
                     <button
                       key={ds.id}
                       onClick={() => {
-                        setActiveDataSource(ds.id);
+                        handleDataSourceSwitch(ds.id);
                         setDsOpen(false);
                       }}
                       className={`flex w-full items-center justify-between rounded-sm px-2 py-1.5 text-sm transition-colors hover:bg-accent ${
@@ -289,6 +335,35 @@ export function ProjectClient({
           </div>
           <UploadZone projectId={project.id} />
         </div>
+      )}
+
+      {/* Confirmation dialog: switching data source clears all matches */}
+      {pendingDataSource && (
+        <>
+          <div className="fixed inset-0 z-50 bg-black/50" onClick={() => setPendingDataSource(null)} />
+          <div className="fixed left-1/2 top-1/2 z-50 w-96 -translate-x-1/2 -translate-y-1/2 rounded-lg border bg-background p-6 shadow-lg">
+            <div className="flex items-start gap-3">
+              <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-destructive" />
+              <div>
+                <h3 className="font-semibold">Switch data source?</h3>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  Switching to{" "}
+                  <strong>{pendingDataSource === "kbob" ? "KBOB" : "Ökobaudat"}</strong>{" "}
+                  will remove all {matchedCount} existing material{matchedCount !== 1 ? " mappings" : " mapping"}.
+                  This cannot be undone.
+                </p>
+                <div className="mt-4 flex gap-2 justify-end">
+                  <Button variant="outline" size="sm" onClick={() => setPendingDataSource(null)}>
+                    Cancel
+                  </Button>
+                  <Button variant="destructive" size="sm" onClick={() => applyDataSourceSwitch(pendingDataSource)}>
+                    Switch &amp; clear mappings
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </>
       )}
     </div>
   );

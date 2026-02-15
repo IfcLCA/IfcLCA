@@ -331,7 +331,43 @@ export class OekobaudatAdapter implements LCADataSourceAdapter {
       .where(and(...conditions))
       .limit(50);
 
-    return rows.map(rowToNormalized);
+    const results = rows.map(rowToNormalized);
+
+    // Lazily enrich results that are missing indicators (synced without detail)
+    const toEnrich = results.filter(
+      (r) => r.indicators.gwpTotal == null && r.sourceId
+    );
+    if (toEnrich.length > 0) {
+      await Promise.allSettled(
+        toEnrich.map(async (r) => {
+          const detail = await this.fetchProcessDetail(r.sourceId);
+          if (!detail) return;
+
+          const indicators = extractIndicators(detail.lciaResults);
+          const density = extractDensity(detail.flowProperties);
+
+          // Update DB record
+          const updates: Record<string, unknown> = { updatedAt: new Date() };
+          for (const [key, val] of Object.entries(indicators)) {
+            if (val != null) updates[key] = val;
+          }
+          if (density != null) updates.density = density;
+
+          if (Object.keys(updates).length > 1) {
+            await db
+              .update(lcaMaterials)
+              .set(updates)
+              .where(eq(lcaMaterials.id, r.id));
+
+            // Update in-memory result
+            Object.assign(r.indicators, indicators);
+            if (density != null) r.density = density;
+          }
+        })
+      );
+    }
+
+    return results;
   }
 
   async getById(sourceId: string): Promise<NormalizedMaterial | null> {
