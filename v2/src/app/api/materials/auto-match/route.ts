@@ -6,6 +6,7 @@ import { eq, and, inArray, isNotNull } from "drizzle-orm";
 import { registry } from "@/lib/lca/registry";
 import { findBestMatch } from "@/lib/lca/matching";
 import { cleanIfcQuery } from "@/lib/lca/preprocessing";
+import { recalculateProject } from "@/lib/lca/calculations-server";
 import type { NormalizedMaterial, MaterialMatch } from "@/types/lca";
 
 export const dynamic = "force-dynamic";
@@ -299,6 +300,21 @@ export async function POST(request: NextRequest) {
             const event = JSON.stringify({ matched, total, materialName, result });
             controller.enqueue(encoder.encode(`data: ${event}\n\n`));
           });
+
+          // Recalculate project emissions now that matches are saved
+          const calcResult = await recalculateProject(projectId).catch((err) => {
+            console.error("[auto-match] Post-match recalculation failed:", err);
+            return null;
+          });
+          if (calcResult) {
+            const event = JSON.stringify({
+              recalculated: true,
+              totals: calcResult.totals,
+              elementCount: calcResult.elementCount,
+            });
+            controller.enqueue(encoder.encode(`data: ${event}\n\n`));
+          }
+
           controller.enqueue(encoder.encode(`data: [DONE]\n\n`));
         } catch (err) {
           const msg = err instanceof Error ? err.message : String(err);
@@ -323,7 +339,14 @@ export async function POST(request: NextRequest) {
   // -------------------------------------------------------------------------
   try {
     const matches = await runMatching();
-    return NextResponse.json({ matches });
+
+    // Recalculate project emissions after batch matching
+    const calcResult = await recalculateProject(projectId).catch((err) => {
+      console.error("[auto-match] Post-match recalculation failed:", err);
+      return null;
+    });
+
+    return NextResponse.json({ matches, emissions: calcResult?.totals });
   } catch (err) {
     console.error("[match] Auto-match failed:", err);
     return NextResponse.json(

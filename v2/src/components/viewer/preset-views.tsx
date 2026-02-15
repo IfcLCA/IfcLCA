@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Compass, ChevronDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { viewerRefs } from "@/lib/store/app-store";
+import { renderFrame } from "./ifc-viewer";
 
 const VIEWS = [
   { id: "top", label: "Top" },
@@ -33,10 +34,10 @@ export function PresetViews() {
     const bounds = scene?.getBounds?.();
     camera.setPresetView(view, bounds ?? undefined);
 
-    // Render animation frames
+    // Render animation frames (preserving isolation/selection state)
     let frames = 0;
     function animRender() {
-      r.render();
+      renderFrame(r);
       frames++;
       if (frames < 20) requestAnimationFrame(animRender);
     }

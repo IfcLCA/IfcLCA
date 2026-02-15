@@ -4,12 +4,13 @@ import { useState } from "react";
 import { Scissors, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { viewerRefs } from "@/lib/store/app-store";
+import { renderFrame } from "./ifc-viewer";
 
 type SectionAxis = "down" | "front" | "side";
 
 /**
  * Section plane control — clips the 3D model along an axis.
- * Positioned as a floating panel near the viewer.
+ * Stores section state in viewerRefs so renderFrame includes it.
  */
 export function SectionControl() {
   const [enabled, setEnabled] = useState(false);
@@ -17,14 +18,12 @@ export function SectionControl() {
   const [position, setPosition] = useState(50);
 
   function applySection(a: SectionAxis, pos: number, on: boolean) {
-    const r = viewerRefs.renderer as any;
-    if (!r) return;
-
-    r.render({
-      sectionPlane: on
-        ? { axis: a, position: pos, enabled: true }
-        : { axis: "down", position: 100, enabled: false },
-    });
+    if (on) {
+      viewerRefs.sectionPlane = { axis: a, position: pos, enabled: true };
+    } else {
+      viewerRefs.sectionPlane = null;
+    }
+    renderFrame();
   }
 
   function toggleSection() {

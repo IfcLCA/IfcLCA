@@ -370,7 +370,8 @@ export function IfcViewer() {
 // Render frame helper — builds render options from current state
 // ---------------------------------------------------------------------------
 
-function renderFrame(r: any) {
+export function renderFrame(r?: any) {
+  if (!r) r = viewerRefs.renderer;
   if (!r) return;
 
   const state = useAppStore.getState();
@@ -416,11 +417,18 @@ function renderFrame(r: any) {
     }
   }
 
-  r.render({
-    selectedIds: selectedIds.size > 0 ? selectedIds : undefined,
-    hiddenIds: hiddenIds.size > 0 ? hiddenIds : undefined,
-    isolatedIds: isolatedIds && isolatedIds.size > 0 ? isolatedIds : undefined,
-  });
+  // Build render options
+  const opts: Record<string, unknown> = {};
+  if (selectedIds.size > 0) opts.selectedIds = selectedIds;
+  if (hiddenIds.size > 0) opts.hiddenIds = hiddenIds;
+  if (isolatedIds && isolatedIds.size > 0) opts.isolatedIds = isolatedIds;
+
+  // Include section plane if active
+  if (viewerRefs.sectionPlane?.enabled) {
+    opts.sectionPlane = viewerRefs.sectionPlane;
+  }
+
+  r.render(opts);
 }
 
 // ---------------------------------------------------------------------------
@@ -463,10 +471,10 @@ export function frameElements(guids: Set<string>) {
     camera.zoomToFit({ x: minX, y: minY, z: minZ }, { x: maxX, y: maxY, z: maxZ }, 400);
   }
 
-  // Trigger continuous render during animation
+  // Trigger continuous render during animation (preserving isolation/selection state)
   let frames = 0;
   function animRender() {
-    r.render();
+    renderFrame(r);
     frames++;
     if (frames < 30) requestAnimationFrame(animRender);
   }

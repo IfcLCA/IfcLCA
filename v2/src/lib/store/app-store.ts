@@ -129,6 +129,12 @@ export interface AppState {
 // These are NOT reactive state; components that need them access directly.
 // ---------------------------------------------------------------------------
 
+export interface SectionPlaneState {
+  axis: "down" | "front" | "side";
+  position: number;
+  enabled: boolean;
+}
+
 interface ViewerRefs {
   renderer: unknown | null; // Renderer — typed as unknown to avoid SSR import
   dataStore: unknown | null; // IfcDataStore
@@ -142,6 +148,8 @@ interface ViewerRefs {
   rendererReady: Promise<void>;
   /** Call to signal renderer is ready (set internally by viewer) */
   rendererReadyResolve: (() => void) | null;
+  /** Current section plane state (mutable for real-time slider) */
+  sectionPlane: SectionPlaneState | null;
 }
 
 function createRendererReadyPromise() {
@@ -162,6 +170,7 @@ export const viewerRefs: ViewerRefs = {
   canvas: null,
   expressIdToGuid: new Map(),
   guidToExpressId: new Map(),
+  sectionPlane: null,
   rendererReady: rendererReadyPromise,
   rendererReadyResolve,
 };
