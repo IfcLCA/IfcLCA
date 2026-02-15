@@ -128,7 +128,7 @@ export function UploadZone({ projectId }: UploadZoneProps) {
               phase: "matching",
               matched: 0,
               total,
-              message: `Matching 0/${total} materials...`,
+              message: `Processing materials... (0/${total})`,
             });
 
             const res = await fetch("/api/materials/auto-match", {
@@ -154,6 +154,7 @@ export function UploadZone({ projectId }: UploadZoneProps) {
             let buffer = "";
             let matched = 0;
             let processed = 0;
+            let allDone = false;
 
             while (true) {
               const { done, value } = await reader.read();
@@ -166,7 +167,7 @@ export function UploadZone({ projectId }: UploadZoneProps) {
               for (const line of lines) {
                 if (!line.startsWith("data: ")) continue;
                 const payload = line.slice(6);
-                if (payload === "[DONE]") continue;
+                if (payload === "[DONE]") { allDone = true; break; }
 
                 try {
                   const event = JSON.parse(payload);
@@ -190,11 +191,18 @@ export function UploadZone({ projectId }: UploadZoneProps) {
                     total: event.total,
                     message: `Processing materials... (${processed}/${event.total})`,
                   });
+
+                  // All materials processed — don't wait for server recalculation
+                  if (processed >= event.total) { allDone = true; break; }
                 } catch {
                   // Ignore malformed SSE lines
                 }
               }
+              if (allDone) break;
             }
+
+            // Cancel the remaining stream (recalculation events) without blocking
+            reader.cancel().catch(() => {});
 
             console.log(`[UploadZone] Auto-match complete: ${matched}/${total} matched`);
             const doneMsg = matched > 0

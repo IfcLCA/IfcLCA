@@ -100,7 +100,7 @@ export function ProjectSummary() {
         phase: "matching",
         matched: 0,
         total,
-        message: `Matching 0/${total} materials...`,
+        message: `Processing materials... (0/${total})`,
       });
 
       const res = await fetch("/api/materials/auto-match", {
@@ -130,6 +130,7 @@ export function ProjectSummary() {
       let processed = 0;
       let reapplied = 0;
       let auto = 0;
+      let allDone = false;
 
       while (true) {
         const { done, value } = await reader.read();
@@ -142,7 +143,7 @@ export function ProjectSummary() {
         for (const line of lines) {
           if (!line.startsWith("data: ")) continue;
           const payload = line.slice(6);
-          if (payload === "[DONE]") continue;
+          if (payload === "[DONE]") { allDone = true; break; }
 
           try {
             const event = JSON.parse(payload);
@@ -164,11 +165,18 @@ export function ProjectSummary() {
               total: event.total,
               message: `Processing materials... (${processed}/${event.total})`,
             });
+
+            // All materials processed — don't wait for server recalculation
+            if (processed >= event.total) { allDone = true; break; }
           } catch {
             // Ignore malformed SSE lines
           }
         }
+        if (allDone) break;
       }
+
+      // Cancel the remaining stream (recalculation events) without blocking
+      reader.cancel().catch(() => {});
 
       if (matched > 0) {
         const parts = [];
