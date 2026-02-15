@@ -1,388 +1,457 @@
-# V1 → V2 Feature Parity: Detailed Implementation Plan
+# Full 3D Integration Plan: Model-Centric Architecture
 
-## Current State Summary
+## Vision
 
-V2 has: 3D viewer, multi-source matching (KBOB + Ökobaudat), SSE streaming auto-match, materials table with CSV export, composite scoring with EOL filtering + Durchschnitt preference.
+The 3D model becomes the **single source of truth** for all interaction. Every UI element — charts, tables, panels — is a lens into the model. Clicking a chart bar isolates those elements in 3D. Selecting an element in 3D highlights it in the chart. Color modes paint the model with LCA results. The viewer is not a passive display — it's the application.
 
-V2 is missing: **actual LCA calculations** (all volumes = 0), charts, IFC export, relative emissions UI, project edit, upload history, activity feed, print/PDF.
+## Current State
+
+**What works:**
+- Element picking (`renderer.pick()`) → store → selection highlight
+- Multi-select (Ctrl+Click) via `selectedIds` in RenderOptions
+- Hide/show by element type via `hiddenIds` in RenderOptions
+- Orbit, pan, zoom camera controls
+- Hover detection (store tracks `hoveredElementId`, but no visual)
+
+**What's available in ifc-lite but NOT wired:**
+- `isolatedIds` in RenderOptions — show ONLY these elements (everything else hidden)
+- `scene.setColorOverrides(Map<expressId, [r,g,b,a]>)` — per-element color override
+- `camera.zoomToFit(min, max)` / `camera.frameBounds(min, max)` — animated camera framing
+- `scene.getEntityBoundingBox(expressId)` — get bounds for a single element
+- `camera.setPresetView('top'|'front'|'left'|...)` — preset camera angles
+- `sectionPlane` in RenderOptions — clip the model by axis
+- `renderer.captureScreenshot()` — for PDF/image export
+
+**Key data mappings already maintained:**
+- `viewerRefs.expressIdToGuid: Map<number, string>` (render → UI)
+- `viewerRefs.guidToExpressId: Map<string, number>` (UI → render)
+- `parseResult.elements[]` with guid, type, materials, totalVolume
 
 ---
 
-## Phase 1: Volume Extraction from IFC (Foundation)
+## Phase A: Heatmap Color Engine
 
-**Why first:** Every subsequent feature depends on having real volumes. Currently `totalVolume = 0` for all materials and `elementMaterials.volume = 0` for all layers.
+**Goal:** When user selects "GWP", "PENRE", "UBP", or "Match Status" in the toolbar, the 3D model paints every element with a color gradient based on its calculated indicator value.
 
-### Step 1.1: Extract volumes from ifc-lite geometry
+### A.1: Build the color computation engine
 
-**File:** `v2/src/lib/ifc/bridge.ts`
-
-ifc-lite's `GeometryProcessor` computes mesh geometry. After geometry processing, volumes can be derived from the mesh data. However, ifc-lite may not expose per-element volumes directly.
-
-**Approach A (Preferred):** Check if ifc-lite exposes `IfcQuantityVolume` from `IfcElementQuantity` property sets. Many IFC files include BaseQuantities with `NetVolume` or `GrossVolume`. Extract these in bridge.ts via `extractPropertiesOnDemand()` which already runs for each element.
+**New file:** `v2/src/lib/viewer/color-engine.ts`
 
 ```typescript
-// In bridge.ts, inside element extraction loop:
-const props = extractPropertiesOnDemand(dataStore, expressId);
-const volume = props?.NetVolume ?? props?.GrossVolume ?? props?.Volume ?? 0;
+export interface ColorMap {
+  overrides: Map<number, [number, number, number, number]>; // expressId → RGBA [0-1]
+  min: number;
+  max: number;
+  legend: Array<{ value: number; color: [number, number, number, number]; label: string }>;
+}
+
+// Heatmap: green (low) → yellow (mid) → red (high)
+export function computeHeatmapColors(
+  elements: IFCElement[],
+  indicator: 'gwpTotal' | 'penreTotal' | 'ubp',
+  materials: MaterialWithMatch[],
+  guidToExpressId: Map<string, number>
+): ColorMap
+
+// Match status: green (matched) → red (unmatched) → gray (no material)
+export function computeMatchStatusColors(
+  elements: IFCElement[],
+  materials: MaterialWithMatch[],
+  guidToExpressId: Map<string, number>
+): ColorMap
+
+// Element type: distinct color per IfcWall, IfcSlab, etc.
+export function computeTypeColors(
+  elements: IFCElement[],
+  guidToExpressId: Map<string, number>
+): ColorMap
 ```
 
-**Approach B (Fallback):** If BaseQuantities are missing, compute volume from mesh geometry. ifc-lite's `GeometryProcessor` produces `Float32Array` vertex buffers per element. Volume can be calculated from the signed volume of the mesh triangles:
+**Color gradient for heatmap:**
+- 0% (low): `[0.18, 0.80, 0.44, 1.0]` (green)
+- 50% (mid): `[1.0, 0.84, 0.0, 1.0]` (yellow)
+- 100% (high): `[0.91, 0.30, 0.24, 1.0]` (red)
+- No data: `[0.6, 0.6, 0.6, 0.4]` (translucent gray)
+
+### A.2: Apply color overrides to renderer
+
+**Modified:** `v2/src/components/viewer/ifc-viewer.tsx`
+
+In the render loop and on colorMode/material changes:
 
 ```typescript
-function meshVolume(vertices: Float32Array, indices: Uint32Array): number {
-  let vol = 0;
-  for (let i = 0; i < indices.length; i += 3) {
-    const a = indices[i] * 3, b = indices[i+1] * 3, c = indices[i+2] * 3;
-    // Signed volume of tetrahedron (origin, v0, v1, v2)
-    vol += (vertices[a] * (vertices[b+1]*vertices[c+2] - vertices[b+2]*vertices[c+1])
-          - vertices[a+1] * (vertices[b]*vertices[c+2] - vertices[b+2]*vertices[c])
-          + vertices[a+2] * (vertices[b]*vertices[c+1] - vertices[b+1]*vertices[c])) / 6;
+// When colorMode or materials change → recompute colors
+useEffect(() => {
+  const r = rendererRef.current as any;
+  if (!r || !parseResult) return;
+
+  const scene = r.getScene();
+  const state = useAppStore.getState();
+
+  if (state.colorMode === 'matchStatus') {
+    const colorMap = computeMatchStatusColors(parseResult.elements, state.materials, viewerRefs.guidToExpressId);
+    scene.setColorOverrides(colorMap.overrides, r.getGPUDevice(), r.getPipeline());
+  } else if (['gwpTotal', 'penreTotal', 'ubp'].includes(state.colorMode)) {
+    const colorMap = computeHeatmapColors(parseResult.elements, state.colorMode, state.materials, viewerRefs.guidToExpressId);
+    scene.setColorOverrides(colorMap.overrides, r.getGPUDevice(), r.getPipeline());
+  } else if (state.colorMode === 'elementType') {
+    const colorMap = computeTypeColors(parseResult.elements, viewerRefs.guidToExpressId);
+    scene.setColorOverrides(colorMap.overrides, r.getGPUDevice(), r.getPipeline());
   }
-  return Math.abs(vol);
+
+  r.render();
+}, [colorMode, materials, parseResult]);
+```
+
+### A.3: Color legend overlay
+
+**New file:** `v2/src/components/viewer/color-legend.tsx`
+
+Positioned over the 3D canvas (bottom-left). Shows:
+- Gradient bar (for heatmap modes): min → max with labels
+- Discrete legend (for match status / element type): colored dots + labels
+- Current mode name
+
+Toggleable — appears when a color mode is active, can be dismissed.
+
+### A.4: Toolbar enhancements
+
+**Modified:** `v2/src/components/viewer/toolbar.tsx`
+
+- Add "UBP" button (missing from current toolbar)
+- Add "Data Source" color mode
+- Visual indicator that coloring is active (border glow or badge)
+- Add "Reset Colors" button to return to default
+
+---
+
+## Phase B: Chart ↔ 3D Bidirectional Interaction
+
+**Goal:** Click a bar in the chart → those elements isolate in 3D + camera frames them. Hover a chart bar → elements highlight in 3D. This is the core "model-centric" feature.
+
+### B.1: Build element group lookup
+
+**New utility:** `v2/src/lib/viewer/element-groups.ts`
+
+Pre-builds maps for fast lookup:
+```typescript
+// material name → Set<guid>
+export function groupByMaterial(elements: IFCElement[]): Map<string, Set<string>>
+
+// element type → Set<guid>
+export function groupByType(elements: IFCElement[]): Map<string, Set<string>>
+
+// category → Set<guid>
+export function groupByCategory(elements: IFCElement[]): Map<string, Set<string>>
+```
+
+### B.2: Add isolation state to store
+
+**Modified:** `v2/src/lib/store/app-store.ts`
+
+```typescript
+interface AppState {
+  // ... existing state ...
+
+  // 3D interaction state
+  isolatedElementIds: Set<string> | null;  // null = show all, Set = only show these
+  highlightedElementIds: Set<string>;      // temporary visual highlight (hover from chart)
+
+  // Actions
+  isolateElements: (guids: Set<string> | null) => void;
+  highlightElements: (guids: Set<string>) => void;
+  clearHighlight: () => void;
+  frameSelection: () => void;  // zoom camera to current selection/isolation
 }
 ```
 
-**Approach C (Hybrid):** Try IfcQuantityVolume first, fall back to mesh calculation. This is the most robust.
+### B.3: Wire isolation + highlight into render loop
 
-### Step 1.2: Distribute volume to material layers
-
-**File:** `v2/src/lib/ifc/bridge.ts`
-
-Once element `totalVolume` is known, distribute to layers using their `fraction`:
+**Modified:** `v2/src/components/viewer/ifc-viewer.tsx`
 
 ```typescript
-// Already have fractions computed from thickness ratios
-for (const layer of element.materials) {
-  layer.volume = element.totalVolume * layer.fraction;
+// In render loop:
+const isolatedIds = state.isolatedElementIds
+  ? new Set([...state.isolatedElementIds].map(g => viewerRefs.guidToExpressId.get(g)).filter(Boolean))
+  : null;
+
+const highlightIds = new Set<number>();
+for (const guid of state.highlightedElementIds) {
+  const eid = viewerRefs.guidToExpressId.get(guid);
+  if (eid !== undefined) highlightIds.add(eid);
+}
+
+r.render({
+  selectedIds: selectedIds.size > 0 ? selectedIds : undefined,
+  hiddenIds: hiddenIds.size > 0 ? hiddenIds : undefined,
+  isolatedIds,
+  // highlightIds rendered as secondary selection with different color
+});
+```
+
+### B.4: Make charts interactive → 3D
+
+**Modified:** `v2/src/components/charts/emissions-chart.tsx`
+
+Add click and hover handlers to chart bars/slices:
+
+```typescript
+<Bar
+  dataKey="value"
+  onClick={(data) => {
+    // Isolate elements belonging to this material/type/category
+    const guids = elementGroups.get(data.fullName);
+    if (guids) {
+      isolateElements(guids);
+      frameSelection();
+    }
+  }}
+  onMouseEnter={(data) => {
+    const guids = elementGroups.get(data.fullName);
+    if (guids) highlightElements(guids);
+  }}
+  onMouseLeave={() => clearHighlight()}
+/>
+```
+
+### B.5: Add "Show All" / "Clear Isolation" button
+
+When elements are isolated, show a floating button over the 3D canvas:
+```
+[x] Showing 12 of 156 elements — Show All
+```
+
+Clicking it calls `isolateElements(null)` to reset.
+
+### B.6: Camera framing on isolation
+
+When elements are isolated or selected, animate the camera to frame just those elements:
+
+```typescript
+function frameElements(guids: Set<string>) {
+  const scene = (rendererRef.current as any).getScene();
+  let minBounds = { x: Infinity, y: Infinity, z: Infinity };
+  let maxBounds = { x: -Infinity, y: -Infinity, z: -Infinity };
+
+  for (const guid of guids) {
+    const eid = viewerRefs.guidToExpressId.get(guid);
+    if (eid === undefined) continue;
+    const bbox = scene.getEntityBoundingBox(eid);
+    if (!bbox) continue;
+    // Expand combined bounds
+    minBounds = { x: Math.min(minBounds.x, bbox.min.x), ... };
+    maxBounds = { x: Math.max(maxBounds.x, bbox.max.x), ... };
+  }
+
+  camera.zoomToFit(minBounds, maxBounds, 500); // 500ms animation
 }
 ```
 
-For `IFCMaterialSummary`, aggregate:
+---
+
+## Phase C: 3D → Charts/Table Bidirectional
+
+**Goal:** Select elements in 3D → charts and table highlight the corresponding materials/types. The UI follows the model, not the other way around.
+
+### C.1: Selection-aware chart highlighting
+
+**Modified:** `v2/src/components/charts/emissions-chart.tsx`
+
+When elements are selected in 3D:
+- Bar chart highlights the bars containing selected elements
+- Pie chart highlights the slices containing selected elements
+
 ```typescript
-materialSummary.totalVolume = sum of layer.volume across all elements using this material
+const selectedMaterials = useMemo(() => {
+  const names = new Set<string>();
+  for (const guid of selectedElementIds) {
+    const el = parseResult?.elements.find(e => e.guid === guid);
+    if (el) for (const mat of el.materials) names.add(mat.name);
+  }
+  return names;
+}, [selectedElementIds, parseResult]);
+
+// In chart rendering:
+<Cell
+  fill={selectedMaterials.has(entry.fullName) ? HIGHLIGHT_COLOR : CHART_COLORS[idx]}
+  stroke={selectedMaterials.has(entry.fullName) ? '#000' : undefined}
+  strokeWidth={selectedMaterials.has(entry.fullName) ? 2 : 0}
+/>
 ```
 
-### Step 1.3: Persist volumes to DB
+### C.2: Selection-aware table highlighting
 
-**File:** `v2/src/app/api/projects/[id]/upload/route.ts`
+**Modified:** `v2/src/components/panels/bottom-panel.tsx`
 
-Already handled — the upload route stores `mat.totalVolume` and `elementMaterials.volume`. Once bridge.ts populates real values, they flow through automatically.
+When elements are selected in 3D:
+- Scroll the table to show materials used by selected elements
+- Highlight those rows with a subtle background color
+- Show a count badge: "Used in 3 selected elements"
 
-### Step 1.4: Verify end-to-end
+### C.3: Element detail panel → 3D framing
 
-After this phase: upload an IFC file → materials table shows real volumes (m³) → `elementMaterials` table has per-layer volumes.
+**Modified:** `v2/src/components/panels/element-detail.tsx`
+
+When element detail panel opens:
+- "Frame in 3D" button zooms camera to that element
+- Material layers show individual volumes + calculated indicators
+- Click a material layer → highlight that layer's elements in 3D
+
+### C.4: Material match panel → 3D isolation
+
+**Modified:** `v2/src/components/panels/material-match.tsx` (or `context-panel.tsx`)
+
+When matching a material:
+- Show a preview: "This material is used in 23 elements"
+- "Show in 3D" button isolates all elements using that material
+- After matching, color updates immediately in 3D
 
 ---
 
-## Phase 2: LCA Calculation Engine (Core Value)
+## Phase D: Storey-Based Navigation
 
-**Why:** Without this, V2 shows raw indicator factors (per kg) but never multiplies by actual mass. Users see nonsensical numbers.
+**Goal:** Navigate the model by building storeys. Toggle storey visibility, isolate a floor, see per-storey emissions.
 
-### Step 2.1: Trigger calculations after matching
+### D.1: Build storey → element mapping
 
-**File:** New `v2/src/app/api/projects/[id]/calculate/route.ts`
+**Modified:** `v2/src/lib/ifc/bridge.ts`
 
-Create a `POST /api/projects/[id]/calculate` endpoint that:
-
-1. Fetches all `elementMaterials` for the project (joined with `materials` and `lcaMaterials`)
-2. For each elementMaterial row where `materialId` has a match:
-   - `mass = volume × density`
-   - `gwpTotal = mass × lcaMaterial.gwpTotal`
-   - `penreTotal = mass × lcaMaterial.penreTotal`
-   - `ubp = mass × lcaMaterial.ubp`
-3. Batch-updates `elementMaterials` rows with calculated values
-4. Aggregates per-element: sum all layers → update `elements.gwpTotal_cached`, `elements.penreTotal_cached`, `elements.ubp_cached`
-5. Aggregates per-project: sum all elements → update `projects.gwpTotal_cached`, `projects.penreTotal_cached`, `projects.ubpTotal_cached`, `projects.emissionsCalculatedAt`
-6. Returns calculated totals
-
-### Step 2.2: Auto-trigger calculation after match changes
-
-**Files:**
-- `v2/src/app/api/materials/match/route.ts` — after manual match, call calculate
-- `v2/src/app/api/materials/auto-match/route.ts` — after all auto-matches done, call calculate
-- `v2/src/app/api/materials/unmatch/route.ts` — after unmatch, recalculate
-
-Rather than calling a separate endpoint, extract calculation logic into a shared function:
-
-**File:** `v2/src/lib/lca/calculations-server.ts`
+During bridging, also extract which elements belong to which storey using ifc-lite's spatial hierarchy:
 
 ```typescript
-export async function recalculateProject(projectId: string): Promise<ProjectEmissions> {
-  // 1. Fetch all elementMaterials with joins
-  // 2. Calculate per-layer indicators
-  // 3. Batch update elementMaterials, elements, project
-  // 4. Return totals
+// bridge.ts addition:
+const storeyElements = new Map<string, Set<string>>(); // storeyGuid → elementGuids
+
+// Use dataStore.spatialHierarchy to walk the tree:
+// IfcProject → IfcSite → IfcBuilding → IfcBuildingStorey → elements
+```
+
+Add to `IFCParseResult`:
+```typescript
+interface IFCStorey {
+  guid: string;
+  name: string;
+  elevation: number;
+  elementGuids: string[];
 }
 ```
 
-### Step 2.3: Display calculated emissions in UI
+### D.2: Storey panel in toolbar/sidebar
 
-**File:** `v2/src/components/panels/bottom-panel.tsx`
+**New file:** `v2/src/components/viewer/storey-panel.tsx`
 
-Currently the totals row sums raw indicator factors. Change to:
-- Per material: `volume × density × factor` (use `calculateLayerIndicators` from `calculations.ts`)
-- Totals row: sum of per-material calculated values
-- Show actual kg CO₂-eq, not factor per kg
+Collapsible list of storeys with:
+- Toggle visibility per storey (checkbox)
+- Click storey → isolate its elements + frame camera
+- Show per-storey emission totals (mini bar chart)
+- Current elevation indicator
 
-**File:** `v2/src/components/panels/project-summary.tsx`
+### D.3: Wire storey visibility to renderer
 
-Update emission totals to use server-calculated cached values from `project.gwpTotal_cached`.
+The store already has `visibilityByStorey: Record<string, boolean>`, and the render loop already builds `hiddenIds` from type visibility. Extend this to include storey visibility:
 
-### Step 2.4: Wire heatmap to calculated values
-
-**File:** `v2/src/components/viewer/ifc-viewer.tsx` (or wherever heatmap coloring is applied)
-
-The store already has `colorMode` and `heatmapIndicator`. `computeHeatmapData()` in `calculations.ts` is ready. Need to:
-
-1. After calculation, build `Map<guid, number>` from `elements.gwpTotal_cached`
-2. Pass to renderer's coloring API
-3. Show color legend
-
----
-
-## Phase 3: Charts & Visualization
-
-**Why:** V1's chart page was heavily used. Users need to see GWP breakdown by category, element type, material to identify where to optimize.
-
-### Step 3.1: Chart data aggregation API
-
-**File:** New `v2/src/app/api/projects/[id]/emissions/route.ts`
-
-Returns pre-aggregated emission data:
 ```typescript
-{
-  totals: { gwp, ubp, penre },
-  byCategory: [{ category, gwp, ubp, penre }],
-  byElementType: [{ type, gwp, ubp, penre }],
-  byMaterial: [{ name, gwp, ubp, penre, volume, density }],
-  relative?: { gwpPerM2Year, ubpPerM2Year, penrePerM2Year } // if area set
+// In render loop:
+for (const [storey, visible] of Object.entries(state.visibilityByStorey)) {
+  if (!visible) {
+    const guids = storeyElements.get(storey) ?? [];
+    for (const guid of guids) {
+      const eid = viewerRefs.guidToExpressId.get(guid);
+      if (eid !== undefined) hiddenIds.add(eid);
+    }
+  }
 }
 ```
 
-### Step 3.2: Chart components
+---
 
-**File:** New `v2/src/components/charts/emissions-chart.tsx`
+## Phase E: Enhanced Viewer Controls
 
-Install `recharts` (already in v1's deps).
+**Goal:** Professional BIM-viewer quality controls: preset views, section planes, screenshot.
 
-Implement chart types:
-- **Bar chart** — horizontal bars: GWP by material or category (default view)
-- **Pie/Donut chart** — proportional breakdown
-- **Stacked bar** — multiple indicators side by side
+### E.1: Preset view buttons
 
-Props:
+**Modified:** `v2/src/components/viewer/toolbar.tsx`
+
+Add preset view dropdown:
+- Top / Bottom / Front / Back / Left / Right
+- Uses `camera.setPresetView('top', bounds)` with animation
+
+### E.2: Section plane control
+
+**New file:** `v2/src/components/viewer/section-control.tsx`
+
+Slider that clips the model along an axis:
 ```typescript
-interface EmissionsChartProps {
-  data: EmissionsByCategory[] | EmissionsByMaterial[];
-  indicator: IndicatorKey; // gwpTotal | penreTotal | ubp
-  chartType: "bar" | "pie" | "stacked";
-  groupBy: "category" | "material" | "elementType";
-}
+renderer.render({
+  sectionPlane: {
+    axis: 'down',
+    position: sliderValue, // 0-100
+    enabled: true,
+  }
+});
 ```
 
-### Step 3.3: Integrate into project page
+Three axis buttons (X/Y/Z) + slider. Shows cross-section for storey navigation.
 
-**File:** `v2/src/components/panels/project-summary.tsx`
+### E.3: Screenshot capture
 
-Replace the static "Environmental Indicators" section with interactive charts.
+**New file:** `v2/src/components/viewer/screenshot-button.tsx`
 
-Add tabs or a dropdown:
-- Summary (current text stats)
-- GWP breakdown (bar chart)
-- By category (pie chart)
-- By element type (bar chart)
+Calls `renderer.captureScreenshot()` → downloads PNG.
+Also used for print/PDF integration — embed a 3D screenshot in the print report.
 
-### Step 3.4: Indicator selector
+### E.4: Fit-to-selection button
 
-Allow switching between GWP, UBP, PENRE for all chart views. V2 already has `heatmapIndicator` in the store — reuse for charts.
+When elements are selected, show a "Frame" button in the toolbar that calls `frameElements()`.
 
 ---
 
-## Phase 4: IFC Export with Embedded Results
+## Phase F: Real-Time Indicator Feedback
 
-**Why:** This is V1's unique value proposition — writing LCA results back into the BIM model so other tools can consume them.
+**Goal:** As the user matches materials, the 3D model updates in real-time. No page refresh needed. The model is always showing the current state.
 
-### Step 4.1: Server-side IFC processing
+### F.1: Reactive color updates
 
-V1 used Pyodide + IfcOpenShell (Python in browser, 30MB). V2 should use a server-side approach.
+When `updateMaterialMatch()` is called in the store:
+1. Recalculate per-element indicators (client-side, from `calculations.ts`)
+2. Recompute color overrides for the active `colorMode`
+3. Apply to renderer immediately
 
-**Option A (Recommended):** Use `ifc-lite`'s write capabilities if available. Check `@ifc-lite/parser` API for property set writing.
+This should be a Zustand `subscribe()` — whenever `materials` changes AND `colorMode` is indicator-based, recompute colors.
 
-**Option B:** Use a lightweight server-side IFC library (e.g., `web-ifc` or `ifc-openshell` Node bindings) to read the original IFC, add `CPset_IfcLCA` property sets, and write back.
+### F.2: Match progress visualization
 
-**Option C:** Binary patch approach — parse IFC STEP file as text, append property set definitions at known anchor points. This avoids heavy deps but is fragile.
+During auto-match (SSE streaming):
+- Each material match triggers an immediate color update
+- User watches the model "paint itself" as matches come in
+- Dramatic, satisfying visual feedback
 
-### Step 4.2: Export API endpoint
+### F.3: Unmatched element flash
 
-**File:** New `v2/src/app/api/projects/[id]/export/route.ts`
-
-`POST /api/projects/[id]/export`
-
-Body: IFC file (binary) from client's IndexedDB cache.
-
-Flow:
-1. Accept original IFC file
-2. Fetch all elements with calculated indicators from DB
-3. For each element (matched by GUID):
-   - Create `IfcPropertySet` named `CPset_IfcLCA`
-   - Add properties: `GWP` (real), `UBP` (real), `PENRE` (real)
-   - Link to element via `IfcRelDefinesByProperties`
-4. Return modified IFC as download
-
-### Step 4.3: Export UI
-
-**File:** New `v2/src/components/export/export-dialog.tsx`
-
-- Button in project header or summary panel: "Export IFC with Results"
-- Dialog:
-  - Upload original IFC (or use cached version from IndexedDB)
-  - Show preview: X elements will get results, Y are missing
-  - Download enriched IFC file
+When hovering over an unmatched material in the table:
+- Flash those elements in 3D with a pulsing outline
+- Strong visual cue: "these are the elements that need your attention"
 
 ---
 
-## Phase 5: Calculation Area & Relative Emissions
-
-**Why:** Comparing absolute emissions between buildings of different sizes is meaningless. Per-m²-per-year normalization is standard practice.
-
-### Step 5.1: Project settings for area
-
-**File:** `v2/src/app/api/projects/[id]/route.ts` — add PATCH support
-
-The DB schema already has `areaType`, `areaValue`, `areaUnit`, `amortization` on the projects table.
-
-Add a PATCH endpoint to update these fields.
-
-### Step 5.2: Project settings UI
-
-**File:** New `v2/src/components/project/project-settings.tsx`
-
-Accessible from project header (gear icon or inline):
-- Area type dropdown: EBF, GFA, NFA, GIA
-- Area value: number input (m²)
-- Amortization period: number input (years, default 50)
-- Project name (editable)
-- Project description (optional)
-
-### Step 5.3: Relative emissions display
-
-**File:** `v2/src/components/panels/project-summary.tsx`
-
-If `project.areaValue > 0`:
-- Show additional row: "GWP per m²·a" = `gwpTotal / (area × amortization)`
-- Same for UBP, PENRE
-- Swiss SIA 2040 target comparison (optional): show how the building compares to the target path
-
-### Step 5.4: `relativeEmission()` is already implemented
-
-`v2/src/lib/lca/calculations.ts` already exports `relativeEmission(absolute, area, amortization)`. Just wire it to the UI.
-
----
-
-## Phase 6: Project Management & History
-
-### Step 6.1: Project edit page
-
-**File:** Extend `v2/src/app/api/projects/[id]/route.ts` with PATCH
-
-**File:** Add inline editing to `v2/src/components/project/project-client.tsx`
-
-- Click project name → inline edit
-- Settings panel (area, amortization, data source) — accessible from header
-
-### Step 6.2: Upload history
-
-**File:** The `uploads` table already exists with `filename`, `fileSize`, `status`, `elementCount`, `materialCount`, `createdAt`.
-
-**File:** New component `v2/src/components/project/upload-history.tsx`
-
-Show list of uploads for the project:
-- Filename, size, date, element/material count, status badge
-- Accessible from project header or summary panel
-
-### Step 6.3: Dashboard improvements
-
-**File:** `v2/src/components/dashboard/dashboard-client.tsx`
-
-Add summary stats at the top:
-- Total projects
-- Total elements across all projects
-- Total materials across all projects
-- Aggregate GWP (from `projects.gwpTotal_cached`)
-
-Project cards should show:
-- Material match progress (X/Y matched)
-- Total GWP if calculated
-- Last activity date
-
-### Step 6.4: Activity feed (optional, lower priority)
-
-**Approach:** Add a lightweight `activities` table or use the existing data (uploads, material changes) to derive activity timeline.
-
-Schema:
-```sql
-CREATE TABLE activities (
-  id TEXT PRIMARY KEY,
-  projectId TEXT REFERENCES projects(id),
-  userId TEXT NOT NULL,
-  type TEXT NOT NULL, -- 'upload', 'match', 'unmatch', 'calculate', 'export'
-  detail TEXT,        -- JSON payload
-  createdAt INTEGER DEFAULT (unixepoch())
-);
-```
-
-Insert activity records in existing API routes (upload, match, unmatch, calculate, export).
-
-Display in dashboard sidebar or project summary.
-
----
-
-## Phase 7: Print/PDF Export
-
-### Step 7.1: Print-optimized layouts
-
-**File:** New `v2/src/components/print/print-layout.tsx`
-
-CSS `@media print` styles for:
-- Project header (name, date, area)
-- Emissions summary table
-- Charts (rendered as static images via Recharts `<ResponsiveContainer>`)
-- Materials table (all rows, not paginated)
-
-### Step 7.2: Print button
-
-Add "Print Report" button to project summary or header.
-
-On click:
-1. Render print layout in a hidden div
-2. Call `window.print()`
-3. Browser native print dialog handles PDF generation
-
-### Step 7.3: Chart image export (optional)
-
-Recharts supports `toBase64Image()` for chart export. Could offer "Download Chart as PNG" alongside print.
-
----
-
-## Implementation Order & Dependencies
+## Implementation Order
 
 ```
-Phase 1 (Volumes)     ←── Foundation, everything depends on this
+Phase A (Color Engine)        ←── Foundation for all visual features
   ↓
-Phase 2 (Calculations) ←── Core value, needs volumes
+Phase B (Chart → 3D)         ←── Core bidirectional interaction
+Phase C (3D → Chart/Table)   ←── Can run parallel with B
   ↓
-Phase 3 (Charts)       ←── Visualization, needs calculations
-Phase 4 (IFC Export)   ←── Can start in parallel with Phase 3
-Phase 5 (Area/Relative)←── Needs calculations, small scope
+Phase D (Storey Navigation)  ←── Builds on isolation/visibility from B
+Phase E (Viewer Controls)    ←── Independent, can start anytime
   ↓
-Phase 6 (Project Mgmt) ←── Independent, can start anytime
-Phase 7 (Print/PDF)    ←── Needs charts
+Phase F (Real-time Feedback) ←── Builds on A+B, final polish
 ```
 
-**Parallelizable:**
-- Phase 3 + Phase 4 can run in parallel (charts vs export)
-- Phase 5 + Phase 6 can run in parallel (both small scope)
-- Phase 6 is fully independent — can start at any point
+**Critical path:** A → B → F
+
+**Parallelizable:** C runs with B. D and E are independent.
 
 ---
 
@@ -390,27 +459,43 @@ Phase 7 (Print/PDF)    ←── Needs charts
 
 | File | Purpose |
 |------|---------|
-| `v2/src/app/api/projects/[id]/calculate/route.ts` | Trigger LCA calculation |
-| `v2/src/app/api/projects/[id]/emissions/route.ts` | Aggregated emission data for charts |
-| `v2/src/app/api/projects/[id]/export/route.ts` | IFC export with embedded results |
-| `v2/src/lib/lca/calculations-server.ts` | Server-side calculation logic (DB writes) |
-| `v2/src/components/charts/emissions-chart.tsx` | Recharts-based visualization |
-| `v2/src/components/project/project-settings.tsx` | Area, amortization, name editing |
-| `v2/src/components/project/upload-history.tsx` | Upload history list |
-| `v2/src/components/export/export-dialog.tsx` | IFC export dialog |
-| `v2/src/components/print/print-layout.tsx` | Print-optimized report layout |
+| `v2/src/lib/viewer/color-engine.ts` | Heatmap/match/type color computation |
+| `v2/src/lib/viewer/element-groups.ts` | Material→elements, type→elements lookup maps |
+| `v2/src/components/viewer/color-legend.tsx` | Gradient/discrete legend overlay on canvas |
+| `v2/src/components/viewer/storey-panel.tsx` | Storey list with visibility toggles |
+| `v2/src/components/viewer/section-control.tsx` | Section plane slider |
+| `v2/src/components/viewer/screenshot-button.tsx` | Screenshot capture button |
 
 ## Files to Modify
 
 | File | Changes |
 |------|---------|
-| `v2/src/lib/ifc/bridge.ts` | Extract real volumes from geometry/properties |
-| `v2/src/app/api/materials/match/route.ts` | Trigger recalculation after match |
-| `v2/src/app/api/materials/auto-match/route.ts` | Trigger recalculation after all matches |
-| `v2/src/app/api/materials/unmatch/route.ts` | Trigger recalculation after unmatch |
-| `v2/src/app/api/projects/[id]/route.ts` | Add PATCH for project editing |
-| `v2/src/components/panels/bottom-panel.tsx` | Show calculated emissions, not raw factors |
-| `v2/src/components/panels/project-summary.tsx` | Charts, relative emissions, settings |
-| `v2/src/components/project/project-client.tsx` | Project editing, export button, settings |
-| `v2/src/components/dashboard/dashboard-client.tsx` | Stats, project card details |
-| `v2/src/lib/store/app-store.ts` | Calculation state, chart data |
+| `v2/src/components/viewer/ifc-viewer.tsx` | Color overrides, isolation, highlight, camera framing, section planes |
+| `v2/src/components/viewer/toolbar.tsx` | Preset views, UBP mode, section toggle, screenshot |
+| `v2/src/components/charts/emissions-chart.tsx` | Click→isolate, hover→highlight, selection-aware highlighting |
+| `v2/src/components/panels/bottom-panel.tsx` | Selection-aware row highlighting, "show in 3D" |
+| `v2/src/components/panels/element-detail.tsx` | "Frame in 3D" button, per-layer indicators |
+| `v2/src/components/panels/project-summary.tsx` | Chart click → 3D isolation |
+| `v2/src/lib/store/app-store.ts` | isolatedElementIds, highlightedElementIds, frameSelection |
+| `v2/src/lib/ifc/bridge.ts` | Storey→element mapping |
+| `v2/src/types/ifc.ts` | Add elementGuids to IFCStorey type |
+| `v2/src/components/print/print-report.tsx` | Embed 3D screenshot |
+
+---
+
+## Key ifc-lite API Usage
+
+| Feature | API | Status |
+|---------|-----|--------|
+| Per-element coloring | `scene.setColorOverrides(Map<expressId, [r,g,b,a]>)` | Internal, needs `getScene()` + `getGPUDevice()` + `getPipeline()` |
+| Element isolation | `renderer.render({ isolatedIds: Set<number> })` | Public, ready to use |
+| Element hiding | `renderer.render({ hiddenIds: Set<number> })` | Public, already in use |
+| Selection highlight | `renderer.render({ selectedIds: Set<number> })` | Public, already in use |
+| Camera framing | `camera.zoomToFit(min, max, duration?)` | Public, not used |
+| Element bounds | `scene.getEntityBoundingBox(expressId)` | Public, not used |
+| Preset views | `camera.setPresetView('top'|...)` | Public, not used |
+| Section planes | `renderer.render({ sectionPlane: {...} })` | Public, not used |
+| Screenshot | `renderer.captureScreenshot()` | Public, not used |
+| GPU pick | `renderer.pick(x, y, options?)` | Public, already in use |
+
+All colors are **RGBA [0-1] float arrays**, NOT hex or 0-255.
