@@ -271,9 +271,23 @@ export async function POST(request: NextRequest) {
           continue;
         }
 
-        // Lower threshold: if search returned candidates, they're already
-        // relevant (SQL LIKE matched). Accept fuzzy score >= 0.4
-        const result = findBestMatch({ materialName: searchQuery }, candidates, 0.4);
+        // For KBOB, only consider candidates that have density set —
+        // entries without density are not usable for LCA calculations
+        if (activeSource === "kbob") {
+          const before = candidates.length;
+          candidates = candidates.filter((c) => c.density != null && c.density > 0);
+          if (before !== candidates.length) {
+            console.log(`[match] KBOB density filter: ${before} → ${candidates.length} candidates`);
+          }
+          if (candidates.length === 0) {
+            console.log(`[match] NO CANDIDATES with density for "${materialName}"`);
+            matches.push({ materialName, match: null, matchedMaterial: null });
+            continue;
+          }
+        }
+
+        // Always pick the best match unless score is really poor (< 0.2)
+        const result = findBestMatch({ materialName: searchQuery }, candidates, 0.2);
 
         if (result.match && result.alternatives.length > 0) {
           const bestMaterial = result.alternatives[0].material;

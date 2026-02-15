@@ -143,7 +143,7 @@ export interface MatchResult {
 export function findBestMatch(
   input: MatchInput,
   candidates: NormalizedMaterial[],
-  autoMatchThreshold = 0.9
+  autoMatchThreshold = 0.2
 ): MatchResult {
   // Preprocess
   const cleaned = cleanIfcQuery(input.materialName);
