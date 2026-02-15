@@ -12,7 +12,11 @@ import {
   ArrowRight,
   Download,
   X,
+  User,
+  RotateCcw,
+  Sparkles,
 } from "lucide-react";
+import type { MatchMethod } from "@/types/lca";
 
 /**
  * Bottom panel — materials table showing all materials
@@ -115,6 +119,30 @@ export function BottomPanel() {
     [project, updateMaterialMatch]
   );
 
+  // Sort: matched first (manual → reapplied → auto by score desc), then unmatched
+  const sortedMaterials = useMemo(() => {
+    const methodPriority: Record<string, number> = {
+      manual: 0,
+      exact: 1,
+      case_insensitive: 2,
+      reapplied: 3,
+      fuzzy: 4,
+      classification: 5,
+      auto: 6,
+    };
+    return [...materials].sort((a, b) => {
+      // Matched before unmatched
+      if (a.match && !b.match) return -1;
+      if (!a.match && b.match) return 1;
+      if (!a.match && !b.match) return a.name.localeCompare(b.name);
+      // Both matched: sort by method priority, then score desc
+      const aPri = methodPriority[a.match!.method] ?? 99;
+      const bPri = methodPriority[b.match!.method] ?? 99;
+      if (aPri !== bPri) return aPri - bPri;
+      return (b.match!.score ?? 0) - (a.match!.score ?? 0);
+    });
+  }, [materials]);
+
   if (materials.length === 0) return null;
 
   const matchedCount = materials.filter((m) => m.match).length;
@@ -168,11 +196,12 @@ export function BottomPanel() {
                 <th className="px-4 py-2 text-right">GWP (kg CO₂-eq)</th>
                 <th className="px-4 py-2 text-right">UBP</th>
                 <th className="px-4 py-2">Matched To</th>
+                <th className="px-4 py-2">Method</th>
                 <th className="px-4 py-2"></th>
               </tr>
             </thead>
             <tbody>
-              {materials.map((mat) => {
+              {sortedMaterials.map((mat) => {
                 const isMatched = !!mat.match;
                 const gwp = mat.matchedMaterial?.indicators?.gwpTotal;
                 const ubp = mat.matchedMaterial?.indicators?.ubp;
@@ -216,6 +245,14 @@ export function BottomPanel() {
                         <span className="text-xs text-muted-foreground">
                           Not matched
                         </span>
+                      )}
+                    </td>
+                    <td className="px-4 py-2">
+                      {isMatched && (
+                        <MatchMethodBadge
+                          method={mat.match!.method}
+                          score={mat.match!.score}
+                        />
                       )}
                     </td>
                     <td className="px-4 py-2">
@@ -265,6 +302,7 @@ export function BottomPanel() {
                   </td>
                   <td className="px-4 py-2"></td>
                   <td className="px-4 py-2"></td>
+                  <td className="px-4 py-2"></td>
                 </tr>
               </tfoot>
             )}
@@ -272,5 +310,80 @@ export function BottomPanel() {
         </div>
       )}
     </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Match method badge — visual confidence indicator
+// ---------------------------------------------------------------------------
+
+const METHOD_CONFIG: Record<
+  string,
+  { label: string; icon: typeof User; className: string; tip: string }
+> = {
+  manual: {
+    label: "Manual",
+    icon: User,
+    className: "border-green-600/40 bg-green-50 text-green-700 dark:bg-green-950/30 dark:text-green-400",
+    tip: "Manually matched by user",
+  },
+  exact: {
+    label: "Exact",
+    icon: CheckCircle2,
+    className: "border-green-600/40 bg-green-50 text-green-700 dark:bg-green-950/30 dark:text-green-400",
+    tip: "Exact name match",
+  },
+  case_insensitive: {
+    label: "Exact",
+    icon: CheckCircle2,
+    className: "border-green-600/40 bg-green-50 text-green-700 dark:bg-green-950/30 dark:text-green-400",
+    tip: "Case-insensitive name match",
+  },
+  reapplied: {
+    label: "Reapplied",
+    icon: RotateCcw,
+    className: "border-blue-600/40 bg-blue-50 text-blue-700 dark:bg-blue-950/30 dark:text-blue-400",
+    tip: "Auto-applied from a previous manual mapping",
+  },
+  fuzzy: {
+    label: "Auto",
+    icon: Sparkles,
+    className: "border-amber-600/40 bg-amber-50 text-amber-700 dark:bg-amber-950/30 dark:text-amber-400",
+    tip: "Matched by similarity algorithm",
+  },
+  classification: {
+    label: "Auto",
+    icon: Sparkles,
+    className: "border-amber-600/40 bg-amber-50 text-amber-700 dark:bg-amber-950/30 dark:text-amber-400",
+    tip: "Matched by classification code",
+  },
+  auto: {
+    label: "Auto",
+    icon: Sparkles,
+    className: "border-amber-600/40 bg-amber-50 text-amber-700 dark:bg-amber-950/30 dark:text-amber-400",
+    tip: "Matched by algorithm",
+  },
+};
+
+function MatchMethodBadge({
+  method,
+  score,
+}: {
+  method: MatchMethod;
+  score: number;
+}) {
+  const config = METHOD_CONFIG[method] ?? METHOD_CONFIG.auto;
+  const Icon = config.icon;
+  const pct = Math.round(score * 100);
+
+  return (
+    <span
+      className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-medium ${config.className}`}
+      title={`${config.tip} (${pct}% confidence)`}
+    >
+      <Icon className="h-3 w-3" />
+      {config.label}
+      <span className="text-[10px] opacity-70">{pct}%</span>
+    </span>
   );
 }

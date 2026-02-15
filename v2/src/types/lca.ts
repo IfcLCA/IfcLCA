@@ -250,7 +250,14 @@ export interface LCADataSourceAdapter {
 // Material matching
 // ---------------------------------------------------------------------------
 
-export type MatchMethod = "exact" | "case_insensitive" | "fuzzy" | "classification" | "manual";
+export type MatchMethod =
+  | "exact"
+  | "case_insensitive"
+  | "fuzzy"
+  | "classification"
+  | "manual"       // User explicitly picked this match (highest confidence)
+  | "reapplied"    // Auto-applied from a previous manual mapping of same material name
+  | "auto";        // Matched by algorithm (lowest confidence)
 
 export interface MaterialMatch {
   /** Reference to the normalized LCA material */

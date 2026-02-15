@@ -95,18 +95,29 @@ export function ProjectSummary() {
       }
 
       let matched = 0;
+      let reapplied = 0;
+      let auto = 0;
       for (const result of data.matches ?? []) {
         if (result.match && result.matchedMaterial) {
           updateMaterialMatch(result.materialName, result.match, result.matchedMaterial);
           matched++;
+          if (result.match.method === "reapplied") reapplied++;
+          else auto++;
         }
       }
 
-      setAutoMatchResult(
-        matched > 0
-          ? `Matched ${matched} of ${unmatched.length} materials`
-          : `No automatic matches found for ${unmatched.length} materials`
-      );
+      if (matched > 0) {
+        const parts = [];
+        if (reapplied > 0) parts.push(`${reapplied} reapplied`);
+        if (auto > 0) parts.push(`${auto} auto`);
+        setAutoMatchResult(
+          `Matched ${matched}/${unmatched.length} (${parts.join(", ")})`
+        );
+      } else {
+        setAutoMatchResult(
+          `No automatic matches found for ${unmatched.length} materials`
+        );
+      }
     } catch {
       setAutoMatchResult("Auto-match failed");
     } finally {

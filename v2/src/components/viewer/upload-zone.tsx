@@ -114,10 +114,43 @@ export function UploadZone({ projectId }: UploadZoneProps) {
           )
         );
 
-        // Send to server for persistence (non-blocking)
-        persistToServer(projectId, file, result.parseResult).catch((err) =>
-          console.error("Failed to persist upload:", err)
-        );
+        // Send to server for persistence, then auto-match all materials
+        persistToServer(projectId, file, result.parseResult)
+          .then(() => {
+            const { activeDataSource, materials, updateMaterialMatch } =
+              useAppStore.getState();
+            const materialNames = materials.map((m) => m.name);
+            if (materialNames.length === 0) return;
+
+            console.log(
+              `[UploadZone] Triggering auto-match for ${materialNames.length} materials`
+            );
+            return fetch("/api/materials/auto-match", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                projectId,
+                source: activeDataSource,
+                materialNames,
+              }),
+            })
+              .then((r) => r.json())
+              .then((data) => {
+                let matched = 0;
+                for (const r of data.matches ?? []) {
+                  if (r.match && r.matchedMaterial) {
+                    updateMaterialMatch(r.materialName, r.match, r.matchedMaterial);
+                    matched++;
+                  }
+                }
+                console.log(
+                  `[UploadZone] Auto-match complete: ${matched}/${materialNames.length} matched`
+                );
+              });
+          })
+          .catch((err) =>
+            console.error("Failed to persist/auto-match upload:", err)
+          );
       } catch (err) {
         console.error("IFC loading failed:", err);
         setModelError(
