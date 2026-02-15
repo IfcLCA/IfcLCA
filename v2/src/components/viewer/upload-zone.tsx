@@ -188,13 +188,14 @@ async function persistToServer(
   file: File,
   parseResult: import("@/types/ifc").IFCParseResult
 ) {
-  const formData = new FormData();
-  formData.append("file", file);
-  formData.append("parseResult", JSON.stringify(parseResult));
-
   const res = await fetch(`/api/projects/${projectId}/upload`, {
     method: "POST",
-    body: formData,
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      filename: file.name,
+      fileSize: file.size,
+      parseResult,
+    }),
   });
 
   if (!res.ok) {

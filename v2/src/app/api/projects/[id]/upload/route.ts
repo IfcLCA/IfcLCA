@@ -98,31 +98,30 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
-  let formData: FormData;
+  let body: Record<string, unknown>;
   try {
-    formData = await request.formData();
+    body = await request.json();
   } catch {
     return NextResponse.json(
-      { error: "Invalid form data" },
+      { error: "Invalid JSON body" },
       { status: 400 }
     );
   }
 
-  const file = formData.get("file") as File | null;
-  const parseResultJson = formData.get("parseResult") as string | null;
+  const filename = body.filename as string | undefined;
+  const fileSize = typeof body.fileSize === "number" ? body.fileSize : undefined;
 
-  if (!file || !parseResultJson) {
+  if (!filename || !body.parseResult) {
     return NextResponse.json(
-      { error: "File and parseResult are required" },
+      { error: "filename and parseResult are required" },
       { status: 400 }
     );
   }
 
-  // Parse + validate with Zod
+  // Validate with Zod
   let parseResult: ValidatedParseResult;
   try {
-    const raw = JSON.parse(parseResultJson);
-    parseResult = parseResultSchema.parse(raw);
+    parseResult = parseResultSchema.parse(body.parseResult);
   } catch (err) {
     if (err instanceof z.ZodError) {
       return NextResponse.json(
@@ -142,8 +141,8 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     id: uploadId,
     projectId,
     userId,
-    filename: file.name,
-    fileSize: file.size,
+    filename,
+    fileSize: fileSize ?? parseResult.stats.fileSizeBytes,
     status: "processing",
     elementCount: parseResult.stats.elementCount,
     materialCount: parseResult.stats.materialCount,
