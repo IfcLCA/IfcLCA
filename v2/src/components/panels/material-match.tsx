@@ -52,15 +52,26 @@ export function MaterialMatch() {
         q: searchQuery,
         source: activeDataSource,
       });
-      const res = await fetch(`/api/materials/search?${params}`);
+      console.log(`[search:client] Searching "${searchQuery}" in ${activeDataSource}`);
+      const res = await fetch(`/api/materials/search?${params}`, {
+        signal: AbortSignal.timeout(30_000),
+      });
       const data = await res.json();
       if (res.ok) {
+        console.log(`[search:client] Got ${(data.materials ?? []).length} results`);
         setResults(data.materials ?? []);
       } else {
+        console.error(`[search:client] Error ${res.status}:`, data);
         setSearchError(data.details || data.error || `Search failed (${res.status})`);
       }
     } catch (err) {
-      setSearchError(err instanceof Error ? err.message : "Network error");
+      console.error("[search:client] Fetch error:", err);
+      const msg = err instanceof Error ? err.message : "Network error";
+      setSearchError(
+        msg.includes("abort") || msg.includes("timeout")
+          ? "Search timed out — try syncing the database first"
+          : msg
+      );
     } finally {
       setLoading(false);
     }

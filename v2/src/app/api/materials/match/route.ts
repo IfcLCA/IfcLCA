@@ -59,6 +59,9 @@ export async function POST(request: NextRequest) {
   }
 
   // Update match
+  console.log(
+    `[match] MANUAL "${materialName}" → lcaId=${lcaMaterialId} source=${source} method=${method ?? "manual"} score=${score ?? 1.0}`
+  );
   await db
     .update(materials)
     .set({

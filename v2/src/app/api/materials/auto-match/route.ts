@@ -12,6 +12,7 @@ import {
 import type { NormalizedMaterial, MaterialMatch } from "@/types/lca";
 
 export const dynamic = "force-dynamic";
+export const maxDuration = 120; // Auto-matching many materials can be slow
 
 // ---------------------------------------------------------------------------
 // Helpers

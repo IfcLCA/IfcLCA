@@ -73,6 +73,45 @@ function tryNormalizedMatch(
   return best;
 }
 
+/** Token overlap match — works well for short queries against long candidate names */
+function tryTokenOverlapMatch(
+  name: string,
+  candidates: NormalizedMaterial[],
+  minScore = 0.4
+): MatchCandidate | null {
+  const queryTokens = tokenize(name);
+  if (queryTokens.length === 0) return null;
+
+  let best: MatchCandidate | null = null;
+
+  for (const c of candidates) {
+    const candidateTokens = tokenize(c.name);
+    if (candidateTokens.length === 0) continue;
+
+    // How many query tokens appear in the candidate?
+    let queryHits = 0;
+    for (const qt of queryTokens) {
+      if (candidateTokens.some((ct) => ct.includes(qt) || qt.includes(ct))) {
+        queryHits++;
+      }
+    }
+    const queryRecall = queryHits / queryTokens.length;
+
+    // Prefer shorter, more specific candidates (less noise)
+    const lengthRatio = Math.min(queryTokens.length, candidateTokens.length) /
+      Math.max(queryTokens.length, candidateTokens.length);
+
+    // Score: heavy weight on query recall, light weight on conciseness
+    const score = queryRecall * 0.75 + lengthRatio * 0.15 + (queryHits > 0 ? 0.1 : 0);
+
+    if (score >= minScore && (!best || score > best.score)) {
+      best = { material: c, score, method: "fuzzy" };
+    }
+  }
+
+  return best;
+}
+
 /** Trigram similarity match */
 function tryFuzzyMatch(
   name: string,
@@ -196,13 +235,23 @@ export function findBestMatch(
   );
   if (classification) alternatives.push(classification);
 
+  // Token overlap match — effective for short queries against long names
+  const tokenOverlap = tryTokenOverlapMatch(cleaned, candidates, 0.4);
+  if (tokenOverlap) alternatives.push(tokenOverlap);
+
+  // Also try with expanded query
+  if (expanded !== cleaned) {
+    const expandedOverlap = tryTokenOverlapMatch(expanded, candidates, 0.4);
+    if (expandedOverlap) alternatives.push(expandedOverlap);
+  }
+
   // Fuzzy match with the expanded query (includes cross-lingual synonyms)
-  const fuzzy = tryFuzzyMatch(expanded, candidates, 0.5);
+  const fuzzy = tryFuzzyMatch(expanded, candidates, 0.4);
   if (fuzzy) alternatives.push(fuzzy);
 
   // Also try fuzzy with just the cleaned name
   if (cleaned !== expanded) {
-    const cleanedFuzzy = tryFuzzyMatch(cleaned, candidates, 0.5);
+    const cleanedFuzzy = tryFuzzyMatch(cleaned, candidates, 0.4);
     if (cleanedFuzzy) alternatives.push(cleanedFuzzy);
   }
 
@@ -229,6 +278,19 @@ export function findBestMatch(
         }
       : null;
 
+  // Logging
+  console.log(
+    `[match:score] "${input.materialName}" → cleaned="${cleaned}" expanded="${expanded.slice(0, 80)}" candidates=${candidates.length} alternatives=${unique.length} best=${best?.score.toFixed(2) ?? "none"}/${best?.method ?? "-"} threshold=${autoMatchThreshold} accepted=${!!match}`
+  );
+  if (unique.length > 0) {
+    console.log(
+      `[match:score] Top 3: ${unique
+        .slice(0, 3)
+        .map((a) => `"${a.material.name.slice(0, 40)}" ${a.score.toFixed(2)}/${a.method}`)
+        .join(" | ")}`
+    );
+  }
+
   return {
     match,
     alternatives: unique.map((a) => ({
@@ -242,6 +304,15 @@ export function findBestMatch(
 // ---------------------------------------------------------------------------
 // String utilities
 // ---------------------------------------------------------------------------
+
+/** Tokenize a name into lowercase words (3+ chars) */
+function tokenize(name: string): string[] {
+  return name
+    .toLowerCase()
+    .replace(/[^a-zäöüàéèêïôùûç0-9\s]/g, " ")
+    .split(/\s+/)
+    .filter((w) => w.length >= 3);
+}
 
 function normalizeName(name: string): string {
   return name

@@ -5,8 +5,9 @@ import { z } from "zod";
 import { db } from "@/db";
 
 export const dynamic = "force-dynamic";
+export const maxDuration = 120; // Allow up to 2 minutes for large IFC files
 import { projects, uploads, materials, elements, elementMaterials } from "@/db/schema";
-import { eq, and, sql } from "drizzle-orm";
+import { eq, and, sql, inArray } from "drizzle-orm";
 
 interface RouteParams {
   params: Promise<{ id: string }>;
@@ -149,23 +150,27 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
   });
 
   try {
-    // Run all inserts inside a transaction for atomicity
-    await db.transaction(async (tx) => {
-      const BATCH_SIZE = 100;
+    const t0 = Date.now();
+    console.log(
+      `[upload] Starting: ${parseResult.elements.length} elements, ${parseResult.materials.length} materials`
+    );
 
-      // Batch upsert materials (uses unique index on projectId + name)
+    // --- Phase 1: Upsert materials (small, ~18 rows) ---
+    await db.transaction(async (tx) => {
+      const BATCH_SIZE = 500;
+
       for (let i = 0; i < parseResult.materials.length; i += BATCH_SIZE) {
         const batch = parseResult.materials.slice(i, i + BATCH_SIZE);
-        const rows = batch.map((mat) => ({
-          id: nanoid(),
-          projectId,
-          name: mat.name,
-          totalVolume: mat.totalVolume,
-        }));
-
         await tx
           .insert(materials)
-          .values(rows)
+          .values(
+            batch.map((mat) => ({
+              id: nanoid(),
+              projectId,
+              name: mat.name,
+              totalVolume: mat.totalVolume,
+            }))
+          )
           .onConflictDoUpdate({
             target: [materials.projectId, materials.name],
             set: {
@@ -174,38 +179,32 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
             },
           });
       }
+    });
+    console.log(`[upload] Materials upserted in ${Date.now() - t0}ms`);
 
-      // Re-fetch material IDs (ON CONFLICT may have kept existing IDs)
-      const existingMats = await tx
-        .select({ id: materials.id, name: materials.name })
-        .from(materials)
-        .where(eq(materials.projectId, projectId));
-
-      const materialIdMap = new Map<string, string>();
-      for (const m of existingMats) {
-        materialIdMap.set(m.name, m.id);
-      }
-
-      // Batch upsert elements (uses unique index on projectId + guid)
+    // --- Phase 2: Upsert elements (can be large, ~5000 rows) ---
+    const t1 = Date.now();
+    await db.transaction(async (tx) => {
+      const BATCH_SIZE = 500;
       for (let i = 0; i < parseResult.elements.length; i += BATCH_SIZE) {
         const batch = parseResult.elements.slice(i, i + BATCH_SIZE);
-        const rows = batch.map((el) => ({
-          id: nanoid(),
-          projectId,
-          uploadId,
-          guid: el.guid,
-          name: el.name,
-          type: el.type,
-          isLoadBearing: el.loadBearing,
-          isExternal: el.isExternal,
-          classificationSystem: el.classification?.system,
-          classificationCode: el.classification?.code,
-          classificationName: el.classification?.name,
-        }));
-
         await tx
           .insert(elements)
-          .values(rows)
+          .values(
+            batch.map((el) => ({
+              id: nanoid(),
+              projectId,
+              uploadId,
+              guid: el.guid,
+              name: el.name,
+              type: el.type,
+              isLoadBearing: el.loadBearing,
+              isExternal: el.isExternal,
+              classificationSystem: el.classification?.system,
+              classificationCode: el.classification?.code,
+              classificationName: el.classification?.name,
+            }))
+          )
           .onConflictDoUpdate({
             target: [elements.projectId, elements.guid],
             set: {
@@ -220,52 +219,81 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
             },
           });
       }
+    });
+    console.log(
+      `[upload] Elements upserted in ${Date.now() - t1}ms`
+    );
 
-      // Re-fetch element IDs
-      const existingEls = await tx
+    // --- Phase 3: Rebuild element-material junctions ---
+    const t2 = Date.now();
+
+    // Fetch material + element ID maps
+    const [existingMats, existingEls] = await Promise.all([
+      db
+        .select({ id: materials.id, name: materials.name })
+        .from(materials)
+        .where(eq(materials.projectId, projectId)),
+      db
         .select({ id: elements.id, guid: elements.guid })
         .from(elements)
-        .where(eq(elements.projectId, projectId));
+        .where(eq(elements.projectId, projectId)),
+    ]);
 
-      const elementIdMap = new Map<string, string>();
-      for (const e of existingEls) {
-        elementIdMap.set(e.guid, e.id);
+    const materialIdMap = new Map<string, string>();
+    for (const m of existingMats) materialIdMap.set(m.name, m.id);
+
+    const elementIdMap = new Map<string, string>();
+    for (const e of existingEls) elementIdMap.set(e.guid, e.id);
+
+    // Delete old junctions for all elements in this project
+    const elementIds = existingEls.map((e) => e.id);
+    if (elementIds.length > 0) {
+      // Delete in batches to avoid "too many SQL variables" error
+      for (let i = 0; i < elementIds.length; i += 500) {
+        const batch = elementIds.slice(i, i + 500);
+        await db
+          .delete(elementMaterials)
+          .where(inArray(elementMaterials.elementId, batch));
       }
+    }
 
-      // Batch insert element-material junctions
-      const junctionRows: Array<{
-        id: string;
-        elementId: string;
-        materialId: string;
-        volume: number;
-        fraction: number;
-        thickness?: number;
-      }> = [];
+    // Build and insert new junctions
+    const junctionRows: Array<{
+      id: string;
+      elementId: string;
+      materialId: string;
+      volume: number;
+      fraction: number;
+      thickness?: number;
+    }> = [];
 
-      for (const el of parseResult.elements) {
-        const elementId = elementIdMap.get(el.guid);
-        if (!elementId) continue;
-
-        for (const mat of el.materials) {
-          const materialId = materialIdMap.get(mat.name);
-          if (!materialId) continue;
-
-          junctionRows.push({
-            id: nanoid(),
-            elementId,
-            materialId,
-            volume: mat.volume,
-            fraction: mat.fraction,
-            thickness: mat.thickness,
-          });
-        }
+    for (const el of parseResult.elements) {
+      const elementId = elementIdMap.get(el.guid);
+      if (!elementId) continue;
+      for (const mat of el.materials) {
+        const materialId = materialIdMap.get(mat.name);
+        if (!materialId) continue;
+        junctionRows.push({
+          id: nanoid(),
+          elementId,
+          materialId,
+          volume: mat.volume,
+          fraction: mat.fraction,
+          thickness: mat.thickness,
+        });
       }
+    }
 
-      for (let i = 0; i < junctionRows.length; i += BATCH_SIZE) {
-        const batch = junctionRows.slice(i, i + BATCH_SIZE);
-        await tx.insert(elementMaterials).values(batch);
-      }
-    });
+    // Insert junctions in batches (separate transactions to reduce payload per request)
+    const JUNCTION_BATCH = 500;
+    for (let i = 0; i < junctionRows.length; i += JUNCTION_BATCH) {
+      const batch = junctionRows.slice(i, i + JUNCTION_BATCH);
+      await db.insert(elementMaterials).values(batch);
+    }
+    console.log(
+      `[upload] ${junctionRows.length} junctions rebuilt in ${Date.now() - t2}ms`
+    );
+    console.log(`[upload] Total: ${Date.now() - t0}ms`);
 
     // Mark upload as complete
     await db

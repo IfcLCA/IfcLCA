@@ -65,6 +65,13 @@ const nextConfig: NextConfig = {
 
   skipTrailingSlashRedirect: true,
   productionBrowserSourceMaps: false,
+
+  // Allow large JSON bodies for IFC upload (parseResult with thousands of elements)
+  experimental: {
+    serverActions: {
+      bodySizeLimit: "50mb",
+    },
+  },
 };
 
 export default nextConfig;
