@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import { EmissionsChart } from "@/components/charts/emissions-chart";
 import type { ChartDataRow } from "@/components/charts/emissions-chart";
+import { groupByMaterial, groupByType } from "@/lib/viewer/element-groups";
 
 export function ProjectSummary() {
   const {
@@ -192,6 +193,17 @@ export function ProjectSummary() {
     }
   }, [project, materials, activeDataSource, updateMaterialMatch, setAutoMatchProgress]);
 
+  // Pre-build element group lookups for chart → 3D interaction
+  const materialGroups = useMemo(() => {
+    if (!parseResult) return undefined;
+    return groupByMaterial(parseResult.elements);
+  }, [parseResult]);
+
+  const typeGroups = useMemo(() => {
+    if (!parseResult) return undefined;
+    return groupByType(parseResult.elements);
+  }, [parseResult]);
+
   const hasEmissions =
     matchedCount > 0 &&
     (emissions.totals.gwp !== 0 || emissions.totals.ubp !== 0 || emissions.totals.penre !== 0);
@@ -353,11 +365,12 @@ export function ProjectSummary() {
                 </div>
               )}
 
-              {/* Chart: by material */}
+              {/* Chart: by material — click bar to isolate elements in 3D */}
               {emissions.byMaterial.length > 0 && (
                 <EmissionsChart
                   data={emissions.byMaterial}
                   title="By Material"
+                  elementGroups={materialGroups}
                 />
               )}
 

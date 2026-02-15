@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, useCallback } from "react";
 import {
   BarChart,
   Bar,
@@ -11,27 +11,29 @@ import {
   Cell,
   PieChart,
   Pie,
-  Legend,
 } from "recharts";
 import type { IndicatorKey } from "@/types/lca";
-import { INDICATOR_REGISTRY } from "@/types/lca";
+import { useAppStore } from "@/lib/store";
+import { frameElements } from "@/components/viewer/ifc-viewer";
 
 // ---------------------------------------------------------------------------
 // Colors
 // ---------------------------------------------------------------------------
 
-const CHART_COLORS = [
-  "hsl(142, 76%, 36%)",   // green-600
-  "hsl(221, 83%, 53%)",   // blue-600
-  "hsl(25, 95%, 53%)",    // orange-500
-  "hsl(262, 83%, 58%)",   // purple-500
-  "hsl(350, 89%, 60%)",   // red-500
-  "hsl(47, 96%, 53%)",    // yellow-500
-  "hsl(173, 80%, 40%)",   // teal-600
-  "hsl(292, 84%, 61%)",   // fuchsia-500
-  "hsl(198, 93%, 60%)",   // sky-400
-  "hsl(15, 75%, 28%)",    // brown
+export const CHART_COLORS = [
+  "hsl(142, 76%, 36%)", // green-600
+  "hsl(221, 83%, 53%)", // blue-600
+  "hsl(25, 95%, 53%)",  // orange-500
+  "hsl(262, 83%, 58%)", // purple-500
+  "hsl(350, 89%, 60%)", // red-500
+  "hsl(47, 96%, 53%)",  // yellow-500
+  "hsl(173, 80%, 40%)", // teal-600
+  "hsl(292, 84%, 61%)", // fuchsia-500
+  "hsl(198, 93%, 60%)", // sky-400
+  "hsl(15, 75%, 28%)",  // brown
 ];
+
+const HIGHLIGHT_COLOR = "hsl(48, 96%, 60%)"; // bright yellow highlight
 
 // ---------------------------------------------------------------------------
 // Types
@@ -52,6 +54,8 @@ interface EmissionsChartProps {
   title: string;
   defaultIndicator?: IndicatorKey;
   height?: number;
+  /** Map from data row name → Set of element GUIDs. Enables 3D interaction. */
+  elementGroups?: Map<string, Set<string>>;
 }
 
 // ---------------------------------------------------------------------------
@@ -63,6 +67,7 @@ export function EmissionsChart({
   title,
   defaultIndicator = "gwpTotal",
   height = 250,
+  elementGroups,
 }: EmissionsChartProps) {
   const [indicator, setIndicator] = useState<"gwp" | "penre" | "ubp">(
     defaultIndicator === "penreTotal"
@@ -72,6 +77,9 @@ export function EmissionsChart({
       : "gwp"
   );
   const [chartType, setChartType] = useState<ChartType>("bar");
+
+  const { isolateElements, highlightElements, clearHighlight, selectedElementIds, parseResult } =
+    useAppStore();
 
   const indicatorMeta = {
     gwp: { label: "GWP", unit: "kg CO\u2082-eq", key: "gwpTotal" as IndicatorKey },
@@ -92,6 +100,50 @@ export function EmissionsChart({
         value: d[indicator],
       }));
   }, [data, indicator]);
+
+  // Determine which chart entries correspond to selected elements
+  const selectedNames = useMemo(() => {
+    if (!selectedElementIds || selectedElementIds.size === 0 || !parseResult) return new Set<string>();
+    const names = new Set<string>();
+    for (const guid of selectedElementIds) {
+      const el = parseResult.elements.find((e) => e.guid === guid);
+      if (el) {
+        for (const mat of el.materials) names.add(mat.name);
+      }
+    }
+    return names;
+  }, [selectedElementIds, parseResult]);
+
+  // Chart click → isolate elements in 3D
+  const handleBarClick = useCallback(
+    (data: any) => {
+      if (!elementGroups) return;
+      const fullName = data?.fullName ?? data?.name;
+      if (!fullName) return;
+      const guids = elementGroups.get(fullName);
+      if (guids && guids.size > 0) {
+        isolateElements(guids);
+        frameElements(guids);
+      }
+    },
+    [elementGroups, isolateElements],
+  );
+
+  // Chart hover → highlight elements in 3D
+  const handleBarMouseEnter = useCallback(
+    (_: any, index: number) => {
+      if (!elementGroups) return;
+      const entry = chartData[index];
+      if (!entry) return;
+      const guids = elementGroups.get(entry.fullName);
+      if (guids) highlightElements(guids);
+    },
+    [elementGroups, chartData, highlightElements],
+  );
+
+  const handleBarMouseLeave = useCallback(() => {
+    clearHighlight();
+  }, [clearHighlight]);
 
   if (data.length === 0) return null;
 
@@ -166,13 +218,25 @@ export function EmissionsChart({
                 color: "hsl(var(--popover-foreground))",
               }}
             />
-            <Bar dataKey="value" radius={[0, 4, 4, 0]}>
-              {chartData.map((_entry, idx) => (
-                <Cell
-                  key={idx}
-                  fill={CHART_COLORS[idx % CHART_COLORS.length]}
-                />
-              ))}
+            <Bar
+              dataKey="value"
+              radius={[0, 4, 4, 0]}
+              onClick={handleBarClick}
+              onMouseEnter={handleBarMouseEnter}
+              onMouseLeave={handleBarMouseLeave}
+              style={elementGroups ? { cursor: "pointer" } : undefined}
+            >
+              {chartData.map((entry, idx) => {
+                const isSelected = selectedNames.has(entry.fullName);
+                return (
+                  <Cell
+                    key={idx}
+                    fill={isSelected ? HIGHLIGHT_COLOR : CHART_COLORS[idx % CHART_COLORS.length]}
+                    stroke={isSelected ? "#000" : undefined}
+                    strokeWidth={isSelected ? 2 : 0}
+                  />
+                );
+              })}
             </Bar>
           </BarChart>
         </ResponsiveContainer>
@@ -192,14 +256,20 @@ export function EmissionsChart({
                 `${name} ${(percent * 100).toFixed(0)}%`
               }
               labelLine={false}
-              style={{ fontSize: 9 }}
+              style={{ fontSize: 9, cursor: elementGroups ? "pointer" : undefined }}
+              onClick={handleBarClick}
             >
-              {chartData.map((_entry, idx) => (
-                <Cell
-                  key={idx}
-                  fill={CHART_COLORS[idx % CHART_COLORS.length]}
-                />
-              ))}
+              {chartData.map((entry, idx) => {
+                const isSelected = selectedNames.has(entry.fullName);
+                return (
+                  <Cell
+                    key={idx}
+                    fill={isSelected ? HIGHLIGHT_COLOR : CHART_COLORS[idx % CHART_COLORS.length]}
+                    stroke={isSelected ? "#000" : undefined}
+                    strokeWidth={isSelected ? 2 : 0}
+                  />
+                );
+              })}
             </Pie>
             <Tooltip
               formatter={(value: number) => [
@@ -221,6 +291,9 @@ export function EmissionsChart({
       {/* Legend with totals */}
       <div className="text-[10px] text-muted-foreground text-right">
         Total: {total.toFixed(2)} {meta.unit}
+        {elementGroups && (
+          <span className="ml-2 text-muted-foreground/50">Click bar to isolate in 3D</span>
+        )}
       </div>
     </div>
   );

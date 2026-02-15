@@ -71,6 +71,8 @@ export interface IFCParseResult {
     guid: string;
     name: string;
     elevation: number;
+    /** Element GUIDs belonging to this storey */
+    elementGuids: string[];
   }>;
   /** Parse timing stats */
   stats: {

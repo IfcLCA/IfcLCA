@@ -15,6 +15,9 @@ import { BottomPanel } from "@/components/panels/bottom-panel";
 import { ExportButton } from "@/components/export/export-dialog";
 import { ProjectSettings } from "@/components/project/project-settings";
 import { PrintReport, PrintButton } from "@/components/print/print-report";
+import { SectionControl } from "@/components/viewer/section-control";
+import { ScreenshotButton } from "@/components/viewer/screenshot-button";
+import { PresetViews } from "@/components/viewer/preset-views";
 import type { projects, materials, lcaMaterials } from "@/db/schema";
 import type { MatchMethod, NormalizedMaterial, IndicatorValues } from "@/types/lca";
 
@@ -312,6 +315,9 @@ export function ProjectClient({
         </div>
         <div className="flex items-center gap-2">
           {hasModel && <ViewerToolbar />}
+          {hasModel && <SectionControl />}
+          {hasModel && <PresetViews />}
+          {hasModel && <ScreenshotButton />}
           {hasModel && <PrintButton />}
           {hasModel && <ExportButton />}
           <ProjectSettings

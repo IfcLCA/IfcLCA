@@ -385,13 +385,24 @@ export async function bridgeToParseResult(
   // Extract storeys from spatial hierarchy
   const storeys: IFCParseResult["storeys"] = [];
   if (hierarchy) {
-    for (const [storeyId, _elements] of hierarchy.byStorey) {
+    for (const [storeyId, storeyElements] of hierarchy.byStorey) {
       const attrs = extractEntityAttributes(store, storeyId);
       const elevation = hierarchy.storeyElevations.get(storeyId) ?? 0;
+
+      // Resolve element expressIds to GUIDs
+      const elementGuids: string[] = [];
+      if (storeyElements) {
+        for (const eId of storeyElements) {
+          const elAttrs = extractEntityAttributes(store, eId);
+          if (elAttrs.globalId) elementGuids.push(elAttrs.globalId);
+        }
+      }
+
       storeys.push({
         guid: attrs.globalId || `storey-${storeyId}`,
         name: attrs.name || `Storey ${storeyId}`,
         elevation,
+        elementGuids,
       });
     }
     storeys.sort((a, b) => a.elevation - b.elevation);

@@ -15,8 +15,11 @@ import {
   User,
   RotateCcw,
   Sparkles,
+  Eye,
 } from "lucide-react";
 import type { MatchMethod } from "@/types/lca";
+import { frameElements } from "@/components/viewer/ifc-viewer";
+import { groupByMaterial } from "@/lib/viewer/element-groups";
 
 /**
  * Bottom panel — materials table showing all materials
@@ -30,6 +33,9 @@ export function BottomPanel() {
     setSelectedMaterial,
     project,
     updateMaterialMatch,
+    parseResult,
+    selectedElementIds,
+    isolateElements,
   } = useAppStore();
 
   // Compute calculated emissions: volume × density × factor per material
@@ -140,6 +146,25 @@ export function BottomPanel() {
     [project, updateMaterialMatch]
   );
 
+  // Build material → element GUID mapping for "Show in 3D"
+  const materialElementMap = useMemo(() => {
+    if (!parseResult) return new Map<string, Set<string>>();
+    return groupByMaterial(parseResult.elements);
+  }, [parseResult]);
+
+  // Materials used by selected elements (for row highlighting)
+  const selectedMaterialNames = useMemo(() => {
+    if (!selectedElementIds || selectedElementIds.size === 0 || !parseResult) return new Set<string>();
+    const names = new Set<string>();
+    for (const guid of selectedElementIds) {
+      const el = parseResult.elements.find((e) => e.guid === guid);
+      if (el) {
+        for (const mat of el.materials) names.add(mat.name);
+      }
+    }
+    return names;
+  }, [selectedElementIds, parseResult]);
+
   // Sort: matched first (manual → reapplied → auto by score desc), then unmatched
   const sortedMaterials = useMemo(() => {
     const methodPriority: Record<string, number> = {
@@ -228,11 +253,14 @@ export function BottomPanel() {
                 const em = origIdx >= 0 ? materialEmissions[origIdx] : null;
                 const gwp = em?.gwp;
                 const ubp = em?.ubp;
+                const isHighlighted = selectedMaterialNames.has(mat.name);
 
                 return (
                   <tr
                     key={mat.name}
-                    className="border-b transition-colors hover:bg-accent/50"
+                    className={`border-b transition-colors hover:bg-accent/50 ${
+                      isHighlighted ? "bg-primary/10 ring-1 ring-inset ring-primary/20" : ""
+                    }`}
                   >
                     <td className="px-4 py-2">
                       {isMatched ? (
@@ -280,6 +308,23 @@ export function BottomPanel() {
                     </td>
                     <td className="px-4 py-2">
                       <div className="flex items-center gap-1">
+                        {materialElementMap.has(mat.name) && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-7 w-7 p-0 text-muted-foreground"
+                            title="Show in 3D"
+                            onClick={() => {
+                              const guids = materialElementMap.get(mat.name);
+                              if (guids) {
+                                isolateElements(guids);
+                                frameElements(guids);
+                              }
+                            }}
+                          >
+                            <Eye className="h-3 w-3" />
+                          </Button>
+                        )}
                         {isMatched && (
                           <Button
                             variant="ghost"

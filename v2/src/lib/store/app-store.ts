@@ -71,6 +71,10 @@ export interface AppState {
   visibilityByType: Record<string, boolean>;
   visibilityByStorey: Record<string, boolean>;
 
+  // 3D interaction state
+  isolatedElementIds: Set<string> | null; // null = show all, Set = only show these
+  highlightedElementIds: Set<string>; // temporary highlight (hover from chart)
+
   // UI state
   contextPanelMode: ContextPanelMode;
   selectedMaterialName: string | null;
@@ -105,6 +109,10 @@ export interface AppState {
   setHeatmapIndicator: (indicator: IndicatorKey) => void;
   toggleTypeVisibility: (type: string) => void;
   toggleStoreyVisibility: (storey: string) => void;
+
+  isolateElements: (guids: Set<string> | null) => void;
+  highlightElements: (guids: Set<string>) => void;
+  clearHighlight: () => void;
 
   setContextPanelMode: (mode: ContextPanelMode) => void;
   setSelectedMaterial: (name: string | null) => void;
@@ -173,6 +181,8 @@ const initialState = {
   totalMaterialCount: 0,
   selectedElementIds: new Set<string>(),
   hoveredElementId: null,
+  isolatedElementIds: null as Set<string> | null,
+  highlightedElementIds: new Set<string>(),
   colorMode: "matchStatus" as ColorMode,
   heatmapIndicator: "gwpTotal" as IndicatorKey,
   visibilityByType: {} as Record<string, boolean>,
@@ -294,6 +304,10 @@ export const useAppStore = create<AppState>((set) => ({
         [storey]: !state.visibilityByStorey[storey],
       },
     })),
+
+  isolateElements: (guids) => set({ isolatedElementIds: guids }),
+  highlightElements: (guids) => set({ highlightedElementIds: guids }),
+  clearHighlight: () => set({ highlightedElementIds: new Set() }),
 
   setContextPanelMode: (mode) => set({ contextPanelMode: mode }),
 

@@ -3,7 +3,8 @@
 import { useAppStore } from "@/lib/store";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { X, Layers, Box } from "lucide-react";
+import { X, Layers, Box, Focus } from "lucide-react";
+import { frameElements } from "@/components/viewer/ifc-viewer";
 
 export function ElementDetail() {
   const {
@@ -40,9 +41,21 @@ export function ElementDetail() {
           </h3>
           <p className="mt-1 font-medium">{element.name}</p>
         </div>
-        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={deselectAll}>
-          <X className="h-4 w-4" />
-        </Button>
+        <div className="flex items-center gap-1">
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-7 gap-1 px-2 text-xs"
+            onClick={() => frameElements(selectedElementIds)}
+            title="Frame in 3D"
+          >
+            <Focus className="h-3.5 w-3.5" />
+            Frame
+          </Button>
+          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={deselectAll}>
+            <X className="h-4 w-4" />
+          </Button>
+        </div>
       </div>
 
       {/* Properties */}
@@ -116,6 +129,21 @@ export function ElementDetail() {
                 <span>{(mat.fraction * 100).toFixed(1)}%</span>
                 {mat.thickness && <span>{(mat.thickness * 1000).toFixed(0)} mm</span>}
               </div>
+              {isMatched && appMaterial?.density && appMaterial.indicators && (
+                <div className="mt-1 flex gap-3 text-[10px] text-muted-foreground/80">
+                  {(() => {
+                    const mass = mat.volume * (appMaterial.density ?? 0);
+                    const gwp = appMaterial.indicators?.gwpTotal != null ? mass * appMaterial.indicators.gwpTotal : null;
+                    const ubp = appMaterial.indicators?.ubp != null ? mass * appMaterial.indicators.ubp : null;
+                    return (
+                      <>
+                        {gwp != null && <span>GWP: {gwp.toFixed(2)} kg CO₂-eq</span>}
+                        {ubp != null && <span>UBP: {ubp.toFixed(0)}</span>}
+                      </>
+                    );
+                  })()}
+                </div>
+              )}
             </button>
           );
         })}

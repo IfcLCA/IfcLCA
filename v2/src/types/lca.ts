@@ -294,6 +294,7 @@ export interface ProjectEmissions {
 // ---------------------------------------------------------------------------
 
 export type ColorMode =
+  | "none"
   | "matchStatus"
   | "gwpTotal"
   | "penreTotal"

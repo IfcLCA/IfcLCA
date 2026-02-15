@@ -2,7 +2,14 @@
 
 import { useRef, useEffect, useCallback, useState } from "react";
 import { useAppStore, viewerRefs } from "@/lib/store/app-store";
-import { AlertCircle } from "lucide-react";
+import { AlertCircle, X } from "lucide-react";
+import { ColorLegend } from "./color-legend";
+import {
+  computeHeatmapColors,
+  computeMatchStatusColors,
+  computeTypeColors,
+} from "@/lib/viewer/color-engine";
+import type { IndicatorKey } from "@/types/lca";
 
 /**
  * IFC 3D viewer component — integrates ifc-lite Renderer with WebGPU.
@@ -13,6 +20,11 @@ import { AlertCircle } from "lucide-react";
  * - Scroll wheel → zoom (towards mouse)
  * - Click → pick element
  * - Ctrl/Cmd+click → toggle multi-select
+ *
+ * 3D integration:
+ * - Color overrides (heatmap, match status, element type)
+ * - Element isolation (from chart clicks)
+ * - Camera framing (zoom to isolated/selected elements)
  */
 export function IfcViewer() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -32,10 +44,14 @@ export function IfcViewer() {
   const {
     parseResult,
     selectedElementIds,
+    isolatedElementIds,
+    colorMode,
+    materials,
     selectElement,
     toggleElementSelection,
     setHoveredElement,
     deselectAll,
+    isolateElements,
   } = useAppStore();
 
   // Detect WebGPU support on mount
@@ -118,34 +134,7 @@ export function IfcViewer() {
           if (cam) {
             const moved = cam.update(dt);
             if (moved) {
-              const r = rendererRef.current as any;
-              const state = useAppStore.getState();
-
-              // Build selected IDs
-              const selectedIds = new Set<number>();
-              for (const guid of state.selectedElementIds) {
-                const eid = viewerRefs.guidToExpressId.get(guid);
-                if (eid !== undefined) selectedIds.add(eid);
-              }
-
-              // Build hidden IDs from type visibility
-              const hiddenIds = new Set<number>();
-              const ds = viewerRefs.dataStore as any;
-              if (ds?.entities) {
-                for (const [type, visible] of Object.entries(
-                  state.visibilityByType
-                )) {
-                  if (!visible) {
-                    const ids = ds.entities.getByType?.(type) ?? [];
-                    for (const id of ids) hiddenIds.add(id);
-                  }
-                }
-              }
-
-              r?.render({
-                selectedIds: selectedIds.size > 0 ? selectedIds : undefined,
-                hiddenIds: hiddenIds.size > 0 ? hiddenIds : undefined,
-              });
+              renderFrame(rendererRef.current as any);
             }
           }
 
@@ -198,21 +187,55 @@ export function IfcViewer() {
     return () => observer.disconnect();
   }, []);
 
-  // Force re-render when selection changes
+  // Subscribe to visibility/isolation changes and force re-render
+  const visibilityByStorey = useAppStore((s) => s.visibilityByStorey);
+  const visibilityByType = useAppStore((s) => s.visibilityByType);
+
   useEffect(() => {
     const r = rendererRef.current as any;
     if (!r) return;
+    renderFrame(r);
+  }, [selectedElementIds, isolatedElementIds, visibilityByStorey, visibilityByType]);
 
-    const selectedIds = new Set<number>();
-    for (const guid of selectedElementIds) {
-      const eid = viewerRefs.guidToExpressId.get(guid);
-      if (eid !== undefined) selectedIds.add(eid);
+  // Apply color overrides when colorMode or materials change
+  useEffect(() => {
+    const r = rendererRef.current as any;
+    if (!r || !parseResult) return;
+
+    try {
+      const scene = r.getScene?.();
+      if (!scene) return;
+
+      const gToE = viewerRefs.guidToExpressId;
+
+      if (colorMode === "none") {
+        scene.clearColorOverrides?.();
+        r.render();
+        return;
+      }
+
+      let colorMap;
+      if (colorMode === "matchStatus") {
+        colorMap = computeMatchStatusColors(parseResult.elements, materials, gToE);
+      } else if (colorMode === "gwpTotal" || colorMode === "penreTotal" || colorMode === "ubp") {
+        colorMap = computeHeatmapColors(parseResult.elements, colorMode as IndicatorKey, materials, gToE);
+      } else if (colorMode === "elementType") {
+        colorMap = computeTypeColors(parseResult.elements, gToE);
+      }
+
+      if (colorMap) {
+        const device = r.getGPUDevice?.();
+        const pipeline = r.getPipeline?.();
+        if (device && pipeline) {
+          scene.setColorOverrides(colorMap.overrides, device, pipeline);
+        }
+      }
+
+      renderFrame(r);
+    } catch (err) {
+      console.warn("[IfcViewer] Color override failed:", err);
     }
-
-    r.render({
-      selectedIds: selectedIds.size > 0 ? selectedIds : undefined,
-    });
-  }, [selectedElementIds]);
+  }, [colorMode, materials, parseResult]);
 
   // Handle click → pick (only if user didn't drag)
   const handleClick = useCallback(
@@ -280,12 +303,16 @@ export function IfcViewer() {
     if (!parseResult || !rendererRef.current) return;
 
     const r = rendererRef.current as any;
-    const scene = r.scene;
+    const scene = r.getScene?.() ?? r.scene;
     if (scene) {
       const bounds = scene.getBounds();
       if (bounds) {
         const cam = cameraRef.current as any;
-        cam?.fitToBounds(bounds.min, bounds.max);
+        if (cam?.zoomToFit) {
+          cam.zoomToFit(bounds.min, bounds.max, 500);
+        } else if (cam?.fitToBounds) {
+          cam.fitToBounds(bounds.min, bounds.max);
+        }
         r.render();
       }
     }
@@ -324,7 +351,7 @@ export function IfcViewer() {
   }
 
   return (
-    <div ref={containerRef} className="viewer-container">
+    <div ref={containerRef} className="viewer-container relative">
       <canvas
         ref={canvasRef}
         onClick={handleClick}
@@ -333,8 +360,117 @@ export function IfcViewer() {
         style={{ touchAction: "none", cursor: "grab" }}
       />
       <LoadingOverlay />
+      <ColorLegend />
+      <IsolationBanner />
     </div>
   );
+}
+
+// ---------------------------------------------------------------------------
+// Render frame helper — builds render options from current state
+// ---------------------------------------------------------------------------
+
+function renderFrame(r: any) {
+  if (!r) return;
+
+  const state = useAppStore.getState();
+
+  // Build selected IDs
+  const selectedIds = new Set<number>();
+  for (const guid of state.selectedElementIds) {
+    const eid = viewerRefs.guidToExpressId.get(guid);
+    if (eid !== undefined) selectedIds.add(eid);
+  }
+
+  // Build hidden IDs from type visibility + storey visibility
+  const hiddenIds = new Set<number>();
+  const ds = viewerRefs.dataStore as any;
+  if (ds?.entities) {
+    for (const [type, visible] of Object.entries(state.visibilityByType)) {
+      if (!visible) {
+        const ids = ds.entities.getByType?.(type) ?? [];
+        for (const id of ids) hiddenIds.add(id);
+      }
+    }
+  }
+
+  // Hide elements from hidden storeys
+  if (state.parseResult) {
+    for (const storey of state.parseResult.storeys) {
+      if (state.visibilityByStorey[storey.name] === false) {
+        for (const guid of storey.elementGuids) {
+          const eid = viewerRefs.guidToExpressId.get(guid);
+          if (eid !== undefined) hiddenIds.add(eid);
+        }
+      }
+    }
+  }
+
+  // Build isolated IDs
+  let isolatedIds: Set<number> | undefined;
+  if (state.isolatedElementIds) {
+    isolatedIds = new Set<number>();
+    for (const guid of state.isolatedElementIds) {
+      const eid = viewerRefs.guidToExpressId.get(guid);
+      if (eid !== undefined) isolatedIds.add(eid);
+    }
+  }
+
+  r.render({
+    selectedIds: selectedIds.size > 0 ? selectedIds : undefined,
+    hiddenIds: hiddenIds.size > 0 ? hiddenIds : undefined,
+    isolatedIds: isolatedIds && isolatedIds.size > 0 ? isolatedIds : undefined,
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Frame elements — zoom camera to fit a set of element GUIDs
+// ---------------------------------------------------------------------------
+
+export function frameElements(guids: Set<string>) {
+  const r = viewerRefs.renderer as any;
+  if (!r) return;
+
+  const scene = r.getScene?.();
+  if (!scene) return;
+
+  let minX = Infinity, minY = Infinity, minZ = Infinity;
+  let maxX = -Infinity, maxY = -Infinity, maxZ = -Infinity;
+  let found = false;
+
+  for (const guid of guids) {
+    const eid = viewerRefs.guidToExpressId.get(guid);
+    if (eid === undefined) continue;
+    const bbox = scene.getEntityBoundingBox(eid);
+    if (!bbox) continue;
+    found = true;
+    minX = Math.min(minX, bbox.min.x);
+    minY = Math.min(minY, bbox.min.y);
+    minZ = Math.min(minZ, bbox.min.z);
+    maxX = Math.max(maxX, bbox.max.x);
+    maxY = Math.max(maxY, bbox.max.y);
+    maxZ = Math.max(maxZ, bbox.max.z);
+  }
+
+  if (!found) return;
+
+  const camera = r.getCamera?.() ?? (r as any).camera;
+  if (!camera) return;
+
+  if (camera.frameBounds) {
+    camera.frameBounds({ x: minX, y: minY, z: minZ }, { x: maxX, y: maxY, z: maxZ }, 400);
+  } else if (camera.zoomToFit) {
+    camera.zoomToFit({ x: minX, y: minY, z: minZ }, { x: maxX, y: maxY, z: maxZ }, 400);
+  }
+
+  // Trigger continuous render during animation
+  let frames = 0;
+  function animRender() {
+    r.render();
+    frames++;
+    if (frames < 30) requestAnimationFrame(animRender);
+  }
+  requestAnimationFrame(animRender);
 }
 
 // ---------------------------------------------------------------------------
@@ -350,28 +486,22 @@ function setupCameraControls(
   lastMouseRef: React.MutableRefObject<{ x: number; y: number }>,
   didDragRef: React.MutableRefObject<boolean>,
 ) {
-  const camera = (renderer as any).camera;
+  const DRAG_THRESHOLD = 4;
 
-  const DRAG_THRESHOLD = 4; // px — movement under this is a click, not a drag
-
-  // Mouse down — start drag
   const onMouseDown = (e: MouseEvent) => {
     isDraggingRef.current = true;
     didDragRef.current = false;
-    // Middle click (1), right click (2), or shift+left = pan
     isPanningRef.current = e.button === 1 || e.button === 2 || e.shiftKey;
     lastMouseRef.current = { x: e.clientX, y: e.clientY };
     canvas.style.cursor = isPanningRef.current ? "move" : "grabbing";
   };
 
-  // Mouse move — orbit or pan
   const onMouseMove = (e: MouseEvent) => {
     if (!isDraggingRef.current) return;
 
     const deltaX = e.clientX - lastMouseRef.current.x;
     const deltaY = e.clientY - lastMouseRef.current.y;
 
-    // Check if we've moved enough to consider it a drag
     if (!didDragRef.current && (Math.abs(deltaX) > DRAG_THRESHOLD || Math.abs(deltaY) > DRAG_THRESHOLD)) {
       didDragRef.current = true;
     }
@@ -390,20 +520,17 @@ function setupCameraControls(
     renderer.render();
   };
 
-  // Mouse up — stop drag
   const onMouseUp = () => {
     isDraggingRef.current = false;
     isPanningRef.current = false;
     canvas.style.cursor = "grab";
   };
 
-  // Mouse leave — stop drag
   const onMouseLeave = () => {
     isDraggingRef.current = false;
     isPanningRef.current = false;
   };
 
-  // Scroll wheel — zoom towards mouse position
   const onWheel = (e: WheelEvent) => {
     e.preventDefault();
 
@@ -418,7 +545,6 @@ function setupCameraControls(
     renderer.render();
   };
 
-  // Prevent context menu on right-click
   const onContextMenu = (e: Event) => e.preventDefault();
 
   canvas.addEventListener("mousedown", onMouseDown);
@@ -430,6 +556,41 @@ function setupCameraControls(
 
   canvas.style.cursor = "grab";
 }
+
+// ---------------------------------------------------------------------------
+// Isolation banner — shows when elements are isolated, with "Show All"
+// ---------------------------------------------------------------------------
+
+function IsolationBanner() {
+  const isolatedElementIds = useAppStore((s) => s.isolatedElementIds);
+  const parseResult = useAppStore((s) => s.parseResult);
+  const isolateElements = useAppStore((s) => s.isolateElements);
+
+  if (!isolatedElementIds || isolatedElementIds.size === 0) return null;
+
+  const total = parseResult?.elements.length ?? 0;
+
+  return (
+    <div className="absolute left-1/2 top-3 z-20 -translate-x-1/2">
+      <div className="flex items-center gap-2 rounded-full border bg-background/90 px-3 py-1.5 text-xs shadow-md backdrop-blur-sm">
+        <span className="text-muted-foreground">
+          Showing {isolatedElementIds.size} of {total} elements
+        </span>
+        <button
+          onClick={() => isolateElements(null)}
+          className="flex items-center gap-1 rounded-full bg-primary px-2 py-0.5 text-primary-foreground transition-colors hover:bg-primary/80"
+        >
+          Show All
+          <X className="h-3 w-3" />
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Loading overlay
+// ---------------------------------------------------------------------------
 
 function LoadingOverlay() {
   const modelLoading = useAppStore((s) => s.modelLoading);
