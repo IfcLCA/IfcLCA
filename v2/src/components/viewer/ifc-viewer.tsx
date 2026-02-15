@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useEffect, useCallback, useState } from "react";
-import { useAppStore, viewerRefs } from "@/lib/store/app-store";
+import { useAppStore, viewerRefs, createRendererReadyPromise } from "@/lib/store/app-store";
 import { AlertCircle, X } from "lucide-react";
 import { ColorLegend } from "./color-legend";
 import {
@@ -86,6 +86,12 @@ export function IfcViewer() {
       return;
     initRef.current = true;
     console.log("[IfcViewer] Initializing renderer...");
+
+    // Create a fresh rendererReady promise for this renderer instance.
+    // Other components (upload-zone, auto-load) await this promise.
+    const { promise, resolve } = createRendererReadyPromise();
+    viewerRefs.rendererReady = promise;
+    viewerRefs.rendererReadyResolve = resolve;
 
     let disposed = false;
 

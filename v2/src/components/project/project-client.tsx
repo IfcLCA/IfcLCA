@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { UserButton } from "@clerk/nextjs";
 import { Building2, ArrowLeft, Database, ChevronDown, Download, AlertTriangle } from "lucide-react";
@@ -52,10 +52,22 @@ export function ProjectClient({
     activeDataSource,
     setActiveDataSource,
     clearAllMatches,
+    resetProjectState,
   } = useAppStore();
   const [dsOpen, setDsOpen] = useState(false);
   const [autoLoadAttempted, setAutoLoadAttempted] = useState(false);
   const [pendingDataSource, setPendingDataSource] = useState<string | null>(null);
+  const prevProjectIdRef = useRef(project.id);
+
+  // Reset store when navigating between projects
+  useEffect(() => {
+    if (prevProjectIdRef.current !== project.id) {
+      console.log(`[ProjectClient] Project changed: ${prevProjectIdRef.current} → ${project.id}`);
+      prevProjectIdRef.current = project.id;
+      resetProjectState();
+      setAutoLoadAttempted(false);
+    }
+  }, [project.id, resetProjectState]);
 
   useEffect(() => {
     setProject({
@@ -339,7 +351,7 @@ export function ProjectClient({
       {showViewer ? (
         <div className="project-layout flex-1 print:hidden">
           <div className="project-layout__viewer relative">
-            <IfcViewer />
+            <IfcViewer key={project.id} />
             {!hasModel && (
               <div className="absolute inset-0 z-10 flex items-center justify-center bg-background/80">
                 <UploadZone projectId={project.id} />
@@ -357,7 +369,7 @@ export function ProjectClient({
         <div className="relative flex flex-1 items-center justify-center print:hidden">
           {/* Hidden viewer to pre-init WebGPU renderer in background */}
           <div className="absolute inset-0 -z-10 opacity-0 pointer-events-none">
-            <IfcViewer />
+            <IfcViewer key={project.id} />
           </div>
           <UploadZone projectId={project.id} />
         </div>

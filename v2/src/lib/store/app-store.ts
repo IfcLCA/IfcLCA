@@ -123,6 +123,7 @@ export interface AppState {
   setAutoMatchProgress: (progress: AutoMatchProgress) => void;
   clearAllMatches: () => void;
 
+  resetProjectState: () => void;
   reset: () => void;
 }
 
@@ -154,7 +155,7 @@ interface ViewerRefs {
   sectionPlane: SectionPlaneState | null;
 }
 
-function createRendererReadyPromise() {
+export function createRendererReadyPromise() {
   let resolve: () => void;
   const promise = new Promise<void>((r) => {
     resolve = r;
@@ -365,6 +366,38 @@ export const useAppStore = create<AppState>((set, get) => ({
       })),
       matchedCount: 0,
     })),
+
+  resetProjectState: () => {
+    // Reset project-specific state WITHOUT destroying the renderer.
+    // Used when navigating between projects.
+    viewerRefs.dataStore = null;
+    viewerRefs.coordinateInfo = null;
+    viewerRefs.expressIdToGuid.clear();
+    viewerRefs.guidToExpressId.clear();
+    viewerRefs.sectionPlane = null;
+    set({
+      parseResult: null,
+      modelLoading: false,
+      modelError: null,
+      loadProgress: null,
+      project: null,
+      materials: [],
+      matchedCount: 0,
+      totalMaterialCount: 0,
+      selectedElementIds: new Set<string>(),
+      hoveredElementId: null,
+      isolatedElementIds: null,
+      highlightedElementIds: new Set<string>(),
+      colorMode: "matchStatus" as ColorMode,
+      visibilityByType: {},
+      visibilityByStorey: {},
+      contextPanelMode: "summary" as ContextPanelMode,
+      selectedMaterialName: null,
+      batchMatchMaterials: [],
+      bottomPanelOpen: false,
+      autoMatchProgress: { phase: "idle", matched: 0, total: 0, message: "" },
+    });
+  },
 
   reset: () => {
     viewerRefs.renderer = null;
