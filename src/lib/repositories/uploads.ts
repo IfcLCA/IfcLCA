@@ -106,14 +106,13 @@ export async function ingestUpload(
   await requireProject(userId, projectId);
   const upload = await db.upload.findFirst({ where: { id: input.uploadId, projectId } });
   if (!upload) throw new NotFoundError("Upload");
-  if (input.elements.length === 0) throw new BadRequestError("The upload contains no elements");
-
   // Last occurrence wins if the parser reports a GUID twice.
   const byGuid = new Map(input.elements.map((e) => [e.globalId, e]));
   const elements = [...byGuid.values()].map((e) => ({ element: e, layers: normalizeLayers(e) }));
   const materialNames = [...new Set(elements.flatMap((e) => e.layers.map((l) => l.materialName)))];
 
   try {
+    if (elements.length === 0) throw new BadRequestError("The upload contains no elements");
     const result = await db.$transaction(
       async (tx) => {
         await tx.material.createMany({

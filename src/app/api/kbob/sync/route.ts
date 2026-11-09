@@ -11,15 +11,17 @@ export const maxDuration = 300;
 /**
  * Refreshes the KBOB cache from lcadata.ch.
  * Called daily by Vercel Cron (vercel.json), which sends
- * `Authorization: Bearer $CRON_SECRET`. Open without a secret in development.
+ * `Authorization: Bearer $CRON_SECRET`. The older KBOB_SYNC_SECRET still
+ * works for manual calls. Open without any secret in development.
  */
 function authorize(request: Request) {
-  const secret = process.env.CRON_SECRET;
-  if (!secret) {
+  const secrets = [process.env.CRON_SECRET, process.env.KBOB_SYNC_SECRET].filter(Boolean);
+  if (secrets.length === 0) {
     if (process.env.NODE_ENV === "development") return;
     throw new UnauthorizedError();
   }
-  if (request.headers.get("authorization") !== `Bearer ${secret}`) {
+  const header = request.headers.get("authorization");
+  if (!secrets.some((s) => header === `Bearer ${s}`)) {
     throw new UnauthorizedError();
   }
 }

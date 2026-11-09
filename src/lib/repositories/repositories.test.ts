@@ -134,7 +134,37 @@ describe.skipIf(!hasTestDb)("repositories against Postgres", () => {
 
     // 2 m³ * 2300 kg/m³ * 0.1 kg CO2-eq/kg; the unmatched layer adds nothing.
     expect(detail.emissions.gwp).toBeCloseTo(460);
+    // Per-element and project totals agree on every indicator.
     expect(detail.elements[0].emissions.gwp).toBeCloseTo(460);
+    expect(detail.elements[0].emissions.ubp).toBeCloseTo(detail.emissions.ubp);
+    expect(detail.elements[0].emissions.penre).toBeCloseTo(2 * 2300 * 0.2);
+    expect(detail.emissions.penre).toBeCloseTo(2 * 2300 * 0.2);
+  });
+
+  it("pages through elements from one upload without repeats or gaps", async () => {
+    const { projects, uploads } = await repos();
+    const project = await projects.createProject(ALICE, { name: "Big" });
+    const { uploadId } = await uploads.createUpload(ALICE, project.id, "big.ifc");
+    const guids = Array.from({ length: 7 }, (_, i) => `g${i}`);
+    await uploads.ingestUpload(ALICE, project.id, {
+      uploadId,
+      elements: guids.map((g) => ({ globalId: g, type: "IfcWall", materials: [{ name: "Backstein", volume: 1 }] })),
+    });
+    const seen: string[] = [];
+    for (let page = 1; page <= 4; page++) {
+      const result = await projects.listElementsPage(ALICE, project.id, page, 2);
+      seen.push(...result.elements.map((e) => e.guid));
+    }
+    expect(seen.sort()).toEqual(guids);
+  });
+
+  it("an upload with no elements is marked Failed, not left Processing", async () => {
+    const { projects, uploads } = await repos();
+    const project = await projects.createProject(ALICE, { name: "Empty" });
+    const { uploadId } = await uploads.createUpload(ALICE, project.id, "empty.ifc");
+    await expect(uploads.ingestUpload(ALICE, project.id, { uploadId, elements: [] })).rejects.toThrow(/no elements/);
+    const detail = await projects.getProjectDetail(ALICE, project.id);
+    expect(detail.uploads[0].status).toBe("Failed");
   });
 
   it("re-uploading replaces elements with the same GUID", async () => {
@@ -187,6 +217,24 @@ describe.skipIf(!hasTestDb)("repositories against Postgres", () => {
     const result = await materials.applyKnownMatches(ALICE, second.id, ["unknown stuff", "Brand new"]);
     expect(result).toMatchObject({ matchedMaterials: ["unknown stuff"], unmatchedMaterials: ["Brand new"] });
     expect(project.id).not.toBe(second.id);
+
+    // The parser's exact name is kept, so the layers created later attach to it.
+    const spaced = await materials.applyKnownMatches(ALICE, second.id, ["Unknown Stuff "]);
+    expect(spaced.matchedMaterials).toEqual(["Unknown Stuff "]);
+
+    // A match this project already has is not overwritten by another project's.
+    const concreteInFirst = (await materials.listUserMaterials(ALICE)).find(
+      (m) => m.projectId === project.id && m.name === "Beton (ohne Bewehrung)"
+    )!;
+    await materials.matchMaterials(ALICE, { materialIds: [concreteInFirst.id], kbobMaterialId: TIMBER });
+    const third = await projects.createProject(ALICE, { name: "Third" });
+    const { db } = await import("@/lib/db");
+    await db.material.create({
+      data: { projectId: third.id, name: "Beton (ohne Bewehrung)", kbobId: CONCRETE, density: 2400 },
+    });
+    await materials.applyKnownMatches(ALICE, third.id, ["Beton (ohne Bewehrung)"]);
+    const kept = await db.material.findFirstOrThrow({ where: { projectId: third.id } });
+    expect(kept).toMatchObject({ kbobId: CONCRETE, density: 2400 });
 
     // Bob does not inherit Alice's matches.
     const bobs = await projects.createProject(BOB, { name: "Bob" });

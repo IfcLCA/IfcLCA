@@ -15,6 +15,9 @@ import { emissionsByProject } from "./emissions";
 import { toKbobDto } from "./kbob";
 
 
+/** One upload writes many elements with the same createdAt; id breaks the tie so pages are stable. */
+const ELEMENT_ORDER = [{ createdAt: "desc" as const }, { id: "asc" as const }];
+
 /** Above this, the detail view loads elements page by page. */
 const ELEMENT_PAGE_THRESHOLD = 1000;
 
@@ -50,14 +53,11 @@ function toElementDto(
 ) {
   let emissions = { ...ZERO_INDICATORS };
   const materials = element.layers.map((layer) => {
-    const material = materialsById.get(layer.materialId);
-    emissions = addIndicators(emissions, layerEmissions(layer.volume, material?.density, material?.kbob));
-    return {
-      _id: layer.id,
-      volume: layer.volume,
-      fraction: layer.fraction,
-      material: material ? toMaterialDto(material) : undefined,
-    };
+    const row = materialsById.get(layer.materialId);
+    const material = row ? toMaterialDto(row) : undefined;
+    // Use the DTO: layerEmissions reads the API field names, not the DB columns.
+    emissions = addIndicators(emissions, layerEmissions(layer.volume, material?.density, material?.kbobMatch));
+    return { _id: layer.id, volume: layer.volume, fraction: layer.fraction, material };
   });
   return {
     _id: element.id,
@@ -184,7 +184,7 @@ export async function getProjectDetail(
     : await db.element.findMany({
         where: { projectId },
         include: { layers: true },
-        orderBy: { createdAt: "desc" },
+        orderBy: ELEMENT_ORDER,
       });
 
   const emissions = emissionsMap.get(projectId) ?? ZERO_INDICATORS;
@@ -210,17 +210,21 @@ export async function listElementsPage(
   limit: number
 ) {
   await requireProject(userId, projectId);
-  const [elements, total, materials] = await Promise.all([
+  const [elements, total] = await Promise.all([
     db.element.findMany({
       where: { projectId },
       include: { layers: true },
-      orderBy: { createdAt: "desc" },
+      orderBy: ELEMENT_ORDER,
       skip: (page - 1) * limit,
       take: limit,
     }),
     db.element.count({ where: { projectId } }),
-    db.material.findMany({ where: { projectId }, include: { kbob: true } }),
   ]);
+  const materialIds = [...new Set(elements.flatMap((e) => e.layers.map((l) => l.materialId)))];
+  const materials = await db.material.findMany({
+    where: { id: { in: materialIds } },
+    include: { kbob: true },
+  });
   const materialsById = new Map(materials.map((m) => [m.id, m]));
   return {
     elements: elements.map((e) => toElementDto(e, materialsById)),

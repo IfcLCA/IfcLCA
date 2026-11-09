@@ -120,51 +120,71 @@ export const knownMatchesInput = z.object({
 
 /**
  * Before an upload is stored: reuse matches the user already made for the
- * same material name in any of their projects. Returns the names that still
- * need matching, so the UI can send the user to the materials library.
+ * same material name (case and surrounding spaces ignored) in any of their
+ * projects. A material this project has already matched keeps its match.
+ * Returns the names that still need matching, so the UI can send the user
+ * to the materials library.
  */
 export async function applyKnownMatches(userId: string, projectId: string, materialNames: string[]) {
   await requireProject(userId, projectId);
-  const names = [...new Set(materialNames.map((n) => n.trim()).filter(Boolean))];
+  // Keep the parser's exact names: ingestUpload stores materials under them.
+  const names = [...new Set(materialNames.filter((n) => n.trim()))];
   if (names.length === 0) return { unmatchedMaterials: [], matchedMaterials: [], unmatchedCount: 0 };
+  const key = (name: string) => name.trim().toLowerCase();
 
-  const previous = await db.material.findMany({
-    where: {
-      project: { userId },
-      kbobId: { not: null },
-      OR: names.map((name) => ({ name: { equals: name, mode: "insensitive" as const } })),
-    },
-    orderBy: { updatedAt: "desc" },
-    select: { name: true, kbobId: true, density: true },
+  const existing = await db.material.findMany({
+    where: { projectId, name: { in: names } },
+    select: { name: true, kbobId: true },
   });
-  // Prefer an exact-case match, then the most recent one (sort is stable).
+  const existingNames = new Set(existing.map((m) => m.name));
+  const alreadyMatched = existing.filter((m) => m.kbobId).map((m) => m.name);
+  const open = names.filter((n) => !alreadyMatched.includes(n));
+
+  const previous = open.length
+    ? await db.material.findMany({
+        where: {
+          project: { userId },
+          kbobId: { not: null },
+          OR: open.map((n) => ({ name: { equals: n.trim(), mode: "insensitive" as const } })),
+        },
+        orderBy: { updatedAt: "desc" },
+        select: { name: true, kbobId: true, density: true },
+      })
+    : [];
+  // Prefer an exact match, then the most recent one (sort is stable).
   const exactFirst = [...previous].sort(
     (a, b) => Number(names.includes(b.name)) - Number(names.includes(a.name))
   );
   const known = new Map<string, { kbobId: string; density: number | null }>();
   for (const p of exactFirst) {
-    const key = p.name.toLowerCase();
-    if (!known.has(key)) known.set(key, { kbobId: p.kbobId!, density: p.density });
+    if (!known.has(key(p.name))) known.set(key(p.name), { kbobId: p.kbobId!, density: p.density });
   }
 
-  const matched: string[] = [];
-  const unmatched: string[] = [];
-  await db.$transaction(async (tx) => {
-    for (const name of names) {
-      const hit = known.get(name.toLowerCase());
-      if (!hit) {
-        unmatched.push(name);
-        continue;
-      }
-      await tx.material.upsert({
-        where: { projectId_name: { projectId, name } },
-        create: { projectId, name, kbobId: hit.kbobId, density: hit.density },
-        update: { kbobId: hit.kbobId, density: hit.density },
-      });
-      matched.push(name);
-    }
+  const toApply = open.filter((n) => known.has(key(n)));
+  const unmatched = open.filter((n) => !known.has(key(n)));
+  // Independent writes, no interactive transaction, so a model with many
+  // materials cannot run into the transaction timeout.
+  await db.material.createMany({
+    data: toApply
+      .filter((n) => !existingNames.has(n))
+      .map((name) => ({ projectId, name, ...known.get(key(name))! })),
+    skipDuplicates: true,
   });
-  return { unmatchedMaterials: unmatched, matchedMaterials: matched, unmatchedCount: unmatched.length };
+  await Promise.all(
+    toApply
+      .filter((n) => existingNames.has(n))
+      .map((name) =>
+        db.material.update({
+          where: { projectId_name: { projectId, name } },
+          data: known.get(key(name))!,
+        })
+      )
+  );
+  return {
+    unmatchedMaterials: unmatched,
+    matchedMaterials: [...alreadyMatched, ...toApply],
+    unmatchedCount: unmatched.length,
+  };
 }
 
 /**
