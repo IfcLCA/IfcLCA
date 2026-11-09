@@ -1,99 +1,69 @@
 /**
- * Utility functions for extracting environmental indicators from KBOB materials
- * Uses new API format (gwpTotal, ubp21Total, primaryEnergyNonRenewableTotal)
+ * Environmental indicators of a KBOB material, and the LCA arithmetic that
+ * uses them. Shared by the server (repositories) and the client (tables).
+ *
+ * Emissions of one material layer = volume (m³) * density (kg/m³) * indicator per kg.
  */
 
 interface KbobMaterialLike {
-  // New API fields
   gwpTotal?: number | null;
   ubp21Total?: number | null;
   primaryEnergyNonRenewableTotal?: number | null;
   density?: number | string | null;
 }
 
-/**
- * Check if a KBOB material has valid emissions and density
- * A material is considered valid if:
- * - All three environmental indicators exist and are not null
- * - At least one environmental indicator is non-zero
- * - Density exists and is non-zero
- */
-export function isValidKbobMaterial(material: KbobMaterialLike | null | undefined): boolean {
-  if (!material) return false;
-
-  // Check if material has valid environmental indicators
-  const hasValidGWP = material.gwpTotal !== null && material.gwpTotal !== undefined;
-  const hasValidUBP = material.ubp21Total !== null && material.ubp21Total !== undefined;
-  const hasValidPENRE = material.primaryEnergyNonRenewableTotal !== null && material.primaryEnergyNonRenewableTotal !== undefined;
-
-  // At least one indicator must be non-zero
-  const hasNonZeroIndicator =
-    (hasValidGWP && material.gwpTotal !== 0) ||
-    (hasValidUBP && material.ubp21Total !== 0) ||
-    (hasValidPENRE && material.primaryEnergyNonRenewableTotal !== 0);
-
-  // Check if material has valid density
-  const hasValidDensity =
-    material.density !== null &&
-    material.density !== undefined &&
-    material.density !== "" &&
-    material.density !== "-" &&
-    material.density !== 0;
-
-  return hasValidGWP && hasValidUBP && hasValidPENRE && hasNonZeroIndicator && hasValidDensity;
-}
-
-/**
- * Extract GWP value from KBOB material
- */
-export function getGWP(kbob: KbobMaterialLike | null | undefined): number {
-  if (!kbob) return 0;
-
-  if (kbob.gwpTotal !== null && kbob.gwpTotal !== undefined) {
-    return kbob.gwpTotal;
-  }
-
-  return 0;
-}
-
-/**
- * Extract UBP value from KBOB material
- */
-export function getUBP(kbob: KbobMaterialLike | null | undefined): number {
-  if (!kbob) return 0;
-
-  if (kbob.ubp21Total !== null && kbob.ubp21Total !== undefined) {
-    return kbob.ubp21Total;
-  }
-
-  return 0;
-}
-
-/**
- * Extract PENRE value from KBOB material
- */
-export function getPENRE(kbob: KbobMaterialLike | null | undefined): number {
-  if (!kbob) return 0;
-
-  if (kbob.primaryEnergyNonRenewableTotal !== null && kbob.primaryEnergyNonRenewableTotal !== undefined) {
-    return kbob.primaryEnergyNonRenewableTotal;
-  }
-
-  return 0;
-}
-
-/**
- * Extract all environmental indicators from KBOB material
- */
-export function getIndicators(kbob: KbobMaterialLike | null | undefined): {
+export interface Indicators {
   gwp: number;
   ubp: number;
   penre: number;
-} {
-  return {
-    gwp: getGWP(kbob),
-    ubp: getUBP(kbob),
-    penre: getPENRE(kbob),
-  };
 }
 
+/** KBOB densities arrive as numbers, numeric strings, "-" or "". */
+export function parseDensity(value: unknown): number | null {
+  if (typeof value === "number") return Number.isFinite(value) ? value : null;
+  if (typeof value === "string" && value.trim() !== "" && value.trim() !== "-") {
+    const parsed = parseFloat(value);
+    return Number.isFinite(parsed) ? parsed : null;
+  }
+  return null;
+}
+
+/**
+ * Usable for matching: all three indicators present, at least one non-zero,
+ * and a positive density.
+ */
+export function isValidKbobMaterial(material: KbobMaterialLike | null | undefined): boolean {
+  if (!material) return false;
+  const values = [material.gwpTotal, material.ubp21Total, material.primaryEnergyNonRenewableTotal];
+  if (values.some((v) => v === null || v === undefined)) return false;
+  if (values.every((v) => v === 0)) return false;
+  const density = parseDensity(material.density);
+  return density !== null && density > 0;
+}
+
+export function getGWP(kbob: KbobMaterialLike | null | undefined): number {
+  return kbob?.gwpTotal ?? 0;
+}
+
+export function getUBP(kbob: KbobMaterialLike | null | undefined): number {
+  return kbob?.ubp21Total ?? 0;
+}
+
+export function getPENRE(kbob: KbobMaterialLike | null | undefined): number {
+  return kbob?.primaryEnergyNonRenewableTotal ?? 0;
+}
+
+export function layerEmissions(
+  volume: number | null | undefined,
+  density: number | null | undefined,
+  kbob: KbobMaterialLike | null | undefined
+): Indicators {
+  const mass = (volume || 0) * (density || 0);
+  return { gwp: mass * getGWP(kbob), ubp: mass * getUBP(kbob), penre: mass * getPENRE(kbob) };
+}
+
+export function addIndicators(a: Indicators, b: Indicators): Indicators {
+  return { gwp: a.gwp + b.gwp, ubp: a.ubp + b.ubp, penre: a.penre + b.penre };
+}
+
+export const ZERO_INDICATORS: Indicators = Object.freeze({ gwp: 0, ubp: 0, penre: 0 });

@@ -1,0 +1,200 @@
+/**
+ * Project materials and their KBOB matches. A material is one name inside
+ * one project; matching sets its KBOB entry and density.
+ */
+import { z } from "zod";
+import type { Prisma } from "@prisma/client";
+import { db } from "@/lib/db";
+import { BadRequestError, NotFoundError } from "@/lib/errors";
+import { getGWP, getPENRE, getUBP, isValidKbobMaterial } from "@/lib/utils/kbob-indicators";
+import { getKbobMaterial, toKbobDto } from "./kbob";
+import { requireProject } from "./projects";
+
+type Tx = Prisma.TransactionClient;
+
+/** Materials library: every material across the user's projects. */
+export async function listUserMaterials(userId: string) {
+  const materials = await db.material.findMany({
+    where: { project: { userId } },
+    include: { kbob: true },
+    orderBy: { name: "asc" },
+  });
+  const volumes = await db.elementMaterial.groupBy({
+    by: ["materialId"],
+    where: { material: { project: { userId } } },
+    _sum: { volume: true },
+  });
+  const volumeById = new Map(volumes.map((v) => [v.materialId, v._sum.volume ?? 0]));
+  return materials.map((m) => {
+    const kbob = m.kbob ? toKbobDto(m.kbob) : undefined;
+    return {
+      id: m.id,
+      name: m.name,
+      category: m.category,
+      volume: volumeById.get(m.id) ?? 0,
+      density: m.density,
+      projectId: m.projectId,
+      kbobMatchId: m.kbobId ?? undefined,
+      kbobMatch: kbob
+        ? { id: kbob.id, Name: kbob.Name, GWP: getGWP(kbob), UBP: getUBP(kbob), PENRE: getPENRE(kbob) }
+        : undefined,
+    };
+  });
+}
+
+export async function listProjectsWithMaterialIds(userId: string) {
+  const projects = await db.project.findMany({
+    where: { userId },
+    select: { id: true, name: true, materials: { select: { id: true } } },
+    orderBy: { name: "asc" },
+  });
+  return projects.map((p) => ({ id: p.id, name: p.name, materialIds: p.materials.map((m) => m.id) }));
+}
+
+async function requireOwnedMaterialIds(userId: string, materialIds: string[]) {
+  const unique = [...new Set(materialIds)];
+  const owned = await db.material.count({ where: { id: { in: unique }, project: { userId } } });
+  if (owned !== unique.length) throw new NotFoundError("Material");
+  return unique;
+}
+
+export const matchInput = z.object({
+  materialIds: z.array(z.string().min(1)).min(1),
+  kbobMaterialId: z.string().min(1),
+  density: z.number().positive().nullish(),
+});
+
+/** Links materials to a KBOB entry. Density: the user's value, else KBOB's. */
+export async function matchMaterials(userId: string, input: z.infer<typeof matchInput>) {
+  const materialIds = await requireOwnedMaterialIds(userId, input.materialIds);
+  const kbob = await getKbobMaterial(input.kbobMaterialId);
+  const density = input.density ?? kbob.density;
+  if (!density || density <= 0) {
+    throw new BadRequestError(`KBOB material "${kbob.nameDE}" has no density; enter one to match it`);
+  }
+  const { count } = await db.material.updateMany({
+    where: { id: { in: materialIds } },
+    data: { kbobId: kbob.id, density },
+  });
+  return { message: "Materials matched", totalModified: count };
+}
+
+export const elementCountsInput = z.object({ materialIds: z.array(z.string()) });
+
+export async function countElementsPerMaterial(userId: string, materialIds: string[]) {
+  const unique = [...new Set(materialIds)];
+  const rows = await db.elementMaterial.groupBy({
+    by: ["materialId"],
+    where: { materialId: { in: unique }, material: { project: { userId } } },
+    _count: { _all: true },
+  });
+  const counts = new Map(rows.map((r) => [r.materialId, r._count._all]));
+  return Object.fromEntries(unique.map((id) => [id, counts.get(id) ?? 0]));
+}
+
+/** Removes the material and its layers, and logs it for the activity feed. */
+export async function deleteMaterial(userId: string, materialId: string) {
+  const material = await db.material.findFirst({ where: { id: materialId, project: { userId } } });
+  if (!material) throw new NotFoundError("Material");
+  await db.$transaction([
+    db.material.delete({ where: { id: materialId } }),
+    db.materialDeletion.create({
+      data: {
+        projectId: material.projectId,
+        userId,
+        materialName: material.name,
+        reason: "Material deleted by user",
+      },
+    }),
+  ]);
+}
+
+export const knownMatchesInput = z.object({
+  projectId: z.string().min(1),
+  materialNames: z.array(z.string()),
+});
+
+/**
+ * Before an upload is stored: reuse matches the user already made for the
+ * same material name in any of their projects. Returns the names that still
+ * need matching, so the UI can send the user to the materials library.
+ */
+export async function applyKnownMatches(userId: string, projectId: string, materialNames: string[]) {
+  await requireProject(userId, projectId);
+  const names = [...new Set(materialNames.map((n) => n.trim()).filter(Boolean))];
+  if (names.length === 0) return { unmatchedMaterials: [], matchedMaterials: [], unmatchedCount: 0 };
+
+  const previous = await db.material.findMany({
+    where: {
+      project: { userId },
+      kbobId: { not: null },
+      OR: names.map((name) => ({ name: { equals: name, mode: "insensitive" as const } })),
+    },
+    orderBy: { updatedAt: "desc" },
+    select: { name: true, kbobId: true, density: true },
+  });
+  // Prefer an exact-case match, then the most recent one (sort is stable).
+  const exactFirst = [...previous].sort(
+    (a, b) => Number(names.includes(b.name)) - Number(names.includes(a.name))
+  );
+  const known = new Map<string, { kbobId: string; density: number | null }>();
+  for (const p of exactFirst) {
+    const key = p.name.toLowerCase();
+    if (!known.has(key)) known.set(key, { kbobId: p.kbobId!, density: p.density });
+  }
+
+  const matched: string[] = [];
+  const unmatched: string[] = [];
+  await db.$transaction(async (tx) => {
+    for (const name of names) {
+      const hit = known.get(name.toLowerCase());
+      if (!hit) {
+        unmatched.push(name);
+        continue;
+      }
+      await tx.material.upsert({
+        where: { projectId_name: { projectId, name } },
+        create: { projectId, name, kbobId: hit.kbobId, density: hit.density },
+        update: { kbobId: hit.kbobId, density: hit.density },
+      });
+      matched.push(name);
+    }
+  });
+  return { unmatchedMaterials: unmatched, matchedMaterials: matched, unmatchedCount: unmatched.length };
+}
+
+/**
+ * During an upload: match still-unmatched materials whose name equals a
+ * usable KBOB name (case-insensitive, exact case preferred). Returns how
+ * many were matched.
+ */
+export async function autoMatchByKbobName(tx: Tx, materials: Array<{ id: string; name: string }>) {
+  if (materials.length === 0) return 0;
+  const candidates = await tx.kbobMaterial.findMany({
+    where: {
+      OR: materials.map((m) => ({ nameDE: { equals: m.name.trim(), mode: "insensitive" as const } })),
+    },
+  });
+  let matched = 0;
+  for (const material of materials) {
+    const name = material.name.trim();
+    const usable = candidates.filter(
+      (k) =>
+        k.nameDE.toLowerCase() === name.toLowerCase() &&
+        isValidKbobMaterial({
+          gwpTotal: k.gwpTotal,
+          ubp21Total: k.ubp21Total,
+          primaryEnergyNonRenewableTotal: k.penreTotal,
+          density: k.density,
+        })
+    );
+    const best = usable.find((k) => k.nameDE === name) ?? usable[0];
+    if (!best) continue;
+    await tx.material.update({
+      where: { id: material.id },
+      data: { kbobId: best.id, density: best.density },
+    });
+    matched++;
+  }
+  return matched;
+}

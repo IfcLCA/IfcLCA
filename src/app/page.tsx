@@ -4,7 +4,7 @@ import type { Metadata } from "next";
 import { Dashboard } from "@/components/dashboard";
 import LandingPage from "@/components/landing-page";
 import { TermsAcceptanceWrapper } from "@/components/terms-acceptance-wrapper";
-import { getDashboardData } from "@/lib/services/dashboard-service";
+import { getDashboardData } from "@/lib/repositories/dashboard";
 import { Suspense } from "react";
 import { DashboardStatsLoading, DashboardProjectsLoading, DashboardActivitiesLoading } from "@/components/dashboard-loading";
 
@@ -63,7 +63,7 @@ export default async function HomePage() {
   }
 
   // Fetch dashboard data for authenticated users (excluding slow emissions calculation)
-  const dashboardData = await getDashboardData(userId, false);
+  const dashboardData = await getDashboardData(userId);
 
   // If user is authenticated but hasn't accepted terms, show terms acceptance
   if (!hasAcceptedTerms) {

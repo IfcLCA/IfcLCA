@@ -1,48 +1,24 @@
 "use server";
 
 import { put } from "@vercel/blob";
-import { auth } from "@clerk/nextjs/server";
-import { Project } from "@/models";
-import { connectToDatabase } from "@/lib/mongodb";
 import { revalidatePath } from "next/cache";
+import { requireUserId } from "@/lib/api";
+import { requireProject, updateProject } from "@/lib/repositories/projects";
 
-export async function uploadProjectImage(
-  projectId: string,
-  formData: FormData
-) {
-  try {
-    const { userId } = await auth();
-    if (!userId) throw new Error("Unauthorized");
+export async function uploadProjectImage(projectId: string, formData: FormData) {
+  const userId = await requireUserId();
+  // Check ownership before storing anything in Blob.
+  await requireProject(userId, projectId);
 
-    const file = formData.get("file") as File;
-    if (!file) throw new Error("No file provided");
+  const file = formData.get("file");
+  if (!(file instanceof File)) throw new Error("No file provided");
 
-    // Generate unique filename
-    const filename = `${projectId}-${Date.now()}-${file.name}`;
+  const blob = await put(`${projectId}-${Date.now()}-${file.name}`, file, {
+    access: "public",
+    addRandomSuffix: false,
+  });
+  await updateProject(userId, projectId, { imageUrl: blob.url });
 
-    // Upload to Vercel Blob
-    const blob = await put(filename, file, {
-      access: "public",
-      addRandomSuffix: false,
-    });
-
-    // Update project in MongoDB
-    await connectToDatabase();
-    const updatedProject = await Project.findByIdAndUpdate(
-      projectId,
-      { imageUrl: blob.url },
-      { new: true }
-    );
-
-    if (!updatedProject) {
-      throw new Error("Failed to update project");
-    }
-
-    // Revalidate the project page
-    revalidatePath(`/projects/${projectId}`);
-    return blob.url;
-  } catch (error) {
-    console.error("Upload error:", error);
-    throw error;
-  }
+  revalidatePath(`/projects/${projectId}`);
+  return blob.url;
 }

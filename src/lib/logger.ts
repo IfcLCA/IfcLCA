@@ -2,7 +2,11 @@
 class Logger {
   private static formatMessage(level: string, message: string, data?: any): string {
     const timestamp = new Date().toISOString();
-    const dataString = data ? `\n${JSON.stringify(data, null, 2)}` : '';
+    // Error objects stringify to "{}", which hid every DB failure in the logs.
+    const dataString = data
+      ? `\n${JSON.stringify(data, (_key, value) =>
+          value instanceof Error ? { name: value.name, message: value.message, stack: value.stack } : value, 2)}`
+      : '';
     return `[${timestamp}] ${level.toUpperCase()}: ${message}${dataString}`;
   }
 

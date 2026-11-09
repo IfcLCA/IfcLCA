@@ -1,0 +1,20 @@
+{
+  "_note": "Sample data for local development and tests. Same shape as the lcadata.ch /api/kbob/materials response. Values are rounded placeholders, not official KBOB figures.",
+  "success": true,
+  "version": "dev-sample",
+  "count": 8,
+  "totalMaterials": 8,
+  "totalPages": 1,
+  "currentPage": 1,
+  "pageSize": "all",
+  "materials": [
+    { "uuid": "00000000-0000-4000-8000-000000000001", "nameDE": "Beton (ohne Bewehrung)", "nameFR": "Béton (sans armature)", "group": "Beton", "density": "2300", "unit": "kg", "gwpTotal": 0.1, "ubp21Total": 130, "primaryEnergyNonRenewableTotal": 0.2 },
+    { "uuid": "00000000-0000-4000-8000-000000000002", "nameDE": "Brettschichtholz", "nameFR": "Bois lamellé-collé", "group": "Holz", "density": 470, "unit": "kg", "gwpTotal": 0.3, "ubp21Total": 900, "primaryEnergyNonRenewableTotal": 1.5 },
+    { "uuid": "00000000-0000-4000-8000-000000000003", "nameDE": "Armierungsstahl", "nameFR": "Acier d'armature", "group": "Metalle", "density": "7850", "unit": "kg", "gwpTotal": 0.7, "ubp21Total": 2200, "primaryEnergyNonRenewableTotal": 3.5 },
+    { "uuid": "00000000-0000-4000-8000-000000000004", "nameDE": "Backstein", "nameFR": "Brique", "group": "Mauersteine", "density": "1100", "unit": "kg", "gwpTotal": 0.25, "ubp21Total": 350, "primaryEnergyNonRenewableTotal": 0.9 },
+    { "uuid": "00000000-0000-4000-8000-000000000005", "nameDE": "Glaswolle", "nameFR": "Laine de verre", "group": "Wärmedämmstoffe", "density": 30, "unit": "kg", "gwpTotal": 1.2, "ubp21Total": 2600, "primaryEnergyNonRenewableTotal": 6 },
+    { "uuid": "00000000-0000-4000-8000-000000000006", "nameDE": "Gipskartonplatte", "nameFR": "Plaque de plâtre cartonnée", "group": "Gips", "density": "850", "unit": "kg", "gwpTotal": 0.2, "ubp21Total": 300, "primaryEnergyNonRenewableTotal": 1 },
+    { "uuid": "00000000-0000-4000-8000-000000000007", "nameDE": "Fensterglas ohne Dichte", "nameFR": "Verre sans densité", "group": "Glas", "density": "-", "unit": "m2", "gwpTotal": 30, "ubp21Total": 50000, "primaryEnergyNonRenewableTotal": 100 },
+    { "uuid": "00000000-0000-4000-8000-000000000008", "nameDE": "Leerer Eintrag", "nameFR": "Entrée vide", "group": "Diverses", "density": "1000", "unit": "kg", "gwpTotal": 0, "ubp21Total": 0, "primaryEnergyNonRenewableTotal": 0 }
+  ]
+}
