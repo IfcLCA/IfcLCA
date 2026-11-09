@@ -120,40 +120,41 @@ export const knownMatchesInput = z.object({
 
 /**
  * Before an upload is stored: reuse matches the user already made for the
- * same material name (case and surrounding spaces ignored) in any of their
- * projects. A material this project has already matched keeps its match.
- * Returns the names that still need matching, so the UI can send the user
- * to the materials library.
+ * same material name (case ignored) in any of their projects. A material
+ * this project has already matched keeps its match. Returns the names that
+ * still need matching, so the UI can send the user to the materials library.
  */
 export async function applyKnownMatches(userId: string, projectId: string, materialNames: string[]) {
   await requireProject(userId, projectId);
   // Keep the parser's exact names: ingestUpload stores materials under them.
   const names = [...new Set(materialNames.filter((n) => n.trim()))];
   if (names.length === 0) return { unmatchedMaterials: [], matchedMaterials: [], unmatchedCount: 0 };
-  const key = (name: string) => name.trim().toLowerCase();
+  const nameSet = new Set(names);
+  const key = (name: string) => name.toLowerCase();
 
-  const existing = await db.material.findMany({
-    where: { projectId, name: { in: names } },
-    select: { name: true, kbobId: true },
-  });
-  const existingNames = new Set(existing.map((m) => m.name));
-  const alreadyMatched = existing.filter((m) => m.kbobId).map((m) => m.name);
-  const open = names.filter((n) => !alreadyMatched.includes(n));
+  const alreadyMatched = (
+    await db.material.findMany({
+      where: { projectId, name: { in: names }, kbobId: { not: null } },
+      select: { name: true },
+    })
+  ).map((m) => m.name);
+  const matchedSet = new Set(alreadyMatched);
+  const open = names.filter((n) => !matchedSet.has(n));
 
   const previous = open.length
     ? await db.material.findMany({
         where: {
           project: { userId },
           kbobId: { not: null },
-          OR: open.map((n) => ({ name: { equals: n.trim(), mode: "insensitive" as const } })),
+          OR: open.map((n) => ({ name: { equals: n, mode: "insensitive" as const } })),
         },
         orderBy: { updatedAt: "desc" },
         select: { name: true, kbobId: true, density: true },
       })
     : [];
-  // Prefer an exact match, then the most recent one (sort is stable).
+  // Prefer an exact-case match, then the most recent one (sort is stable).
   const exactFirst = [...previous].sort(
-    (a, b) => Number(names.includes(b.name)) - Number(names.includes(a.name))
+    (a, b) => Number(nameSet.has(b.name)) - Number(nameSet.has(a.name))
   );
   const known = new Map<string, { kbobId: string; density: number | null }>();
   for (const p of exactFirst) {
@@ -162,23 +163,17 @@ export async function applyKnownMatches(userId: string, projectId: string, mater
 
   const toApply = open.filter((n) => known.has(key(n)));
   const unmatched = open.filter((n) => !known.has(key(n)));
-  // Independent writes, no interactive transaction, so a model with many
-  // materials cannot run into the transaction timeout.
-  await db.material.createMany({
-    data: toApply
-      .filter((n) => !existingNames.has(n))
-      .map((name) => ({ projectId, name, ...known.get(key(name))! })),
-    skipDuplicates: true,
-  });
-  await Promise.all(
-    toApply
-      .filter((n) => existingNames.has(n))
-      .map((name) =>
-        db.material.update({
-          where: { projectId_name: { projectId, name } },
-          data: known.get(key(name))!,
-        })
-      )
+  // A batch transaction: atomic, runs on one connection, and has no
+  // interactive-transaction timeout for models with many materials.
+  await db.$transaction(
+    toApply.map((name) => {
+      const match = known.get(key(name))!;
+      return db.material.upsert({
+        where: { projectId_name: { projectId, name } },
+        create: { projectId, name, ...match },
+        update: match,
+      });
+    })
   );
   return {
     unmatchedMaterials: unmatched,

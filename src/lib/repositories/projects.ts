@@ -213,19 +213,16 @@ export async function listElementsPage(
   const [elements, total] = await Promise.all([
     db.element.findMany({
       where: { projectId },
-      include: { layers: true },
+      include: { layers: { include: { material: { include: { kbob: true } } } } },
       orderBy: ELEMENT_ORDER,
       skip: (page - 1) * limit,
       take: limit,
     }),
     db.element.count({ where: { projectId } }),
   ]);
-  const materialIds = [...new Set(elements.flatMap((e) => e.layers.map((l) => l.materialId)))];
-  const materials = await db.material.findMany({
-    where: { id: { in: materialIds } },
-    include: { kbob: true },
-  });
-  const materialsById = new Map(materials.map((m) => [m.id, m]));
+  const materialsById = new Map(
+    elements.flatMap((e) => e.layers.map((l) => [l.material.id, l.material] as const))
+  );
   return {
     elements: elements.map((e) => toElementDto(e, materialsById)),
     total,

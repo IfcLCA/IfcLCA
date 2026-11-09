@@ -9,10 +9,12 @@ import { ZERO_INDICATORS, type Indicators } from "@/lib/utils/kbob-indicators";
  * match, an upload, or a deletion. Same formula as layerEmissions():
  * volume * material density * KBOB indicator, summed over layers.
  */
-const SUMS_FROM_LAYERS = Prisma.sql`
+const SUMS = Prisma.sql`
   COALESCE(SUM(em.volume * COALESCE(m.density, 0) * COALESCE(k.gwp_total, 0)), 0)::float8   AS gwp,
   COALESCE(SUM(em.volume * COALESCE(m.density, 0) * COALESCE(k.ubp21_total, 0)), 0)::float8 AS ubp,
-  COALESCE(SUM(em.volume * COALESCE(m.density, 0) * COALESCE(k.penre_total, 0)), 0)::float8 AS penre
+  COALESCE(SUM(em.volume * COALESCE(m.density, 0) * COALESCE(k.penre_total, 0)), 0)::float8 AS penre`;
+
+const FROM_LAYERS = Prisma.sql`
   FROM element_materials em
   JOIN materials m ON m.id = em.material_id
   LEFT JOIN kbob_materials k ON k.id = m.kbob_id`;
@@ -22,7 +24,7 @@ export async function emissionsByProject(projectIds: string[]): Promise<Map<stri
   if (projectIds.length === 0) return result;
 
   const rows = await db.$queryRaw<Array<Indicators & { project_id: string }>>`
-    SELECT m.project_id, ${SUMS_FROM_LAYERS}
+    SELECT m.project_id, ${SUMS} ${FROM_LAYERS}
     WHERE m.project_id IN (${Prisma.join(projectIds)})
     GROUP BY m.project_id`;
 
@@ -35,7 +37,7 @@ export async function emissionsByProject(projectIds: string[]): Promise<Map<stri
 
 export async function emissionsForUser(userId: string): Promise<Indicators> {
   const [row] = await db.$queryRaw<Indicators[]>`
-    SELECT ${SUMS_FROM_LAYERS}
+    SELECT ${SUMS} ${FROM_LAYERS}
     JOIN projects p ON p.id = m.project_id
     WHERE p.user_id = ${userId}`;
   return row ?? { ...ZERO_INDICATORS };

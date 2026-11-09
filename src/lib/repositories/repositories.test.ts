@@ -219,8 +219,9 @@ describe.skipIf(!hasTestDb)("repositories against Postgres", () => {
     expect(project.id).not.toBe(second.id);
 
     // The parser's exact name is kept, so the layers created later attach to it.
-    const spaced = await materials.applyKnownMatches(ALICE, second.id, ["Unknown Stuff "]);
-    expect(spaced.matchedMaterials).toEqual(["Unknown Stuff "]);
+    const shouted = await materials.applyKnownMatches(ALICE, second.id, ["UNKNOWN STUFF"]);
+    expect(shouted.matchedMaterials).toEqual(["UNKNOWN STUFF"]);
+    expect((await materials.listUserMaterials(ALICE)).map((m) => m.name)).toContain("UNKNOWN STUFF");
 
     // A match this project already has is not overwritten by another project's.
     const concreteInFirst = (await materials.listUserMaterials(ALICE)).find(
