@@ -141,11 +141,10 @@ export async function parseIFCFile(
       body: JSON.stringify({ materialNames, projectId }),
     });
 
+    const matchesData = await checkMatchesResponse.json().catch(() => ({}));
     if (!checkMatchesResponse.ok) {
-      throw new Error("Failed to check material matches");
+      throw new Error(matchesData.error || "Failed to check material matches");
     }
-
-    const matchesData = await checkMatchesResponse.json();
     const unmatchedMaterialCount = matchesData.unmatchedMaterials.length;
 
     // Log initial file info
@@ -233,7 +232,8 @@ export async function parseIFCFile(
     );
 
     if (!processResponse.ok) {
-      throw new Error("Failed to process elements");
+      const body = await processResponse.json().catch(() => ({}));
+      throw new Error(body.error || "Failed to process elements");
     }
 
     return {

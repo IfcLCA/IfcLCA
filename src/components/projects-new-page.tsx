@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
@@ -28,6 +28,7 @@ import { toast } from "@/hooks/use-toast";
 import { Loader2, PlusCircle, ArrowLeft } from "lucide-react";
 import { Breadcrumbs } from "@/components/breadcrumbs";
 import Link from "next/link";
+import { fetchJson } from "@/lib/fetch-json";
 
 const formSchema = z.object({
   name: z.string().min(2, {
@@ -40,19 +41,22 @@ export default function ProjectsNewPage() {
   const router = useRouter();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [projectCount, setProjectCount] = useState<number | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
+
+  const checkProjectCount = useCallback(async () => {
+    setLoadError(null);
+    try {
+      const projects = await fetchJson<unknown[]>("/api/projects");
+      setProjectCount(projects.length);
+    } catch (error) {
+      console.error("Error checking project count:", error);
+      setLoadError(error instanceof Error ? error.message : "Could not load your projects");
+    }
+  }, []);
 
   useEffect(() => {
-    async function checkProjectCount() {
-      try {
-        const response = await fetch("/api/projects");
-        const projects = await response.json();
-        setProjectCount(projects.length);
-      } catch (error) {
-        console.error("Error checking project count:", error);
-      }
-    }
     checkProjectCount();
-  }, []);
+  }, [checkProjectCount]);
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -75,7 +79,7 @@ export default function ProjectsNewPage() {
         credentials: "same-origin",
       });
 
-      const data = await response.json();
+      const data = await response.json().catch(() => ({}));
 
       if (!response.ok) {
         if (response.status === 403 && data.message) {
@@ -116,6 +120,23 @@ export default function ProjectsNewPage() {
     { label: "Projects", href: "/projects" },
     { label: "New Project", href: undefined },
   ];
+
+  if (loadError) {
+    return (
+      <div className="container mx-auto p-6 space-y-8">
+        <Breadcrumbs items={breadcrumbItems} />
+        <Card className="max-w-2xl mx-auto">
+          <CardHeader>
+            <CardTitle>Could not load your projects</CardTitle>
+            <CardDescription>{loadError}</CardDescription>
+          </CardHeader>
+          <CardFooter>
+            <Button onClick={checkProjectCount}>Try again</Button>
+          </CardFooter>
+        </Card>
+      </div>
+    );
+  }
 
   if (projectCount === null) {
     return (

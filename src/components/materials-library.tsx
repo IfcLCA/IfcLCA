@@ -36,6 +36,7 @@ import {
 } from "@radix-ui/react-icons";
 import { Trash2Icon } from "lucide-react";
 import { MaterialChange } from "@/types/material";
+import { fetchJson } from "@/lib/fetch-json";
 import Fuse from "fuse.js";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
@@ -305,20 +306,10 @@ export function MaterialLibraryComponent() {
   useEffect(() => {
     async function fetchData() {
       try {
-        const [materialsRes, kbobRes, projectsRes] = await Promise.all([
-          fetch("/api/materials"),
-          fetch("/api/kbob"),
-          fetch("/api/materials/projects"),
-        ]);
-
-        if (!materialsRes.ok || !kbobRes.ok || !projectsRes.ok) {
-          throw new Error("Failed to fetch data");
-        }
-
         const [materialsData, kbobData, projectsData] = await Promise.all([
-          materialsRes.json(),
-          kbobRes.json(),
-          projectsRes.json(),
+          fetchJson<any[]>("/api/materials"),
+          fetchJson<KbobMaterial[]>("/api/kbob"),
+          fetchJson<any[]>("/api/materials/projects"),
         ]);
 
         // Initialize materials with empty array if undefined
@@ -334,7 +325,7 @@ export function MaterialLibraryComponent() {
         }
       } catch (error) {
         console.error("Error fetching data:", error);
-        setError("Failed to load data");
+        setError(error instanceof Error ? error.message : "Failed to load data");
       } finally {
         setIsLoading(false);
       }
@@ -452,8 +443,8 @@ export function MaterialLibraryComponent() {
       setIsMatchingInProgress(true);
 
       // Convert changes into the format expected by the API
-      const matchPromises = changesWithDensity.map(async (change) => {
-        const response = await fetch("/api/materials/match", {
+      const matchPromises = changesWithDensity.map((change) =>
+        fetchJson("/api/materials/match", {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
@@ -461,14 +452,10 @@ export function MaterialLibraryComponent() {
           body: JSON.stringify({
             materialIds: [change.materialId],
             kbobMaterialId: change.newMatch.id,
-            density: change.selectedDensity || change.newMatch.Density,
+            density: change.selectedDensity || change.newMatch.Density || undefined,
           }),
-        });
-
-        if (!response.ok) {
-          throw new Error(`Failed to match material ${change.materialId}`);
-        }
-      });
+        })
+      );
 
       // Wait for all matches to be applied
       await Promise.all(matchPromises);
@@ -498,7 +485,7 @@ export function MaterialLibraryComponent() {
       console.error("Failed to apply matches:", error);
       toast({
         title: "Error",
-        description: "Failed to apply matches. Please try again.",
+        description: error instanceof Error ? error.message : "Failed to apply matches. Please try again.",
         variant: "destructive",
       });
     } finally {
