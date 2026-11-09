@@ -6,7 +6,7 @@ import { z } from "zod";
 import type { Prisma } from "@prisma/client";
 import { db } from "@/lib/db";
 import { BadRequestError, NotFoundError } from "@/lib/errors";
-import { getKbobMaterial, usableKbobWhere } from "./kbob";
+import { getKbobMaterial, toKbobDto, usableKbobWhere } from "./kbob";
 import { requireProject } from "./projects";
 
 type Tx = Prisma.TransactionClient;
@@ -34,15 +34,8 @@ export async function listUserMaterials(userId: string) {
     density: m.density,
     projectId: m.projectId,
     kbobMatchId: m.kbobId ?? undefined,
-    kbobMatch: m.kbob
-      ? {
-          id: m.kbob.id,
-          Name: m.kbob.nameDE,
-          GWP: m.kbob.gwpTotal ?? 0,
-          UBP: m.kbob.ubp21Total ?? 0,
-          PENRE: m.kbob.penreTotal ?? 0,
-        }
-      : undefined,
+    // Same DTO as everywhere else: the library reads it with getGWP().
+    kbobMatch: m.kbob ? toKbobDto(m.kbob) : undefined,
   }));
 }
 

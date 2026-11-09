@@ -189,6 +189,9 @@ describe.skipIf(!hasTestDb)("repositories against Postgres", () => {
     const detail = await projects.getProjectDetail(ALICE, project.id);
     // + 1 m³ * 470 kg/m³ * 0.3
     expect(detail.emissions.gwp).toBeCloseTo(460 + 141);
+    // The library reads indicators from kbobMatch with getGWP().
+    const libraryRow = (await materials.listUserMaterials(ALICE)).find((m) => m.id === unknown.id)!;
+    expect(libraryRow.kbobMatch).toMatchObject({ Name: "Brettschichtholz", gwpTotal: 0.3 });
 
     await materials.matchMaterials(ALICE, { materialIds: [unknown.id], kbobMaterialId: TIMBER, density: 500 });
     expect((await projects.getProjectDetail(ALICE, project.id)).emissions.gwp).toBeCloseTo(460 + 150);
