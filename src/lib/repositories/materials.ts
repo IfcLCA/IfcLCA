@@ -6,40 +6,44 @@ import { z } from "zod";
 import type { Prisma } from "@prisma/client";
 import { db } from "@/lib/db";
 import { BadRequestError, NotFoundError } from "@/lib/errors";
-import { getGWP, getPENRE, getUBP, isValidKbobMaterial } from "@/lib/utils/kbob-indicators";
-import { getKbobMaterial, toKbobDto } from "./kbob";
+import { getKbobMaterial, usableKbobWhere } from "./kbob";
 import { requireProject } from "./projects";
 
 type Tx = Prisma.TransactionClient;
 
 /** Materials library: every material across the user's projects. */
 export async function listUserMaterials(userId: string) {
-  const materials = await db.material.findMany({
-    where: { project: { userId } },
-    include: { kbob: true },
-    orderBy: { name: "asc" },
-  });
-  const volumes = await db.elementMaterial.groupBy({
-    by: ["materialId"],
-    where: { material: { project: { userId } } },
-    _sum: { volume: true },
-  });
+  const [materials, volumes] = await Promise.all([
+    db.material.findMany({
+      where: { project: { userId } },
+      include: { kbob: true },
+      orderBy: { name: "asc" },
+    }),
+    db.elementMaterial.groupBy({
+      by: ["materialId"],
+      where: { material: { project: { userId } } },
+      _sum: { volume: true },
+    }),
+  ]);
   const volumeById = new Map(volumes.map((v) => [v.materialId, v._sum.volume ?? 0]));
-  return materials.map((m) => {
-    const kbob = m.kbob ? toKbobDto(m.kbob) : undefined;
-    return {
-      id: m.id,
-      name: m.name,
-      category: m.category,
-      volume: volumeById.get(m.id) ?? 0,
-      density: m.density,
-      projectId: m.projectId,
-      kbobMatchId: m.kbobId ?? undefined,
-      kbobMatch: kbob
-        ? { id: kbob.id, Name: kbob.Name, GWP: getGWP(kbob), UBP: getUBP(kbob), PENRE: getPENRE(kbob) }
-        : undefined,
-    };
-  });
+  return materials.map((m) => ({
+    id: m.id,
+    name: m.name,
+    category: m.category,
+    volume: volumeById.get(m.id) ?? 0,
+    density: m.density,
+    projectId: m.projectId,
+    kbobMatchId: m.kbobId ?? undefined,
+    kbobMatch: m.kbob
+      ? {
+          id: m.kbob.id,
+          Name: m.kbob.nameDE,
+          GWP: m.kbob.gwpTotal ?? 0,
+          UBP: m.kbob.ubp21Total ?? 0,
+          PENRE: m.kbob.penreTotal ?? 0,
+        }
+      : undefined,
+  }));
 }
 
 export async function listProjectsWithMaterialIds(userId: string) {
@@ -172,22 +176,14 @@ export async function autoMatchByKbobName(tx: Tx, materials: Array<{ id: string;
   if (materials.length === 0) return 0;
   const candidates = await tx.kbobMaterial.findMany({
     where: {
+      ...usableKbobWhere,
       OR: materials.map((m) => ({ nameDE: { equals: m.name.trim(), mode: "insensitive" as const } })),
     },
   });
   let matched = 0;
   for (const material of materials) {
     const name = material.name.trim();
-    const usable = candidates.filter(
-      (k) =>
-        k.nameDE.toLowerCase() === name.toLowerCase() &&
-        isValidKbobMaterial({
-          gwpTotal: k.gwpTotal,
-          ubp21Total: k.ubp21Total,
-          primaryEnergyNonRenewableTotal: k.penreTotal,
-          density: k.density,
-        })
-    );
+    const usable = candidates.filter((k) => k.nameDE.toLowerCase() === name.toLowerCase());
     const best = usable.find((k) => k.nameDE === name) ?? usable[0];
     if (!best) continue;
     await tx.material.update({

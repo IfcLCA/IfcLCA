@@ -62,7 +62,7 @@ export const ingestInput = z.object({
 
 export type IngestElement = z.infer<typeof ingestInput>["elements"][number];
 
-export interface NormalizedLayer {
+interface NormalizedLayer {
   materialName: string;
   volume: number;
   fraction: number | null;

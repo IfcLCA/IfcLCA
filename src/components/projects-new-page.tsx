@@ -28,7 +28,8 @@ import { toast } from "@/hooks/use-toast";
 import { Loader2, PlusCircle, ArrowLeft } from "lucide-react";
 import { Breadcrumbs } from "@/components/breadcrumbs";
 import Link from "next/link";
-import { fetchJson } from "@/lib/fetch-json";
+import { ApiError, fetchJson } from "@/lib/fetch-json";
+import { MAX_PROJECTS_PER_USER } from "@/lib/constants/projects";
 
 const formSchema = z.object({
   name: z.string().min(2, {
@@ -70,7 +71,7 @@ export default function ProjectsNewPage() {
     try {
       setIsSubmitting(true);
 
-      const response = await fetch("/api/projects", {
+      const data = await fetchJson<{ _id: string }>("/api/projects", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -78,21 +79,6 @@ export default function ProjectsNewPage() {
         body: JSON.stringify(values),
         credentials: "same-origin",
       });
-
-      const data = await response.json().catch(() => ({}));
-
-      if (!response.ok) {
-        if (response.status === 403 && data.message) {
-          toast({
-            title: "Project Limit Reached",
-            description: data.message,
-            variant: "destructive",
-          });
-          router.push('/projects');
-          return;
-        }
-        throw new Error(data.error || "Failed to create project");
-      }
 
       toast({
         title: "Success",
@@ -102,6 +88,15 @@ export default function ProjectsNewPage() {
       router.push(`/projects/${data._id}`);
       router.refresh();
     } catch (error) {
+      if (error instanceof ApiError && error.status === 403) {
+        toast({
+          title: "Project Limit Reached",
+          description: error.message,
+          variant: "destructive",
+        });
+        router.push("/projects");
+        return;
+      }
       console.error("Error creating project:", error);
       toast({
         title: "Error",
@@ -151,7 +146,7 @@ export default function ProjectsNewPage() {
     );
   }
 
-  if (projectCount >= 3) {
+  if (projectCount >= MAX_PROJECTS_PER_USER) {
     return (
       <div className="container mx-auto p-6 space-y-8">
         <Breadcrumbs items={breadcrumbItems} />

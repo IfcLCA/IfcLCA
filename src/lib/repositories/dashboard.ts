@@ -1,5 +1,5 @@
 import { db } from "@/lib/db";
-import { emissionsForUser } from "./emissions";
+import { ZERO_INDICATORS } from "@/lib/utils/kbob-indicators";
 import { listProjectSummaries } from "./projects";
 
 export interface Activity {
@@ -81,23 +81,24 @@ export async function listActivities(userId: string, page: number, limit: number
   return { activities, hasMore: skip + activities.length < total, total };
 }
 
-export async function getDashboardData(userId: string, options: { includeEmissions?: boolean } = {}) {
-  const [projectCount, elementCount, materialCount, recentProjects, feed, emissions] = await Promise.all([
-    db.project.count({ where: { userId } }),
-    db.element.count({ where: { project: { userId } } }),
-    db.material.count({ where: { project: { userId } } }),
-    listProjectSummaries(userId, 3),
+/**
+ * Dashboard stats, recent projects and feed. Emissions are left at zero:
+ * the dashboard loads them separately from /api/emissions.
+ */
+export async function getDashboardData(userId: string) {
+  const [projects, feed] = await Promise.all([
+    listProjectSummaries(userId),
     listActivities(userId, 1, 6),
-    options.includeEmissions ? emissionsForUser(userId) : null,
   ]);
+  const sum = (key: "elements" | "materials") => projects.reduce((n, p) => n + p._count[key], 0);
   return {
     stats: {
-      totalProjects: projectCount,
-      totalElements: elementCount,
-      totalMaterials: materialCount,
-      totalEmissions: emissions ?? { gwp: 0, ubp: 0, penre: 0 },
+      totalProjects: projects.length,
+      totalElements: sum("elements"),
+      totalMaterials: sum("materials"),
+      totalEmissions: { ...ZERO_INDICATORS },
     },
-    recentProjects,
+    recentProjects: projects.slice(0, 3),
     recentActivities: feed.activities,
   };
 }

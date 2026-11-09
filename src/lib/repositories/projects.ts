@@ -7,14 +7,13 @@
  */
 import { z } from "zod";
 import type { Element, ElementMaterial, KbobMaterial, Material, Project, Upload } from "@prisma/client";
+import { MAX_PROJECTS_PER_USER } from "@/lib/constants/projects";
 import { db } from "@/lib/db";
 import { ForbiddenError, NotFoundError } from "@/lib/errors";
 import { addIndicators, layerEmissions, ZERO_INDICATORS } from "@/lib/utils/kbob-indicators";
 import { emissionsByProject } from "./emissions";
 import { toKbobDto } from "./kbob";
 
-/** Free plan limit, also shown in the UI (projects-new-page.tsx). */
-export const MAX_PROJECTS_PER_USER = 3;
 
 /** Above this, the detail view loads elements page by page. */
 const ELEMENT_PAGE_THRESHOLD = 1000;
@@ -126,7 +125,7 @@ function toProjectDto(project: Project) {
 const countSelect = { select: { elements: true, uploads: true, materials: true } } as const;
 
 /** Projects list and dashboard cards, most recently active first. */
-export async function listProjectSummaries(userId: string, limit?: number) {
+export async function listProjectSummaries(userId: string) {
   const projects = await db.project.findMany({
     where: { userId },
     include: {
@@ -147,24 +146,7 @@ export async function listProjectSummaries(userId: string, limit?: number) {
       _count: p._count,
     };
   });
-  summaries.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
-  return limit ? summaries.slice(0, limit) : summaries;
-}
-
-export async function getProjectSummary(userId: string, projectId: string) {
-  const project = await db.project.findFirst({
-    where: { id: projectId, userId },
-    include: { _count: countSelect },
-  });
-  if (!project) throw new NotFoundError("Project");
-  const emissions = (await emissionsByProject([project.id])).get(project.id) ?? ZERO_INDICATORS;
-  return {
-    ...toProjectDto(project),
-    emissions,
-    elementCount: project._count.elements,
-    uploadCount: project._count.uploads,
-    materialCount: project._count.materials,
-  };
+  return summaries.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
 }
 
 /**

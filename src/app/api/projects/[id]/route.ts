@@ -3,7 +3,6 @@ import { parseBody, requireUserId, route } from "@/lib/api";
 import {
   deleteProject,
   getProjectDetail,
-  getProjectSummary,
   updateProject,
   updateProjectInput,
 } from "@/lib/repositories/projects";
@@ -16,11 +15,7 @@ type Ctx = { params: Promise<{ id: string }> };
 export const GET = route("Loading the project", async (request: Request, { params }: Ctx) => {
   const userId = await requireUserId();
   const { id } = await params;
-  const { searchParams } = new URL(request.url);
-  if (searchParams.get("summary") === "true") {
-    return NextResponse.json(await getProjectSummary(userId, id));
-  }
-  const includeAllElements = searchParams.get("includeAllElements") === "true";
+  const includeAllElements = new URL(request.url).searchParams.get("includeAllElements") === "true";
   return NextResponse.json(await getProjectDetail(userId, id, { includeAllElements }));
 });
 

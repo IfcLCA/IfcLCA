@@ -461,12 +461,7 @@ export function MaterialLibraryComponent() {
       await Promise.all(matchPromises);
 
       // Refresh materials
-      const materialsResponse = await fetch("/api/materials");
-      if (!materialsResponse.ok) {
-        throw new Error("Failed to fetch updated materials");
-      }
-      const updatedMaterials = await materialsResponse.json();
-      setMaterials(updatedMaterials);
+      setMaterials(await fetchJson<Material[]>("/api/materials"));
 
       // Reset states
       setTemporaryMatches({});
@@ -804,13 +799,7 @@ export function MaterialLibraryComponent() {
     try {
       setIsDeletingMaterial(true);
 
-      const response = await fetch(`/api/materials/${material.id}`, {
-        method: "DELETE",
-      });
-
-      if (!response.ok) {
-        throw new Error("Failed to delete material");
-      }
+      await fetchJson(`/api/materials/${material.id}`, { method: "DELETE" });
 
       // Update local state by removing the deleted material
       setMaterials((prevMaterials) =>
@@ -827,7 +816,7 @@ export function MaterialLibraryComponent() {
       console.error("Error deleting material:", error);
       toast({
         title: "Error",
-        description: "Failed to delete material. Please try again.",
+        description: error instanceof Error ? error.message : "Failed to delete material. Please try again.",
         variant: "destructive",
       });
     } finally {

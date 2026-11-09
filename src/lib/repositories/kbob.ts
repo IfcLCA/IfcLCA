@@ -25,7 +25,7 @@ export function toKbobDto(row: KbobMaterial): IKBOBMaterial & { id: string } {
 }
 
 /** Same rule as isValidKbobMaterial, expressed as a query. */
-const usableWhere = {
+export const usableKbobWhere = {
   gwpTotal: { not: null },
   ubp21Total: { not: null },
   penreTotal: { not: null },
@@ -38,8 +38,8 @@ const usableWhere = {
  * empty, so the UI shows "not synced yet" instead of an empty list.
  */
 export async function listUsableKbobMaterials() {
-  const rows = await db.kbobMaterial.findMany({ where: usableWhere, orderBy: { nameDE: "asc" } });
-  if (rows.length === 0) {
+  const rows = await db.kbobMaterial.findMany({ where: usableKbobWhere, orderBy: { nameDE: "asc" } });
+  if (rows.length === 0 && (await db.kbobMaterial.count()) === 0) {
     throw new UnavailableError(
       "The KBOB material list has not been synced yet. Run the KBOB sync and try again."
     );
@@ -51,9 +51,4 @@ export async function getKbobMaterial(id: string): Promise<KbobMaterial> {
   const row = await db.kbobMaterial.findUnique({ where: { id } });
   if (!row) throw new NotFoundError("KBOB material");
   return row;
-}
-
-export async function kbobCacheStatus() {
-  const agg = await db.kbobMaterial.aggregate({ _count: true, _max: { syncedAt: true } });
-  return { count: agg._count, lastSyncedAt: agg._max.syncedAt };
 }

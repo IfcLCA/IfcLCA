@@ -56,6 +56,7 @@ describe.skipIf(!hasTestDb)("repositories against Postgres", () => {
       materials: await import("./materials"),
       kbob: await import("./kbob"),
       dashboard: await import("./dashboard"),
+      emissions: await import("./emissions"),
     };
   }
 
@@ -160,7 +161,7 @@ describe.skipIf(!hasTestDb)("repositories against Postgres", () => {
     expect(detail.emissions.gwp).toBeCloseTo(460 + 141);
 
     await materials.matchMaterials(ALICE, { materialIds: [unknown.id], kbobMaterialId: TIMBER, density: 500 });
-    expect((await projects.getProjectSummary(ALICE, project.id)).emissions.gwp).toBeCloseTo(460 + 150);
+    expect((await projects.getProjectDetail(ALICE, project.id)).emissions.gwp).toBeCloseTo(460 + 150);
   });
 
   it("refuses to match a KBOB entry without density unless the user gives one", async () => {
@@ -225,14 +226,15 @@ describe.skipIf(!hasTestDb)("repositories against Postgres", () => {
   });
 
   it("builds the dashboard and activity feed from the same rows", async () => {
-    const { dashboard, materials } = await repos();
+    const { dashboard, materials, emissions } = await repos();
     await projectWithUpload();
     const unknown = (await materials.listUserMaterials(ALICE)).find((m) => m.name === "Unknown Stuff")!;
     await materials.deleteMaterial(ALICE, unknown.id);
 
-    const data = await dashboard.getDashboardData(ALICE, { includeEmissions: true });
+    const data = await dashboard.getDashboardData(ALICE);
     expect(data.stats).toMatchObject({ totalProjects: 1, totalElements: 1, totalMaterials: 1 });
-    expect(data.stats.totalEmissions.gwp).toBeCloseTo(460);
+    expect((await emissions.emissionsForUser(ALICE)).gwp).toBeCloseTo(460);
+    expect((await emissions.emissionsForUser(BOB)).gwp).toBe(0);
     expect(data.recentActivities.map((a) => a.type).sort()).toEqual(
       ["file_uploaded", "material_deleted", "project_created"]
     );

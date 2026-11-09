@@ -5,7 +5,7 @@ class Logger {
     // Error objects stringify to "{}", which hid every DB failure in the logs.
     const dataString = data
       ? `\n${JSON.stringify(data, (_key, value) =>
-          value instanceof Error ? { name: value.name, message: value.message, stack: value.stack } : value, 2)}`
+          value instanceof Error ? { name: value.name, code: (value as { code?: unknown }).code, message: value.message, stack: value.stack } : value, 2)}`
       : '';
     return `[${timestamp}] ${level.toUpperCase()}: ${message}${dataString}`;
   }

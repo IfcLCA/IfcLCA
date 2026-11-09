@@ -1,6 +1,6 @@
 import { Prisma } from "@prisma/client";
 import { db } from "@/lib/db";
-import { addIndicators, ZERO_INDICATORS, type Indicators } from "@/lib/utils/kbob-indicators";
+import { ZERO_INDICATORS, type Indicators } from "@/lib/utils/kbob-indicators";
 
 /**
  * Project totals, computed from the layers on every read.
@@ -32,7 +32,14 @@ export async function emissionsByProject(projectIds: string[]): Promise<Map<stri
 }
 
 export async function emissionsForUser(userId: string): Promise<Indicators> {
-  const projects = await db.project.findMany({ where: { userId }, select: { id: true } });
-  const byProject = await emissionsByProject(projects.map((p) => p.id));
-  return [...byProject.values()].reduce(addIndicators, ZERO_INDICATORS);
+  const [row] = await db.$queryRaw<Indicators[]>`
+    SELECT COALESCE(SUM(em.volume * COALESCE(m.density, 0) * COALESCE(k.gwp_total, 0)), 0)::float8   AS gwp,
+           COALESCE(SUM(em.volume * COALESCE(m.density, 0) * COALESCE(k.ubp21_total, 0)), 0)::float8 AS ubp,
+           COALESCE(SUM(em.volume * COALESCE(m.density, 0) * COALESCE(k.penre_total, 0)), 0)::float8 AS penre
+    FROM element_materials em
+    JOIN materials m ON m.id = em.material_id
+    JOIN projects p ON p.id = m.project_id
+    LEFT JOIN kbob_materials k ON k.id = m.kbob_id
+    WHERE p.user_id = ${userId}`;
+  return row ?? { ...ZERO_INDICATORS };
 }
