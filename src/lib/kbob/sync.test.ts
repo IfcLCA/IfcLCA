@@ -78,4 +78,17 @@ describe.skipIf(!hasTestDb)("saveKbobResponse", () => {
     const result = await saveKbobResponse(db, response);
     expect(result.skipped).toBe(1);
   });
+
+  it("keeps the last entry when a uuid repeats, and stores syncedAt exactly", async () => {
+    const { db } = await import("@/lib/db");
+    const now = new Date("2026-11-10T05:30:00.123Z");
+    const response = kbobFixture();
+    response.materials.push({ ...response.materials[0], gwpTotal: 0.3 });
+    const result = await saveKbobResponse(db, response, now);
+
+    expect(result).toMatchObject({ synced: 8, skipped: 1 });
+    const concrete = await db.kbobMaterial.findUniqueOrThrow({ where: { id: CONCRETE } });
+    expect(concrete.gwpTotal).toBe(0.3);
+    expect(concrete.syncedAt.toISOString()).toBe(now.toISOString());
+  });
 });

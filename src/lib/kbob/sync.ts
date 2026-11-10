@@ -75,23 +75,42 @@ export function toKbobRow(material: KbobApiMaterial, version: string, syncedAt: 
 /**
  * Upserts every material from the API response. Rows that disappeared from
  * the API are kept, because project materials may still point at them.
- * All-or-nothing: one transaction, so a failed sync leaves the old cache.
+ * All-or-nothing: a single INSERT … ON CONFLICT statement, so a failed sync
+ * leaves the old cache. One statement instead of one upsert per row keeps the
+ * whole sync to one round trip (per-row upserts in a $transaction exceed
+ * Prisma's 5 s transaction timeout on a remote database).
  */
 export async function saveKbobResponse(
   db: PrismaClient,
   response: KbobApiResponse,
   now = new Date()
 ): Promise<{ synced: number; skipped: number; version: string }> {
-  const rows = response.materials
+  const valid = response.materials
     .filter((m) => typeof m?.uuid === "string" && m.uuid && typeof m.nameDE === "string")
     .map((m) => toKbobRow(m, response.version, now));
+  // ON CONFLICT rejects a uuid twice in one statement; the last occurrence wins.
+  const rows = [...new Map(valid.map((row) => [row.id, row])).values()];
 
-  await db.$transaction(
-    rows.map((row) => {
-      const { id, ...data } = row;
-      return db.kbobMaterial.upsert({ where: { id }, create: row, update: data });
-    })
-  );
+  if (rows.length > 0) {
+    await db.$executeRaw`
+      INSERT INTO "kbob_materials"
+        ("id", "name_de", "name_fr", "group", "unit", "density",
+         "gwp_total", "ubp21_total", "penre_total", "version", "synced_at")
+      SELECT r."id", r."nameDE", r."nameFR", r."group", r."unit", r."density",
+             r."gwpTotal", r."ubp21Total", r."penreTotal", r."version", r."syncedAt"
+      FROM jsonb_to_recordset(${JSON.stringify(rows)}::jsonb) AS r(
+        "id" text, "nameDE" text, "nameFR" text, "group" text, "unit" text,
+        "density" double precision, "gwpTotal" double precision,
+        "ubp21Total" double precision, "penreTotal" double precision,
+        "version" text, "syncedAt" timestamp(3)
+      )
+      ON CONFLICT ("id") DO UPDATE SET
+        "name_de" = EXCLUDED."name_de", "name_fr" = EXCLUDED."name_fr",
+        "group" = EXCLUDED."group", "unit" = EXCLUDED."unit",
+        "density" = EXCLUDED."density", "gwp_total" = EXCLUDED."gwp_total",
+        "ubp21_total" = EXCLUDED."ubp21_total", "penre_total" = EXCLUDED."penre_total",
+        "version" = EXCLUDED."version", "synced_at" = EXCLUDED."synced_at"`;
+  }
 
   return {
     synced: rows.length,
