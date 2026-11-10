@@ -77,8 +77,8 @@ export function toKbobRow(material: KbobApiMaterial, version: string, syncedAt: 
  * the API are kept, because project materials may still point at them.
  * All-or-nothing: a single INSERT … ON CONFLICT statement, so a failed sync
  * leaves the old cache. One statement instead of one upsert per row keeps the
- * whole sync to one round trip (per-row upserts in a $transaction exceed
- * Prisma's 5 s transaction timeout on a remote database).
+ * whole sync to one round trip; per-row upserts cost one round trip each and
+ * outran the transaction timeout on the first sync against a remote database.
  */
 export async function saveKbobResponse(
   db: PrismaClient,

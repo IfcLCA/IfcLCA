@@ -156,8 +156,8 @@ export async function applyKnownMatches(userId: string, projectId: string, mater
 
   const toApply = open.filter((n) => known.has(key(n)));
   const unmatched = open.filter((n) => !known.has(key(n)));
-  // A batch transaction: atomic and on one connection. Its timeout comes from
-  // transactionOptions in src/lib/db.ts.
+  // A batch transaction: atomic and on one connection, but still one round
+  // trip per material. Its timeout comes from transactionOptions in src/lib/db.ts.
   if (toApply.length > 0) {
     await db.$transaction(
       toApply.map((name) => {
