@@ -3,9 +3,9 @@
  * posts the elements; ingestUpload() stores them with their material layers.
  */
 import { randomUUID } from "node:crypto";
-import { z } from "zod";
+import { z, ZodError } from "zod";
 import { db } from "@/lib/db";
-import { BadRequestError, NotFoundError } from "@/lib/errors";
+import { BadRequestError, HttpError, NotFoundError } from "@/lib/errors";
 import { requireProject } from "./projects";
 import { autoMatchByKbobName } from "./materials";
 
@@ -25,31 +25,41 @@ export async function createUpload(userId: string, projectId: string, filename: 
   return { success: true, uploadId: upload.id, status: upload.status, filename: upload.filename };
 }
 
+// Bounded so emission sums (volume x density x indicator) stay finite in float8.
 const finiteNumber = z.preprocess(
   (v) => (typeof v === "string" ? Number(v) : v),
-  z.number().finite()
+  z.number().finite().min(-1e9).max(1e9)
 );
+
+// Postgres text rejects NUL, and a lone UTF-16 surrogate is stored as U+FFFD,
+// which would no longer match the name the element layers refer to.
+const text = (max: number) =>
+  z
+    .string()
+    .max(max)
+    .transform((s) => s.toWellFormed().replaceAll("\0", ""));
+const NAME = 1000;
 
 export const ingestInput = z.object({
   uploadId: z.string().min(1),
   elements: z.array(
     z.object({
-      globalId: z.string().min(1),
-      type: z.string().default("Unknown"),
-      name: z.string().nullish(),
+      globalId: text(255).pipe(z.string().min(1)),
+      type: text(NAME).default("Unknown"),
+      name: text(NAME).nullish(),
       volume: finiteNumber.nullish(),
       properties: z
         .object({ loadBearing: z.boolean().nullish(), isExternal: z.boolean().nullish() })
         .nullish(),
       classification: z
-        .object({ system: z.string(), code: z.string().nullish(), name: z.string().nullish() })
+        .object({ system: text(NAME), code: text(NAME).nullish(), name: text(NAME).nullish() })
         .nullish(),
-      materials: z.array(z.object({ name: z.string(), volume: finiteNumber.nullish() })).nullish(),
+      materials: z.array(z.object({ name: text(NAME), volume: finiteNumber.nullish() })).nullish(),
       materialLayers: z
         .object({
           layers: z.array(
             z.object({
-              materialName: z.string(),
+              materialName: text(NAME),
               volume: finiteNumber.nullish(),
               fraction: finiteNumber.nullish(),
             })
@@ -171,14 +181,34 @@ export async function ingestUpload(
     );
     return { success: true, shouldRedirectToLibrary: true, ...result };
   } catch (error) {
-    await db.upload
-      .update({
-        where: { id: upload.id },
-        data: { status: "Failed", error: error instanceof Error ? error.message : String(error) },
-      })
-      .catch(() => {});
+    await markUploadFailed(userId, projectId, upload.id, error);
     throw error;
   }
+}
+
+/**
+ * Marks a still-processing upload as failed. Only client errors keep their
+ * message; anything else (Prisma, Postgres) would leak internals to the UI.
+ */
+export async function markUploadFailed(
+  userId: string,
+  projectId: string,
+  uploadId: unknown,
+  error: unknown
+) {
+  if (typeof uploadId !== "string" || !uploadId) return;
+  const message =
+    error instanceof HttpError
+      ? error.message
+      : error instanceof ZodError
+        ? "The uploaded model data is invalid"
+        : "Saving the upload failed";
+  await db.upload
+    .updateMany({
+      where: { id: uploadId, projectId, project: { userId }, status: "Processing" },
+      data: { status: "Failed", error: message },
+    })
+    .catch(() => {});
 }
 
 async function requireUpload(userId: string, uploadId: string) {

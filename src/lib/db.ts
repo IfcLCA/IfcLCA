@@ -9,7 +9,8 @@ function createClient(): PrismaClient {
   if (!connectionString) {
     throw new Error("DATABASE_URL is not set");
   }
-  const pool = new Pool({ connectionString });
+  // Bound the wait for a pooled connection (pool exhausted, Neon waking up).
+  const pool = new Pool({ connectionString, connectionTimeoutMillis: 10_000 });
   return new PrismaClient({
     adapter: new PrismaPg(pool),
     // With a driver adapter even batch $transaction([...]) calls run under the

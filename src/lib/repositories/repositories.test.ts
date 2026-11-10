@@ -273,8 +273,40 @@ describe.skipIf(!hasTestDb)("repositories against Postgres", () => {
 
     const detail = await projects.getProjectDetail(ALICE, project.id);
     expect(detail.uploads[0].status).toBe("Failed");
-    expect(detail.uploads[0].error).toBeTruthy();
+    expect(detail.uploads[0].error).toBe("Saving the upload failed"); // no Postgres internals
     expect(detail.elementCount).toBe(0); // rolled back
+  });
+
+  it("sanitizes names and bounds volumes in the ingest payload", async () => {
+    const { ingestInput } = await import("./uploads");
+    const parsed = ingestInput.parse({
+      uploadId: "u",
+      elements: [
+        { globalId: "g", name: "a\u0000b", materials: [{ name: "Beton \ud800", volume: 1 }] },
+      ],
+    });
+    expect(parsed.elements[0].name).toBe("ab");
+    expect(parsed.elements[0].materials![0].name).toBe("Beton �");
+    expect(() =>
+      ingestInput.parse({ uploadId: "u", elements: [{ globalId: "g", volume: 1e308 }] })
+    ).toThrow();
+    expect(() =>
+      ingestInput.parse({ uploadId: "u", elements: [{ globalId: "g", name: "x".repeat(1001) }] })
+    ).toThrow();
+  });
+
+  it("marks the upload Failed when the process route rejects the payload", async () => {
+    const { projects, uploads } = await repos();
+    const project = await projects.createProject(ALICE, { name: "House" });
+    const { uploadId } = await uploads.createUpload(ALICE, project.id, "bad.ifc");
+    // Bob cannot fail Alice's upload.
+    await uploads.markUploadFailed(BOB, project.id, uploadId, new Error("x"));
+    expect((await projects.getProjectDetail(ALICE, project.id)).uploads[0].status).toBe("Processing");
+
+    const { ZodError } = await import("zod");
+    await uploads.markUploadFailed(ALICE, project.id, uploadId, new ZodError([]));
+    const upload = (await projects.getProjectDetail(ALICE, project.id)).uploads[0];
+    expect(upload).toMatchObject({ status: "Failed", error: "The uploaded model data is invalid" });
   });
 
   it("builds the dashboard and activity feed from the same rows", async () => {
