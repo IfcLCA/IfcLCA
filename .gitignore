@@ -1,6 +1,10 @@
 /node_modules
 /.next/
 .env*
+!.env.example
 .vercel
 /public/fonts
 tsconfig.tsbuildinfo
+
+# clerk configuration (can include secrets)
+/.clerk/

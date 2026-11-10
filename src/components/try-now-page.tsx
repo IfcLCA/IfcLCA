@@ -16,6 +16,7 @@ import { EmissionsSummaryCard } from "@/components/emissions-summary-card";
 import NavigationHeader from "@/components/navigation-header";
 import MarketingFooter from "@/components/marketing-footer";
 import { fileTransferService } from "@/lib/file-transfer";
+import { fetchJson } from "@/lib/fetch-json";
 import {
   Upload,
   FileUp,
@@ -278,8 +279,7 @@ export default function TryNowPage() {
 
     // Load KBOB data if needed
     if (!kbobDataRef.current) {
-      const res = await fetch("/api/kbob");
-      kbobDataRef.current = await res.json();
+      kbobDataRef.current = await fetchJson("/api/kbob");
     }
 
     // Parse IFC
@@ -440,7 +440,7 @@ export default function TryNowPage() {
 
     } catch (err) {
       console.error(err);
-      setError("Failed to process the IFC file. Please ensure it contains valid data.");
+      setError(`Failed to process the IFC file: ${err instanceof Error ? err.message : "unknown error"}`);
     } finally {
       clearInterval(insightInterval);
       setProcessingInsight("");

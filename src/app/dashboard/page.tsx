@@ -2,7 +2,7 @@ import { auth } from "@clerk/nextjs/server";
 import { Dashboard } from "@/components/dashboard";
 import { redirect } from "next/navigation";
 import { Metadata } from "next";
-import { getDashboardData } from "@/lib/services/dashboard-service";
+import { getDashboardData } from "@/lib/repositories/dashboard";
 
 // Since this page is behind authentication, prevent indexing
 export const metadata: Metadata = {

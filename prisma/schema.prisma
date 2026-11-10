@@ -1,0 +1,156 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// Users live in Clerk. Every user-owned row stores the Clerk user id and every
+// query is scoped by it (see src/lib/repositories).
+
+model Project {
+  id                   String   @id @default(uuid())
+  userId               String   @map("user_id")
+  name                 String
+  description          String?
+  imageUrl             String?  @map("image_url")
+  classificationSystem String   @default("eBKP-H") @map("classification_system")
+  // Reference area for per-m² results, e.g. type "EBF", value 1200, unit "m²".
+  calculationAreaType  String?  @map("calculation_area_type")
+  calculationAreaValue Float?   @map("calculation_area_value")
+  calculationAreaUnit  String?  @map("calculation_area_unit")
+  createdAt            DateTime @default(now()) @map("created_at")
+  updatedAt            DateTime @updatedAt @map("updated_at")
+
+  uploads           Upload[]
+  elements          Element[]
+  materials         Material[]
+  materialDeletions MaterialDeletion[]
+
+  @@index([userId, updatedAt])
+  @@map("projects")
+}
+
+enum UploadStatus {
+  Processing
+  Completed
+  Failed
+}
+
+model Upload {
+  id            String       @id @default(uuid())
+  projectId     String       @map("project_id")
+  userId        String       @map("user_id")
+  filename      String
+  status        UploadStatus @default(Processing)
+  error         String?
+  elementCount  Int          @default(0) @map("element_count")
+  materialCount Int          @default(0) @map("material_count")
+  createdAt     DateTime     @default(now()) @map("created_at")
+  updatedAt     DateTime     @updatedAt @map("updated_at")
+
+  project  Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  elements Element[]
+
+  @@index([projectId, createdAt])
+  @@map("uploads")
+}
+
+model Element {
+  id                   String   @id @default(uuid())
+  projectId            String   @map("project_id")
+  uploadId             String?  @map("upload_id")
+  guid                 String
+  name                 String
+  type                 String
+  volume               Float    @default(0)
+  loadBearing          Boolean  @default(false) @map("load_bearing")
+  isExternal           Boolean  @default(false) @map("is_external")
+  classificationSystem String?  @map("classification_system")
+  classificationCode   String?  @map("classification_code")
+  classificationName   String?  @map("classification_name")
+  createdAt            DateTime @default(now()) @map("created_at")
+  updatedAt            DateTime @updatedAt @map("updated_at")
+
+  project Project          @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  upload  Upload?          @relation(fields: [uploadId], references: [id], onDelete: Cascade)
+  layers  ElementMaterial[]
+
+  @@unique([projectId, guid])
+  @@index([uploadId])
+  @@map("elements")
+}
+
+// One material layer of an element. Emissions are derived, never stored:
+// volume * material.density * kbob indicator.
+model ElementMaterial {
+  id         String @id @default(uuid())
+  elementId  String @map("element_id")
+  materialId String @map("material_id")
+  volume     Float
+  fraction   Float?
+
+  element  Element  @relation(fields: [elementId], references: [id], onDelete: Cascade)
+  material Material @relation(fields: [materialId], references: [id], onDelete: Cascade)
+
+  @@index([elementId])
+  @@index([materialId])
+  @@map("element_materials")
+}
+
+model Material {
+  id        String   @id @default(uuid())
+  projectId String   @map("project_id")
+  name      String
+  category  String?
+  // kg/m³. Defaults to the KBOB density when matched; the user can override it.
+  density   Float?
+  kbobId    String?  @map("kbob_id")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  project Project          @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  kbob    KbobMaterial?    @relation(fields: [kbobId], references: [id], onDelete: SetNull)
+  layers  ElementMaterial[]
+
+  @@unique([projectId, name])
+  @@index([kbobId])
+  @@map("materials")
+}
+
+// Cached copy of the KBOB list from lcadata.ch. Refreshed by
+// src/lib/kbob/sync.ts (daily cron or `npm run kbob:sync`), never per request.
+model KbobMaterial {
+  id         String   @id // lcadata.ch uuid
+  nameDE     String   @map("name_de")
+  nameFR     String?  @map("name_fr")
+  group      String?
+  unit       String?
+  density    Float?
+  gwpTotal   Float?   @map("gwp_total")
+  ubp21Total Float?   @map("ubp21_total")
+  penreTotal Float?   @map("penre_total")
+  version    String
+  syncedAt   DateTime @map("synced_at")
+
+  materials Material[]
+
+  @@index([nameDE])
+  @@map("kbob_materials")
+}
+
+// Feeds the "deleted a material" entries in the activity feed.
+model MaterialDeletion {
+  id           String   @id @default(uuid())
+  projectId    String   @map("project_id")
+  userId       String   @map("user_id")
+  materialName String   @map("material_name")
+  reason       String?
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([projectId, createdAt])
+  @@map("material_deletions")
+}

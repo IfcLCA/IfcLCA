@@ -1,8 +1,17 @@
 {
+  "regions": [
+    "fra1"
+  ],
   "functions": {
     "src/app/api/**/*": {
       "memory": 1024,
       "maxDuration": 300
     }
-  }
+  },
+  "crons": [
+    {
+      "path": "/api/kbob/sync",
+      "schedule": "0 3 * * *"
+    }
+  ]
 }

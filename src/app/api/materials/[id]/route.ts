@@ -1,56 +1,13 @@
 import { NextResponse } from "next/server";
-import { connectToDatabase } from "@/lib/mongodb";
-import { Material, MaterialDeletion } from "@/models";
-import { auth } from "@clerk/nextjs/server";
-import mongoose from "mongoose";
+import { requireUserId, route } from "@/lib/api";
+import { deleteMaterial } from "@/lib/repositories/materials";
 
-export async function DELETE(
-  request: Request,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  try {
-    const { userId } = await auth();
-    if (!userId) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    await connectToDatabase();
-
+export const DELETE = route(
+  "Deleting the material",
+  async (_request: Request, { params }: { params: Promise<{ id: string }> }) => {
+    const userId = await requireUserId();
     const { id } = await params;
-    const materialId = id;
-
-    // Find the material to get its name and project ID before deletion
-    const material = await Material.findById(materialId).lean() as {
-      projectId?: mongoose.Types.ObjectId;
-      name?: string;
-    } | null;
-    if (!material) {
-      return NextResponse.json(
-        { error: "Material not found" },
-        { status: 404 }
-      );
-    }
-
-    // Delete the material
-    await Material.findByIdAndDelete(materialId);
-
-    // Create a material deletion record
-    await MaterialDeletion.create({
-      projectId: material.projectId,
-      userId,
-      materialName: material.name,
-      reason: "Material deleted by user",
-    });
-
-    return NextResponse.json(
-      { message: "Material deleted successfully" },
-      { status: 200 }
-    );
-  } catch (error) {
-    console.error("Failed to delete material:", error);
-    return NextResponse.json(
-      { error: "Failed to delete material" },
-      { status: 500 }
-    );
+    await deleteMaterial(userId, id);
+    return NextResponse.json({ message: "Material deleted successfully" });
   }
-}
+);

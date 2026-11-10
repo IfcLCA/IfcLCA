@@ -39,8 +39,26 @@ IfcLCA leverages **openBIM** and **Open Data Standards** to analyze the environm
 - **Next.js** & **React** for the frontend
 - **Tailwind CSS** for styling
 - **Clerk** for authentication
-- **MongoDB** for database
+- **Postgres** (Neon in production) via **Prisma**
 - **TypeScript** throughout the codebase
+
+## 🧑‍💻 Development
+
+```bash
+cp .env.example .env.local          # Clerk keys; leave them out to use Clerk keyless dev mode
+echo 'DATABASE_URL=postgresql://postgres@localhost:5432/ifclca' > .env   # read by Prisma and scripts
+npm install
+npm run db:migrate:dev              # create tables
+npm run kbob:sync                   # needs KBOB_API_KEY, or:
+npm run kbob:sync -- --file scripts/fixtures/kbob-sample.json   # sample data, not official KBOB values
+npm run dev
+```
+
+- `npm test` runs unit tests. Set `TEST_DATABASE_URL` to an empty Postgres database to also run the repository tests (they truncate it).
+- `npm run typecheck`, `npm run lint`.
+- Code layout: route handlers in `src/app/api` stay thin; data access and ownership checks live in `src/lib/repositories`; the KBOB cache refresh is `src/lib/kbob/sync.ts`.
+- The KBOB list is cached in the `kbob_materials` table. Vercel Cron calls `/api/kbob/sync` daily (`vercel.json`, needs `CRON_SECRET`). Page loads never call lcadata.ch.
+- Moving data from the old MongoDB: see `docs/migrating-from-mongodb.md`.
 
 ## 🌍 Open Source
 IfcLCA is and will always be Open Source. Sustainability is a team effort and requires trust and transparency. The project is released under the **AGPL-3.0** license.

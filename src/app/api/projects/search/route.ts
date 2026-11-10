@@ -1,37 +1,13 @@
 import { NextResponse } from "next/server";
-import { connectToDatabase } from "@/lib/mongodb";
-import { Project } from "@/models";
-import { auth } from "@clerk/nextjs/server";
+import { requireUserId, route } from "@/lib/api";
+import { searchProjects } from "@/lib/repositories/projects";
 
-export async function GET(request: Request) {
-  try {
-    const { userId } = await auth();
-    if (!userId) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+export const dynamic = "force-dynamic";
 
-    const { searchParams } = new URL(request.url);
-    const query = searchParams.get("q") || "";
-    const all = searchParams.get("all") === "true";
-
-    await connectToDatabase();
-
-    const queryConditions = {
-      userId,
-      ...(all ? {} : { name: { $regex: query, $options: "i" } }),
-    };
-
-    const projects = await Project.find(queryConditions)
-      .select("name description _id")
-      .sort({ name: 1 })
-      .limit(all ? 10 : 5)
-      .lean();
-
-    return NextResponse.json(projects);
-  } catch (error) {
-    return NextResponse.json(
-      { error: "Failed to search projects" },
-      { status: 500 }
-    );
-  }
-}
+export const GET = route("Searching projects", async (request: Request) => {
+  const userId = await requireUserId();
+  const { searchParams } = new URL(request.url);
+  const query = searchParams.get("q") ?? "";
+  const all = searchParams.get("all") === "true";
+  return NextResponse.json(await searchProjects(userId, query, all));
+});

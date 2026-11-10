@@ -1,4 +1,5 @@
 import { logger } from "@/lib/logger";
+import { fetchJson } from "@/lib/fetch-json";
 import {
   parseIfcWithWasm,
   IFCParseResult as WASMParseResult,
@@ -17,7 +18,7 @@ export async function parseIFCFile(
   file: File,
   projectId: string
 ): Promise<IFCParseResult> {
-  let responseData;
+
   try {
     logger.debug("Starting Ifc parsing process", {
       filename: file.name,
@@ -28,19 +29,11 @@ export async function parseIFCFile(
 
     // Create upload record
     logger.debug("Creating upload record...");
-    const uploadResponse = await fetch(`/api/projects/${projectId}/upload`, {
+    const responseData = await fetchJson<{ uploadId: string }>(`/api/projects/${projectId}/upload`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ filename: file.name }),
     });
-
-    logger.debug("Upload response status:", uploadResponse.status);
-    responseData = await uploadResponse.json();
-    logger.debug("Upload response data:", responseData);
-
-    if (!uploadResponse.ok || !responseData.uploadId) {
-      throw new Error(responseData.error || "Failed to create upload record");
-    }
 
     // Parse the Ifc file locally using IfcOpenShell WASM
     logger.debug("Parsing Ifc file locally using IfcOpenShell WASM");
@@ -135,17 +128,12 @@ export async function parseIFCFile(
 
     // Process materials
     const materialNames = Array.from(materials);
-    const checkMatchesResponse = await fetch("/api/materials/check-matches", {
+    const matchesData = await fetchJson<{ unmatchedMaterials: string[] }>("/api/materials/check-matches", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ materialNames, projectId }),
     });
 
-    if (!checkMatchesResponse.ok) {
-      throw new Error("Failed to check material matches");
-    }
-
-    const matchesData = await checkMatchesResponse.json();
     const unmatchedMaterialCount = matchesData.unmatchedMaterials.length;
 
     // Log initial file info
@@ -184,7 +172,7 @@ export async function parseIFCFile(
     });
 
     // Process elements
-    const processResponse = await fetch(
+    await fetchJson(
       `/api/projects/${projectId}/upload/process`,
       {
         method: "POST",
@@ -232,9 +220,6 @@ export async function parseIFCFile(
       }
     );
 
-    if (!processResponse.ok) {
-      throw new Error("Failed to process elements");
-    }
 
     return {
       uploadId: responseData.uploadId,

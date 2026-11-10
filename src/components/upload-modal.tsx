@@ -88,7 +88,7 @@ export function UploadModal({
             error instanceof Error &&
             error.message === "Upload timed out after 50 seconds"
               ? "The upload timed out. Please try again with a smaller file."
-              : "There was an error processing your file. Please try again or contact support if the issue persists.",
+              : `There was an error processing your file: ${error instanceof Error ? error.message : "unknown error"}`,
           variant: "destructive",
         });
         onOpenChange(false);
