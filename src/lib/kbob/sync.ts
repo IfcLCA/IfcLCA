@@ -97,12 +97,12 @@ export async function saveKbobResponse(
         ("id", "name_de", "name_fr", "group", "unit", "density",
          "gwp_total", "ubp21_total", "penre_total", "version", "synced_at")
       SELECT r."id", r."nameDE", r."nameFR", r."group", r."unit", r."density",
-             r."gwpTotal", r."ubp21Total", r."penreTotal", r."version", r."syncedAt"
+             r."gwpTotal", r."ubp21Total", r."penreTotal",
+             ${response.version}::text, ${now}::timestamp(3)
       FROM jsonb_to_recordset(${JSON.stringify(rows)}::jsonb) AS r(
         "id" text, "nameDE" text, "nameFR" text, "group" text, "unit" text,
         "density" double precision, "gwpTotal" double precision,
-        "ubp21Total" double precision, "penreTotal" double precision,
-        "version" text, "syncedAt" timestamp(3)
+        "ubp21Total" double precision, "penreTotal" double precision
       )
       ON CONFLICT ("id") DO UPDATE SET
         "name_de" = EXCLUDED."name_de", "name_fr" = EXCLUDED."name_fr",
