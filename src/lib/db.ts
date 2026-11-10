@@ -12,6 +12,9 @@ function createClient(): PrismaClient {
   const pool = new Pool({ connectionString });
   return new PrismaClient({
     adapter: new PrismaPg(pool),
+    // With a driver adapter even batch $transaction([...]) calls run under the
+    // interactive timeout, whose 5 s default is short for a remote database.
+    transactionOptions: { timeout: 30_000, maxWait: 10_000 },
     log: process.env.NODE_ENV === "development" ? ["error", "warn"] : ["error"],
   });
 }

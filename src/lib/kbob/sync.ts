@@ -114,7 +114,7 @@ export async function saveKbobResponse(
 
   return {
     synced: rows.length,
-    skipped: response.materials.length - rows.length,
+    skipped: response.materials.length - valid.length,
     version: response.version,
   };
 }

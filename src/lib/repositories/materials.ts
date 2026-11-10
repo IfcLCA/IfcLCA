@@ -156,22 +156,20 @@ export async function applyKnownMatches(userId: string, projectId: string, mater
 
   const toApply = open.filter((n) => known.has(key(n)));
   const unmatched = open.filter((n) => !known.has(key(n)));
-  // One round trip per material, so give the transaction the same headroom as
-  // ingestUpload. With the pg driver adapter even a batch $transaction gets
-  // the 5 s interactive default, which a model with many materials can exceed.
-  await db.$transaction(
-    async (tx) => {
-      for (const name of toApply) {
+  // A batch transaction: atomic and on one connection. Its timeout comes from
+  // transactionOptions in src/lib/db.ts.
+  if (toApply.length > 0) {
+    await db.$transaction(
+      toApply.map((name) => {
         const match = known.get(key(name))!;
-        await tx.material.upsert({
+        return db.material.upsert({
           where: { projectId_name: { projectId, name } },
           create: { projectId, name, ...match },
           update: match,
         });
-      }
-    },
-    { timeout: 120_000, maxWait: 10_000 }
-  );
+      })
+    );
+  }
   return {
     unmatchedMaterials: unmatched,
     matchedMaterials: [...alreadyMatched, ...toApply],
