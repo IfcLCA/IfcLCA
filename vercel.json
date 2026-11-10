@@ -1,4 +1,7 @@
 {
+  "regions": [
+    "fra1"
+  ],
   "functions": {
     "src/app/api/**/*": {
       "memory": 1024,
